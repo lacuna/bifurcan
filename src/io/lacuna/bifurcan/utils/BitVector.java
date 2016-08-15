@@ -14,22 +14,7 @@ public final class BitVector {
    * @return a bit vector which can hold the specified number of bits
    */
   public static long[] create(int length) {
-    return new long[((length - 1) >> 6) + 1];
-  }
-
-  /**
-   * @param a a bit-vector
-   * @param b a bit-vector
-   * @return the lexicographic comparison of the two vectors
-   */
-  public static long compareTo(long[] a, long[] b) {
-    for (int i = 0; i < a.length; i++) {
-      long diff = a[i] - b[i];
-      if (diff != 0) {
-        return diff;
-      }
-    }
-    return 0;
+    return new long[(Math.max(0, length - 1) >> 6) + 1];
   }
 
   /**
@@ -55,10 +40,6 @@ public final class BitVector {
     return interleaved;
   }
 
-  private static void throwLenException(int len) {
-    throw new IndexOutOfBoundsException("len must be in [0, 64], but was: " + len);
-  }
-
   /**
    * Reads a bit range from the vector, which cannot be longer than 64 bits.
    *
@@ -68,19 +49,14 @@ public final class BitVector {
    * @return a number representing the bit range
    */
   public static long get(long[] vector, int offset, int len) {
-
-    if (len < 0 || len > 64) {
-      throwLenException(len);
-    }
-
     int idx = offset >> 6;
     int bitIdx = offset & 63;
 
-    int truncatedLen = Math.min(len, 63 - bitIdx);
+    int truncatedLen = Math.min(len, 64 - bitIdx);
     long val = (vector[idx] >>> bitIdx) & maskBelow(len);
 
     if (len != truncatedLen) {
-      val |= vector[idx + 1] & maskBelow(len - truncatedLen);
+      val |= (vector[idx + 1] & maskBelow(len - truncatedLen)) << truncatedLen;
     }
 
     return val;
@@ -95,10 +71,6 @@ public final class BitVector {
    * @param len    the bit length of the value
    */
   public static void overwrite(long[] vector, long val, int offset, int len) {
-
-    if (len < 0 || len > 64) {
-      throwLenException(len);
-    }
 
     int idx = offset >> 6;
 
@@ -153,17 +125,33 @@ public final class BitVector {
    * @param len       the length of the empty bit range
    * @return an updated copy of the vector
    */
-  public static long[] insert(long[] vector, int vectorLen, int offset, int len) {
+  public static long[] interpose(long[] vector, int vectorLen, int offset, int len) {
     long[] updated = create(vectorLen + len);
 
     int idx = offset >> 6;
     System.arraycopy(vector, 0, updated, 0, idx);
 
-    int delta = offset & 63;
-    updated[idx] |= vector[idx] & maskBelow(delta);
+    if (idx < vector.length) {
+      int delta = offset & 63;
+      updated[idx] |= vector[idx] & maskBelow(delta);
+    }
 
     copy(vector, offset, updated, offset + len, vectorLen - offset);
 
+    return updated;
+  }
+
+  /**
+   * @param vector    the bit vector
+   * @param vectorLen the length of the bit vector
+   * @param val       the value to be inserted
+   * @param offset    the offset within the bit vector
+   * @param len       the bit length of the value
+   * @return an updated copy of the vector
+   */
+  public static long[] insert(long[] vector, int vectorLen, long val, int offset, int len) {
+    long[] updated = interpose(vector, vectorLen, offset, len);
+    overwrite(updated, val, offset, len);
     return updated;
   }
 
@@ -182,8 +170,10 @@ public final class BitVector {
     int idx = offset >> 6;
     System.arraycopy(vector, 0, updated, 0, idx);
 
-    int delta = offset & 63;
-    updated[idx] |= vector[idx] & maskBelow(delta);
+    if (idx < updated.length) {
+      int delta = offset & 63;
+      updated[idx] |= vector[idx] & maskBelow(delta);
+    }
 
     copy(vector, offset + len, updated, offset, vectorLen - (offset + len));
 
