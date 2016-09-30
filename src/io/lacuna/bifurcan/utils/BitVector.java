@@ -1,5 +1,7 @@
 package io.lacuna.bifurcan.utils;
 
+import static io.lacuna.bifurcan.utils.Bits.branchingBit;
+import static io.lacuna.bifurcan.utils.Bits.maskAbove;
 import static io.lacuna.bifurcan.utils.Bits.maskBelow;
 
 /**
@@ -18,16 +20,16 @@ public final class BitVector {
   }
 
   /**
-   * @param bitsPerVector the number of significant bits in vector
-   * @param vectors       a list of bit-vectors
+   * @param bitLen  the number of significant bits in each vector
+   * @param vectors a list of bit-vectors
    * @return the bit-wise interleaving of the values, starting with the topmost bit of the 0th vector, followed by the
    * topmost bit of the 1st vector, and downward from there
    */
-  public static long[] interleave(int bitsPerVector, long[] vectors) {
-    long[] interleaved = create(bitsPerVector * vectors.length);
+  public static long[] interleave(int bitLen, long[] vectors) {
+    long[] interleaved = create(bitLen * vectors.length);
 
     int offset = (interleaved.length << 6) - 1;
-    for (int i = 0; i < bitsPerVector; i++) {
+    for (int i = 0; i < bitLen; i++) {
       long mask = 1L << i;
 
       for (int j = vectors.length - 1; j >= 0; j--) {
@@ -38,6 +40,32 @@ public final class BitVector {
     }
 
     return interleaved;
+  }
+
+  public static int branchingBit(long[] a, long[] b, int aIdx, int bIdx, int bitOffset, int bitLen) {
+    long mask = maskAbove(bitOffset & 63);
+    int branch = Bits.branchingBit(a[aIdx] & mask, b[bIdx] & mask);
+
+    if (branch >= 0) {
+      return branch;
+    }
+
+    aIdx++;
+    bIdx++;
+
+    int branchIdx = 64 - bitOffset;
+    int len = ((bitLen - (bitOffset + 1)) >> 6) + 1;
+
+    for (int i = 0; i < len; i++) {
+      branch = Bits.branchingBit(a[aIdx + i], b[bIdx + 1]);
+      if (branch >= 0) {
+        return branchIdx + branch;
+      } else {
+        branchIdx += 64;
+      }
+    }
+
+    return branchIdx > bitLen ? -1 : branchIdx;
   }
 
   /**

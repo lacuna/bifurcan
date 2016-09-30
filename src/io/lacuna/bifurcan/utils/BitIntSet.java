@@ -3,7 +3,7 @@ package io.lacuna.bifurcan.utils;
 import java.util.Arrays;
 
 /**
- * A series of utility functions that use a bit-vector to store a sorted set of integers with arbitrary bit-lengths.
+ * A series of utility functions that use a bit-vector to store a sorted set of integers with bit-lengths within [1,64].
  *
  * @author ztellman
  */

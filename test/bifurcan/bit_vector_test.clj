@@ -7,6 +7,7 @@
    [java.util
     ArrayList]
    [io.lacuna.bifurcan.utils
+    Bits
     BitVector]))
 
 ;;;

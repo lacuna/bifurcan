@@ -38,7 +38,11 @@ public class Bits {
   }
 
   public static int branchingBit(long a, long b) {
-    return bitLog2(highestBit(a ^ b, 1));
+    if (a == b) {
+      return -1;
+    } else {
+      return bitLog2(highestBit(a ^ b, 1));
+    }
   }
 
 }
