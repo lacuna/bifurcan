@@ -6,7 +6,7 @@ import java.util.NoSuchElementException;
 /**
  * @author ztellman
  */
-public interface IList<V> {
+public interface IList<V> extends Iterable<V> {
 
   IList<V> append(V value);
 
