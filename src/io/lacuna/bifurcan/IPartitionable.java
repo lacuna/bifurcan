@@ -3,9 +3,9 @@ package io.lacuna.bifurcan;
 /**
  * @author ztellman
  */
-public interface IMergeable<V> {
+public interface IPartitionable<V> {
 
-  IList<V> split(int parts);
+  IList<V> partition(int parts);
 
   V merge(V collection);
 }

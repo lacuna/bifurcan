@@ -1,15 +1,22 @@
 package io.lacuna.bifurcan;
 
+import java.lang.reflect.Array;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+import java.util.Spliterator;
+import java.util.Spliterators;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 /**
  * @author ztellman
  */
+@SuppressWarnings("unchecked")
 public interface IList<V> extends
         ILinearizable<IList<V>>,
         IForkable<IList<V>>,
-        IMergeable<IList<V>>,
+        IPartitionable<IList<V>>,
         Iterable<V> {
 
   /**
@@ -18,7 +25,7 @@ public interface IList<V> extends
   IList<V> append(V value);
 
   /**
-   * @return a new list, with the element at {@code idx} overwritten with {@code value}
+   * @return a new list, with the element at {@code idx} overwritten with {@code value}.  If {@code idx} is equal to {@code size()}, the value is appended.
    * @throws IndexOutOfBoundsException when {@code idx} is not within {@code [0, count]}
    */
   IList<V> set(long idx, V value);
@@ -35,9 +42,16 @@ public interface IList<V> extends
   long size();
 
   /**
-   * @return the collection, represented as a normal Java {@code List}, without support for writes
+   * @return a {@code java.util.stream.Stream}, representing the elements in the list.
    */
-  java.util.List<V> toList();
+  default Stream<V> stream() {
+    return StreamSupport.stream(spliterator(), false);
+  }
+
+  @Override
+  default Spliterator<V> spliterator() {
+    return Spliterators.spliteratorUnknownSize(iterator(), Spliterator.ORDERED);
+  }
 
   default Iterator<V> iterator() {
     return new Iterator<V>() {
@@ -52,11 +66,62 @@ public interface IList<V> extends
       @Override
       public V next() {
         if (hasNext()) {
-          return nth(++idx);
+          return nth(idx++);
         } else {
           throw new NoSuchElementException();
         }
       }
     };
+  }
+
+  /**
+   * @return a read-only version of the list, which will throw an {@code UnsupportedOperationException} for any write
+   */
+  default IList<V> readOnly() {
+    return Lists.readOnly(this);
+  }
+
+  /**
+   * @return the elements of the list, in an array
+   */
+  default Object[] toArray() {
+    Object[] ary = new Object[(int) size()];
+    IntStream.range(0, ary.length).forEach(i -> ary[i] = nth(i));
+    return ary;
+  }
+
+  /**
+   * @param klass the component class of the list, which must be specified due to Java's impoverished type system
+   * @return the elements of the list, in a typed array
+   */
+  default V[] toArray(Class<V> klass) {
+    V[] ary = (V[]) Array.newInstance(klass, (int) size());
+    IntStream.range(0, ary.length).forEach(i -> ary[i] = nth(i));
+    return ary;
+  }
+
+  /**
+   * @return the collection, represented as a normal Java {@code List}, which will throw an {@code UnsupportedOperationException} for any write
+   */
+  default java.util.List<V> toList() {
+    return Lists.toList(this);
+  }
+
+  @Override
+  default IList<IList<V>> partition(int parts) {
+    IList<V>[] ary = new IList[parts];
+
+    long subSize = size() / parts;
+    long offset = 0;
+    for (int i = 0; i < parts; i++) {
+      ary[i] = Lists.subList(this, offset, i == (parts - 1) ? size() : offset + subSize);
+    }
+
+    return Lists.from(ary);
+  }
+
+  @Override
+  default IList<V> merge(IList<V> collection) {
+    return null;
   }
 }

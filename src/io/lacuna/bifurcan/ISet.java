@@ -6,7 +6,7 @@ package io.lacuna.bifurcan;
 public interface ISet<V> extends
         ILinearizable<ISet<V>>,
         IForkable<ISet<V>>,
-        IMergeable<ISet<V>> {
+        IPartitionable<ISet<V>> {
 
   /**
    * @return the set, containing {@code value}
