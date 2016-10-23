@@ -11,6 +11,11 @@ import java.util.function.*;
 import static io.lacuna.bifurcan.utils.Bits.maskBelow;
 
 /**
+ * A hash-map implementation which uses Robin Hood hashing for placement, and provides flexibility as to hashing and
+ * equality mechanisms. The number of bits used in the hash can also be configured, allowing a tradeoff between memory
+ * usage and number of spurious equality checks on writes and reads.
+ *
+ *
  * @author ztellman
  */
 @SuppressWarnings("unchecked")
@@ -34,15 +39,31 @@ public class LinearMap<K, V> implements IMap<K, V> {
     this(16, 32, Objects::hashCode, Objects::equals);
   }
 
+  /**
+   * Creates a map from an existing {@code java.util.Map}, using the default Java hashing and equality mechanisms.
+   *
+   * @param m an existing {@code java.util.Map}
+   */
   public LinearMap(java.util.Map<K, V> m) {
     this(Bits.log2Ceil(m.size()), 32, Objects::hashCode, Objects::equals);
     m.entrySet().forEach(e -> put(e.getKey(), e.getValue()));
   }
 
+  /**
+   * Creates a map from an existing data structure, using the default Java hashing and equality mechanisms.
+   *
+   * @param m an existing map
+   */
   public LinearMap(IMap<K, V> m) {
     this(m, 32, Objects::hashCode, Objects::equals);
   }
 
+  /**
+   * @param m another map
+   * @param hashBits the number of significant bits in the hash
+   * @param hashFn the hashing function
+   * @param equalsFn the equality function
+   */
   public LinearMap(IMap<K, V> m, int hashBits, ToLongFunction<K> hashFn, BiPredicate<K, K> equalsFn) {
     this(Bits.log2Ceil(m.size()), hashBits, hashFn, equalsFn);
     m.entries().stream().forEach(e -> put(e.key(), e.value()));
@@ -231,7 +252,7 @@ public class LinearMap<K, V> implements IMap<K, V> {
 
   private interface Biterator {
     int next();
-  } 
+  }
 
   private int stride() {
     return hashBits + indexBits + 1;

@@ -4,6 +4,9 @@ import java.util.Collection;
 import java.util.Optional;
 
 /**
+ * A simple implementation of a list, mimicking most behaviors of Java's ArrayList, and providing {@code peek()},
+ * {@code push()}, and {@code pop()} methods for use as a stack.
+ *
  * @author ztellman
  */
 @SuppressWarnings("unchecked")
@@ -32,14 +35,19 @@ public class LinearList<V> implements IList<V> {
     this.elements = new Object[capacity];
   }
 
-  public LinearList<V> resize(int newSize) {
-    if (newSize == elements.length) {
+  /**
+   * @param newCapacity the updated capacity of the list, which cannot be smaller than the current size
+   * @return a resized list
+   * @throws IllegalArgumentException when {@code newCapacity} is smaller than {@code size()}
+   */
+  public LinearList<V> resize(int newCapacity) {
+    if (newCapacity == elements.length) {
       return this;
-    } else if (newSize < size) {
+    } else if (newCapacity < size) {
       throw new IllegalArgumentException("new size smaller than current size");
     }
 
-    LinearList list = new LinearList(newSize);
+    LinearList list = new LinearList(newCapacity);
     System.arraycopy(elements, 0, list.elements, 0, size);
     list.size = size;
     return list;
