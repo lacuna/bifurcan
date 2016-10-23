@@ -19,6 +19,21 @@ public final class BitVector {
     return new long[(Math.max(0, length - 1) >> 6) + 1];
   }
 
+  public static long[] clone(long[] vector) {
+    long[] nVector = new long[vector.length];
+    System.arraycopy(vector, 0, nVector, 0, vector.length);
+    return nVector;
+  }
+
+  /**
+   * @param vector the bit vector
+   * @param bitIndex the bit to be tested
+   * @return true if the bit is 1, false otherwise
+   */
+  public static boolean test(long[] vector, int bitIndex) {
+    return (vector[bitIndex >> 6] & (1L << (bitIndex & 63))) != 0;
+  }
+
   /**
    * @param bitLen  the number of significant bits in each vector
    * @param vectors a list of bit-vectors
@@ -94,7 +109,7 @@ public final class BitVector {
    * Overwrites a bit range within the vector.
    *
    * @param vector the bit vector
-   * @param val    the value to overwrite
+   * @param val    the value to set
    * @param offset the offset of the write
    * @param len    the bit length of the value
    */
@@ -112,6 +127,15 @@ public final class BitVector {
       long mask = maskBelow(len - truncatedValLen);
       vector[idx + 1] &= ~mask;
       vector[idx + 1] |= (val >>> truncatedValLen);
+    }
+  }
+
+  public static void overwrite(long[] vector, int bitIdx, boolean flag) {
+    long mask = (1L << (bitIdx & 63));
+    if (flag) {
+      vector[bitIdx >> 6] |= mask;
+    } else {
+      vector[bitIdx >> 6] &= ~mask;
     }
   }
 

@@ -73,12 +73,12 @@
                       [0 (BitVector/create 0)])]
     [l (bit-vector-seq bits (/ len bits) v)]))
 
-(u/def-collection-check test-bit-vector-16 1e5 (vector-actions 16 16384)
+(u/def-collection-check test-bit-vector-16 1e4 (vector-actions 16 16384)
   [a (ArrayList.)
    [len v] [0 (BitVector/create 0)]]
   (= a (bit-vector-seq 16 (/ len 16) v)))
 
-(u/def-collection-check test-bit-vector-48 1e5 (vector-actions 48 Integer/MAX_VALUE)
+(u/def-collection-check test-bit-vector-48 1e4 (vector-actions 48 Integer/MAX_VALUE)
   [a (ArrayList.)
    [len v] [0 (BitVector/create 0)]]
   (= a (bit-vector-seq 48 (/ len 48) v)))

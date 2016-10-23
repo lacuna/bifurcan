@@ -64,6 +64,7 @@ public class LinearList<V> implements IList<V> {
    */
   public IList<V> pop() {
     size = Math.max(0, size - 1);
+    elements[size] = null;
     return this;
   }
 

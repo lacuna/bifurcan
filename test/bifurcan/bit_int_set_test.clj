@@ -55,14 +55,12 @@
                       [0 (BitIntSet/create)])]
     [l (bit-int-set [len v] bits)]))
 
-(u/def-collection-check test-bit-int-set-16 1e5 (set-actions 16 16384)
+(u/def-collection-check test-bit-int-set-16 1e4 (set-actions 16 16384)
   [s (HashSet.)
    [len v] [0 (BitIntSet/create)]]
   (= s (bit-int-set [len v] 16)))
 
-(u/def-collection-check test-bit-int-set-48 1e5 (set-actions 48 Integer/MAX_VALUE)
+(u/def-collection-check test-bit-int-set-48 1e4 (set-actions 48 Integer/MAX_VALUE)
   [s (HashSet.)
    [len v] [0 (BitIntSet/create)]]
   (= s (bit-int-set [len v] 48)))
-
-;;;

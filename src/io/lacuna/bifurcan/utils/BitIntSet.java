@@ -19,8 +19,8 @@ public class BitIntSet {
   /**
    * @param set            the bit-int set
    * @param bitsPerElement the bits per element
-   * @param idx            the index
-   * @return the value stored at the given index
+   * @param idx            the table
+   * @return the value stored at the given table
    */
   public static long get(long[] set, int bitsPerElement, int idx) {
     return BitVector.get(set, idx * bitsPerElement, bitsPerElement);
@@ -33,7 +33,7 @@ public class BitIntSet {
    * @param bitsPerElement the bits per element
    * @param size           the number of elements in the set
    * @param val            the value to search for
-   * @return If idx >= 0, the actual index of the value.  Otherwise, the return value represents the index where the
+   * @return If idx >= 0, the actual table of the value.  Otherwise, the return value represents the table where the
    * value would be inserted, where -1 represents the 0th element, -2 represents the 1st element, and so on.
    */
   public static int indexOf(long[] set, int bitsPerElement, int size, long val) {

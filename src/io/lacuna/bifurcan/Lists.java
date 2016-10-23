@@ -3,6 +3,7 @@ package io.lacuna.bifurcan;
 import java.lang.reflect.Array;
 import java.util.*;
 import java.util.function.*;
+import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -22,7 +23,7 @@ public class Lists {
       if (obj instanceof IList) {
         return Lists.equals(this, (IList<V>) obj);
       }
-      return  false;
+      return false;
     }
 
     @Override
@@ -193,10 +194,11 @@ public class Lists {
 
       @Override
       public int lastIndexOf(Object o) {
-        return IntStream.range(0, size())
-                .filter(idx -> Objects.equals(get(size() - (idx + 1)), o))
-                .findFirst()
-                .orElse(-1);
+        return size() -
+                IntStream.range(0, size())
+                        .filter(idx -> Objects.equals(get(size() - (idx + 1)), o))
+                        .findFirst()
+                        .orElse(size() + 1);
       }
 
       @Override
@@ -258,10 +260,28 @@ public class Lists {
       }
 
       @Override
-      public List<V> subList(int fromIndex, int toIndex) {
+      public java.util.List<V> subList(int fromIndex, int toIndex) {
         return IntStream.range(0, toIndex - fromIndex)
                 .mapToObj(idx -> get(idx))
                 .collect(Collectors.toList());
+      }
+
+      @Override
+      public int hashCode() {
+        return (int) Lists.hash(list, Objects::hashCode, (a, b) -> (a * 31) + b);
+      }
+
+      @Override
+      public boolean equals(Object obj) {
+        if (obj instanceof java.util.List) {
+          return Lists.equals(list, Lists.from(this));
+        }
+        return false;
+      }
+
+      @Override
+      public String toString() {
+        return Lists.toString(list);
       }
     };
   }
@@ -311,7 +331,7 @@ public class Lists {
         if (idx > Integer.MAX_VALUE) {
           throw new IndexOutOfBoundsException();
         }
-        return array[(int)idx];
+        return array[(int) idx];
       }
 
       @Override
@@ -402,6 +422,36 @@ public class Lists {
       @Override
       public IList<V> linear() {
         return this;
+      }
+    };
+  }
+
+  public static <V> Collector<V, IList<V>, IList<V>> collector() {
+    return new Collector<V, IList<V>, IList<V>>() {
+
+      @Override
+      public Supplier<IList<V>> supplier() {
+        return LinearList::new;
+      }
+
+      @Override
+      public BiConsumer<IList<V>, V> accumulator() {
+        return IList::append;
+      }
+
+      @Override
+      public BinaryOperator<IList<V>> combiner() {
+        return IPartitionable::merge;
+      }
+
+      @Override
+      public Function<IList<V>, IList<V>> finisher() {
+        return a -> a;
+      }
+
+      @Override
+      public Set<Characteristics> characteristics() {
+        return EnumSet.of(Characteristics.IDENTITY_FINISH);
       }
     };
   }
