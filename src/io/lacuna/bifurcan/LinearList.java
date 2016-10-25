@@ -44,7 +44,7 @@ public class LinearList<V> implements IList<V> {
     if (newCapacity == elements.length) {
       return this;
     } else if (newCapacity < size) {
-      throw new IllegalArgumentException("new size smaller than current size");
+      throw new IllegalArgumentException("new capacity (" + newCapacity + ") smaller than current size: " + size);
     }
 
     LinearList list = new LinearList(newCapacity);

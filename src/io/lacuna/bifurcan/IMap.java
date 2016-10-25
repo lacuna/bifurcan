@@ -9,7 +9,7 @@ public interface IMap<K, V> extends
         ILinearizable<IMap<K, V>>,
         IForkable<IMap<K, V>> {
 
-  interface IEntry<K, V>  {
+  interface IEntry<K, V> {
     K key();
 
     V value();

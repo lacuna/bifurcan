@@ -2,7 +2,8 @@
   (:require
    [clojure.test :refer :all]
    [clojure.test.check.generators :as gen]
-   [bifurcan.test-utils :as u])
+   [bifurcan.test-utils :as u]
+   [criterium.core :as c])
   (:import
    [java.util
     HashMap]
@@ -48,3 +49,5 @@
   [m (HashMap.)
    s SparseIntMap/EMPTY]
   (= m (sparse->map s)))
+
+;;;
