@@ -1,7 +1,6 @@
 package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.Maps.Entry;
-import io.lacuna.bifurcan.utils.BitVector;
 import io.lacuna.bifurcan.utils.Bits;
 
 import java.util.Objects;
@@ -9,12 +8,10 @@ import java.util.Optional;
 import java.util.function.*;
 
 import static io.lacuna.bifurcan.utils.Bits.log2Ceil;
-import static io.lacuna.bifurcan.utils.Bits.maskBelow;
 
 /**
- * A hash-map implementation which uses Robin Hood hashing for placement, and provides flexibility as to hashing and
- * equality mechanisms. The number of bits used in the hash can also be configured, allowing a trade-off between memory
- * usage and number of spurious equality checks on writes and reads.
+ * A hash-map implementation which uses Robin Hood hashing for placement, and allows for customized hashing and equality
+ * semantics.
  * <p>
  * Unlike {@code HashMap.entrySet()}, the {@code entries()} method is O(1), returning an IList that proxies through to the
  * underlying {@code entries} array, which is guaranteed to be densely packed.
@@ -24,27 +21,18 @@ import static io.lacuna.bifurcan.utils.Bits.maskBelow;
 @SuppressWarnings("unchecked")
 public class LinearMap<K, V> implements IMap<K, V> {
 
-  // This is an unusually low load factor, but it only impacts the size of the bit-packed table[], not the size of the
-  // entries[] array.  Where normally this might imply a 66% memory overhead, in practice it represents <10% overhead,
-  // since table[] consumes an order of magnitude less memory than entries[] even when each Entry only contains a
-  // pair of Longs.  In almost any situation, this should only ever be reduced, yielding faster construction.
-  public static final float DEFAULT_LOAD_FACTOR = 0.6f;
+  public static final float DEFAULT_LOAD_FACTOR = 0.9f;
 
-  public static final int DEFAULT_HASH_BITS = 32;
+  private static final int NONE = 0;
+  private static final int FALLBACK = 1;
 
-  private static final long NONE = 0;
-  private static final long FALLBACK = 1;
-
-  private final ToLongFunction<K> hashFn;
+  private final ToIntFunction<K> hashFn;
   private final BiPredicate<K, K> equalsFn;
-  private final byte indexBits;
-  private final byte hashBits;
-  private final long hashMask;
-  private final long indexMask;
-  private final float loadFactor;
+  private final int indexMask;
   private final int threshold;
 
   private final long[] table;
+
   private final IEntry<K, V>[] entries;
   private int size;
 
@@ -57,7 +45,7 @@ public class LinearMap<K, V> implements IMap<K, V> {
   }
 
   public LinearMap(int initialCapacity, float loadFactor) {
-    this(initialCapacity, loadFactor, DEFAULT_HASH_BITS, Objects::hashCode, Objects::equals);
+    this(initialCapacity, loadFactor, Objects::hashCode, Objects::equals);
   }
 
   /**
@@ -75,30 +63,22 @@ public class LinearMap<K, V> implements IMap<K, V> {
     m.entries().stream().forEach(e -> put(e.key(), e.value()));
   }
 
-  public LinearMap(int initialCapacity, float loadFactor, int hashBits, ToLongFunction<K> hashFn, BiPredicate<K, K> equalsFn) {
+  public LinearMap(int initialCapacity, float loadFactor, ToIntFunction<K> hashFn, BiPredicate<K, K> equalsFn) {
 
     initialCapacity = (int) (1L << log2Ceil(initialCapacity));
-
-    if (hashBits < 2 || hashBits > 64) {
-      throw new IllegalArgumentException("hashBits must be within [2, 64]");
-    }
 
     if (loadFactor < 0 || loadFactor > 1) {
       throw new IllegalArgumentException("loadFactor must be within [0,1]");
     }
 
-    this.indexBits = (byte) Bits.bitOffset(initialCapacity);
-    this.hashBits = (byte) hashBits;
+    this.indexMask = (int) Bits.maskBelow(Bits.bitOffset(initialCapacity));
     this.hashFn = hashFn;
     this.equalsFn = equalsFn;
-    this.loadFactor = loadFactor;
     this.threshold = (int) (initialCapacity * loadFactor);
 
     this.entries = new IEntry[threshold + 1];
-    this.table = BitVector.create((indexBits + hashBits + 1) * initialCapacity);
+    this.table = new long[initialCapacity];
     this.size = 0;
-    this.hashMask = maskBelow(hashBits);
-    this.indexMask = maskBelow(indexBits);
   }
 
   private static int necessaryCapacity(int size, float loadFactor) {
@@ -106,101 +86,100 @@ public class LinearMap<K, V> implements IMap<K, V> {
   }
 
   private LinearMap<K, V> resize(int capacity) {
-    LinearMap<K, V> m = new LinearMap<>(capacity, loadFactor, hashBits, hashFn, equalsFn);
+    LinearMap<K, V> m = new LinearMap<>(capacity, (float) threshold / table.length, hashFn, equalsFn);
     System.arraycopy(entries, 0, m.entries, 0, size);
     m.size = size;
 
-    Biterator it = new Biterator(0);
-    do {
-      if (it.hash != NONE && !it.tombstone) {
-        m.naivePut(it.hash, it.entryIndex());
+    for (int idx = 0; idx < table.length; idx++) {
+      long row = table[idx];
+      int hash = Row.hash(row);
+      if (hash != NONE && !Row.tombstone(row)) {
+        m.naivePut(hash, Row.entryIndex(row));
       }
-      it.next();
-    } while (it.index != 0);
+    }
 
     return m;
   }
 
-  private Biterator biterateTo(K key) {
-    long hash = keyHash(key);
-    Biterator it = new Biterator(hash);
+  private int indexFor(K key) {
+    int hash = keyHash(key);
 
-    for (; ; ) {
-      if (it.hash == hash && !it.tombstone && Objects.equals(it.entry().key(), key)) {
-        return it;
-      } else if (it.hash == NONE || it.tooFar(hash)) {
-        return null;
+    for (int idx = indexFor(hash); ; idx = nextIndex(idx)) {
+      long row = table[idx];
+      int currHash = Row.hash(row);
+      if (currHash == hash && !Row.tombstone(row) && equalsFn.test(key, entry(idx).key())) {
+        return idx;
+      } else if (currHash == NONE || isTooFar(idx, hash, currHash)) {
+        return -1;
       }
-      it.next();
     }
   }
 
-  private void naivePut(long hash, int index) {
-    Biterator it = new Biterator(hash);
-    for (; ; ) {
-      if (it.hash == NONE) {
-        it.overwrite(hash, index);
+  private void naivePut(int hash, int entryIndex) {
+    for (int idx = indexFor(hash); ; idx = nextIndex(idx)) {
+      long row = table[idx];
+      int currHash = Row.hash(row);
+      if (currHash == NONE) {
+        table[idx] = Row.construct(hash, entryIndex);
         break;
-      } else if (it.tooFar(hash)) {
-        int tmpIndex = it.entryIndex();
-        long tmpHash = it.hash;
-        it.overwrite(hash, index);
+      } else if (isTooFar(idx, hash, currHash)) {
+        int currEntryIndex = Row.entryIndex(row);
+        table[idx] = Row.construct(hash, entryIndex);
 
-        index = tmpIndex;
-        hash = tmpHash;
+        entryIndex = currEntryIndex;
+        hash = currHash;
       }
-      it.next();
     }
   }
 
   // factored out for better inlining
-  private boolean putCheckEquality(Biterator it, IEntry<K, V> entry) {
-    int currIndex = it.entryIndex();
+  private boolean putCheckEquality(int idx, IEntry<K, V> entry) {
+    long row = table[idx];
+    int currIndex = Row.entryIndex(row);
     IEntry<K, V> currEntry = entries[currIndex];
     if (equalsFn.test(entry.key(), currEntry.key())) {
       entries[currIndex] = entry;
-      it.tombstone(false);
+      table[idx] = Row.removeTombstone(row);
       return true;
     } else {
       return false;
     }
   }
 
-  private void put(long hash, IEntry<K, V> entry) {
-    Biterator it = new Biterator(hash);
-    for (; ; ) {
+  private void put(int hash, IEntry<K, V> entry) {
+    for (int idx = indexFor(hash); ; idx = nextIndex(idx)) {
+      long row = table[idx];
+      int currHash = Row.hash(row);
+      boolean isNone = currHash == NONE;
+      boolean currTombstone = Row.tombstone(row);
 
-      boolean isNone = it.hash == NONE;
-
-      if (it.hash == hash && !it.tombstone && putCheckEquality(it, entry)) {
+      if (currHash == hash && !currTombstone && putCheckEquality(idx, entry)) {
         break;
-      } else if (isNone || it.tooFar(hash)) {
+      } else if (isNone || isTooFar(idx, hash, currHash)) {
         // if it's empty, or it's a tombstone and there's no possible exact match further down, use it
-        if (isNone || it.tombstone) {
+        if (isNone || currTombstone) {
           entries[size] = entry;
-          it.overwrite(hash, size);
+          table[idx] = Row.construct(hash, size);
           size++;
           break;
         }
 
         // we deserve this location more, so swap them out
-        int currIndex = it.entryIndex();
-        IEntry<K, V> currEntry = entries[currIndex];
-        entries[currIndex] = entry;
-        it.overwrite(hash, currIndex);
+        int currEntryIndex = Row.entryIndex(row);
+        IEntry<K, V> currEntry = entries[currEntryIndex];
+        entries[currEntryIndex] = entry;
+        table[idx] = Row.construct(hash, currEntryIndex);
 
         entry = currEntry;
-        hash = it.hash;
+        hash = currHash;
       }
-
-      it.next();
     }
   }
 
   @Override
   public IMap<K, V> put(K key, V value) {
     if (size >= threshold) {
-      return resize(capacity() << 1).put(key, value);
+      return resize(table.length << 1).put(key, value);
     } else {
       put(keyHash(key), new Entry<>(key, value));
       return this;
@@ -209,17 +188,18 @@ public class LinearMap<K, V> implements IMap<K, V> {
 
   @Override
   public IMap<K, V> remove(K key) {
-    Biterator it = biterateTo(key);
-    if (it != null) {
+    int idx = indexFor(key);
+    if (idx >= 0) {
+      long row = table[idx];
       size--;
-      int entryIdx = it.entryIndex();
-      if (entryIdx != size) {
+      int entryIndex = Row.entryIndex(row);
+      if (entryIndex != size) {
         IEntry<K, V> lastEntry = entries[size];
-        Biterator lastIt = biterateTo(lastEntry.key());
-        lastIt.overwrite(lastIt.hash, entryIdx);
-        entries[entryIdx] = lastEntry;
+        int lastIdx = indexFor(lastEntry.key());
+        table[lastIdx] = Row.construct(Row.hash(table[lastIdx]), entryIndex);
+        entries[entryIndex] = lastEntry;
       }
-      it.tombstone(true);
+      table[idx] = Row.addTombstone(row);
       entries[size] = null;
     }
 
@@ -228,19 +208,19 @@ public class LinearMap<K, V> implements IMap<K, V> {
 
   @Override
   public Optional<V> get(K key) {
-    long hash = keyHash(key);
-    Biterator it = new Biterator(hash);
+    int hash = keyHash(key);
 
-    for (; ; ) {
-      if (it.hash == hash && !it.tombstone) {
-        IEntry<K, V> entry = it.entry();
+    for (int idx = indexFor(hash); ; idx = nextIndex(idx)) {
+      long row = table[idx];
+      int currHash = Row.hash(row);
+      if (currHash == hash && !Row.tombstone(row)) {
+        IEntry<K, V> entry = entry(idx);
         if (equalsFn.test(entry.key(), key)) {
           return Optional.of(entry.value());
         }
-      } else if (it.hash == NONE || it.tooFar(hash)) {
+      } else if (currHash == NONE || isTooFar(idx, hash, currHash)) {
         return Optional.empty();
       }
-      it.next();
     }
   }
 
@@ -282,65 +262,61 @@ public class LinearMap<K, V> implements IMap<K, V> {
     return Maps.toString(this);
   }
 
-  /// internal accessors
+  /// Utility functions
 
-  private class Biterator {
+  private static class Row {
 
-    int index;
-    long hash;
-    boolean tombstone;
+    static final long HASH_MASK = Bits.maskBelow(32);
+    static final long ENTRY_INDEX_MASK = Bits.maskBelow(31);
+    static final long TOMBSTONE_MASK = 1L << 63;
 
-    Biterator(long hash) {
-      this.index = (int) (hash & indexMask);
-      this.hash = BitVector.get(table, bitIndex(), hashBits);
-      this.tombstone = BitVector.test(table, bitIndex() + hashBits + indexBits);
+    static long construct(int hash, int entryIndex) {
+      return hash | (entryIndex & ENTRY_INDEX_MASK) << 32;
     }
 
-    void next() {
-      index = (index + 1) & (int) indexMask;
-      hash = BitVector.get(table, bitIndex(), hashBits);
-      tombstone = BitVector.test(table, bitIndex() + hashBits + indexBits);
+    static int hash(long row) {
+      return (int) (row & HASH_MASK);
     }
 
-    int bitIndex() {
-      return index * stride();
+    static int entryIndex(long row) {
+      return (int) ((row >>> 32) & ENTRY_INDEX_MASK);
     }
 
-    int entryIndex() {
-      return (int) BitVector.get(table, bitIndex() + hashBits, indexBits);
+    static boolean tombstone(long row) {
+      return (row & TOMBSTONE_MASK) != 0;
     }
 
-    void tombstone(boolean flag) {
-      BitVector.overwrite(table, bitIndex() + hashBits + indexBits, flag);
+    static long addTombstone(long row) {
+      return row | TOMBSTONE_MASK;
     }
 
-    void overwrite(long hash, int index) {
-      BitVector.overwrite(table, ((long) index << hashBits) | hash, bitIndex(), hashBits + indexBits + 1);
-    }
-
-    IEntry<K, V> entry() {
-      return entries[entryIndex()];
-    }
-
-    boolean tooFar(long initHash) {
-      return probeDistance(initHash, index) > probeDistance(hash, index);
+    static long removeTombstone(long row) {
+      return row & ~TOMBSTONE_MASK;
     }
   }
 
-  private int capacity() {
-    return 1 << indexBits;
+  private int indexFor(int hash) {
+    return hash & indexMask;
   }
 
-  private int probeDistance(long hash, int index) {
-    return (int) ((index + capacity() - (hash & indexMask)) & indexMask);
+  private int nextIndex(int idx) {
+    return (idx + 1) & indexMask;
   }
 
-  private int stride() {
-    return hashBits + indexBits + 1;
+  private IEntry<K, V> entry(int idx) {
+    return entries[Row.entryIndex(table[idx])];
   }
 
-  private long keyHash(K key) {
-    long hash = hashFn.applyAsLong(key) & hashMask;
+  int probeDistance(int hash, int index) {
+    return ((index + table.length - (hash & indexMask)) & indexMask);
+  }
+
+  private boolean isTooFar(int idx, int initHash, int hash) {
+    return probeDistance(initHash, idx) > probeDistance(hash, idx);
+  }
+
+  private int keyHash(K key) {
+    int hash = hashFn.applyAsInt(key);
 
     // make sure we don't have too many collisions in the lower bits
     hash ^= (hash >>> 20) ^ (hash >>> 12);

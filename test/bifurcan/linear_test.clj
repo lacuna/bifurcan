@@ -74,9 +74,9 @@
       (when (< idx 1e6)
         (recur (doto l (.add idx)) (unchecked-inc idx))))))
 
-(defn benchmark-linear-map [n load-factor]
+(defn run-benchmark-linear-map [n load-factor]
   (println "\n*** put entries to LinearMap")
-  #_(let [s (vec (repeatedly n uuid))]
+  (let [s (vec (repeatedly n uuid))]
     (c/quick-bench
       (loop [m (LinearMap. 16 load-factor), s s]
         (when-not (empty? s)
@@ -90,18 +90,26 @@
         (.get ^LinearMap m k))))
 
   (println "\n*** put entries to HashMap")
-  #_(let [s (vec (repeatedly n uuid))]
+  (let [s (vec (repeatedly n uuid))]
     (c/quick-bench
-      (loop [m (HashMap. 16 load-factor), s s]
+      (loop [m (HashMap. 16), s s]
         (when-not (empty? s)
           (recur (doto m (.put (first s) (first s))) (rest s))))))
 
   (println "\n*** get entries from HashMap")
   (let [ks (vec (repeatedly n uuid))
-        m  (reduce #(doto ^HashMap %1 (.put %2 %2)) (HashMap. 16 load-factor) ks)]
+        m  (reduce #(doto ^HashMap %1 (.put %2 %2)) (HashMap. 16) ks)]
     (c/quick-bench
       (doseq [k ks]
         (.get ^HashMap m k)))))
+
+(deftest ^:benchmark benchmark-linear-map
+  (doall
+    (for [n [10 1e2 1e3 1e4 1e5 1e6]
+          load [0.5 0.75 0.9 0.95 0.99]]
+      (do
+        (println "\n\n=== benchmarking map: n =" n "load =" load)
+        (run-benchmark-linear-map n load)))))
 
 (deftest ^:benchmark benchmark-clojure-map
   (println "\n*** put 1e6 entries to {}")

@@ -96,7 +96,7 @@ public final class BitVector {
     int bitIdx = offset & 63;
 
     int truncatedLen = Math.min(len, 64 - bitIdx);
-    long val = (vector[idx] >>> bitIdx) & maskBelow(len);
+    long val = (vector[idx] >>> bitIdx) & maskBelow(truncatedLen);
 
     if (len != truncatedLen) {
       val |= (vector[idx + 1] & maskBelow(len - truncatedLen)) << truncatedLen;
