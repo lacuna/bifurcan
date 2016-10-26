@@ -6,7 +6,7 @@ There are a number of existing JVM libraries in this space, including those in t
 
 These libraries are all-or-nothing propositions: they work great as long as you also adopt the surrounding ecosystem.  Historically, given the lack of functional primitives in Java's standard library, this made a lot of sense.  With the introduction of lambdas, streams, et al in Java 8, however, this is no longer required.
 
-This library builds only on the primitives provided by the Java 8 standard library.  Rather than using the existing collection interfaces in `java.uil` such as `List` or `Map`, it provides its own interfaces (`IList`, `IMap`, `ISet`) that provide functional semantics - `IMap.put(key, val)` returns a new `IMap` rather than the previous value.  Each interface provides a method (`toList`, `toMap`, `toSet`) for coercing the collection to a read-only version of the standard Java interfaces.
+This library builds only on the primitives provided by the Java 8 standard library.  Rather than using the existing collection interfaces in `java.util` such as `List` or `Map`, it provides its own interfaces (`IList`, `IMap`, `ISet`) that provide functional semantics - `IMap.put(key, val)` returns a new `IMap` rather than the previous value.  Each interface provides a method (`toList`, `toMap`, `toSet`) for coercing the collection to a read-only version of the standard Java interfaces.
 
 ### "linear" and "forked" collections
 
