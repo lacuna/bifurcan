@@ -2,7 +2,7 @@
 
 This library provides flexible, high-quality implementations of functional data structures, in Java.
 
-There are a number of existing JVM libraries in this space, including those in the Clojure and Scala standard libraries.  However, these libraries tend to bring a large number of tangential code along for the ride.  For instance, the collections in the [Functional Java](https://github.com/functionaljava/functionaljava) library assume and encourage the use of all the surrounding abstractions.  Clojure's data structures, while implemented in Java, are hard-coded to use Clojure's equality semantics, and in some places specially optimized for use with Clojure's keyword type.
+There are a number of existing JVM libraries in this space, including those in the Clojure and Scala standard libraries.  However, these libraries tend to bring a large amount of tangential code along for the ride.  For instance, the collections in the [Functional Java](https://github.com/functionaljava/functionaljava) library assume and encourage the use of all the surrounding abstractions.  Clojure's data structures, while implemented in Java, are hard-coded to use Clojure's equality semantics, and in some places specially optimized for use with Clojure's keyword type.
 
 These libraries are all-or-nothing propositions: they work great as long as you also adopt the surrounding ecosystem.  Historically, given the lack of functional primitives in Java's standard library, this made a lot of sense.  With the introduction of lambdas, streams, et al in Java 8, however, this is no longer required.
 
