@@ -17,6 +17,7 @@ import java.util.stream.Collectors;
 /**
  * @author ztellman
  */
+@SuppressWarnings("unchecked")
 public class Maps {
 
   static class Entry<K, V> implements IEntry<K, V> {

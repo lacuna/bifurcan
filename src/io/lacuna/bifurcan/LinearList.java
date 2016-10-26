@@ -32,7 +32,7 @@ public class LinearList<V> implements IList<V> {
   }
 
   public LinearList(int capacity) {
-    this.elements = new Object[capacity];
+    this.elements = new Object[Math.max(1, capacity)];
   }
 
   /**
@@ -113,8 +113,7 @@ public class LinearList<V> implements IList<V> {
 
   @Override
   public IList<V> forked() {
-    // todo return tree list
-    return null;
+    throw new IllegalStateException("a LinearList cannot be efficiently transformed into a forked representation");
   }
 
   @Override

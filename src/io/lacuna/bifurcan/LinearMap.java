@@ -11,17 +11,23 @@ import static io.lacuna.bifurcan.utils.Bits.log2Ceil;
 
 /**
  * A hash-map implementation which uses Robin Hood hashing for placement, and allows for customized hashing and equality
- * semantics.
+ * semantics.  Performance is moderately faster than {@code java.util.HashMap}, and much better in the worst case of
+ * poor hash distribution.
  * <p>
  * Unlike {@code HashMap.entrySet()}, the {@code entries()} method is O(1), returning an IList that proxies through to the
- * underlying {@code entries} array, which is guaranteed to be densely packed.
+ * underlying {@code entries}, which are in a densely packed array.  Partitioning this list is the most efficient way to
+ * process the collection in parallel.
+ * <p>
+ * However, {@code LinearMap} also exposes O(N) {@code partition()} and {@code merge()} methods, which despite their
+ * asymptotic complexity can be quite fast in practice.  The appropriate way to partition this collection will depend
+ * on the use case.
  *
  * @author ztellman
  */
 @SuppressWarnings("unchecked")
-public class LinearMap<K, V> implements IMap<K, V> {
+public class LinearMap<K, V> implements IMap<K, V>, IPartitionable<LinearMap<K, V>> {
 
-  public static final float DEFAULT_LOAD_FACTOR = 0.9f;
+  public static final float DEFAULT_LOAD_FACTOR = 0.95f;
 
   private static final int NONE = 0;
   private static final int FALLBACK = 1;
@@ -29,7 +35,7 @@ public class LinearMap<K, V> implements IMap<K, V> {
   private final ToIntFunction<K> hashFn;
   private final BiPredicate<K, K> equalsFn;
   private final int indexMask;
-  private final int threshold;
+  private final float loadFactor;
 
   private final long[] table;
 
@@ -37,7 +43,7 @@ public class LinearMap<K, V> implements IMap<K, V> {
   private int size;
 
   public LinearMap() {
-    this(16);
+    this(8);
   }
 
   public LinearMap(int initialCapacity) {
@@ -65,19 +71,20 @@ public class LinearMap<K, V> implements IMap<K, V> {
 
   public LinearMap(int initialCapacity, float loadFactor, ToIntFunction<K> hashFn, BiPredicate<K, K> equalsFn) {
 
-    initialCapacity = (int) (1L << log2Ceil(initialCapacity));
-
     if (loadFactor < 0 || loadFactor > 1) {
-      throw new IllegalArgumentException("loadFactor must be within [0,1]");
+      throw new IllegalArgumentException("loadFactor must be within (0,1)");
     }
 
-    this.indexMask = (int) Bits.maskBelow(Bits.bitOffset(initialCapacity));
+    initialCapacity = Math.max(4, initialCapacity);
+    int tableLength = (int) (1L << log2Ceil((long) Math.ceil(initialCapacity / loadFactor)));
+
+    this.indexMask = tableLength - 1;
     this.hashFn = hashFn;
     this.equalsFn = equalsFn;
-    this.threshold = (int) (initialCapacity * loadFactor);
+    this.loadFactor = loadFactor;
 
-    this.entries = new IEntry[threshold + 1];
-    this.table = new long[initialCapacity];
+    this.entries = new IEntry[initialCapacity];
+    this.table = new long[tableLength];
     this.size = 0;
   }
 
@@ -86,15 +93,14 @@ public class LinearMap<K, V> implements IMap<K, V> {
   }
 
   private LinearMap<K, V> resize(int capacity) {
-    LinearMap<K, V> m = new LinearMap<>(capacity, (float) threshold / table.length, hashFn, equalsFn);
+    LinearMap<K, V> m = new LinearMap<>(capacity, loadFactor, hashFn, equalsFn);
     System.arraycopy(entries, 0, m.entries, 0, size);
     m.size = size;
 
     for (int idx = 0; idx < table.length; idx++) {
       long row = table[idx];
-      int hash = Row.hash(row);
-      if (hash != NONE && !Row.tombstone(row)) {
-        m.naivePut(hash, Row.entryIndex(row));
+      if (Row.populated(row)) {
+        m.constructPut(Row.hash(row), Row.entryIndex(row));
       }
     }
 
@@ -104,28 +110,29 @@ public class LinearMap<K, V> implements IMap<K, V> {
   private int indexFor(K key) {
     int hash = keyHash(key);
 
-    for (int idx = indexFor(hash); ; idx = nextIndex(idx)) {
+    for (int idx = indexFor(hash), dist = 0; ; idx = nextIndex(idx), dist++) {
       long row = table[idx];
       int currHash = Row.hash(row);
-      if (currHash == hash && !Row.tombstone(row) && equalsFn.test(key, entry(idx).key())) {
+      if (currHash == hash && !Row.tombstone(row) && equalsFn.test(key, entries[Row.entryIndex(row)].key())) {
         return idx;
-      } else if (currHash == NONE || isTooFar(idx, hash, currHash)) {
+      } else if (currHash == NONE || dist > probeDistance(currHash, idx)) {
         return -1;
       }
     }
   }
 
-  private void naivePut(int hash, int entryIndex) {
-    for (int idx = indexFor(hash); ; idx = nextIndex(idx)) {
+  private void constructPut(int hash, int entryIndex) {
+    for (int idx = indexFor(hash), dist = 0; ; idx = nextIndex(idx), dist++) {
       long row = table[idx];
       int currHash = Row.hash(row);
       if (currHash == NONE) {
         table[idx] = Row.construct(hash, entryIndex);
         break;
-      } else if (isTooFar(idx, hash, currHash)) {
+      } else if (dist > probeDistance(currHash, idx)) {
         int currEntryIndex = Row.entryIndex(row);
         table[idx] = Row.construct(hash, entryIndex);
 
+        dist = probeDistance(currHash, idx);
         entryIndex = currEntryIndex;
         hash = currHash;
       }
@@ -147,7 +154,7 @@ public class LinearMap<K, V> implements IMap<K, V> {
   }
 
   private void put(int hash, IEntry<K, V> entry) {
-    for (int idx = indexFor(hash); ; idx = nextIndex(idx)) {
+    for (int idx = indexFor(hash), dist = 0; ; idx = nextIndex(idx), dist++) {
       long row = table[idx];
       int currHash = Row.hash(row);
       boolean isNone = currHash == NONE;
@@ -155,7 +162,7 @@ public class LinearMap<K, V> implements IMap<K, V> {
 
       if (currHash == hash && !currTombstone && putCheckEquality(idx, entry)) {
         break;
-      } else if (isNone || isTooFar(idx, hash, currHash)) {
+      } else if (isNone || dist > probeDistance(currHash, idx)) {
         // if it's empty, or it's a tombstone and there's no possible exact match further down, use it
         if (isNone || currTombstone) {
           entries[size] = entry;
@@ -170,6 +177,7 @@ public class LinearMap<K, V> implements IMap<K, V> {
         entries[currEntryIndex] = entry;
         table[idx] = Row.construct(hash, currEntryIndex);
 
+        dist = probeDistance(currHash, idx);
         entry = currEntry;
         hash = currHash;
       }
@@ -178,8 +186,8 @@ public class LinearMap<K, V> implements IMap<K, V> {
 
   @Override
   public IMap<K, V> put(K key, V value) {
-    if (size >= threshold) {
-      return resize(table.length << 1).put(key, value);
+    if (size == entries.length) {
+      return resize(entries.length << 1).put(key, value);
     } else {
       put(keyHash(key), new Entry<>(key, value));
       return this;
@@ -210,15 +218,15 @@ public class LinearMap<K, V> implements IMap<K, V> {
   public Optional<V> get(K key) {
     int hash = keyHash(key);
 
-    for (int idx = indexFor(hash); ; idx = nextIndex(idx)) {
+    for (int idx = indexFor(hash), dist = 0; ; idx = nextIndex(idx), dist++) {
       long row = table[idx];
       int currHash = Row.hash(row);
       if (currHash == hash && !Row.tombstone(row)) {
-        IEntry<K, V> entry = entry(idx);
+        IEntry<K, V> entry = entries[Row.entryIndex(row)];
         if (equalsFn.test(entry.key(), key)) {
           return Optional.of(entry.value());
         }
-      } else if (currHash == NONE || isTooFar(idx, hash, currHash)) {
+      } else if (currHash == NONE || dist > probeDistance(currHash, idx)) {
         return Optional.empty();
       }
     }
@@ -236,7 +244,7 @@ public class LinearMap<K, V> implements IMap<K, V> {
 
   @Override
   public IMap<K, V> forked() {
-    return null;
+    throw new IllegalStateException("a LinearMap cannot be efficiently transformed into a forked representation");
   }
 
   @Override
@@ -262,6 +270,50 @@ public class LinearMap<K, V> implements IMap<K, V> {
     return Maps.toString(this);
   }
 
+  @Override
+  public IList<LinearMap<K, V>> partition(int parts) {
+    parts = Math.min(parts, size);
+    IList<LinearMap<K, V>> list = new LinearList<>(parts);
+    if (parts == 0) {
+      return list.append(this);
+    }
+
+    int partSize = table.length / parts;
+    for (int p = 0; p < parts; p++) {
+      int start = p * partSize;
+      int finish = (p == (parts - 1)) ? table.length : start + partSize;
+
+      LinearMap<K, V> m = new LinearMap<>(finish - start);
+      list.append(m);
+
+      for (int i = start; i < finish; i++) {
+        long row = table[i];
+        if (Row.populated(row)) {
+          m.entries[m.size] = this.entries[Row.entryIndex(row)];
+          m.constructPut(Row.hash(row), m.size++);
+        }
+      }
+    }
+
+    return list;
+  }
+
+  @Override
+  public LinearMap<K, V> merge(LinearMap<K, V> o) {
+    if (o.size() <= size()) {
+      LinearMap<K, V> m = resize((int) (size + o.size()));
+      for (int i = 0; i < o.table.length; i++) {
+        long row = o.table[i];
+        if (Row.populated(row)) {
+          m.put(Row.hash(row), o.entries[Row.entryIndex(row)]);
+        }
+      }
+      return m;
+    } else {
+      return o.merge(this);
+    }
+  }
+
   /// Utility functions
 
   private static class Row {
@@ -276,6 +328,10 @@ public class LinearMap<K, V> implements IMap<K, V> {
 
     static int hash(long row) {
       return (int) (row & HASH_MASK);
+    }
+
+    static boolean populated(long row) {
+      return (row & HASH_MASK) != NONE && (row & TOMBSTONE_MASK) == 0;
     }
 
     static int entryIndex(long row) {
@@ -303,16 +359,8 @@ public class LinearMap<K, V> implements IMap<K, V> {
     return (idx + 1) & indexMask;
   }
 
-  private IEntry<K, V> entry(int idx) {
-    return entries[Row.entryIndex(table[idx])];
-  }
-
-  int probeDistance(int hash, int index) {
-    return ((index + table.length - (hash & indexMask)) & indexMask);
-  }
-
-  private boolean isTooFar(int idx, int initHash, int hash) {
-    return probeDistance(initHash, idx) > probeDistance(hash, idx);
+  private int probeDistance(int hash, int index) {
+    return (index + table.length - (hash & indexMask)) & indexMask;
   }
 
   private int keyHash(K key) {
@@ -323,5 +371,6 @@ public class LinearMap<K, V> implements IMap<K, V> {
     hash ^= (hash >>> 7) ^ (hash >>> 4);
     return hash == NONE ? FALLBACK : hash;
   }
+
 
 }

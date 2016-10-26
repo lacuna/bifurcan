@@ -56,6 +56,12 @@
    m' (LinearMap.)]
   (= m (->map m')))
 
+(u/def-collection-check test-linear-map-merge 1e4 (map-actions)
+  [m {}
+   m' (LinearMap.)]
+  (= m' (->> (.partition m' 8) (reduce #(.merge ^LinearMap %1 %2)))))
+
+
 ;;;
 
 (defn uuid []
@@ -82,19 +88,19 @@
         (when-not (empty? s)
           (recur (.put m (first s) (first s)) (rest s))))))
 
-  (println "\n*** get entries from LinearMap")
-  (let [ks  (vec (repeatedly n uuid))
-        m   (reduce #(.put ^LinearMap %1 %2 %2) (LinearMap. 16 load-factor) ks)]
-    (c/quick-bench
-      (doseq [k ks]
-        (.get ^LinearMap m k))))
-
   (println "\n*** put entries to HashMap")
   (let [s (vec (repeatedly n uuid))]
     (c/quick-bench
       (loop [m (HashMap. 16), s s]
         (when-not (empty? s)
           (recur (doto m (.put (first s) (first s))) (rest s))))))
+
+  (println "\n*** get entries from LinearMap")
+  (let [ks (vec (repeatedly n uuid))
+        m  (reduce #(.put ^LinearMap %1 %2 %2) (LinearMap. 16 load-factor) ks)]
+    (c/quick-bench
+      (doseq [k ks]
+        (.get ^LinearMap m k))))
 
   (println "\n*** get entries from HashMap")
   (let [ks (vec (repeatedly n uuid))
@@ -105,8 +111,8 @@
 
 (deftest ^:benchmark benchmark-linear-map
   (doall
-    (for [n [10 1e2 1e3 1e4 1e5 1e6]
-          load [0.5 0.75 0.9 0.95 0.99]]
+    (for [n [10 1e2 1e3 1e4 1e5 1e6 1e7]
+          load [0.5 0.75 0.85 0.9 0.95 0.99]]
       (do
         (println "\n\n=== benchmarking map: n =" n "load =" load)
         (run-benchmark-linear-map n load)))))
