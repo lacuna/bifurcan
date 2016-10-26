@@ -51,10 +51,15 @@
    l (LinearList.)]
   (= (seq v) (-> l .iterator iterator-seq)))
 
-(u/def-collection-check test-linear-map 1e4 (map-actions)
+(u/def-collection-check test-linear-map-equality 1e4 (map-actions)
   [m {}
    m' (LinearMap.)]
   (= m (->map m')))
+
+(u/def-collection-check test-linear-map-lookup 1e4 (map-actions)
+  [m {}
+   m' (LinearMap.)]
+  (= m (zipmap (keys m) (->> m keys (map #(-> m' (.get %) (.orElse nil)))))))
 
 (u/def-collection-check test-linear-map-merge 1e4 (map-actions)
   [m {}
@@ -112,7 +117,7 @@
 (deftest ^:benchmark benchmark-linear-map
   (doall
     (for [n [10 1e2 1e3 1e4 1e5 1e6 1e7]
-          load [0.5 0.75 0.85 0.9 0.95 0.99]]
+          load [0.95]]
       (do
         (println "\n\n=== benchmarking map: n =" n "load =" load)
         (run-benchmark-linear-map n load)))))

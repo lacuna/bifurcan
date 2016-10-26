@@ -54,21 +54,21 @@ public class LinearList<V> implements IList<V> {
   }
 
   /**
-   * @return returns the most recently pushed/appended value, or nothing if the list is empty
+   * @return returns the most recently pushed/appended rowValue, or nothing if the list is empty
    */
   public Optional<V> peek() {
     return size > 0 ? Optional.of((V) elements[size - 1]) : Optional.empty();
   }
 
   /**
-   * @return a list with {@code value} appended
+   * @return a list with {@code rowValue} appended
    */
   public IList<V> push(V value) {
     return append(value);
   }
 
   /**
-   * @return a list with the most recently pushed/appended value removed, or the same list if there are no elements
+   * @return a list with the most recently pushed/appended rowValue removed, or the same list if there are no elements
    */
   public IList<V> pop() {
     size = Math.max(0, size - 1);
@@ -113,7 +113,7 @@ public class LinearList<V> implements IList<V> {
 
   @Override
   public IList<V> forked() {
-    throw new IllegalStateException("a LinearList cannot be efficiently transformed into a forked representation");
+    throw new UnsupportedOperationException("a LinearList cannot be efficiently transformed into a forked representation");
   }
 
   @Override

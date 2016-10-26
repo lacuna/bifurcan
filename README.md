@@ -16,7 +16,7 @@ Persistent data structures keep us from having to worry what other functions or 
 
 In the literature, non-persistent data structures are called *ephemeral*, and in Clojure they're called *transient*.  Any persistent Clojure data structure can be turned into a transient version of itself, updated, and then returned to a persistent state.  Since transient data structures are allowed to overwrite previous versions of themselves, they can close the performance gap with mutable collections.
 
-Bifurcan provides both ephemeral and persistent implementations of each collection, called "linear" and "forked" respectively.  This is meant to reflect the data flow of each use case: an ephemeral collection has a single downstream consumer, while a persistent data structure may have many.
+Bifurcan provides both ephemeral and persistent implementations of each collection, called *linear* and *forked* respectively.  This is meant to reflect the data flow of each use case: an ephemeral collection has a single downstream consumer, while a persistent data structure may have many.
 
 Any data structure can be turned into a linear or forked variant of itself via `linear()` and `forked()`.  However, in the special case where a forked variant isn't required, Bifurcan provides special `LinearList`, `LinearMap`, and `LinearSet` implementations that provide equivalent performance to Java's mutable collections.
 

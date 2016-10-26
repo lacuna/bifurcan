@@ -9,17 +9,17 @@ public interface ISet<V> extends
         IPartitionable<ISet<V>> {
 
   /**
-   * @return the set, containing {@code value}
+   * @return the set, containing {@code rowValue}
    */
   ISet<V> add(V value);
 
   /**
-   * @return the set, without {@code value}
+   * @return the set, without {@code rowValue}
    */
   ISet<V> remove(V value);
 
   /**
-   * @return true, if the set contains {@code value}
+   * @return true, if the set contains {@code rowValue}
    */
   boolean contains(V value);
 
@@ -32,6 +32,12 @@ public interface ISet<V> extends
    * @return an {@code IList} containing all the elements in the set
    */
   IList<V> elements();
+
+  ISet<V> union(ISet<V> s);
+
+  ISet<V> difference(ISet<V> s);
+
+  ISet<V> intersection(ISet<V> s);
 
   /**
    * @return the collection, represented as a normal Java {@code Set}, without support for writes

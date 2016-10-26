@@ -109,9 +109,9 @@ public final class BitVector {
    * Overwrites a bit range within the vector.
    *
    * @param vector the bit vector
-   * @param val    the value to set
+   * @param val    the rowValue to set
    * @param offset the offset of the write
-   * @param len    the bit length of the value
+   * @param len    the bit length of the rowValue
    */
   public static void overwrite(long[] vector, long val, int offset, int len) {
 
@@ -196,9 +196,9 @@ public final class BitVector {
   /**
    * @param vector    the bit vector
    * @param vectorLen the length of the bit vector
-   * @param val       the value to be inserted
+   * @param val       the rowValue to be inserted
    * @param offset    the offset within the bit vector
-   * @param len       the bit length of the value
+   * @param len       the bit length of the rowValue
    * @return an updated copy of the vector
    */
   public static long[] insert(long[] vector, int vectorLen, long val, int offset, int len) {

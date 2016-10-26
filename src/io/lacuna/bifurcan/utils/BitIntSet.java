@@ -20,21 +20,21 @@ public class BitIntSet {
    * @param set            the bit-int set
    * @param bitsPerElement the bits per element
    * @param idx            the table
-   * @return the value stored at the given table
+   * @return the rowValue stored at the given table
    */
   public static long get(long[] set, int bitsPerElement, int idx) {
     return BitVector.get(set, idx * bitsPerElement, bitsPerElement);
   }
 
   /**
-   * Performs a binary search for the given value.
+   * Performs a binary search for the given rowValue.
    *
    * @param set            the bit-int set
    * @param bitsPerElement the bits per element
    * @param size           the number of elements in the set
-   * @param val            the value to search for
-   * @return If idx >= 0, the actual table of the value.  Otherwise, the return value represents the table where the
-   * value would be inserted, where -1 represents the 0th element, -2 represents the 1st element, and so on.
+   * @param val            the rowValue to search for
+   * @return If idx >= 0, the actual table of the rowValue.  Otherwise, the return rowValue represents the table where the
+   * rowValue would be inserted, where -1 represents the 0th element, -2 represents the 1st element, and so on.
    */
   public static int indexOf(long[] set, int bitsPerElement, int size, long val) {
     int low = 0;
@@ -61,8 +61,8 @@ public class BitIntSet {
    * @param set            the bit-int set
    * @param bitsPerElement the bits per element
    * @param size           the number of elements in the set
-   * @param val            the value to add
-   * @return an updated long[] array if the value is not already in the set, otherwise 'set' is returned unchanged
+   * @param val            the rowValue to add
+   * @return an updated long[] array if the rowValue is not already in the set, otherwise 'set' is returned unchanged
    */
   public static long[] add(long[] set, int bitsPerElement, int size, long val) {
     int idx = indexOf(set, bitsPerElement, size, val);
@@ -78,8 +78,8 @@ public class BitIntSet {
    * @param set            the bit-int set
    * @param bitsPerElement the bits per element
    * @param size           the number of elements in the set
-   * @param val            the value to remove
-   * @return an updated long[] array if the value was in the set, otherwise 'set' is returned unchanged
+   * @param val            the rowValue to remove
+   * @return an updated long[] array if the rowValue was in the set, otherwise 'set' is returned unchanged
    */
   public static long[] remove(long[] set, int bitsPerElement, int size, long val) {
     int idx = indexOf(set, bitsPerElement, size, val);

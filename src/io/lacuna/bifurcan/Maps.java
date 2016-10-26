@@ -117,7 +117,12 @@ public class Maps {
         Set<Map.Entry<K, V>> entries = map.entrySet();
         return entries.stream()
                 .map(e -> (IEntry<K, V>) new Entry(e.getKey(), e.getValue()))
-                .collect(Lists.collector());
+                .collect(Lists.linearCollector());
+      }
+
+      //@Override
+      public ISet<K> keys() {
+        return null;
       }
 
       @Override

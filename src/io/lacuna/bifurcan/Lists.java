@@ -426,7 +426,7 @@ public class Lists {
     };
   }
 
-  public static <V> Collector<V, IList<V>, IList<V>> collector() {
+  public static <V> Collector<V, IList<V>, IList<V>> linearCollector() {
     return new Collector<V, IList<V>, IList<V>>() {
 
       @Override

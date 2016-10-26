@@ -16,7 +16,7 @@ public interface IMap<K, V> extends
   }
 
   /**
-   * @return the map, with {@code value} stored under {@code key}
+   * @return the map, with {@code rowValue} stored under {@code key}
    */
   IMap<K, V> put(K key, V value);
 
@@ -26,7 +26,7 @@ public interface IMap<K, V> extends
   IMap<K, V> remove(K key);
 
   /**
-   * @return an {@code Optional} containing the value under {@code key}, or nothing if none exists
+   * @return an {@code Optional} containing the rowValue under {@code key}, or nothing if none exists
    */
   Optional<V> get(K key);
 
@@ -34,6 +34,8 @@ public interface IMap<K, V> extends
    * @return an {@code IList} containing all the entries within the map
    */
   IList<IEntry<K, V>> entries();
+
+  //ISet<K> keys();
 
   /**
    * @return the number of entries in the map
