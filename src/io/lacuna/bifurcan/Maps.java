@@ -51,7 +51,7 @@ public class Maps {
     StringBuilder sb = new StringBuilder("{");
 
     Iterator<IEntry<K, V>> it = m.entries().iterator();
-    while (it.hasNext()){
+    while (it.hasNext()) {
       IEntry<K, V> entry = it.next();
       sb.append(keyPrinter.apply(entry.key()));
       sb.append(" ");
@@ -104,12 +104,12 @@ public class Maps {
 
       @Override
       public Optional<V> get(K key) {
-        Object value = map.getOrDefault(key, defaultValue);
-        if (value == defaultValue) {
-          return Optional.empty();
-        } else {
-          return Optional.of((V) value);
-        }
+        return Optional.ofNullable((V) map.get(key));
+      }
+
+      @Override
+      public boolean contains(K key) {
+        return map.containsKey(key);
       }
 
       @Override
@@ -117,12 +117,8 @@ public class Maps {
         Set<Map.Entry<K, V>> entries = map.entrySet();
         return entries.stream()
                 .map(e -> (IEntry<K, V>) new Entry(e.getKey(), e.getValue()))
-                .collect(Lists.linearCollector());
-      }
-
-      //@Override
-      public ISet<K> keys() {
-        return null;
+                .collect(Lists.linearCollector())
+                .readOnly();
       }
 
       @Override
@@ -192,35 +188,21 @@ public class Maps {
 
       @Override
       public Set<K> keySet() {
-        return map.entries().stream().map(e -> e.key()).collect(Collectors.toSet());
+        return Sets.toSet(
+                map.entries().map(IEntry::key),
+                k -> map.get(k).isPresent());
       }
 
       @Override
       public Collection<V> values() {
-        return map.entries().stream().map(e -> e.value()).collect(Collectors.toList());
+        return Lists.toList(map.entries().map(IEntry::value));
       }
 
       @Override
       public Set<Entry<K, V>> entrySet() {
-        return map.entries().stream()
-                .map(e ->
-                        new Map.Entry<K, V>() {
-                          @Override
-                          public K getKey() {
-                            return e.key();
-                          }
-
-                          @Override
-                          public V getValue() {
-                            return e.value();
-                          }
-
-                          @Override
-                          public V setValue(V value) {
-                            throw new UnsupportedOperationException();
-                          }
-                        }
-                ).collect(Collectors.toSet());
+        return Sets.toSet(
+                map.entries().map(Maps::toEntry),
+                e -> map.get(e.getKey()).map(v -> Objects.equals(v, e.getValue())).orElse(false));
       }
 
       @Override
@@ -239,6 +221,25 @@ public class Maps {
       @Override
       public int hashCode() {
         return (int) Maps.hash(map, e -> Objects.hashCode(e.key()) ^ Objects.hashCode(e.value()), (a, b) -> a + b);
+      }
+    };
+  }
+
+  public static <K, V> Map.Entry<K, V> toEntry(IEntry<K, V> entry) {
+    return new Map.Entry<K, V>() {
+      @Override
+      public K getKey() {
+        return entry.key();
+      }
+
+      @Override
+      public V getValue() {
+        return entry.value();
+      }
+
+      @Override
+      public V setValue(V value) {
+        throw new UnsupportedOperationException();
       }
     };
   }

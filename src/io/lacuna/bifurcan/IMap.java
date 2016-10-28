@@ -30,6 +30,8 @@ public interface IMap<K, V> extends
    */
   Optional<V> get(K key);
 
+  boolean contains(K key);
+
   /**
    * @return an {@code IList} containing all the entries within the map
    */

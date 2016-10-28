@@ -5,6 +5,8 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Spliterator;
 import java.util.Spliterators;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -123,5 +125,17 @@ public interface IList<V> extends
   @Override
   default IList<V> merge(IList<V> collection) {
     return null;
+  }
+
+  default <U> IList<U> map(Function<V, U> f) {
+    return Lists.from(size(), i -> f.apply(nth(i)));
+  }
+
+  default <U> U reduce(BiFunction<U, V, U> f, U initVal) {
+    U val = initVal;
+    for (V e : this) {
+      val = f.apply(val, e);
+    }
+    return val;
   }
 }
