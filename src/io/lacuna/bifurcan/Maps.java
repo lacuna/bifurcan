@@ -1,6 +1,6 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.IMap.IEntry;
+import io.lacuna.bifurcan.IReadMap.IEntry;
 
 import java.util.Collection;
 import java.util.Iterator;
@@ -8,17 +8,17 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.BiPredicate;
-import java.util.function.Function;
-import java.util.function.LongBinaryOperator;
-import java.util.function.ToLongFunction;
-import java.util.stream.Collectors;
+import java.util.function.*;
+
+import static io.lacuna.bifurcan.Lists.lazyMap;
 
 /**
  * @author ztellman
  */
 @SuppressWarnings("unchecked")
 public class Maps {
+
+  public static IReadMap.EntryMerger MERGE_LAST_WRITE_WINS = (a, b) -> b;
 
   static class Entry<K, V> implements IEntry<K, V> {
     public final K key;
@@ -43,11 +43,11 @@ public class Maps {
     }
   }
 
-  public static <K, V> String toString(IMap<K, V> m) {
+  public static <K, V> String toString(IReadMap<K, V> m) {
     return toString(m, Objects::toString, Objects::toString);
   }
 
-  public static <K, V> String toString(IMap<K, V> m, Function<K, String> keyPrinter, Function<V, String> valPrinter) {
+  public static <K, V> String toString(IReadMap<K, V> m, Function<K, String> keyPrinter, Function<V, String> valPrinter) {
     StringBuilder sb = new StringBuilder("{");
 
     Iterator<IEntry<K, V>> it = m.entries().iterator();
@@ -70,15 +70,27 @@ public class Maps {
     return hash(m, e -> (Objects.hash(e.key()) * 31) ^ Objects.hash(e.value()), (a, b) -> a + b);
   }
 
-  public static <K, V> long hash(IMap<K, V> m, ToLongFunction<IEntry<K, V>> hash, LongBinaryOperator combiner) {
+  public static <K, V> long hash(IReadMap<K, V> m, ToLongFunction<IEntry<K, V>> hash, LongBinaryOperator combiner) {
     return m.entries().stream().mapToLong(hash).reduce(combiner).orElse(0);
   }
 
-  public static <K, V> boolean equals(IMap<K, V> a, IMap<K, V> b) {
+  public static <K, V> IReadMap<K, V> merge(IReadMap<K, V> a, IReadMap<K, V> b, IReadMap.EntryMerger<K, V> mergeFn) {
+    if (a.size() <= b.size()) {
+      return merge(b, a, mergeFn);
+    }
+
+    LinearMap<K, V> m = new LinearMap<>(a);
+    for (IEntry<K, V> e : b.entries()) {
+      m = (LinearMap<K, V>) m.put(e.key(), e.value(), mergeFn);
+    }
+    return m;
+  }
+
+  public static <K, V> boolean equals(IReadMap<K, V> a, IReadMap<K, V> b) {
     return equals(a, b, Objects::equals);
   }
 
-  public static <K, V> boolean equals(IMap<K, V> a, IMap<K, V> b, BiPredicate<V, V> valEquals) {
+  public static <K, V> boolean equals(IReadMap<K, V> a, IReadMap<K, V> b, BiPredicate<V, V> valEquals) {
     if (a.size() != b.size()) {
       return false;
     }
@@ -89,18 +101,8 @@ public class Maps {
     });
   }
 
-  public static <K, V> IMap<K, V> from(java.util.Map map) {
-    Object defaultValue = new Object();
-    return new IMap<K, V>() {
-      @Override
-      public IMap<K, V> put(K key, V value) {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public IMap<K, V> remove(K key) {
-        throw new UnsupportedOperationException();
-      }
+  public static <K, V> IReadMap<K, V> from(java.util.Map map) {
+    return new IReadMap<K, V>() {
 
       @Override
       public Optional<V> get(K key) {
@@ -113,32 +115,26 @@ public class Maps {
       }
 
       @Override
-      public IList<IEntry<K, V>> entries() {
+      public IReadList<IEntry<K, V>> entries() {
         Set<Map.Entry<K, V>> entries = map.entrySet();
         return entries.stream()
                 .map(e -> (IEntry<K, V>) new Entry(e.getKey(), e.getValue()))
-                .collect(Lists.linearCollector())
-                .readOnly();
+                .collect(Lists.linearCollector());
+      }
+
+      @Override
+      public IReadSet<K> keys() {
+        return new LinearSet<>(lazyMap(entries(), IEntry::key));
       }
 
       @Override
       public long size() {
         return map.size();
       }
-
-      @Override
-      public IMap<K, V> forked() {
-        return null;
-      }
-
-      @Override
-      public IMap<K, V> linear() {
-        return new LinearMap<>(map);
-      }
     };
   }
 
-  public static <K, V> java.util.Map<K, V> toMap(IMap<K, V> map) {
+  public static <K, V> java.util.Map<K, V> toMap(IReadMap<K, V> map) {
     return new java.util.Map<K, V>() {
 
       @Override
@@ -189,19 +185,19 @@ public class Maps {
       @Override
       public Set<K> keySet() {
         return Sets.toSet(
-                map.entries().map(IEntry::key),
+                lazyMap(map.entries(), IEntry::key),
                 k -> map.get(k).isPresent());
       }
 
       @Override
       public Collection<V> values() {
-        return Lists.toList(map.entries().map(IEntry::value));
+        return Lists.toList(lazyMap(map.entries(), IEntry::value));
       }
 
       @Override
       public Set<Entry<K, V>> entrySet() {
         return Sets.toSet(
-                map.entries().map(Maps::toEntry),
+                lazyMap(map.entries(), Maps::toEntry),
                 e -> map.get(e.getKey()).map(v -> Objects.equals(v, e.getValue())).orElse(false));
       }
 

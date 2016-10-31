@@ -1,53 +1,34 @@
 package io.lacuna.bifurcan;
 
-import java.util.Optional;
+import java.util.function.BiFunction;
 
 /**
  * @author ztellman
  */
+@SuppressWarnings("unchecked")
 public interface IMap<K, V> extends
+        IReadMap<K, V>,
         ILinearizable<IMap<K, V>>,
         IForkable<IMap<K, V>> {
 
-  interface IEntry<K, V> {
-    K key();
-
-    V value();
-  }
+  /**
+   * @param key   the key
+   * @param value the new value under the key
+   * @param mergeFn a function which will be invoked if there is a pre-existing value under {@code key}, with both the
+   *                old and new value, to determine what should be stored in the map
+   * @return an updated map
+   */
+  IMap<K, V> put(K key, V value, EntryMerger<K, V> mergeFn);
 
   /**
-   * @return the map, with {@code rowValue} stored under {@code key}
+   * @return an updated map with {@code value} stored under {@code key}
    */
-  IMap<K, V> put(K key, V value);
+  default IMap<K, V> put(K key, V value) {
+    return put(key, value, Maps.MERGE_LAST_WRITE_WINS);
+  }
 
   /**
    * @return the map, without anything stored under {@code key}
    */
   IMap<K, V> remove(K key);
-
-  /**
-   * @return an {@code Optional} containing the rowValue under {@code key}, or nothing if none exists
-   */
-  Optional<V> get(K key);
-
-  boolean contains(K key);
-
-  /**
-   * @return an {@code IList} containing all the entries within the map
-   */
-  IList<IEntry<K, V>> entries();
-
-  //ISet<K> keys();
-
-  /**
-   * @return the number of entries in the map
-   */
-  long size();
-
-  /**
-   * @return the collection, represented as a normal Java {@code Map}, which will throw {@code UnsupportedOperationException} on writes
-   */
-  default java.util.Map<K, V> toMap() {
-    return Maps.toMap(this);
-  }
 }

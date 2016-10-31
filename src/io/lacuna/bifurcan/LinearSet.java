@@ -7,7 +7,7 @@ import java.util.function.ToIntFunction;
 /**
  * @author ztellman
  */
-public class LinearSet<V> implements ISet<V>, IPartitionable<LinearSet<V>> {
+public class LinearSet<V> implements ISet<V> {
 
   private LinearMap<V, Void> map;
 
@@ -19,7 +19,7 @@ public class LinearSet<V> implements ISet<V>, IPartitionable<LinearSet<V>> {
     this(initialCapacity, Objects::hashCode, Objects::equals);
   }
 
-  public LinearSet(IList<V> elements) {
+  public LinearSet(IReadList<V> elements) {
     this((int) elements.size());
     for (V e : elements) {
       map = (LinearMap<V, Void>) map.put(e, null);
@@ -64,15 +64,15 @@ public class LinearSet<V> implements ISet<V>, IPartitionable<LinearSet<V>> {
   }
 
   @Override
-  public IList<V> elements() {
-    IList<IMap.IEntry<V, Void>> entries = map.entries();
+  public IReadList<V> elements() {
+    IReadList<IMap.IEntry<V, Void>> entries = map.entries();
     return Lists.from(entries.size(), i -> entries.nth(i).key());
   }
 
   @Override
   public ISet<V> union(ISet<V> s) {
     if (s instanceof LinearSet) {
-      return new LinearSet<V>(map.merge(((LinearSet<V>) s).map));
+      return new LinearSet<V>((LinearMap<V, Void>) map.merge(((LinearSet<V>) s).map));
     } else {
       return Sets.union(this, s);
     }
@@ -107,13 +107,8 @@ public class LinearSet<V> implements ISet<V>, IPartitionable<LinearSet<V>> {
   }
 
   @Override
-  public IList<LinearSet<V>> partition(int parts) {
-    return map.partition(parts).stream().map(m -> new LinearSet<>(m)).collect(Lists.linearCollector());
-  }
-
-  @Override
-  public LinearSet<V> merge(LinearSet<V> set) {
-    return new LinearSet<V>(map.merge(set.map));
+  public IReadList<IReadSet<V>> split(int parts) {
+    return map.split(parts).stream().map(m -> new LinearSet<>(m)).collect(Lists.linearCollector());
   }
 
   @Override

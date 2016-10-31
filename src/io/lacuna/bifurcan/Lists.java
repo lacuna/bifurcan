@@ -12,42 +12,15 @@ import java.util.stream.IntStream;
  */
 public class Lists {
 
-  private static abstract class LazyList<V> implements IList<V> {
-    @Override
-    public int hashCode() {
-      return (int) Lists.hash(this);
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-      if (obj instanceof IList) {
-        return Lists.equals(this, (IList<V>) obj);
-      }
-      return false;
-    }
-
-    @Override
-    public String toString() {
-      return Lists.toString(this);
-    }
-
-    @Override
-    public IList<V> forked() {
-      // todo build tree list
-      return null;
-    }
-
-    @Override
-    public IList<V> linear() {
-      return new LinearList<V>(this);
-    }
+  public static <V, U> IReadList<U> lazyMap(IReadList<V> l, Function<V, U> f) {
+    return Lists.from(l.size(), i -> f.apply(l.nth(i)));
   }
 
-  public static <V> boolean equals(IList<V> a, IList<V> b) {
+  public static <V> boolean equals(IReadList<V> a, IReadList<V> b) {
     return equals(a, b, Objects::equals);
   }
 
-  public static <V> boolean equals(IList<V> a, IList<V> b, BiPredicate<V, V> equals) {
+  public static <V> boolean equals(IReadList<V> a, IReadList<V> b, BiPredicate<V, V> equals) {
     if (a.size() != b.size()) {
       return false;
     }
@@ -61,19 +34,19 @@ public class Lists {
     return true;
   }
 
-  public static <V> long hash(IList<V> l) {
+  public static <V> long hash(IReadList<V> l) {
     return hash(l, Objects::hashCode, (a, b) -> (a * 31) + b);
   }
 
-  public static <V> long hash(IList<V> l, ToLongFunction<V> hash, LongBinaryOperator combiner) {
+  public static <V> long hash(IReadList<V> l, ToLongFunction<V> hash, LongBinaryOperator combiner) {
     return l.stream().mapToLong(hash).reduce(combiner).orElse(0);
   }
 
-  public static <V> String toString(IList<V> l) {
+  public static <V> String toString(IReadList<V> l) {
     return toString(l, Objects::toString);
   }
 
-  public static <V> String toString(IList<V> l, Function<V, String> printer) {
+  public static <V> String toString(IReadList<V> l, Function<V, String> printer) {
     StringBuilder sb = new StringBuilder("[");
 
     Iterator<V> it = l.iterator();
@@ -88,7 +61,7 @@ public class Lists {
     return sb.toString();
   }
 
-  public static <V> java.util.List<V> toList(IList<V> list) {
+  public static <V> java.util.List<V> toList(IReadList<V> list) {
     return new java.util.List<V>() {
 
       @Override
@@ -286,100 +259,54 @@ public class Lists {
     };
   }
 
-  public static <V> IList<V> subList(IList<V> list, long start, long end) {
-    return new LazyList<V>() {
-      @Override
-      public IList<V> append(V value) {
-        return forked().append(value);
+  public static <V> IReadList<V> subList(IReadList<V> list, long start, long end) {
+    long size = end - start;
+    return Lists.from(size, idx -> {
+      if (0 <= idx && idx < size) {
+        return list.nth(start + idx);
+      } else {
+        throw new IndexOutOfBoundsException();
       }
-
-      @Override
-      public IList<V> set(long idx, V value) {
-        return forked().set(idx, value);
-      }
-
-      @Override
-      public V nth(long idx) {
-        if (idx < size()) {
-          return list.nth(start + idx);
-        } else {
-          throw new IndexOutOfBoundsException();
-        }
-      }
-
-      @Override
-      public long size() {
-        return end - start;
-      }
-    };
+    });
   }
 
-  public static <V> IList<V> from(V[] array) {
-    return new LazyList<V>() {
-      @Override
-      public IList<V> append(V value) {
-        return forked().append(value);
+  public static <V> IReadList<V> from(V[] array) {
+    return Lists.from(array.length, idx -> {
+      if (idx > Integer.MAX_VALUE) {
+        throw new IndexOutOfBoundsException();
       }
-
-      @Override
-      public IList<V> set(long idx, V value) {
-        return forked().set(idx, value);
-      }
-
-      @Override
-      public V nth(long idx) {
-        if (idx > Integer.MAX_VALUE) {
-          throw new IndexOutOfBoundsException();
-        }
-        return array[(int) idx];
-      }
-
-      @Override
-      public long size() {
-        return array.length;
-      }
-    };
+      return array[(int) idx];
+    });
   }
 
-  public static <V> IList<V> from(java.util.List<V> list) {
-    return new LazyList<V>() {
-      @Override
-      public IList<V> append(V value) {
-        return forked().append(value);
+  public static <V> IReadList<V> from(java.util.List<V> list) {
+    return Lists.from(list.size(), idx -> {
+      if (idx > Integer.MAX_VALUE) {
+        throw new IndexOutOfBoundsException();
       }
-
-      @Override
-      public IList<V> set(long idx, V value) {
-        return forked().set(idx, value);
-      }
-
-      @Override
-      public V nth(long idx) {
-        if (idx > Integer.MAX_VALUE) {
-          throw new IndexOutOfBoundsException();
-        }
-        return list.get((int) idx);
-      }
-
-      @Override
-      public long size() {
-        return list.size();
-      }
-    };
+      return list.get((int) idx);
+    });
   }
 
-  public static <V> IList<V> from(long size, LongFunction<V> elementFn) {
-    return new LazyList<V>() {
+  public static <V> IReadList<V> from(long size, LongFunction<V> elementFn) {
+    return new IReadList<V>() {
       @Override
-      public IList<V> append(V value) {
-        return forked().append(value);
+      public int hashCode() {
+        return (int) Lists.hash(this);
       }
 
       @Override
-      public IList<V> set(long idx, V value) {
-        return forked().set(idx, value);
+      public boolean equals(Object obj) {
+        if (obj instanceof IReadList) {
+          return Lists.equals(this, (IReadList<V>) obj);
+        }
+        return false;
       }
 
+      @Override
+      public String toString() {
+        return Lists.toString(this);
+      }
       @Override
       public V nth(long idx) {
         return elementFn.apply(idx);
@@ -388,40 +315,6 @@ public class Lists {
       @Override
       public long size() {
         return size;
-      }
-    };
-  }
-
-  public static <V> IList<V> readOnly(IList<V> list) {
-    return new LazyList<V>() {
-      @Override
-      public IList<V> append(V value) {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public IList<V> set(long idx, V value) {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public V nth(long idx) {
-        return list.nth(idx);
-      }
-
-      @Override
-      public long size() {
-        return list.size();
-      }
-
-      @Override
-      public IList<V> forked() {
-        return this;
-      }
-
-      @Override
-      public IList<V> linear() {
-        return this;
       }
     };
   }
@@ -441,7 +334,8 @@ public class Lists {
 
       @Override
       public BinaryOperator<IList<V>> combiner() {
-        return IPartitionable::merge;
+        // todo implement concat
+        throw new UnsupportedOperationException();
       }
 
       @Override

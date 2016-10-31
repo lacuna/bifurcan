@@ -7,6 +7,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.*;
 
+import static io.lacuna.bifurcan.Lists.lazyMap;
 import static io.lacuna.bifurcan.utils.Bits.log2Ceil;
 
 /**
@@ -18,17 +19,17 @@ import static io.lacuna.bifurcan.utils.Bits.log2Ceil;
  * underlying {@code entries}, which are in a densely packed array.  Partitioning this list is the most efficient way to
  * process the collection in parallel.
  * <p>
- * However, {@code LinearMap} also exposes O(N) {@code partition()} and {@code merge()} methods, which despite their
- * asymptotic complexity can be quite fast in practice.  The appropriate way to partition this collection will depend
+ * However, {@code LinearMap} also exposes O(N) {@code split()} and {@code merge()} methods, which despite their
+ * asymptotic complexity can be quite fast in practice.  The appropriate way to split this collection will depend
  * on the use case.
  *
  * @author ztellman
  */
 @SuppressWarnings("unchecked")
-public class LinearMap<K, V> implements IMap<K, V>, IPartitionable<LinearMap<K, V>> {
+public class LinearMap<K, V> implements IMap<K, V>, ISplittable<LinearMap<K, V>> {
 
   public static final int MAX_CAPACITY = (1 << 30) - 1;
-  private static final float LOAD_FACTOR = 0.95f;
+  private static final float LOAD_FACTOR = 0.9f;
 
   private static final int NONE = 0;
   private static final int FALLBACK = 1;
@@ -51,18 +52,25 @@ public class LinearMap<K, V> implements IMap<K, V>, IPartitionable<LinearMap<K, 
   }
 
   /**
-   * Creates a map from an existing {@code java.util.Map}, using the default Java hashing and equality mechanisms.
+   * Creates a LinearMap from an existing {@code java.util.io.lacuna.bifurcan.Map}, using the default Java hashing and equality mechanisms.
    *
-   * @param m an existing {@code java.util.Map}
+   * @param m an existing {@code java.util.io.lacuna.bifurcan.Map}
    */
   public LinearMap(java.util.Map<K, V> m) {
     this(m.size());
     m.entrySet().forEach(e -> put(e.getKey(), e.getValue()));
   }
 
-  public LinearMap(IMap<K, V> m) {
+  public LinearMap(IReadMap<K, V> m) {
     this((int) m.size());
-    m.entries().stream().forEach(e -> put(e.key(), e.value()));
+    if (m instanceof LinearMap) {
+      LinearMap<K, V> l = (LinearMap<K, V>) m;
+      System.arraycopy(l.entries, 0, entries, 0, size);
+      System.arraycopy(l.table, 0, table, 0, table.length);
+      size = l.size;
+    } else {
+      m.entries().stream().forEach(e -> put(e.key(), e.value()));
+    }
   }
 
   public LinearMap(int initialCapacity, ToIntFunction<K> hashFn, BiPredicate<K, K> equalsFn) {
@@ -133,12 +141,12 @@ public class LinearMap<K, V> implements IMap<K, V>, IPartitionable<LinearMap<K, 
   }
 
   // factored out for better inlining
-  private boolean putCheckEquality(int idx, IEntry<K, V> entry) {
+  private boolean putCheckEquality(int idx, IEntry<K, V> entry, EntryMerger<K, V> mergeFn) {
     long row = table[idx];
     int currIndex = Row.entryIndex(row);
     IEntry<K, V> currEntry = entries[currIndex];
     if (equalsFn.test(entry.key(), currEntry.key())) {
-      entries[currIndex] = entry;
+      entries[currIndex] = entry; //mergeFn.merge(currEntry, entry);
       table[idx] = Row.removeTombstone(row);
       return true;
     } else {
@@ -146,14 +154,18 @@ public class LinearMap<K, V> implements IMap<K, V>, IPartitionable<LinearMap<K, 
     }
   }
 
-  private void put(int hash, IEntry<K, V> entry) {
-    for (int idx = indexFor(hash), dist = 0; ; idx = nextIndex(idx), dist++) {
+  private void put(int hash, IEntry<K, V> entry, EntryMerger<K, V> mergeFn) {
+    for (int idx = indexFor(hash), dist = 0, abs = 0; ; idx = nextIndex(idx), dist++, abs++) {
       long row = table[idx];
       int currHash = Row.hash(row);
       boolean isNone = currHash == NONE;
       boolean currTombstone = Row.tombstone(row);
 
-      if (currHash == hash && !currTombstone && putCheckEquality(idx, entry)) {
+      if (abs > table.length) {
+        throw new IllegalStateException("something went wrong");
+      }
+
+      if (currHash == hash && !currTombstone && putCheckEquality(idx, entry, mergeFn)) {
         break;
       } else if (isNone || dist > probeDistance(currHash, idx)) {
         // if it's empty, or it's a tombstone and there's no possible exact match further down, use it
@@ -163,7 +175,6 @@ public class LinearMap<K, V> implements IMap<K, V>, IPartitionable<LinearMap<K, 
           size++;
           break;
         }
-
         // we deserve this location more, so swap them out
         int currEntryIndex = Row.entryIndex(row);
         IEntry<K, V> currEntry = entries[currEntryIndex];
@@ -178,11 +189,11 @@ public class LinearMap<K, V> implements IMap<K, V>, IPartitionable<LinearMap<K, 
   }
 
   @Override
-  public IMap<K, V> put(K key, V value) {
+  public IMap<K, V> put(K key, V value, EntryMerger<K, V> mergeFn) {
     if (size == entries.length) {
       return resize(entries.length << 1).put(key, value);
     } else {
-      put(keyHash(key), new Entry<>(key, value));
+      put(keyHash(key), new Entry<>(key, value), mergeFn);
       return this;
     }
   }
@@ -237,8 +248,13 @@ public class LinearMap<K, V> implements IMap<K, V>, IPartitionable<LinearMap<K, 
   }
 
   @Override
-  public IList<IEntry<K, V>> entries() {
+  public IReadList<IEntry<K, V>> entries() {
     return Lists.from(size, i -> entries[(int) i]);
+  }
+
+  @Override
+  public IReadSet<K> keys() {
+    return Sets.from(lazyMap(entries(), IEntry::key), this::contains);
   }
 
   @Override
@@ -275,7 +291,7 @@ public class LinearMap<K, V> implements IMap<K, V>, IPartitionable<LinearMap<K, 
   }
 
   @Override
-  public IList<LinearMap<K, V>> partition(int parts) {
+  public IList<LinearMap<K, V>> split(int parts) {
     parts = Math.min(parts, size);
     IList<LinearMap<K, V>> list = new LinearList<>(parts);
     if (parts == 0) {
@@ -303,18 +319,23 @@ public class LinearMap<K, V> implements IMap<K, V>, IPartitionable<LinearMap<K, 
   }
 
   @Override
-  public LinearMap<K, V> merge(LinearMap<K, V> o) {
-    if (o.size() <= size()) {
+  public IReadMap<K, V> merge(IReadMap<K, V> o, EntryMerger<K, V> mergeFn) {
+    if (!(o instanceof LinearMap)) {
+      Maps.merge(this, o, mergeFn);
+    }
+
+    LinearMap<K, V> l = (LinearMap<K, V>) o;
+    if (l.size() <= size()) {
       LinearMap<K, V> m = resize((int) (size + o.size()));
-      for (int i = 0; i < o.table.length; i++) {
-        long row = o.table[i];
+      for (int i = 0; i < l.table.length; i++) {
+        long row = l.table[i];
         if (Row.populated(row)) {
-          m.put(Row.hash(row), o.rowEntry(row));
+          m.put(Row.hash(row), l.rowEntry(row), mergeFn);
         }
       }
       return m;
     } else {
-      return o.merge(this);
+      return l.merge(this, (a, b) -> mergeFn.merge(b, a));
     }
   }
 

@@ -26,7 +26,7 @@ public class LinearList<V> implements IList<V> {
     this.size = elements.length;
   }
 
-  public LinearList(IList<V> list) {
+  public LinearList(IReadList<V> list) {
     this.elements = list.toArray();
     this.size = elements.length;
   }
@@ -109,6 +109,11 @@ public class LinearList<V> implements IList<V> {
   @Override
   public long size() {
     return size;
+  }
+
+  @Override
+  public IReadList<V> concat(IReadList<V> l) {
+    return null;
   }
 
   @Override

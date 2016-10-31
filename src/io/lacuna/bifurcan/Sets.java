@@ -10,15 +10,15 @@ import java.util.stream.IntStream;
  */
 public class Sets {
 
-  public static <V> long hash(ISet<V> s) {
+  public static <V> long hash(IReadSet<V> s) {
     return hash(s, Objects::hashCode, (a, b) -> a + b);
   }
 
-  public static <V> long hash(ISet<V> set, ToLongFunction<V> hash, LongBinaryOperator combiner) {
+  public static <V> long hash(IReadSet<V> set, ToLongFunction<V> hash, LongBinaryOperator combiner) {
     return set.elements().stream().mapToLong(hash).reduce(combiner).orElse(0);
   }
 
-  public static <V> boolean equals(ISet<V> a, ISet<V> b) {
+  public static <V> boolean equals(IReadSet<V> a, IReadSet<V> b) {
     if (a.size() != b.size()) {
       return false;
     }
@@ -37,7 +37,7 @@ public class Sets {
     return null;
   }
 
-  public static <V> java.util.Set<V> toSet(IList<V> elements, Predicate<V> contains) {
+  public static <V> java.util.Set<V> toSet(IReadList<V> elements, Predicate<V> contains) {
     return new Set<V>() {
       @Override
       public int size() {
@@ -106,6 +106,58 @@ public class Sets {
         throw new UnsupportedOperationException();
       }
     };
+  }
+
+  public static <V> IReadSet<V> from(IReadList<V> elements, Predicate<V> contains) {
+    return new IReadSet<V>() {
+      @Override
+      public boolean contains(V value) {
+        return contains.test(value);
+      }
+
+      @Override
+      public long size() {
+        return elements.size();
+      }
+
+      @Override
+      public IReadList<V> elements() {
+        return elements;
+      }
+
+      @Override
+      public IReadList<IReadSet<V>> split(int parts) {
+        return Sets.split(this, parts);
+      }
+    };
+  }
+
+  public static <V> IReadSet<V> from(java.util.Set<V> s) {
+    return new IReadSet<V>() {
+      @Override
+      public boolean contains(V value) {
+        return s.contains(value);
+      }
+
+      @Override
+      public long size() {
+        return s.size();
+      }
+
+      @Override
+      public IReadList<V> elements() {
+        return (IReadList<V>) Lists.from(s.toArray());
+      }
+
+      @Override
+      public IReadList<IReadSet<V>> split(int parts) {
+        return Sets.split(this, parts);
+      }
+    };
+  }
+
+  public static <V> IReadList<IReadSet<V>> split(IReadSet<V> set, int parts) {
+    return set.elements().split(parts).stream().map(l -> new LinearSet<V>(l)).collect(Lists.linearCollector());
   }
 
   public static <V> String toString(ISet<V> set) {
