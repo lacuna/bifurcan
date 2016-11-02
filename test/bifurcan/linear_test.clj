@@ -12,7 +12,8 @@
     ArrayList]
    [io.lacuna.bifurcan.utils
     BitVector
-    Bits]
+    Bits
+    SparseIntMap]
    [io.lacuna.bifurcan
     LinearList
     LinearMap

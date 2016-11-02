@@ -5,7 +5,6 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Spliterator;
 import java.util.Spliterators;
-import java.util.function.Function;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -99,7 +98,11 @@ public interface IReadList<V> extends ISplittable<IReadList<V>>, Iterable<V> {
     return Lists.from(ary);
   }
 
+  default IReadList<V> subList(long start, long end) {
+    return Lists.subList(this, start, end);
+  }
+
   default IReadList<V> concat(IReadList<V> l) {
-    return null;
+    return Lists.concat(this, l);
   }
 }

@@ -1,8 +1,23 @@
 package io.lacuna.bifurcan;
 
+import io.lacuna.bifurcan.IReadMap.IEntry;
+import io.lacuna.bifurcan.utils.SparseIntMap;
+
 import java.lang.reflect.Array;
-import java.util.*;
-import java.util.function.*;
+import java.util.Collection;
+import java.util.EnumSet;
+import java.util.Iterator;
+import java.util.ListIterator;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.BiConsumer;
+import java.util.function.BiPredicate;
+import java.util.function.BinaryOperator;
+import java.util.function.Function;
+import java.util.function.LongBinaryOperator;
+import java.util.function.LongFunction;
+import java.util.function.Supplier;
+import java.util.function.ToLongFunction;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -11,6 +26,94 @@ import java.util.stream.IntStream;
  * @author ztellman
  */
 public class Lists {
+
+  /**
+   * A dense concatenation of n-many ReadLists.  This creates a flattened list of all the lists, which in the worst
+   * case is O(N^2), but avoids the issue of left-leaning concatenation trees which blow the stack on lookup.  An ideal
+   * approach would involve self-balancing trees, but this should suffice for now.
+   */
+  @SuppressWarnings("unchecked")
+  private static class ConcatList<V> implements IReadList<V> {
+
+    final SparseIntMap<IReadList<V>> lists;
+    final long size;
+
+    public ConcatList(IReadList<V> a, IReadList<V> b) {
+      lists = (SparseIntMap<IReadList<V>>) SparseIntMap.EMPTY.put(0, a).put(a.size(), b);
+      size = a.size() + b.size();
+    }
+
+    public ConcatList(IReadList<V> list) {
+      lists = (SparseIntMap<IReadList<V>>) SparseIntMap.EMPTY.put(0, list);
+      size = list.size();
+    }
+
+    private ConcatList(SparseIntMap<IReadList<V>> lists, long size) {
+      this.lists = lists;
+      this.size = size;
+    }
+
+    @Override
+    public V nth(long idx) {
+      if (idx < 0 || size <= idx) {
+        throw new IndexOutOfBoundsException(idx + " must be within [0," + size + ")");
+      }
+      IEntry<Long, IReadList<V>> entry = lists.floorEntry(idx);
+      return entry.value().nth(idx - entry.key());
+    }
+
+    @Override
+    public long size() {
+      return size;
+    }
+
+    @Override
+    public int hashCode() {
+      return (int) Lists.hash(this);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (obj instanceof IReadList) {
+        return Lists.equals(this, (IReadList<V>) obj);
+      }
+      return false;
+    }
+
+    @Override
+    public String toString() {
+      return Lists.toString(this);
+    }
+
+    @Override
+    public IReadList<V> subList(long start, long end) {
+      if (end > size() || start < 0) {
+        throw new IndexOutOfBoundsException();
+      } else if (start == 0 && end == size()) {
+        return this;
+      }
+
+      SparseIntMap<IReadList<V>> m = SparseIntMap.EMPTY;
+      long pos = start;
+      while (pos < end) {
+        IEntry<Long, IReadList<V>> e = lists.floorEntry(pos);
+        IReadList<V> l = e.value().subList(start - e.key(), Math.min(end - pos, e.value().size()));
+        m = m.put(pos, l);
+        pos += l.size();
+      }
+      return new ConcatList<V>(m, end - start);
+    }
+
+    ConcatList<V> concat(ConcatList<V> o) {
+      SparseIntMap<IReadList<V>> m = lists;
+      long nSize = size;
+      for (IReadList<V> l : lists.values()) {
+        m = m.put(nSize, l);
+        nSize += l.size();
+      }
+      return new ConcatList<V>(m, nSize);
+    }
+  }
 
   public static <V, U> IReadList<U> lazyMap(IReadList<V> l, Function<V, U> f) {
     return Lists.from(l.size(), i -> f.apply(l.nth(i)));
@@ -261,6 +364,12 @@ public class Lists {
 
   public static <V> IReadList<V> subList(IReadList<V> list, long start, long end) {
     long size = end - start;
+    if (start < 0 || end > list.size()) {
+      throw new IllegalArgumentException();
+    } else if (size == list.size()) {
+      return list;
+    }
+
     return Lists.from(size, idx -> {
       if (0 <= idx && idx < size) {
         return list.nth(start + idx);
@@ -307,8 +416,12 @@ public class Lists {
       public String toString() {
         return Lists.toString(this);
       }
+
       @Override
       public V nth(long idx) {
+        if (idx < 0 || size <= idx) {
+          throw new IndexOutOfBoundsException(idx + " must be within [0," + size + ")");
+        }
         return elementFn.apply(idx);
       }
 
@@ -319,27 +432,26 @@ public class Lists {
     };
   }
 
-  public static <V> Collector<V, IList<V>, IList<V>> linearCollector() {
-    return new Collector<V, IList<V>, IList<V>>() {
+  public static <V> Collector<V, IReadList<V>, IReadList<V>> linearCollector() {
+    return new Collector<V, IReadList<V>, IReadList<V>>() {
 
       @Override
-      public Supplier<IList<V>> supplier() {
+      public Supplier<IReadList<V>> supplier() {
         return LinearList::new;
       }
 
       @Override
-      public BiConsumer<IList<V>, V> accumulator() {
-        return IList::append;
+      public BiConsumer<IReadList<V>, V> accumulator() {
+        return (l, v) -> ((LinearList<V>) l).append(v);
       }
 
       @Override
-      public BinaryOperator<IList<V>> combiner() {
-        // todo implement concat
-        throw new UnsupportedOperationException();
+      public BinaryOperator<IReadList<V>> combiner() {
+        return Lists::concat;
       }
 
       @Override
-      public Function<IList<V>, IList<V>> finisher() {
+      public Function<IReadList<V>, IReadList<V>> finisher() {
         return a -> a;
       }
 
@@ -348,5 +460,17 @@ public class Lists {
         return EnumSet.of(Characteristics.IDENTITY_FINISH);
       }
     };
+  }
+
+  public static <V> IReadList<V> concat(IReadList<V> a, IReadList<V> b) {
+    if (a instanceof ConcatList && b instanceof ConcatList) {
+      return ((ConcatList<V>) a).concat((ConcatList<V>) b);
+    } else if (a instanceof ConcatList) {
+      return ((ConcatList<V>) a).concat(new ConcatList<>(b));
+    } else if (b instanceof ConcatList) {
+      return new ConcatList<>(a).concat((ConcatList<V>) b);
+    } else {
+      return new ConcatList<V>(a, b);
+    }
   }
 }

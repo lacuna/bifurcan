@@ -20,7 +20,7 @@ public class Maps {
 
   public static IReadMap.EntryMerger MERGE_LAST_WRITE_WINS = (a, b) -> b;
 
-  static class Entry<K, V> implements IEntry<K, V> {
+  public static class Entry<K, V> implements IEntry<K, V> {
     public final K key;
     public final V value;
 
@@ -40,6 +40,20 @@ public class Maps {
     @Override
     public String toString() {
       return key + " = " + value;
+    }
+
+    @Override
+    public int hashCode() {
+      return (Objects.hash(key) * 31) + Objects.hash(value);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (obj instanceof IEntry) {
+        IEntry<K, V> e = (IEntry<K, V>) obj;
+        return Objects.equals(key, e.key()) && Objects.equals(value, e.value());
+      }
+      return false;
     }
   }
 

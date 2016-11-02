@@ -21,18 +21,24 @@ public class LinearList<V> implements IList<V> {
     this(DEFAULT_CAPACITY);
   }
 
-  public LinearList(Collection<V> collection) {
-    this.elements = collection.toArray();
-    this.size = elements.length;
-  }
-
-  public LinearList(IReadList<V> list) {
-    this.elements = list.toArray();
-    this.size = elements.length;
-  }
-
   public LinearList(int capacity) {
-    this.elements = new Object[Math.max(1, capacity)];
+    this(0, new Object[Math.max(1, capacity)]);
+  }
+
+  private LinearList(int size, Object[] elements) {
+    this.size = size;
+    this.elements = elements;
+  }
+
+  public static <V> LinearList<V> from(Collection<V> collection) {
+    return new LinearList<V>(collection.size(), collection.toArray());
+  }
+
+  public static <V> LinearList<V> from(IReadList<V> list) {
+    if (list.size() > Integer.MAX_VALUE) {
+      throw new IllegalArgumentException("LinearList cannot hold more than 1 << 30 entries");
+    }
+    return new LinearList<V>((int) list.size(), list.toArray());
   }
 
   /**
@@ -101,7 +107,7 @@ public class LinearList<V> implements IList<V> {
   @Override
   public V nth(long idx) {
     if (idx < 0 || idx >= size) {
-      throw new IndexOutOfBoundsException();
+      throw new IndexOutOfBoundsException(idx + " must be within [0," + size + ")");
     }
     return (V) elements[(int) idx];
   }
@@ -109,11 +115,6 @@ public class LinearList<V> implements IList<V> {
   @Override
   public long size() {
     return size;
-  }
-
-  @Override
-  public IReadList<V> concat(IReadList<V> l) {
-    return null;
   }
 
   @Override

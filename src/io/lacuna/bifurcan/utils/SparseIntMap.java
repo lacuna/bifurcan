@@ -1,5 +1,10 @@
 package io.lacuna.bifurcan.utils;
 
+import io.lacuna.bifurcan.IReadList;
+import io.lacuna.bifurcan.IReadMap;
+import io.lacuna.bifurcan.Lists;
+import io.lacuna.bifurcan.Maps;
+
 import java.util.Optional;
 
 /**
@@ -42,6 +47,10 @@ public class SparseIntMap<V> {
 
   private byte minBitLength(long val) {
     return (byte) (Bits.log2Floor(val) + 1);
+  }
+
+  public IReadList<V> values() {
+    return Lists.from(vals.length, i -> (V) vals[(int) i]);
   }
 
   private SparseIntMap<V> append(long key, V val) {
@@ -90,6 +99,13 @@ public class SparseIntMap<V> {
 
       return new SparseIntMap<V>(nKeyBits, nKeys, nVals);
     }
+  }
+
+  public IReadMap.IEntry<Long, V> floorEntry(long key) {
+    int idx = BitIntSet.indexOf(keys, keyBits, vals.length, key);
+    System.out.println(key + " " + idx);
+    idx = idx < 0 ? -idx - 2 : idx;
+    return idx < 0 ? null : new Maps.Entry<>(BitIntSet.get(keys, keyBits, idx), (V) vals[idx]);
   }
 
   public SparseIntMap<V> put(long key, V val) {
