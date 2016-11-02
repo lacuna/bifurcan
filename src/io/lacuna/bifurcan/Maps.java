@@ -93,7 +93,7 @@ public class Maps {
       return merge(b, a, mergeFn);
     }
 
-    LinearMap<K, V> m = new LinearMap<>(a);
+    LinearMap<K, V> m = LinearMap.from(a);
     for (IEntry<K, V> e : b.entries()) {
       m = (LinearMap<K, V>) m.put(e.key(), e.value(), mergeFn);
     }

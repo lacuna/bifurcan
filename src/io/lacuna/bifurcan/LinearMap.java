@@ -74,16 +74,6 @@ public class LinearMap<K, V> implements IMap<K, V>, ISplittable<LinearMap<K, V>>
     }
   }
 
-  /**
-   * Creates a LinearMap from an existing {@code java.util.io.lacuna.bifurcan.Map}, using the default Java hashing and equality mechanisms.
-   *
-   * @param m an existing {@code java.util.io.lacuna.bifurcan.Map}
-   */
-  public LinearMap(java.util.Map<K, V> m) {
-    this(m.size());
-
-  }
-
   public LinearMap(int initialCapacity, ToIntFunction<K> hashFn, BiPredicate<K, K> equalsFn) {
 
     if (initialCapacity > MAX_CAPACITY) {
@@ -437,5 +427,4 @@ public class LinearMap<K, V> implements IMap<K, V>, ISplittable<LinearMap<K, V>>
     hash ^= (hash >>> 7) ^ (hash >>> 4);
     return hash == NONE ? FALLBACK : hash;
   }
-
 }
