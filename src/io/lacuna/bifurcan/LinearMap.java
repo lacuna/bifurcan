@@ -51,6 +51,29 @@ public class LinearMap<K, V> implements IMap<K, V>, ISplittable<LinearMap<K, V>>
     this(initialCapacity, Objects::hashCode, Objects::equals);
   }
 
+  public static <K, V> LinearMap<K,V> from(java.util.Map<K, V> map) {
+    LinearMap<K, V> l = new LinearMap<K, V>(map.size());
+    map.entrySet().forEach(e -> l.put(e.getKey(), e.getValue()));
+    return l;
+  }
+
+  public static <K, V> LinearMap<K,V> from(IReadMap<K, V> map) {
+    if (map instanceof LinearMap) {
+      LinearMap<K, V> m = (LinearMap<K, V>) map;
+      LinearMap<K, V> l = new LinearMap<K, V>((int) map.size(), m.hashFn, m.equalsFn);
+
+      System.arraycopy(l.entries, 0, m.entries, 0, m.size);
+      System.arraycopy(l.table, 0, m.table, 0, m.table.length);
+      l.size = m.size;
+
+      return l;
+    } else {
+      LinearMap<K, V> l = new LinearMap<K, V>((int) map.size());
+      map.entries().stream().forEach(e -> l.put(e.key(), e.value()));
+      return l;
+    }
+  }
+
   /**
    * Creates a LinearMap from an existing {@code java.util.io.lacuna.bifurcan.Map}, using the default Java hashing and equality mechanisms.
    *
@@ -58,19 +81,7 @@ public class LinearMap<K, V> implements IMap<K, V>, ISplittable<LinearMap<K, V>>
    */
   public LinearMap(java.util.Map<K, V> m) {
     this(m.size());
-    m.entrySet().forEach(e -> put(e.getKey(), e.getValue()));
-  }
 
-  public LinearMap(IReadMap<K, V> m) {
-    this((int) m.size());
-    if (m instanceof LinearMap) {
-      LinearMap<K, V> l = (LinearMap<K, V>) m;
-      System.arraycopy(l.entries, 0, entries, 0, size);
-      System.arraycopy(l.table, 0, table, 0, table.length);
-      size = l.size;
-    } else {
-      m.entries().stream().forEach(e -> put(e.key(), e.value()));
-    }
   }
 
   public LinearMap(int initialCapacity, ToIntFunction<K> hashFn, BiPredicate<K, K> equalsFn) {
