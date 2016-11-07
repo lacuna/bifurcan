@@ -8,7 +8,8 @@
                    :benchmark :benchmark
                    :stress :stress
                    :all (constantly true)}
-  :profiles {:dev {:dependencies [[org.clojure/clojure "1.8.0"]
+  :profiles {:travis {:jvm-opts ^:replace ["-server" "-Xmx1g"]}
+             :dev {:dependencies [[org.clojure/clojure "1.8.0"]
                                   [org.clojure/test.check "0.9.0"]
                                   [criterium "0.4.3"]]}}
-  :jvm-opts ^:replace ["-server" "-XX:+UseG1GC" "-Xmx8g" "-XX:-OmitStackTraceInFastThrow"])
+  :jvm-opts ^:replace ["-server" "-XX:+UseG1GC" "-Xmx12g" "-XX:-OmitStackTraceInFastThrow"])
