@@ -7,7 +7,7 @@ import java.util.function.ToIntFunction;
 /**
  * @author ztellman
  */
-public class LinearSet<V> implements ISet<V> {
+public class LinearSet<V> implements IEditableSet<V> {
 
   private LinearMap<V, Void> map;
 
@@ -19,20 +19,6 @@ public class LinearSet<V> implements ISet<V> {
     this(initialCapacity, Objects::hashCode, Objects::equals);
   }
 
-  public LinearSet(IReadList<V> elements) {
-    this((int) elements.size());
-    for (V e : elements) {
-      map = (LinearMap<V, Void>) map.put(e, null);
-    }
-  }
-
-  public LinearSet(java.util.Collection<V> elements) {
-    this(elements.size());
-    for (V e : elements) {
-      map = (LinearMap<V, Void>) map.put(e, null);
-    }
-  }
-
   public LinearSet(int initialCapacity, ToIntFunction<V> hashFn, BiPredicate<V, V> equalsFn) {
     map = new LinearMap<>(initialCapacity, hashFn, equalsFn);
   }
@@ -41,15 +27,35 @@ public class LinearSet<V> implements ISet<V> {
     this.map = map;
   }
 
+  public static <V> LinearSet<V> from(IList<V> elements) {
+    return from(elements.toList());
+  }
+
+  public static <V> LinearSet<V> from(java.util.Collection<V> elements) {
+    LinearSet<V> set = new LinearSet<>((int) elements.size());
+    for (V e : elements) {
+      set = set.add(e);
+    }
+    return set;
+  }
+
+  public static <V> LinearSet<V> from(ISet<V> set) {
+    if (set instanceof LinearSet) {
+      return ((LinearSet<V>) set).clone();
+    } else {
+      return from(set.toSet());
+    }
+  }
+
   @Override
-  public ISet<V> add(V value) {
-    map = (LinearMap<V, Void>) map.put(value, null);
+  public LinearSet<V> add(V value) {
+    map.put(value, null);
     return this;
   }
 
   @Override
-  public ISet<V> remove(V value) {
-    map = (LinearMap<V, Void>) map.remove(value);
+  public LinearSet<V> remove(V value) {
+    map.remove(value);
     return this;
   }
 
@@ -64,56 +70,73 @@ public class LinearSet<V> implements ISet<V> {
   }
 
   @Override
-  public IReadList<V> elements() {
-    IReadList<IMap.IEntry<V, Void>> entries = map.entries();
+  public IList<V> elements() {
+    IList<IEditableMap.IEntry<V, Void>> entries = map.entries();
     return Lists.from(entries.size(), i -> entries.nth(i).key());
   }
 
   @Override
   public ISet<V> union(ISet<V> s) {
     if (s instanceof LinearSet) {
-      return new LinearSet<V>((LinearMap<V, Void>) map.merge(((LinearSet<V>) s).map));
+      map.merge(((LinearSet<V>) s).map);
     } else {
-      return Sets.union(this, s);
+      for (V e : s) {
+        map.put(e, null);
+      }
     }
+    return this;
   }
 
   @Override
   public ISet<V> difference(ISet<V> s) {
     if (s instanceof LinearSet) {
-      return new LinearSet<V>(map.difference(((LinearSet<V>) s).map));
+      map.difference(((LinearSet<V>) s).map);
     } else {
-      return Sets.difference(this, s);
+      for (V e : s) {
+        map.remove(e);
+      }
     }
+    return this;
   }
 
   @Override
   public ISet<V> intersection(ISet<V> s) {
     if (s instanceof LinearSet) {
-      return new LinearSet<V>(map.intersection(((LinearSet<V>) s).map));
+      map.intersection(((LinearSet<V>) s).map);
     } else {
-      return Sets.intersection(this, s);
+      for (V e : s) {
+        if (!map.contains(e)) {
+          map.remove(e);
+        }
+      }
     }
-  }
-
-  @Override
-  public ISet<V> forked() {
-    throw new UnsupportedOperationException("A LinearSet cannot be efficiently transformed into a forked representation");
-  }
-
-  @Override
-  public ISet<V> linear() {
     return this;
   }
 
   @Override
-  public IReadList<IReadSet<V>> split(int parts) {
-    return map.split(parts).stream().map(m -> new LinearSet<>(m)).collect(Lists.linearCollector());
+  public IEditableSet<V> forked() {
+    throw new UnsupportedOperationException("A LinearSet cannot be efficiently transformed into a forked representation");
+  }
+
+  @Override
+  public IEditableSet<V> linear() {
+    return this;
+  }
+
+  @Override
+  public IList<ISet<V>> split(int parts) {
+    return map.split(parts).stream().map(m -> new LinearSet<>((LinearMap<V, Void>) m)).collect(Lists.collector());
   }
 
   @Override
   public int hashCode() {
-    return (int) Sets.hash(this);
+    int hash = 0;
+    for (long row : map.table) {
+      if (LinearMap.Row.populated(row)) {
+        hash += LinearMap.Row.hash(row);
+      }
+    }
+    return hash;
   }
 
   @Override
@@ -122,6 +145,11 @@ public class LinearSet<V> implements ISet<V> {
       return Sets.equals(this, (ISet<V>) obj);
     }
     return false;
+  }
+
+  @Override
+  protected LinearSet<V> clone() {
+    return new LinearSet<>(map.clone());
   }
 
   @Override

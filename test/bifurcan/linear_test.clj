@@ -9,51 +9,82 @@
    [java.util
     HashMap
     HashSet
-    ArrayList]
+    ArrayList
+    ArrayDeque
+    Collection]
    [io.lacuna.bifurcan.utils
     BitVector
     Bits
     SparseIntMap]
    [io.lacuna.bifurcan
+    IMap
+    IList
+    ISet
+    IEditableList
+    IEditableSet
+    IEditableMap
     LinearList
     LinearMap
-    LinearSet]))
+    LinearSet
+    IMap$IEntry]))
+
+(set! *warn-on-reflection* true)
 
 ;;;
 
-(defn list-append [^LinearList l x]
-  (.append l x))
+(defn list-add-first [^IEditableList l v]
+  (.addFirst l v))
 
-(defn map-put [^LinearMap m k v]
+(defn list-add-last [^IEditableList l v]
+  (.addLast l v))
+
+(defn list-remove-first [^IEditableList l]
+  (.removeFirst l))
+
+(defn list-remove-last [^IEditableList l]
+  (.removeLast l))
+
+(defn map-put [^IEditableMap m k v]
   (.put m k v))
 
-(defn map-remove [^LinearMap m k]
+(defn map-remove [^IEditableMap m k]
   (.remove m k))
 
-(defn set-add [^LinearSet m e]
+(defn set-add [^IEditableSet m e]
   (.add m e))
 
-(defn set-remove [^LinearSet m e]
+(defn set-remove [^IEditableSet m e]
   (.remove m e))
 
-(defn ->map [^LinearMap m]
-  (->> m .entries .iterator iterator-seq (map #(vector (.key %) (.value %))) (into {})))
+(defn ->map [^IMap m]
+  (->> m .entries .iterator iterator-seq (map (fn [^IMap$IEntry e] [(.key e) (.value e)])) (into {})))
 
-(defn ->set [^LinearSet s]
+(defn ->set [^ISet s]
   (->> s .elements .iterator iterator-seq (into #{})))
 
 ;;;
 
 (defn list-actions []
-  {:add (u/action [gen/pos-int] conj list-append)})
+  {:add-first (u/action [gen/pos-int] #(cons %2 %1) list-add-first)
+   :add-last (u/action [gen/pos-int] #(conj (vec %1) %2) list-add-last)
+   :remove-first (u/action [] rest list-remove-first)
+   :remove-last (u/action [] butlast list-remove-last)})
 
 (defn map-actions []
-  {:put    (u/action [gen/pos-int gen/pos-int] assoc map-put)
-   :remove (u/action [gen/pos-int] dissoc map-remove)})
+  {:put    (u/action [gen/large-integer gen/pos-int] assoc map-put)
+   :remove (u/action [gen/large-integer] dissoc map-remove)})
 
 (defn set-actions []
-  {:add    (u/action [gen/pos-int] conj set-add)
-   :remove (u/action [gen/pos-int] disj set-remove)})
+  {:add    (u/action [gen/large-integer] conj set-add)
+   :remove (u/action [gen/large-integer] disj set-remove)})
+
+(defn construct-lists [actions]
+  (let [[a b] (u/apply-actions
+                (list-actions)
+                actions
+                []
+                (LinearList.))]
+    [a b]))
 
 (defn construct-maps [actions]
   (let [[a b] (u/apply-actions
@@ -66,7 +97,7 @@
 (u/def-collection-check test-linear-list 1e4 (list-actions)
   [v []
    l (LinearList.)]
-  (= (seq v) (-> l .iterator iterator-seq)))
+  (= (seq v) (-> ^LinearList l .iterator iterator-seq)))
 
 (u/def-collection-check test-linear-map-equality 1e4 (map-actions)
   [m {}
@@ -76,12 +107,12 @@
 (u/def-collection-check test-linear-map-lookup 1e4 (map-actions)
   [m {}
    m' (LinearMap.)]
-  (= m (zipmap (keys m) (->> m keys (map #(-> m' (.get %) (.orElse nil)))))))
+  (= m (zipmap (keys m) (->> m keys (map #(-> ^IMap m' (.get % nil)))))))
 
 (u/def-collection-check test-linear-map-merge 1e4 (map-actions)
   [m {}
    m' (LinearMap.)]
-  (= m' (->> (.split m' 8) (reduce #(.merge ^LinearMap %1 %2)))))
+  (= m' (->> (.split ^IMap m' 8) (reduce #(.merge ^LinearMap %1 %2)))))
 
 (u/def-collection-check test-linear-set 1e4 (set-actions)
   [s #{}
@@ -91,18 +122,29 @@
 
 ;;;
 
-(defn uuid []
-  (str (java.util.UUID/randomUUID)))
+(defn construct-linear-list [^LinearList l vs]
+  (loop [l l, vs vs]
+    (if (empty? vs)
+      l
+      (recur (.addLast l (first vs)) (rest vs)))))
 
-(defn append-to-linear-list [^long n]
-  (loop [l (LinearList.), idx 0]
-    (when (< idx n)
-      (recur (.append l idx) (unchecked-inc idx)))))
+(defn construct-java-list [^java.util.List l vs]
+  (loop [l l, vs vs]
+    (if (empty? vs)
+      l
+      (recur (doto l (.add (first vs))) (rest vs)))))
 
-(defn append-to-array-list [^long n]
-  (loop [l (ArrayList.), idx 0]
-    (when (< idx n)
-      (recur (doto l (.add idx)) (unchecked-inc idx)))))
+(defn construct-java-deque [^java.util.Deque l vs]
+  (loop [l l, vs vs]
+    (if (empty? vs)
+      l
+      (recur (doto l (.addLast (first vs))) (rest vs)))))
+
+(defn construct-vector [v vs]
+  (loop [l (transient v), vs vs]
+    (if (empty? vs)
+      (persistent! l)
+      (recur (conj! l (first vs)) (rest vs)))))
 
 (defn construct-linear-map [^LinearMap m vs]
   (loop [m m, vs vs]
@@ -122,9 +164,21 @@
       (persistent! m)
       (recur (assoc! m (first vs) nil) (rest vs)))))
 
+(defn lookup-linear-list [^LinearList l ks]
+  (doseq [k ks]
+    (.nth l k)))
+
+(defn lookup-java-list [^java.util.List l ks]
+  (doseq [k ks]
+    (.get l k)))
+
+(defn lookup-vector [v ks]
+  (doseq [k ks]
+    (nth v k)))
+
 (defn lookup-linear-map [^LinearMap m ks]
   (doseq [k ks]
-    (.get m k)))
+    (.get m k nil)))
 
 (defn lookup-hash-map [^HashMap m ks]
   (doseq [k ks]
@@ -166,30 +220,44 @@
 
 ;;;
 
+;; a simple object that exists to provide minimal overhead within a hashmap
+(deftype Obj [^int hash]
+  Object
+  (hashCode [_] (int hash))
+  (equals [this o] (identical? this o)))
+
 (defn benchmark [f]
-  (-> (c/quick-benchmark* f nil)
+  (-> (c/quick-benchmark* f {:samples 18})
     :mean
     first
     (* 1e9)))
 
 (defn generate-entries [n]
-  (->> uuid (repeatedly n) vec))
+  (->> #(Obj. (rand-int Integer/MAX_VALUE)) (repeatedly n) vec))
 
-(defn benchmark-collection [base-collection construct lookup]
+(defn generate-numbers [n]
+  (->> n range shuffle vec))
+
+(defn benchmark-collection [base-collection generate-entries construct lookup test?]
   (prn (class (base-collection 0)))
-  (->> (range 1 7)
+  (->> (range 1 8)
     (map #(Math/pow 10 %))
     (map (fn [n]
-           (prn n)
+           (println (str "10^" (int (Math/log10 n))))
            (let [s  (generate-entries n)
                  s' (generate-entries n)
                  c  (base-collection n)
                  c' (construct c s)]
              [n (->>
-                  {:construct           (benchmark #(construct (base-collection n) s))
-                   :construct-duplicate (benchmark #(-> (base-collection n) (construct s) (construct s)))
-                   :lookup              (benchmark #(lookup c' s))
-                   :lookup-misses       (benchmark #(lookup c' s'))}
+                  (merge
+                    (when (test? :construct)
+                      {:construct (benchmark #(construct (base-collection n) s))})
+                    #_(when (test? :construct-duplicate)
+                      {:construct-duplicate (benchmark #(-> (base-collection n) (construct s) (construct s)))})
+                    (when (test? :lookup)
+                      {:lookup (benchmark #(lookup c' s))})
+                    (when (test? :lookup-misses)
+                      {:lookup-misses (benchmark #(lookup c' s'))}))
                   (map (fn [[k v]]
                          [k (int (/ v n))]))
                   (into {}))])))
@@ -197,10 +265,16 @@
 
 (deftest ^:benchmark benchmark-collections
   (pprint
-    {:linear-map  (benchmark-collection (fn [_] (LinearMap.)) construct-linear-map lookup-linear-map)
-     :linear-set  (benchmark-collection (fn [_] (LinearSet.)) construct-linear-set lookup-linear-set)
-     :hash-map    (benchmark-collection (fn [_] (HashMap.)) construct-hash-map lookup-hash-map)
-     :hash-set    (benchmark-collection (fn [_] (HashSet.)) construct-hash-set lookup-hash-set)
-     :clojure-map (benchmark-collection (fn [_] {}) construct-clojure-map lookup-clojure-map)
-     :clojure-set (benchmark-collection (fn [_] #{}) construct-clojure-set lookup-clojure-set)
-     }))
+    [:linear-list #_(benchmark-collection (fn [_] (LinearList.)) generate-numbers construct-linear-list lookup-linear-list  #{:construct :lookup})
+     :array-list #_(benchmark-collection (fn [_] (ArrayList.)) generate-numbers construct-java-list lookup-java-list #{:construct :lookup})
+     :array-deque #_(benchmark-collection (fn [_] (ArrayDeque.)) generate-numbers construct-java-deque nil #{:construct})
+     :vector #_(benchmark-collection (fn [_] []) generate-numbers construct-vector lookup-vector #{:construct :lookup})
+
+     :linear-map  (benchmark-collection (fn [_] (LinearMap.)) generate-entries construct-linear-map lookup-linear-map (constantly true))
+     :linear-set  #_(benchmark-collection (fn [_] (LinearSet.)) generate-entries construct-linear-set lookup-linear-set (constantly true))
+
+     :hash-set    #_(benchmark-collection (fn [_] (HashSet.)) generate-entries construct-hash-set lookup-hash-set (constantly true))
+     :clojure-set #_(benchmark-collection (fn [_] #{}) generate-entries construct-clojure-set lookup-clojure-set (constantly true))
+     :hash-map    (benchmark-collection (fn [_] (HashMap.)) generate-entries construct-hash-map lookup-hash-map (constantly true))
+     :clojure-map (benchmark-collection (fn [_] {}) generate-entries construct-clojure-map lookup-clojure-map (constantly true))]
+    ))

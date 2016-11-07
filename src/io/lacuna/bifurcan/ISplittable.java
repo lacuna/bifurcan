@@ -12,5 +12,5 @@ public interface ISplittable<V> {
    * @param parts the target number of pieces
    * @return a list containing subsets of the collection.
    */
-  IReadList<V> split(int parts);
+  IList<V> split(int parts);
 }

@@ -1,21 +1,20 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.Maps.Entry;
 import io.lacuna.bifurcan.utils.Bits;
 
 import java.util.Objects;
-import java.util.Optional;
 import java.util.function.*;
 
 import static io.lacuna.bifurcan.Lists.lazyMap;
 import static io.lacuna.bifurcan.utils.Bits.log2Ceil;
+import static java.lang.System.arraycopy;
 
 /**
  * A hash-map implementation which uses Robin Hood hashing for placement, and allows for customized hashing and equality
- * semantics.  Performance is moderately faster than {@code java.util.HashMap}, and much better in the worst case of
- * poor hash distribution.
+ * semantics.  Performance is moderately faster {@code java.util.HashMap}, increasingly so past 100k entries, and much
+ * better in the worst case of poor hash distribution.
  * <p>
- * Unlike {@code HashMap.entrySet()}, the {@code entries()} method is O(1), returning an IList that proxies through to the
+ * Unlike {@code HashMap}, the {@code entries()} method allows random access, returning an IList that proxies through to the
  * underlying {@code entries}, which are in a densely packed array.  Partitioning this list is the most efficient way to
  * process the collection in parallel.
  * <p>
@@ -26,44 +25,47 @@ import static io.lacuna.bifurcan.utils.Bits.log2Ceil;
  * @author ztellman
  */
 @SuppressWarnings("unchecked")
-public class LinearMap<K, V> implements IMap<K, V>, ISplittable<LinearMap<K, V>> {
+public class LinearMap<K, V> implements IEditableMap<K, V> {
 
-  public static final int MAX_CAPACITY = (1 << 30) - 1;
-  private static final float LOAD_FACTOR = 0.9f;
+  /// Fields
+
+  public static final int MAX_CAPACITY = 1 << 29;
+  private static final float LOAD_FACTOR = 0.95f;
 
   private static final int NONE = 0;
   private static final int FALLBACK = 1;
 
   private final ToIntFunction<K> hashFn;
   private final BiPredicate<K, K> equalsFn;
-  private final int indexMask;
 
-  private final long[] table;
-
-  private final IEntry<K, V>[] entries;
+  private int indexMask;
+  public long[] table;
+  public Object[] entries;
   private int size;
 
+  /// Constructors
+
   public LinearMap() {
-    this(8);
+    this(16);
   }
 
   public LinearMap(int initialCapacity) {
     this(initialCapacity, Objects::hashCode, Objects::equals);
   }
 
-  public static <K, V> LinearMap<K,V> from(java.util.Map<K, V> map) {
+  public static <K, V> LinearMap<K, V> from(java.util.Map<K, V> map) {
     LinearMap<K, V> l = new LinearMap<K, V>(map.size());
     map.entrySet().forEach(e -> l.put(e.getKey(), e.getValue()));
     return l;
   }
 
-  public static <K, V> LinearMap<K,V> from(IReadMap<K, V> map) {
+  public static <K, V> LinearMap<K, V> from(IMap<K, V> map) {
     if (map instanceof LinearMap) {
       LinearMap<K, V> m = (LinearMap<K, V>) map;
       LinearMap<K, V> l = new LinearMap<K, V>((int) map.size(), m.hashFn, m.equalsFn);
 
-      System.arraycopy(l.entries, 0, m.entries, 0, m.size);
-      System.arraycopy(l.table, 0, m.table, 0, m.table.length);
+      arraycopy(l.entries, 0, m.entries, 0, m.size);
+      arraycopy(l.table, 0, m.table, 0, m.table.length);
       l.size = m.size;
 
       return l;
@@ -74,187 +76,98 @@ public class LinearMap<K, V> implements IMap<K, V>, ISplittable<LinearMap<K, V>>
     }
   }
 
+  public static <K, V> LinearMap<K, V> from(IList<IEntry<K, V>> entries) {
+    if (entries.size() > MAX_CAPACITY) {
+      throw new IllegalArgumentException("LinearMap cannot hold more than 1 << 29 entries");
+    }
+    LinearMap<K, V> m = new LinearMap<>((int) entries.size());
+    for (IEntry<K, V> e : entries) {
+      m = m.put(e.key(), e.value());
+    }
+    return m;
+  }
+
   public LinearMap(int initialCapacity, ToIntFunction<K> hashFn, BiPredicate<K, K> equalsFn) {
 
     if (initialCapacity > MAX_CAPACITY) {
       throw new IllegalArgumentException("initialCapacity cannot be larger than " + MAX_CAPACITY);
     }
 
-    initialCapacity = Math.max(4, initialCapacity);
-    int tableLength = (int) (1L << log2Ceil((long) Math.ceil(initialCapacity / LOAD_FACTOR)));
-
-    this.indexMask = tableLength - 1;
     this.hashFn = hashFn;
     this.equalsFn = equalsFn;
-
-    this.entries = new IEntry[initialCapacity];
-    this.table = new long[tableLength];
     this.size = 0;
+
+    resize(initialCapacity);
   }
 
-  private LinearMap<K, V> resize(int capacity) {
-    if (capacity > MAX_CAPACITY) {
-      throw new IllegalStateException("the map cannot be larger than " + MAX_CAPACITY);
-    }
+  /// Accessors
 
-    LinearMap<K, V> m = new LinearMap<>(capacity, hashFn, equalsFn);
-    System.arraycopy(entries, 0, m.entries, 0, size);
-    m.size = size;
-
-    for (int idx = 0; idx < table.length; idx++) {
-      long row = table[idx];
-      if (Row.populated(row)) {
-        m.constructPut(Row.hash(row), Row.entryIndex(row));
-      }
-    }
-
-    return m;
-  }
-
-  private int indexFor(int hash, K key) {
-    for (int idx = indexFor(hash), dist = 0; ; idx = nextIndex(idx), dist++) {
-      long row = table[idx];
-      int currHash = Row.hash(row);
-      if (currHash == hash && !Row.tombstone(row) && equalsFn.test(key, entries[Row.entryIndex(row)].key())) {
-        return idx;
-      } else if (currHash == NONE || dist > probeDistance(currHash, idx)) {
-        return -1;
-      }
-    }
-  }
-
-  private void constructPut(int hash, int entryIndex) {
-    for (int idx = indexFor(hash), dist = 0; ; idx = nextIndex(idx), dist++) {
-      long row = table[idx];
-      int currHash = Row.hash(row);
-      if (currHash == NONE) {
-        table[idx] = Row.construct(hash, entryIndex);
-        break;
-      } else if (dist > probeDistance(currHash, idx)) {
-        int currEntryIndex = Row.entryIndex(row);
-        table[idx] = Row.construct(hash, entryIndex);
-
-        dist = probeDistance(currHash, idx);
-        entryIndex = currEntryIndex;
-        hash = currHash;
-      }
-    }
-  }
-
-  // factored out for better inlining
-  private boolean putCheckEquality(int idx, IEntry<K, V> entry, EntryMerger<K, V> mergeFn) {
-    long row = table[idx];
-    int currIndex = Row.entryIndex(row);
-    IEntry<K, V> currEntry = entries[currIndex];
-    if (equalsFn.test(entry.key(), currEntry.key())) {
-      entries[currIndex] = entry; //mergeFn.merge(currEntry, entry);
-      table[idx] = Row.removeTombstone(row);
-      return true;
-    } else {
-      return false;
-    }
-  }
-
-  private void put(int hash, IEntry<K, V> entry, EntryMerger<K, V> mergeFn) {
-    for (int idx = indexFor(hash), dist = 0, abs = 0; ; idx = nextIndex(idx), dist++, abs++) {
-      long row = table[idx];
-      int currHash = Row.hash(row);
-      boolean isNone = currHash == NONE;
-      boolean currTombstone = Row.tombstone(row);
-
-      if (abs > table.length) {
-        throw new IllegalStateException("something went wrong");
-      }
-
-      if (currHash == hash && !currTombstone && putCheckEquality(idx, entry, mergeFn)) {
-        break;
-      } else if (isNone || dist > probeDistance(currHash, idx)) {
-        // if it's empty, or it's a tombstone and there's no possible exact match further down, use it
-        if (isNone || currTombstone) {
-          entries[size] = entry;
-          table[idx] = Row.construct(hash, size);
-          size++;
-          break;
-        }
-        // we deserve this location more, so swap them out
-        int currEntryIndex = Row.entryIndex(row);
-        IEntry<K, V> currEntry = entries[currEntryIndex];
-        entries[currEntryIndex] = entry;
-        table[idx] = Row.construct(hash, currEntryIndex);
-
-        dist = probeDistance(currHash, idx);
-        entry = currEntry;
-        hash = currHash;
-      }
-    }
+  @Override
+  public LinearMap<K, V> put(K key, V value) {
+    return put(key, value, Maps.MERGE_LAST_WRITE_WINS);
   }
 
   @Override
-  public IMap<K, V> put(K key, V value, EntryMerger<K, V> mergeFn) {
-    if (size == entries.length) {
-      return resize(entries.length << 1).put(key, value);
-    } else {
-      put(keyHash(key), new Entry<>(key, value), mergeFn);
-      return this;
+  public LinearMap<K, V> put(K key, V value, ValueMerger<K, V> mergeFn) {
+    if ((size << 1) == entries.length) {
+      resize(size << 1);
     }
+    put(keyHash(key), key, value, mergeFn);
+    return this;
   }
 
   @Override
-  public IMap<K, V> remove(K key) {
-    int idx = indexFor(keyHash(key), key);
+  public LinearMap<K, V> remove(K key) {
+    int idx = tableIndex(keyHash(key), key);
+
     if (idx >= 0) {
       long row = table[idx];
       size--;
-      int entryIndex = Row.entryIndex(row);
-      if (entryIndex != size) {
-        IEntry<K, V> lastEntry = entries[size];
-        K lastKey = lastEntry.key();
-        int lastIdx = indexFor(keyHash(lastKey), lastKey);
-        table[lastIdx] = Row.construct(Row.hash(table[lastIdx]), entryIndex);
-        entries[entryIndex] = lastEntry;
+      int keyIndex = Row.keyIndex(row);
+      int lastKeyIndex = size << 1;
+
+      // if we're not the last entry, swap the last entry into our slot, so we remain dense
+      if (keyIndex != lastKeyIndex) {
+        K lastKey = (K) entries[lastKeyIndex];
+        V lastValue = (V) entries[lastKeyIndex + 1];
+        int lastIdx = tableIndex(keyHash(lastKey), lastKey);
+        table[lastIdx] = Row.construct(Row.hash(table[lastIdx]), keyIndex);
+        putEntry(keyIndex, lastKey, lastValue);
       }
+
       table[idx] = Row.addTombstone(row);
-      entries[size] = null;
+      putEntry(lastKeyIndex, null, null);
     }
 
     return this;
   }
 
-  private IEntry<K, V> entryFor(K key){
-    int hash = keyHash(key);
+  @Override
+  public boolean contains(K key) {
+    return tableIndex(keyHash(key), key) >= 0;
+  }
 
-    for (int idx = indexFor(hash), dist = 0; ; idx = nextIndex(idx), dist++) {
+  @Override
+  public V get(K key, V defaultValue) {
+    int idx = tableIndex(keyHash(key), key);
+    if (idx >= 0) {
       long row = table[idx];
-      int currHash = Row.hash(row);
-      if (currHash == hash && !Row.tombstone(row)) {
-        IEntry<K, V> entry = entries[Row.entryIndex(row)];
-        if (equalsFn.test(entry.key(), key)) {
-          return entry;
-        }
-      } else if (currHash == NONE || dist > probeDistance(currHash, idx)) {
-        return null;
-      }
+      return (V) entries[Row.keyIndex(row) + 1];
+    } else {
+      return defaultValue;
     }
   }
 
   @Override
-  public boolean contains(K key) {
-    return entryFor(key) != null;
+  public IList<IEntry<K, V>> entries() {
+    return Lists.from(size, i -> {
+      int idx = ((int) i) << 1;
+      return new Maps.Entry<>((K) entries[idx], (V) entries[idx + 1]);
+    });
   }
 
   @Override
-  public Optional<V> get(K key) {
-    IEntry<K, V> entry = entryFor(key);
-    return entry != null ? Optional.ofNullable(entry.value()) : Optional.empty();
-  }
-
-  @Override
-  public IReadList<IEntry<K, V>> entries() {
-    return Lists.from(size, i -> entries[(int) i]);
-  }
-
-  @Override
-  public IReadSet<K> keys() {
+  public ISet<K> keys() {
     return Sets.from(lazyMap(entries(), IEntry::key), this::contains);
   }
 
@@ -264,12 +177,12 @@ public class LinearMap<K, V> implements IMap<K, V>, ISplittable<LinearMap<K, V>>
   }
 
   @Override
-  public IMap<K, V> forked() {
+  public IEditableMap<K, V> forked() {
     throw new IllegalStateException("a LinearMap cannot be efficiently transformed into a forked representation");
   }
 
   @Override
-  public IMap<K, V> linear() {
+  public IEditableMap<K, V> linear() {
     return this;
   }
 
@@ -282,8 +195,24 @@ public class LinearMap<K, V> implements IMap<K, V>, ISplittable<LinearMap<K, V>>
   }
 
   @Override
+  protected LinearMap<K, V> clone() {
+    LinearMap<K, V> m = new LinearMap<K, V>(entries.length, hashFn, equalsFn);
+    arraycopy(table, 0, m.table, 0, table.length);
+    arraycopy(entries, 0, m.entries, 0, entries.length);
+    m.size = size;
+    return m;
+  }
+
+  @Override
   public int hashCode() {
-    return (int) Maps.hash(this);
+    int hash = 0;
+    for (long row : table) {
+      if (Row.populated(row)) {
+        V value = (V) entries[Row.keyIndex(row) + 1];
+        hash += (Row.hash(row) * 31) + Objects.hashCode(value);
+      }
+    }
+    return hash;
   }
 
   @Override
@@ -292,11 +221,11 @@ public class LinearMap<K, V> implements IMap<K, V>, ISplittable<LinearMap<K, V>>
   }
 
   @Override
-  public IList<LinearMap<K, V>> split(int parts) {
+  public IList<IMap<K, V>> split(int parts) {
     parts = Math.min(parts, size);
-    IList<LinearMap<K, V>> list = new LinearList<>(parts);
-    if (parts == 0) {
-      return list.append(this);
+    IEditableList<IMap<K, V>> list = new LinearList<>(parts);
+    if (parts <= 1) {
+      return list.addLast(this);
     }
 
     int partSize = table.length / parts;
@@ -305,14 +234,20 @@ public class LinearMap<K, V> implements IMap<K, V>, ISplittable<LinearMap<K, V>>
       int finish = (p == (parts - 1)) ? table.length : start + partSize;
 
       LinearMap<K, V> m = new LinearMap<>(finish - start);
-      list.append(m);
 
       for (int i = start; i < finish; i++) {
         long row = table[i];
         if (Row.populated(row)) {
-          m.entries[m.size] = rowEntry(row);
-          m.constructPut(Row.hash(row), m.size++);
+          int keyIndex = Row.keyIndex(row);
+          int resultKeyIndex = m.size << 1;
+          m.putEntry(resultKeyIndex, (K) entries[keyIndex], (V) entries[keyIndex + 1]);
+          m.putTable(Row.hash(row), resultKeyIndex);
+          m.size++;
         }
+      }
+
+      if (m.size > 0) {
+        list.addLast(m);
       }
     }
 
@@ -320,38 +255,24 @@ public class LinearMap<K, V> implements IMap<K, V>, ISplittable<LinearMap<K, V>>
   }
 
   @Override
-  public IReadMap<K, V> merge(IReadMap<K, V> o, EntryMerger<K, V> mergeFn) {
-    if (!(o instanceof LinearMap)) {
-      Maps.merge(this, o, mergeFn);
-    }
-
-    LinearMap<K, V> l = (LinearMap<K, V>) o;
-    if (l.size() <= size()) {
-      LinearMap<K, V> m = resize((int) (size + o.size()));
-      for (int i = 0; i < l.table.length; i++) {
-        long row = l.table[i];
+  public IMap<K, V> merge(IMap<K, V> o, ValueMerger<K, V> mergeFn) {
+    if (o.size() == 0) {
+      return this;
+    } else if (o instanceof LinearMap) {
+      LinearMap<K, V> l = (LinearMap<K, V>) o;
+      resize(size + l.size);
+      for (long row : l.table) {
         if (Row.populated(row)) {
-          m.put(Row.hash(row), l.rowEntry(row), mergeFn);
+          int keyIndex = Row.keyIndex(row);
+          put(Row.hash(row), (K) l.entries[keyIndex], (V) l.entries[keyIndex + 1], mergeFn);
         }
       }
-      return m;
     } else {
-      return l.merge(this, (a, b) -> mergeFn.merge(b, a));
-    }
-  }
-
-  private void combine(LinearMap<K, ?> m, LinearMap<K, V> result, IntPredicate indexPredicate) {
-    for (int i = 0; i < table.length; i++) {
-      long row = table[i];
-      if (Row.populated(row)) {
-        IEntry<K, V> entry = rowEntry(row);
-        int entryIndex = m.indexFor(Row.hash(row), entry.key());
-        if (indexPredicate.test(entryIndex)) {
-          result.entries[result.size] = entry;
-          result.constructPut(Row.hash(row), result.size++);
-        }
+      for (IEntry<K, V> e : o.entries()) {
+        put(e.key(), e.value(), mergeFn);
       }
     }
+    return this;
   }
 
   LinearMap<K, V> difference(LinearMap<K, ?> m) {
@@ -368,14 +289,154 @@ public class LinearMap<K, V> implements IMap<K, V>, ISplittable<LinearMap<K, V>>
 
   /// Utility functions
 
-  private static class Row {
+  private void combine(LinearMap<K, ?> m, LinearMap<K, V> result, IntPredicate indexPredicate) {
+    for (long row : table) {
+      if (Row.populated(row)) {
+        int currKeyIndex = Row.keyIndex(row);
+        K currKey = (K) entries[currKeyIndex];
+        int entryIndex = m.tableIndex(Row.hash(row), currKey);
+        if (indexPredicate.test(entryIndex)) {
+          int resultKeyIndex = result.size << 1;
+          result.putEntry(resultKeyIndex, currKey, (V) entries[currKeyIndex + 1]);
+          result.putTable(Row.hash(row), resultKeyIndex);
+          result.size++;
+        }
+      }
+    }
+  }
 
-    static final long HASH_MASK = Bits.maskBelow(32);
-    static final long ENTRY_INDEX_MASK = Bits.maskBelow(31);
+  private void resize(int capacity) {
+
+    if (capacity > MAX_CAPACITY) {
+      throw new IllegalStateException("the map cannot be larger than " + MAX_CAPACITY);
+    }
+
+    capacity = Math.max(4, capacity);
+    int tableLength = (1 << log2Ceil((long) Math.ceil(capacity / LOAD_FACTOR)));
+    indexMask = tableLength - 1;
+
+    // update table
+    if (table == null) {
+      table = new long[tableLength];
+    } else if (table.length != tableLength) {
+      long[] nTable = new long[tableLength];
+      for (long row : table) {
+        if (Row.populated(row)) {
+          int hash = Row.hash(row);
+          putTable(nTable, hash, Row.keyIndex(row), estimatedIndex(hash));
+        }
+      }
+      table = nTable;
+    }
+
+    // update entries
+    if (entries == null) {
+      entries = new Object[capacity << 1];
+    } else {
+      Object[] nEntries = new Object[capacity << 1];
+      arraycopy(entries, 0, nEntries, 0, size << 1);
+      entries = nEntries;
+    }
+
+  }
+
+  private int tableIndex(int hash, K key) {
+    for (int idx = estimatedIndex(hash), dist = 0; ; idx = nextIndex(idx), dist++) {
+      long row = table[idx];
+      int currHash = Row.hash(row);
+      if (currHash == hash && !Row.tombstone(row) && equalsFn.test(key, (K) entries[Row.keyIndex(row)])) {
+        return idx;
+      } else if (currHash == NONE || dist > probeDistance(currHash, idx)) {
+        return -1;
+      }
+    }
+  }
+
+  private void putTable(long[] table, int hash, int keyIndex, int tableIndex) {
+    for (int idx = tableIndex, dist = probeDistance(hash, tableIndex), abs = 0; ; idx = nextIndex(idx), dist++, abs++) {
+      long row = table[idx];
+      int currHash = Row.hash(row);
+
+      if (abs > table.length) {
+        throw new IllegalStateException();
+      }
+
+      if (currHash == NONE) {
+        table[idx] = Row.construct(hash, keyIndex);
+        break;
+      } else if (dist > probeDistance(currHash, idx)) {
+        int currKeyIndex = Row.keyIndex(row);
+        table[idx] = Row.construct(hash, keyIndex);
+
+        if (Row.tombstone(row)) {
+          break;
+        }
+
+        dist = probeDistance(currHash, idx);
+        keyIndex = currKeyIndex;
+        hash = currHash;
+      }
+    }
+  }
+
+  private void putEntry(int keyIndex, K key, V value) {
+    entries[keyIndex] = key;
+    entries[keyIndex + 1] = value;
+  }
+
+  private void putTable(int hash, int keyIndex) {
+    putTable(table, hash, keyIndex, estimatedIndex(hash));
+  }
+
+  // factored out for better inlining
+  private boolean putCheckEquality(int idx, K key, V value, ValueMerger<K, V> mergeFn) {
+    long row = table[idx];
+    int keyIndex = Row.keyIndex(row);
+    K currKey = (K) entries[keyIndex];
+    if (equalsFn.test(key, currKey)) {
+      entries[keyIndex + 1] = mergeFn.merge((V) entries[keyIndex + 1], value);
+      table[idx] = Row.removeTombstone(row);
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  private void put(int hash, K key, V value, ValueMerger<K, V> mergeFn) {
+    for (int idx = estimatedIndex(hash), dist = 0; ; idx = nextIndex(idx), dist++) {
+      long row = table[idx];
+      int currHash = Row.hash(row);
+      boolean isNone = currHash == NONE;
+      boolean currTombstone = Row.tombstone(row);
+
+      if (currHash == hash && !currTombstone && putCheckEquality(idx, key, value, mergeFn)) {
+        break;
+      } else if (isNone || dist > probeDistance(currHash, idx)) {
+
+        // we know there isn't any collision, so add it to the end
+        int keyIndex = size << 1;
+        putEntry(keyIndex, key, value);
+        size++;
+
+        if (isNone || currTombstone) {
+          table[idx] = Row.construct(hash, keyIndex);
+        } else {
+          putTable(table, hash, keyIndex, idx);
+        }
+
+        break;
+      }
+    }
+  }
+
+  static class Row {
+
+    static final long HASH_MASK = (1L << 32) - 1;
+    static final long KEY_INDEX_MASK = (1L << 31) - 1;
     static final long TOMBSTONE_MASK = 1L << 63;
 
-    static long construct(int hash, int entryIndex) {
-      return hash | (entryIndex & ENTRY_INDEX_MASK) << 32;
+    static long construct(int hash, int keyIndex) {
+      return (hash & HASH_MASK) | (keyIndex & KEY_INDEX_MASK) << 32;
     }
 
     static int hash(long row) {
@@ -386,8 +447,8 @@ public class LinearMap<K, V> implements IMap<K, V>, ISplittable<LinearMap<K, V>>
       return (row & HASH_MASK) != NONE && (row & TOMBSTONE_MASK) == 0;
     }
 
-    static int entryIndex(long row) {
-      return (int) ((row >>> 32) & ENTRY_INDEX_MASK);
+    static int keyIndex(long row) {
+      return (int) ((row >> 32) & KEY_INDEX_MASK);
     }
 
     static boolean tombstone(long row) {
@@ -403,11 +464,7 @@ public class LinearMap<K, V> implements IMap<K, V>, ISplittable<LinearMap<K, V>>
     }
   }
 
-  private IEntry<K, V> rowEntry(long row) {
-    return entries[Row.entryIndex(row)];
-  }
-
-  private int indexFor(int hash) {
+  private int estimatedIndex(int hash) {
     return hash & indexMask;
   }
 

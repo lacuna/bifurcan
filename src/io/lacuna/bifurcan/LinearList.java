@@ -1,101 +1,115 @@
 package io.lacuna.bifurcan;
 
+import io.lacuna.bifurcan.utils.Bits;
+
 import java.util.Collection;
 import java.util.Optional;
 
+import static io.lacuna.bifurcan.utils.Bits.log2Ceil;
+
 /**
- * A simple implementation of a list, mimicking most behaviors of Java's ArrayList, and providing {@code peek()},
- * {@code push()}, and {@code pop()} methods for use as a stack.
+ * A simple implementation of a list, mimicking most behaviors of Java's ArrayDeque.
  *
  * @author ztellman
  */
 @SuppressWarnings("unchecked")
-public class LinearList<V> implements IList<V> {
+public class LinearList<V> implements IEditableList<V> {
 
   private static final int DEFAULT_CAPACITY = 8;
 
-  private final Object[] elements;
-  private int size;
+  public Object[] elements;
+  public int mask;
+  public int size, offset;
 
   public LinearList() {
     this(DEFAULT_CAPACITY);
   }
 
   public LinearList(int capacity) {
-    this(0, new Object[Math.max(1, capacity)]);
+    this(0, new Object[Math.max(1, 1 << log2Ceil(capacity))]);
   }
 
   private LinearList(int size, Object[] elements) {
     this.size = size;
+    this.offset = 0;
+    this.mask = elements.length - 1;
     this.elements = elements;
   }
 
   public static <V> LinearList<V> from(Collection<V> collection) {
-    return new LinearList<V>(collection.size(), collection.toArray());
-  }
-
-  public static <V> LinearList<V> from(IReadList<V> list) {
-    if (list.size() > Integer.MAX_VALUE) {
-      throw new IllegalArgumentException("LinearList cannot hold more than 1 << 30 entries");
+    LinearList<V> list = new LinearList<V>(collection.size());
+    for (V value : collection) {
+      list.elements[list.size++] = value;
     }
-    return new LinearList<V>((int) list.size(), list.toArray());
-  }
-
-  /**
-   * @param newCapacity the updated capacity of the list, which cannot be smaller than the current size
-   * @return a resized list
-   * @throws IllegalArgumentException when {@code newCapacity} is smaller than {@code size()}
-   */
-  public LinearList<V> resize(int newCapacity) {
-    if (newCapacity == elements.length) {
-      return this;
-    } else if (newCapacity < size) {
-      throw new IllegalArgumentException("new capacity (" + newCapacity + ") smaller than current size: " + size);
-    }
-
-    LinearList list = new LinearList(newCapacity);
-    System.arraycopy(elements, 0, list.elements, 0, size);
-    list.size = size;
     return list;
   }
 
-  /**
-   * @return returns the most recently pushed/appended rowValue, or nothing if the list is empty
-   */
-  public Optional<V> peek() {
-    return size > 0 ? Optional.of((V) elements[size - 1]) : Optional.empty();
+  public static <V> LinearList<V> from(IList<V> list) {
+    if (list.size() > Integer.MAX_VALUE) {
+      throw new IllegalArgumentException("LinearList cannot hold more than 1 << 30 entries");
+    }
+    return from(list.toList());
   }
 
-  /**
-   * @return a list with {@code rowValue} appended
-   */
-  public IList<V> push(V value) {
-    return append(value);
-  }
+  private void resize(int newCapacity) {
 
-  /**
-   * @return a list with the most recently pushed/appended rowValue removed, or the same list if there are no elements
-   */
-  public IList<V> pop() {
-    size = Math.max(0, size - 1);
-    elements[size] = null;
-    return this;
-  }
+    Object[] nElements = new Object[newCapacity];
 
-  @Override
-  public IList<V> append(V value) {
-    if (size == elements.length) {
-      return resize(size << 1).append(value);
+    int truncatedSize = Math.min(size, elements.length - offset);
+    System.arraycopy(elements, offset, nElements, 0, truncatedSize);
+    if (size != truncatedSize) {
+      System.arraycopy(elements, 0, nElements, truncatedSize, size - truncatedSize);
     }
 
-    elements[size++] = value;
+    mask = nElements.length - 1;
+    elements = nElements;
+    offset = 0;
+  }
+
+  @Override
+  public LinearList<V> addLast(V value) {
+    if (size == elements.length) {
+      resize(size << 1);
+    }
+    elements[(offset + size++) & mask] = value;
     return this;
   }
 
   @Override
-  public IList<V> set(long idx, V value) {
+  public IEditableList<V> addFirst(V value) {
+    if (size == elements.length) {
+      resize(size << 1);
+    }
+    offset = (offset - 1) & mask;
+    elements[offset] = value;
+    size++;
+    return this;
+  }
+
+  @Override
+  public LinearList<V> removeFirst() {
+    if (size == 0) {
+      return this;
+    }
+    elements[offset] = null;
+    offset = (offset + 1) & mask;
+    size--;
+    return this;
+  }
+
+  @Override
+  public LinearList<V> removeLast() {
+    if (size == 0) {
+      return this;
+    }
+    elements[(offset + --size) & mask] = null;
+    return this;
+  }
+
+  @Override
+  public LinearList<V> set(long idx, V value) {
     if (idx == size) {
-      return append(value);
+      return addLast(value);
     } else if (idx > Integer.MAX_VALUE) {
       throw new IndexOutOfBoundsException();
     }
@@ -105,11 +119,19 @@ public class LinearList<V> implements IList<V> {
   }
 
   @Override
+  public LinearList<V> concat(IList<V> l) {
+    for (V e : l) {
+      addLast(e);
+    }
+    return this;
+  }
+
+  @Override
   public V nth(long idx) {
     if (idx < 0 || idx >= size) {
       throw new IndexOutOfBoundsException(idx + " must be within [0," + size + ")");
     }
-    return (V) elements[(int) idx];
+    return (V) elements[(offset + (int) idx) & mask];
   }
 
   @Override
@@ -118,12 +140,12 @@ public class LinearList<V> implements IList<V> {
   }
 
   @Override
-  public IList<V> forked() {
+  public IEditableList<V> forked() {
     throw new UnsupportedOperationException("a LinearList cannot be efficiently transformed into a forked representation");
   }
 
   @Override
-  public IList<V> linear() {
+  public IEditableList<V> linear() {
     return this;
   }
 
@@ -134,8 +156,8 @@ public class LinearList<V> implements IList<V> {
 
   @Override
   public boolean equals(Object obj) {
-    if (obj instanceof IList) {
-      return Lists.equals(this, (IList<V>) obj);
+    if (obj instanceof IEditableList) {
+      return Lists.equals(this, (IEditableList<V>) obj);
     }
     return false;
   }

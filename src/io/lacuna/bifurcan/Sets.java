@@ -3,6 +3,7 @@ package io.lacuna.bifurcan;
 import java.lang.reflect.Array;
 import java.util.*;
 import java.util.function.*;
+import java.util.stream.Collector;
 import java.util.stream.IntStream;
 
 /**
@@ -10,15 +11,15 @@ import java.util.stream.IntStream;
  */
 public class Sets {
 
-  public static <V> long hash(IReadSet<V> s) {
+  public static <V> long hash(ISet<V> s) {
     return hash(s, Objects::hashCode, (a, b) -> a + b);
   }
 
-  public static <V> long hash(IReadSet<V> set, ToLongFunction<V> hash, LongBinaryOperator combiner) {
+  public static <V> long hash(ISet<V> set, ToLongFunction<V> hash, LongBinaryOperator combiner) {
     return set.elements().stream().mapToLong(hash).reduce(combiner).orElse(0);
   }
 
-  public static <V> boolean equals(IReadSet<V> a, IReadSet<V> b) {
+  public static <V> boolean equals(ISet<V> a, ISet<V> b) {
     if (a.size() != b.size()) {
       return false;
     }
@@ -26,18 +27,38 @@ public class Sets {
   }
 
   public static <V> ISet<V> difference(ISet<V> a, ISet<V> b) {
-    return null;
+    LinearSet<V> s = LinearSet.from(a);
+    for (V e : b) {
+      s = s.remove(e);
+    }
+    return s;
   }
 
   public static <V> ISet<V> union(ISet<V> a, ISet<V> b) {
-    return null;
+    if (b.size() > a.size()) {
+      return union(b, a);
+    }
+    LinearSet<V> s = LinearSet.from(a);
+    for (V e : b) {
+      s = s.add(e);
+    }
+    return s;
   }
 
   public static <V> ISet<V> intersection(ISet<V> a, ISet<V> b) {
-    return null;
+    if (b.size() < a.size()) {
+      return intersection(b, a);
+    }
+    LinearSet<V> s = new LinearSet<>((int) a.size());
+    for (V e : a) {
+      if (b.contains(e)) {
+        s = s.add(e);
+      }
+    }
+    return s;
   }
 
-  public static <V> java.util.Set<V> toSet(IReadList<V> elements, Predicate<V> contains) {
+  public static <V> java.util.Set<V> toSet(IList<V> elements, Predicate<V> contains) {
     return new Set<V>() {
       @Override
       public int size() {
@@ -108,8 +129,8 @@ public class Sets {
     };
   }
 
-  public static <V> IReadSet<V> from(IReadList<V> elements, Predicate<V> contains) {
-    return new IReadSet<V>() {
+  public static <V> ISet<V> from(IList<V> elements, Predicate<V> contains) {
+    return new ISet<V>() {
       @Override
       public boolean contains(V value) {
         return contains.test(value);
@@ -121,19 +142,19 @@ public class Sets {
       }
 
       @Override
-      public IReadList<V> elements() {
+      public IList<V> elements() {
         return elements;
       }
 
       @Override
-      public IReadList<IReadSet<V>> split(int parts) {
+      public IList<ISet<V>> split(int parts) {
         return Sets.split(this, parts);
       }
     };
   }
 
-  public static <V> IReadSet<V> from(java.util.Set<V> s) {
-    return new IReadSet<V>() {
+  public static <V> ISet<V> from(java.util.Set<V> s) {
+    return new ISet<V>() {
       @Override
       public boolean contains(V value) {
         return s.contains(value);
@@ -145,26 +166,26 @@ public class Sets {
       }
 
       @Override
-      public IReadList<V> elements() {
-        return (IReadList<V>) Lists.from(s.toArray());
+      public IList<V> elements() {
+        return (IList<V>) Lists.from(s.toArray());
       }
 
       @Override
-      public IReadList<IReadSet<V>> split(int parts) {
+      public IList<ISet<V>> split(int parts) {
         return Sets.split(this, parts);
       }
     };
   }
 
-  public static <V> IReadList<IReadSet<V>> split(IReadSet<V> set, int parts) {
-    return set.elements().split(parts).stream().map(l -> new LinearSet<V>(l)).collect(Lists.linearCollector());
+  public static <V> IList<ISet<V>> split(ISet<V> set, int parts) {
+    return set.elements().split(parts).stream().map(LinearSet::from).collect(Lists.collector());
   }
 
-  public static <V> String toString(ISet<V> set) {
+  public static <V> String toString(IEditableSet<V> set) {
     return toString(set, Objects::toString);
   }
 
-  public static <V> String toString(ISet<V> set, Function<V, String> elementPrinter) {
+  public static <V> String toString(IEditableSet<V> set, Function<V, String> elementPrinter) {
     StringBuilder sb = new StringBuilder("{");
 
     Iterator<V> it = set.elements().iterator();
@@ -177,5 +198,34 @@ public class Sets {
     sb.append("}");
 
     return sb.toString();
+  }
+
+  public static <V> Collector<V, ISet<V>, ISet<V>> collector() {
+    return new Collector<V, ISet<V>, ISet<V>>() {
+      @Override
+      public Supplier<ISet<V>> supplier() {
+        return LinearSet::new;
+      }
+
+      @Override
+      public BiConsumer<ISet<V>, V> accumulator() {
+        return (s, e) -> ((LinearSet<V>) s).add(e);
+      }
+
+      @Override
+      public BinaryOperator<ISet<V>> combiner() {
+        return ISet::union;
+      }
+
+      @Override
+      public Function<ISet<V>, ISet<V>> finisher() {
+        return a -> a;
+      }
+
+      @Override
+      public Set<Characteristics> characteristics() {
+        return EnumSet.of(Characteristics.IDENTITY_FINISH);
+      }
+    };
   }
 }

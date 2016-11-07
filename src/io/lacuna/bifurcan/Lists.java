@@ -1,6 +1,6 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.IReadMap.IEntry;
+import io.lacuna.bifurcan.IMap.IEntry;
 import io.lacuna.bifurcan.utils.SparseIntMap;
 
 import java.lang.reflect.Array;
@@ -19,7 +19,6 @@ import java.util.function.LongFunction;
 import java.util.function.Supplier;
 import java.util.function.ToLongFunction;
 import java.util.stream.Collector;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /**
@@ -33,22 +32,22 @@ public class Lists {
    * approach would involve self-balancing trees, but this should suffice for now.
    */
   @SuppressWarnings("unchecked")
-  private static class ConcatList<V> implements IReadList<V> {
+  private static class ConcatList<V> implements IList<V> {
 
-    final SparseIntMap<IReadList<V>> lists;
+    final SparseIntMap<IList<V>> lists;
     final long size;
 
-    public ConcatList(IReadList<V> a, IReadList<V> b) {
-      lists = (SparseIntMap<IReadList<V>>) SparseIntMap.EMPTY.put(0, a).put(a.size(), b);
+    public ConcatList(IList<V> a, IList<V> b) {
+      lists = (SparseIntMap<IList<V>>) SparseIntMap.EMPTY.put(0, a).put(a.size(), b);
       size = a.size() + b.size();
     }
 
-    public ConcatList(IReadList<V> list) {
-      lists = (SparseIntMap<IReadList<V>>) SparseIntMap.EMPTY.put(0, list);
+    public ConcatList(IList<V> list) {
+      lists = (SparseIntMap<IList<V>>) SparseIntMap.EMPTY.put(0, list);
       size = list.size();
     }
 
-    private ConcatList(SparseIntMap<IReadList<V>> lists, long size) {
+    private ConcatList(SparseIntMap<IList<V>> lists, long size) {
       this.lists = lists;
       this.size = size;
     }
@@ -58,7 +57,7 @@ public class Lists {
       if (idx < 0 || size <= idx) {
         throw new IndexOutOfBoundsException(idx + " must be within [0," + size + ")");
       }
-      IEntry<Long, IReadList<V>> entry = lists.floorEntry(idx);
+      IEntry<Long, IList<V>> entry = lists.floorEntry(idx);
       return entry.value().nth(idx - entry.key());
     }
 
@@ -74,8 +73,8 @@ public class Lists {
 
     @Override
     public boolean equals(Object obj) {
-      if (obj instanceof IReadList) {
-        return Lists.equals(this, (IReadList<V>) obj);
+      if (obj instanceof IList) {
+        return Lists.equals(this, (IList<V>) obj);
       }
       return false;
     }
@@ -86,18 +85,18 @@ public class Lists {
     }
 
     @Override
-    public IReadList<V> subList(long start, long end) {
+    public IList<V> subList(long start, long end) {
       if (end > size() || start < 0) {
         throw new IndexOutOfBoundsException();
       } else if (start == 0 && end == size()) {
         return this;
       }
 
-      SparseIntMap<IReadList<V>> m = SparseIntMap.EMPTY;
+      SparseIntMap<IList<V>> m = SparseIntMap.EMPTY;
       long pos = start;
       while (pos < end) {
-        IEntry<Long, IReadList<V>> e = lists.floorEntry(pos);
-        IReadList<V> l = e.value().subList(start - e.key(), Math.min(end - pos, e.value().size()));
+        IEntry<Long, IList<V>> e = lists.floorEntry(pos);
+        IList<V> l = e.value().subList(start - e.key(), Math.min(end - pos, e.value().size()));
         m = m.put(pos, l);
         pos += l.size();
       }
@@ -105,9 +104,9 @@ public class Lists {
     }
 
     ConcatList<V> concat(ConcatList<V> o) {
-      SparseIntMap<IReadList<V>> m = lists;
+      SparseIntMap<IList<V>> m = lists;
       long nSize = size;
-      for (IReadList<V> l : lists.values()) {
+      for (IList<V> l : lists.values()) {
         m = m.put(nSize, l);
         nSize += l.size();
       }
@@ -115,15 +114,48 @@ public class Lists {
     }
   }
 
-  public static <V, U> IReadList<U> lazyMap(IReadList<V> l, Function<V, U> f) {
+  private static class SubList<V> implements IList<V> {
+    private final IList<V> list;
+    private final long offset;
+    private final long size;
+
+    public SubList(IList<V> list, long offset, long size) {
+      this.list = list;
+      this.offset = offset;
+      this.size = size;
+    }
+
+    @Override
+    public V nth(long idx) {
+      if (idx < 0 || size <= idx) {
+        throw new IndexOutOfBoundsException(idx + " must be within [0," + size + ")");
+      }
+      return list.nth(offset + idx);
+    }
+
+    @Override
+    public long size() {
+      return size;
+    }
+
+    @Override
+    public IList<V> subList(long start, long end) {
+      if (start < 0 || end <= start || end <= size) {
+        throw new IllegalArgumentException();
+      }
+      return new SubList<V>(list, offset + start, end - start);
+    }
+  }
+
+  public static <V, U> IList<U> lazyMap(IList<V> l, Function<V, U> f) {
     return Lists.from(l.size(), i -> f.apply(l.nth(i)));
   }
 
-  public static <V> boolean equals(IReadList<V> a, IReadList<V> b) {
+  public static <V> boolean equals(IList<V> a, IList<V> b) {
     return equals(a, b, Objects::equals);
   }
 
-  public static <V> boolean equals(IReadList<V> a, IReadList<V> b, BiPredicate<V, V> equals) {
+  public static <V> boolean equals(IList<V> a, IList<V> b, BiPredicate<V, V> equals) {
     if (a.size() != b.size()) {
       return false;
     }
@@ -137,19 +169,19 @@ public class Lists {
     return true;
   }
 
-  public static <V> long hash(IReadList<V> l) {
+  public static <V> long hash(IList<V> l) {
     return hash(l, Objects::hashCode, (a, b) -> (a * 31) + b);
   }
 
-  public static <V> long hash(IReadList<V> l, ToLongFunction<V> hash, LongBinaryOperator combiner) {
+  public static <V> long hash(IList<V> l, ToLongFunction<V> hash, LongBinaryOperator combiner) {
     return l.stream().mapToLong(hash).reduce(combiner).orElse(0);
   }
 
-  public static <V> String toString(IReadList<V> l) {
+  public static <V> String toString(IList<V> l) {
     return toString(l, Objects::toString);
   }
 
-  public static <V> String toString(IReadList<V> l, Function<V, String> printer) {
+  public static <V> String toString(IList<V> l, Function<V, String> printer) {
     StringBuilder sb = new StringBuilder("[");
 
     Iterator<V> it = l.iterator();
@@ -164,7 +196,7 @@ public class Lists {
     return sb.toString();
   }
 
-  public static <V> java.util.List<V> toList(IReadList<V> list) {
+  public static <V> java.util.List<V> toList(IList<V> list) {
     return new java.util.List<V>() {
 
       @Override
@@ -337,9 +369,7 @@ public class Lists {
 
       @Override
       public java.util.List<V> subList(int fromIndex, int toIndex) {
-        return IntStream.range(0, toIndex - fromIndex)
-                .mapToObj(idx -> get(idx))
-                .collect(Collectors.toList());
+        return Lists.toList(list.subList(fromIndex, toIndex));
       }
 
       @Override
@@ -362,24 +392,18 @@ public class Lists {
     };
   }
 
-  public static <V> IReadList<V> subList(IReadList<V> list, long start, long end) {
+  public static <V> IList<V> subList(IList<V> list, long start, long end) {
     long size = end - start;
-    if (start < 0 || end > list.size()) {
+    if (start < 0 || end > list.size() || end <= size) {
       throw new IllegalArgumentException();
     } else if (size == list.size()) {
       return list;
     }
 
-    return Lists.from(size, idx -> {
-      if (0 <= idx && idx < size) {
-        return list.nth(start + idx);
-      } else {
-        throw new IndexOutOfBoundsException();
-      }
-    });
+    return new SubList<V>(list, start, size);
   }
 
-  public static <V> IReadList<V> from(V[] array) {
+  public static <V> IList<V> from(V[] array) {
     return Lists.from(array.length, idx -> {
       if (idx > Integer.MAX_VALUE) {
         throw new IndexOutOfBoundsException();
@@ -388,7 +412,7 @@ public class Lists {
     });
   }
 
-  public static <V> IReadList<V> from(java.util.List<V> list) {
+  public static <V> IList<V> from(java.util.List<V> list) {
     return Lists.from(list.size(), idx -> {
       if (idx > Integer.MAX_VALUE) {
         throw new IndexOutOfBoundsException();
@@ -397,8 +421,8 @@ public class Lists {
     });
   }
 
-  public static <V> IReadList<V> from(long size, LongFunction<V> elementFn) {
-    return new IReadList<V>() {
+  public static <V> IList<V> from(long size, LongFunction<V> elementFn) {
+    return new IList<V>() {
       @Override
       public int hashCode() {
         return (int) Lists.hash(this);
@@ -406,8 +430,8 @@ public class Lists {
 
       @Override
       public boolean equals(Object obj) {
-        if (obj instanceof IReadList) {
-          return Lists.equals(this, (IReadList<V>) obj);
+        if (obj instanceof IList) {
+          return Lists.equals(this, (IList<V>) obj);
         }
         return false;
       }
@@ -432,26 +456,25 @@ public class Lists {
     };
   }
 
-  public static <V> Collector<V, IReadList<V>, IReadList<V>> linearCollector() {
-    return new Collector<V, IReadList<V>, IReadList<V>>() {
-
+  public static <V> Collector<V, LinearList<V>, IList<V>> collector() {
+    return new Collector<V, LinearList<V>, IList<V>>() {
       @Override
-      public Supplier<IReadList<V>> supplier() {
+      public Supplier<LinearList<V>> supplier() {
         return LinearList::new;
       }
 
       @Override
-      public BiConsumer<IReadList<V>, V> accumulator() {
-        return (l, v) -> ((LinearList<V>) l).append(v);
+      public BiConsumer<LinearList<V>, V> accumulator() {
+        return LinearList::addLast;
       }
 
       @Override
-      public BinaryOperator<IReadList<V>> combiner() {
-        return Lists::concat;
+      public BinaryOperator<LinearList<V>> combiner() {
+        return LinearList::concat;
       }
 
       @Override
-      public Function<IReadList<V>, IReadList<V>> finisher() {
+      public Function<LinearList<V>, IList<V>> finisher() {
         return a -> a;
       }
 
@@ -462,7 +485,7 @@ public class Lists {
     };
   }
 
-  public static <V> IReadList<V> concat(IReadList<V> a, IReadList<V> b) {
+  public static <V> IList<V> concat(IList<V> a, IList<V> b) {
     if (a instanceof ConcatList && b instanceof ConcatList) {
       return ((ConcatList<V>) a).concat((ConcatList<V>) b);
     } else if (a instanceof ConcatList) {
