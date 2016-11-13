@@ -1,6 +1,6 @@
 ![](doc/labyrinth.jpg)
 
-__This library is a work in progress, it does not have even an initial release yet__
+__This library is a work in progress, and should not be used yet__
 
 This library provides flexible, high-quality implementations of collections in Java, all of which share these properties:
 
