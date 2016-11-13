@@ -11,12 +11,11 @@ import static java.lang.System.arraycopy;
 
 /**
  * A hash-map implementation which uses Robin Hood hashing for placement, and allows for customized hashing and equality
- * semantics.  Performance is moderately faster {@code java.util.HashMap}, increasingly so past 100k entries, and much
- * better in the worst case of poor hash distribution.
+ * semantics.  Performance is equivalent to {@code java.util.HashMap} for reads, moderately faster for writes, and more
+ * robust to cases of poor hash distribution.
  * <p>
- * Unlike {@code HashMap}, the {@code entries()} method allows random access, returning an IList that proxies through to the
- * underlying {@code entries}, which are in a densely packed array.  Partitioning this list is the most efficient way to
- * process the collection in parallel.
+ * The {@code entries()} method is O(1) and allows random access, returning an IList that proxies through to an
+ * underlying array.  Partitioning this list is the most efficient way to process the collection in parallel.
  * <p>
  * However, {@code LinearMap} also exposes O(N) {@code split()} and {@code merge()} methods, which despite their
  * asymptotic complexity can be quite fast in practice.  The appropriate way to split this collection will depend
@@ -255,7 +254,7 @@ public class LinearMap<K, V> implements IEditableMap<K, V> {
   }
 
   @Override
-  public IMap<K, V> merge(IMap<K, V> o, ValueMerger<K, V> mergeFn) {
+  public LinearMap<K, V> merge(IMap<K, V> o, ValueMerger<K, V> mergeFn) {
     if (o.size() == 0) {
       return this;
     } else if (o instanceof LinearMap) {
@@ -275,6 +274,8 @@ public class LinearMap<K, V> implements IEditableMap<K, V> {
     return this;
   }
 
+  /// Bookkeeping functions
+
   LinearMap<K, V> difference(LinearMap<K, ?> m) {
     LinearMap<K, V> result = new LinearMap<>(size);
     combine(m, result, i -> i == -1);
@@ -286,8 +287,6 @@ public class LinearMap<K, V> implements IEditableMap<K, V> {
     combine(m, result, i -> i != -1);
     return result;
   }
-
-  /// Utility functions
 
   private void combine(LinearMap<K, ?> m, LinearMap<K, V> result, IntPredicate indexPredicate) {
     for (long row : table) {
@@ -428,6 +427,8 @@ public class LinearMap<K, V> implements IEditableMap<K, V> {
       }
     }
   }
+
+  /// Utility functions
 
   static class Row {
 

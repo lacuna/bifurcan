@@ -11,5 +11,6 @@
   :profiles {:travis {:jvm-opts ^:replace ["-server" "-Xmx1g"]}
              :dev {:dependencies [[org.clojure/clojure "1.8.0"]
                                   [org.clojure/test.check "0.9.0"]
-                                  [criterium "0.4.3"]]}}
-  :jvm-opts ^:replace ["-server" "-XX:+UseG1GC" "-Xmx12g" "-XX:-OmitStackTraceInFastThrow"])
+                                  [criterium "0.4.3"]
+                                  [potemkin "0.4.3"]]}}
+  :jvm-opts ^:replace ["-server" "-XX:+UseG1GC" "-Xmx10g" "-XX:-OmitStackTraceInFastThrow"])
