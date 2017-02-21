@@ -7,7 +7,11 @@ import java.util.Optional;
  * @author ztellman
  */
 @SuppressWarnings("unchecked")
-public interface IMap<K, V> extends Iterable<IMap.IEntry<K, V>>, ISplittable<IMap<K, V>> {
+public interface IMap<K, V> extends
+    Iterable<IMap.IEntry<K, V>>,
+    ISplittable<IMap<K, V>>,
+    ILinearizable<IMap<K, V>>,
+    IForkable<IMap<K, V>> {
 
   interface IEntry<K, V> {
     K key();
@@ -15,7 +19,7 @@ public interface IMap<K, V> extends Iterable<IMap.IEntry<K, V>>, ISplittable<IMa
     V value();
   }
 
-  interface ValueMerger<K, V> {
+  interface ValueMerger<V> {
     V merge(V current, V updated);
   }
 
@@ -64,15 +68,80 @@ public interface IMap<K, V> extends Iterable<IMap.IEntry<K, V>>, ISplittable<IMa
   }
 
   /**
-   * @param b another map
+   * @param b       another map
    * @param mergeFn a function which, in the case of key collisions, returns the resulting
    * @return
-     */
-  default IMap<K, V> merge(IMap<K, V> b, ValueMerger<K, V> mergeFn) {
+   */
+  default IMap<K, V> merge(IMap<K, V> b, ValueMerger<V> mergeFn) {
     return Maps.merge(this, b, mergeFn);
   }
 
-  default IMap<K, V> merge(IMap<K, V> b) {
-    return this.merge(b, Maps.MERGE_LAST_WRITE_WINS);
+  default IMap<K, V> difference(ISet<K> keys) {
+    IMap<K, V> m = this;
+    for (K key : keys) {
+      m = m.remove(key);
+    }
+    return m;
   }
+
+  default IMap<K, V> intersection(ISet<K> keys) {
+    return null;
+  }
+
+  default IMap<K, V> union(IMap<K, V> m) {
+    return Maps.merge(this, m, Maps.MERGE_LAST_WRITE_WINS);
+  }
+
+  default IMap<K, V> difference(IMap<K, ?> m) {
+    return difference(m.keys());
+  }
+
+  default IMap<K, V> intersection(IMap<K, ?> m) {
+    return intersection(m.keys());
+  }
+
+  /**
+   * @param key   the key
+   * @param value the new value under the key
+   * @param merge a function which will be invoked if there is a pre-existing value under {@code key}, with both the
+   *              old and new value, to determine what should be stored in the map
+   * @return an updated map
+   */
+  default IMap<K, V> put(K key, V value, ValueMerger<V> merge) {
+    return null;
+  }
+
+  /**
+   * @return an updated map with {@code value} stored under {@code key}
+   */
+  default IMap<K, V> put(K key, V value) {
+    return put(key, value, Maps.MERGE_LAST_WRITE_WINS);
+  }
+
+  /**
+   * @return the map, without anything stored under {@code key}
+   */
+  default IMap<K, V> remove(K key) {
+    return null;
+  }
+
+  @Override
+  default IMap<K, V> forked() {
+    return null;
+  }
+
+  @Override
+  default IMap<K, V> linear() {
+    return null;
+  }
+
+  @Override
+  default public IList<IMap<K, V>> split(int parts) {
+    return keys()
+        .split(parts)
+        .stream()
+        .map(ks -> Maps.from(ks, k -> get(k, null)))
+        .collect(Lists.collector());
+  }
+
 }

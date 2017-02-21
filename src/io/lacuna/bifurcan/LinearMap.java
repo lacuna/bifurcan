@@ -24,7 +24,7 @@ import static java.lang.System.arraycopy;
  * @author ztellman
  */
 @SuppressWarnings("unchecked")
-public class LinearMap<K, V> implements IEditableMap<K, V> {
+public class LinearMap<K, V> implements IMap<K, V> {
 
   /// Fields
 
@@ -61,10 +61,10 @@ public class LinearMap<K, V> implements IEditableMap<K, V> {
   public static <K, V> LinearMap<K, V> from(IMap<K, V> map) {
     if (map instanceof LinearMap) {
       LinearMap<K, V> m = (LinearMap<K, V>) map;
-      LinearMap<K, V> l = new LinearMap<K, V>((int) map.size(), m.hashFn, m.equalsFn);
+      LinearMap<K, V> l = new LinearMap<K, V>(m.entries.length >> 1, m.hashFn, m.equalsFn);
 
-      arraycopy(l.entries, 0, m.entries, 0, m.size);
-      arraycopy(l.table, 0, m.table, 0, m.table.length);
+      arraycopy(m.entries, 0, l.entries, 0, m.size << 1);
+      arraycopy(m.table, 0, l.table, 0, m.table.length);
       l.size = m.size;
 
       return l;
@@ -107,11 +107,11 @@ public class LinearMap<K, V> implements IEditableMap<K, V> {
   }
 
   @Override
-  public LinearMap<K, V> put(K key, V value, ValueMerger<K, V> mergeFn) {
+  public LinearMap<K, V> put(K key, V value, IMap.ValueMerger<V> merge) {
     if ((size << 1) == entries.length) {
       resize(size << 1);
     }
-    put(keyHash(key), key, value, mergeFn);
+    put(keyHash(key), key, value, merge);
     return this;
   }
 
@@ -176,12 +176,12 @@ public class LinearMap<K, V> implements IEditableMap<K, V> {
   }
 
   @Override
-  public IEditableMap<K, V> forked() {
+  public IMap<K, V> forked() {
     throw new IllegalStateException("a LinearMap cannot be efficiently transformed into a forked representation");
   }
 
   @Override
-  public IEditableMap<K, V> linear() {
+  public IMap<K, V> linear() {
     return this;
   }
 
@@ -222,7 +222,7 @@ public class LinearMap<K, V> implements IEditableMap<K, V> {
   @Override
   public IList<IMap<K, V>> split(int parts) {
     parts = Math.min(parts, size);
-    IEditableList<IMap<K, V>> list = new LinearList<>(parts);
+    IList<IMap<K, V>> list = new LinearList<>(parts);
     if (parts <= 1) {
       return list.addLast(this);
     }
@@ -254,7 +254,7 @@ public class LinearMap<K, V> implements IEditableMap<K, V> {
   }
 
   @Override
-  public LinearMap<K, V> merge(IMap<K, V> o, ValueMerger<K, V> mergeFn) {
+  public LinearMap<K, V> merge(IMap<K, V> o, ValueMerger<V> mergeFn) {
     if (o.size() == 0) {
       return this;
     } else if (o instanceof LinearMap) {
@@ -388,7 +388,7 @@ public class LinearMap<K, V> implements IEditableMap<K, V> {
   }
 
   // factored out for better inlining
-  private boolean putCheckEquality(int idx, K key, V value, ValueMerger<K, V> mergeFn) {
+  private boolean putCheckEquality(int idx, K key, V value, IMap.ValueMerger<V> mergeFn) {
     long row = table[idx];
     int keyIndex = Row.keyIndex(row);
     K currKey = (K) entries[keyIndex];
@@ -401,7 +401,7 @@ public class LinearMap<K, V> implements IEditableMap<K, V> {
     }
   }
 
-  private void put(int hash, K key, V value, ValueMerger<K, V> mergeFn) {
+  private void put(int hash, K key, V value, IMap.ValueMerger<V> mergeFn) {
     for (int idx = estimatedIndex(hash), dist = 0; ; idx = nextIndex(idx), dist++) {
       long row = table[idx];
       int currHash = Row.hash(row);

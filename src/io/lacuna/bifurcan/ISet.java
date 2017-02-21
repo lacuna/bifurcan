@@ -7,14 +7,18 @@ import java.util.stream.IntStream;
 /**
  * @author ztellman
  */
-public interface ISet<V> extends Iterable<V>, ISplittable<ISet<V>> {
+public interface ISet<V> extends
+    Iterable<V>,
+    ISplittable<ISet<V>>,
+    ILinearizable<ISet<V>>,
+    IForkable<ISet<V>> {
 
   /**
    * @return true, if the set contains {@code rowValue}
    */
   boolean contains(V value);
 
-  /**
+  /**s
    * @return the number of elements in the set
    */
   long size();
@@ -23,6 +27,20 @@ public interface ISet<V> extends Iterable<V>, ISplittable<ISet<V>> {
    * @return an {@code IList} containing all the elements in the set
    */
   IList<V> elements();
+
+  /**
+   * @return the set, containing {@code rowValue}
+   */
+  default ISet<V> add(V value) {
+    return null;
+  }
+
+  /**
+   * @return the set, without {@code rowValue}
+   */
+  default ISet<V> remove(V value) {
+    return null;
+  }
 
   default Iterator<V> iterator() {
     return elements().iterator();
@@ -44,7 +62,7 @@ public interface ISet<V> extends Iterable<V>, ISplittable<ISet<V>> {
    * @return the collection, represented as a normal Java {@code Set}, without support for writes
    */
   default java.util.Set<V> toSet() {
-    return Sets.toSet(elements(), e -> contains(e));
+    return Sets.toSet(elements(), this::contains);
   }
 
   /**
@@ -66,5 +84,20 @@ public interface ISet<V> extends Iterable<V>, ISplittable<ISet<V>> {
     IList<V> es = elements();
     IntStream.range(0, ary.length).forEach(i -> ary[i] = es.nth(i));
     return ary;
+  }
+
+  @Override
+  default ISet<V> forked() {
+    return null;
+  }
+
+  @Override
+  default ISet<V> linear() {
+    return null;
+  }
+
+  @Override
+  default IList<ISet<V>> split(int parts) {
+    return Sets.split(this, parts);
   }
 }

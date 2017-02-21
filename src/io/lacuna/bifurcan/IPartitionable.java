@@ -12,7 +12,7 @@ public interface IPartitionable<V> {
    * @param parts the target number of pieces
    * @return a list containing subsets of the collection.
    */
-  IEditableList<V> partition(int parts);
+  IList<V> partition(int parts);
 
   /**
    * @param collection another collection

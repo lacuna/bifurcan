@@ -456,25 +456,26 @@ public class Lists {
     };
   }
 
-  public static <V> Collector<V, LinearList<V>, IList<V>> collector() {
-    return new Collector<V, LinearList<V>, IList<V>>() {
+  // TODO: don't use LinearList here
+  public static <V> Collector<V, IList<V>, IList<V>> collector() {
+    return new Collector<V, IList<V>, IList<V>>() {
       @Override
-      public Supplier<LinearList<V>> supplier() {
+      public Supplier<IList<V>> supplier() {
         return LinearList::new;
       }
 
       @Override
-      public BiConsumer<LinearList<V>, V> accumulator() {
-        return LinearList::addLast;
+      public BiConsumer<IList<V>, V> accumulator() {
+        return IList::addLast;
       }
 
       @Override
-      public BinaryOperator<LinearList<V>> combiner() {
-        return LinearList::concat;
+      public BinaryOperator<IList<V>> combiner() {
+        return IList::concat;
       }
 
       @Override
-      public Function<LinearList<V>, IList<V>> finisher() {
+      public Function<IList<V>, IList<V>> finisher() {
         return a -> a;
       }
 

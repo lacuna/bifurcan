@@ -82,7 +82,7 @@ public class SparseIntMap<V> {
     }
 
     byte nKeyBits = minBitLength(key(size() - 2));
-    Object[] nVals = ArrayVector.remove(vals, size() - 1);
+    Object[] nVals = ArrayVector.remove(vals, size() - 1, 1);
 
     if (keyBits == nKeyBits) {
       int bitLength = vals.length * keyBits;
@@ -136,7 +136,7 @@ public class SparseIntMap<V> {
       return new SparseIntMap<V>(
               keyBits,
               BitVector.remove(keys, (keyBits * vals.length), (keyBits * idx), keyBits),
-              ArrayVector.remove(vals, idx));
+              ArrayVector.remove(vals, idx, 1));
     }
   }
 

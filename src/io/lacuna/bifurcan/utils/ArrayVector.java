@@ -6,40 +6,116 @@ import static java.lang.System.arraycopy;
  * @author ztellman
  */
 public class ArrayVector {
-  public static Object[] create(int len) {
-    return new Object[len];
-  }
 
-  public static Object[] insert(Object[] vec, int idx, Object val) {
-    Object[] nVec = create(vec.length + 1);
+  // Object
+
+  public static Object[] insert(Object[] vec, int idx, Object v) {
+    Object[] nVec = new Object[vec.length + 1];
     arraycopy(vec, 0, nVec, 0, idx);
-    nVec[idx] = val;
+    nVec[idx] = v;
     arraycopy(vec, idx, nVec, idx + 1, vec.length - idx);
 
     return nVec;
   }
 
-  public static Object[] append(Object[] vec, Object val) {
-    Object[] nVec = create(vec.length + 1);
-    arraycopy(vec, 0, nVec, 0, vec.length);
-    nVec[vec.length] = val;
-
-    return nVec;
-  }
-
-  public static Object[] set(Object[] vec, int idx, Object val) {
-    Object[] nVec = create(vec.length);
-    arraycopy(vec, 0, nVec, 0, vec.length);
-    nVec[idx] = val;
-
-    return nVec;
-  }
-
-  public static Object[] remove(Object[] vec, int idx) {
-    Object[] nVec = create(vec.length - 1);
+  public static Object[] insert(Object[] vec, int idx, Object v1, Object v2) {
+    Object[] nVec = new Object[vec.length + 2];
     arraycopy(vec, 0, nVec, 0, idx);
-    arraycopy(vec, idx + 1, nVec, idx, nVec.length - idx);
+    nVec[idx] = v1;
+    nVec[idx + 1] = v2;
+    arraycopy(vec, idx, nVec, idx + 2, vec.length - idx);
 
     return nVec;
   }
+
+  public static Object[] append(Object[] vec, Object v) {
+    Object[] nVec = new Object[vec.length + 1];
+    arraycopy(vec, 0, nVec, 0, vec.length);
+    nVec[vec.length] = v;
+
+    return nVec;
+  }
+
+  public static Object[] append(Object[] vec, Object v1, Object v2) {
+    Object[] nVec = new Object[vec.length + 2];
+    arraycopy(vec, 0, nVec, 0, vec.length);
+    nVec[vec.length] = v1;
+    nVec[vec.length + 1] = v2;
+
+    return nVec;
+  }
+
+  public static Object[] set(Object[] vec, int idx, Object v) {
+    Object[] nVec = new Object[vec.length];
+    arraycopy(vec, 0, nVec, 0, vec.length);
+    nVec[idx] = v;
+
+    return nVec;
+  }
+
+  public static Object[] set(Object[] vec, int idx, Object v1, Object v2) {
+    Object[] nVec = new Object[vec.length];
+    arraycopy(vec, 0, nVec, 0, vec.length);
+    nVec[idx] = v1;
+    nVec[idx + 1] = v2;
+
+    return nVec;
+  }
+
+  public static Object[] remove(Object[] vec, int idx, int len) {
+    Object[] nVec = new Object[vec.length - len];
+    arraycopy(vec, 0, nVec, 0, idx);
+    arraycopy(vec, idx + len, nVec, idx, nVec.length - idx);
+
+    return nVec;
+  }
+
+  // int
+
+  public static int[] insert(int[] vec, int idx, int v) {
+    int[] nVec = new int[vec.length + 1];
+    arraycopy(vec, 0, nVec, 0, idx);
+    nVec[idx] = v;
+    arraycopy(vec, idx, nVec, idx + 1, vec.length - idx);
+
+    return nVec;
+  }
+
+  public static int[] insert(int[] vec, int idx, int v1, int v2) {
+    int[] nVec = new int[vec.length + 2];
+    arraycopy(vec, 0, nVec, 0, idx);
+    nVec[idx] = v1;
+    nVec[idx + 1] = v2;
+    arraycopy(vec, idx, nVec, idx + 2, vec.length - idx);
+
+    return nVec;
+  }
+
+
+  public static int[] set(int[] vec, int idx, int v) {
+    int[] nVec = new int[vec.length];
+    arraycopy(vec, 0, nVec, 0, vec.length);
+    nVec[idx] = v;
+
+    return nVec;
+  }
+
+  public static int[] set(int[] vec, int idx, int v1, int v2) {
+    int[] nVec = new int[vec.length];
+    arraycopy(vec, 0, nVec, 0, vec.length);
+    nVec[idx] = v1;
+    nVec[idx + 1] = v2;
+
+    return nVec;
+  }
+
+  public static int[] remove(int[] vec, int idx, int len) {
+    int[] nVec = new int[vec.length - len];
+    arraycopy(vec, 0, nVec, 0, idx);
+    arraycopy(vec, idx + len, nVec, idx, nVec.length - idx);
+
+    return nVec;
+  }
+
+
 }

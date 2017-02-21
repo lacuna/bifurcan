@@ -13,7 +13,7 @@ import static io.lacuna.bifurcan.utils.Bits.log2Ceil;
  * @author ztellman
  */
 @SuppressWarnings("unchecked")
-public class LinearList<V> implements IEditableList<V> {
+public class LinearList<V> implements IList<V> {
 
   private static final int DEFAULT_CAPACITY = 8;
 
@@ -76,7 +76,7 @@ public class LinearList<V> implements IEditableList<V> {
   }
 
   @Override
-  public IEditableList<V> addFirst(V value) {
+  public LinearList<V> addFirst(V value) {
     if (size == elements.length) {
       resize(size << 1);
     }
@@ -140,12 +140,12 @@ public class LinearList<V> implements IEditableList<V> {
   }
 
   @Override
-  public IEditableList<V> forked() {
+  public IList<V> forked() {
     throw new UnsupportedOperationException("a LinearList cannot be efficiently transformed into a forked representation");
   }
 
   @Override
-  public IEditableList<V> linear() {
+  public IList<V> linear() {
     return this;
   }
 
@@ -156,8 +156,8 @@ public class LinearList<V> implements IEditableList<V> {
 
   @Override
   public boolean equals(Object obj) {
-    if (obj instanceof IEditableList) {
-      return Lists.equals(this, (IEditableList<V>) obj);
+    if (obj instanceof IList) {
+      return Lists.equals(this, (IList<V>) obj);
     }
     return false;
   }

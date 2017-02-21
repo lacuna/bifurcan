@@ -15,12 +15,10 @@
     Bits
     SparseIntMap]
    [io.lacuna.bifurcan
+    Map
     IMap
     IList
     ISet
-    IEditableList
-    IEditableSet
-    IEditableMap
     LinearList
     LinearMap
     LinearSet
@@ -30,28 +28,28 @@
 
 ;;;
 
-(defn list-add-first [^IEditableList l v]
+(defn list-add-first [^IList l v]
   (.addFirst l v))
 
-(defn list-add-last [^IEditableList l v]
+(defn list-add-last [^IList l v]
   (.addLast l v))
 
-(defn list-remove-first [^IEditableList l]
+(defn list-remove-first [^IList l]
   (.removeFirst l))
 
-(defn list-remove-last [^IEditableList l]
+(defn list-remove-last [^IList l]
   (.removeLast l))
 
-(defn map-put [^IEditableMap m k v]
+(defn map-put [^IMap m k v]
   (.put m k v))
 
-(defn map-remove [^IEditableMap m k]
+(defn map-remove [^IMap m k]
   (.remove m k))
 
-(defn set-add [^IEditableSet m e]
+(defn set-add [^ISet m e]
   (.add m e))
 
-(defn set-remove [^IEditableSet m e]
+(defn set-remove [^ISet m e]
   (.remove m e))
 
 (defn ->map [^IMap m]
@@ -107,10 +105,15 @@
    m' (LinearMap.)]
   (= m (zipmap (keys m) (->> m keys (map #(-> ^IMap m' (.get % nil)))))))
 
+(u/def-collection-check test-map-lookup 1e4 (map-actions)
+  [m {}
+   m' (Map.)]
+  (= m (zipmap (keys m) (->> m keys (map #(-> ^IMap m' (.get % nil)))))))
+
 (u/def-collection-check test-linear-map-merge 1e4 (map-actions)
   [m {}
    m' (LinearMap.)]
-  (= m' (->> (.split ^IMap m' 8) (reduce #(.merge ^LinearMap %1 %2)))))
+  (= m' (->> (.split ^IMap m' 8) (reduce #(.union ^IMap %1 %2)))))
 
 (u/def-collection-check test-linear-set 1e4 (set-actions)
   [s #{}

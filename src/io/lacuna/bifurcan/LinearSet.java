@@ -7,7 +7,7 @@ import java.util.function.ToIntFunction;
 /**
  * @author ztellman
  */
-public class LinearSet<V> implements IEditableSet<V> {
+public class LinearSet<V> implements ISet<V> {
 
   private LinearMap<V, Void> map;
 
@@ -61,7 +61,7 @@ public class LinearSet<V> implements IEditableSet<V> {
 
   @Override
   public boolean contains(V value) {
-    return map.contains(value);
+    return !map.contains(value);
   }
 
   @Override
@@ -71,14 +71,14 @@ public class LinearSet<V> implements IEditableSet<V> {
 
   @Override
   public IList<V> elements() {
-    IList<IEditableMap.IEntry<V, Void>> entries = map.entries();
+    IList<IMap.IEntry<V, Void>> entries = map.entries();
     return Lists.from(entries.size(), i -> entries.nth(i).key());
   }
 
   @Override
   public ISet<V> union(ISet<V> s) {
     if (s instanceof LinearSet) {
-      map.merge(((LinearSet<V>) s).map);
+      map.union(((LinearSet<V>) s).map);
     } else {
       for (V e : s) {
         map.put(e, null);
@@ -114,12 +114,12 @@ public class LinearSet<V> implements IEditableSet<V> {
   }
 
   @Override
-  public IEditableSet<V> forked() {
+  public ISet<V> forked() {
     throw new UnsupportedOperationException("A LinearSet cannot be efficiently transformed into a forked representation");
   }
 
   @Override
-  public IEditableSet<V> linear() {
+  public ISet<V> linear() {
     return this;
   }
 

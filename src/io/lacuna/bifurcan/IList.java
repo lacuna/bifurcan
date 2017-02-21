@@ -13,7 +13,11 @@ import java.util.stream.StreamSupport;
  * @author ztellman
  */
 @SuppressWarnings("unchecked")
-public interface IList<V> extends ISplittable<IList<V>>, Iterable<V> {
+public interface IList<V> extends
+    ISplittable<IList<V>>,
+    Iterable<V>,
+    IForkable<IList<V>>,
+    ILinearizable<IList<V>> {
 
   /**
    * @return the element at {@code idx}
@@ -25,6 +29,42 @@ public interface IList<V> extends ISplittable<IList<V>>, Iterable<V> {
    * @return the length of the list
    */
   long size();
+
+  /**
+   * @return a new list, with {@code value} appended
+   */
+  default IList<V> addLast(V value) {
+    return null;
+  }
+
+  /**
+   * @return a new list, with {@code value} prepended
+   */
+  default IList<V> addFirst(V value) {
+    return null;
+  }
+
+  /**
+   * @return a new list with the last value removed, or the same list if already empty
+   */
+  default IList<V> removeLast() {
+    return null;
+  }
+
+  /**
+   * @return a new list with the first value removed, or the same value if already empty
+   */
+  default IList<V> removeFirst() {
+    return null;
+  }
+
+  /**
+   * @return a new list, with the element at {@code idx} overwritten with {@code value}. If {@code idx} is equal to {@code size()}, the value is appended.
+   * @throws IndexOutOfBoundsException when {@code idx} is not within {@code [0, count]}
+   */
+  default IList<V> set(long idx, V value) {
+    return null;
+  }
 
   /**
    * @return a {@code java.util.stream.Stream}, representing the elements in the list.
@@ -135,5 +175,15 @@ public interface IList<V> extends ISplittable<IList<V>>, Iterable<V> {
       throw new NoSuchElementException();
     }
     return nth(size() - 1);
+  }
+
+  @Override
+  default IList<V> forked() {
+    return null;
+  }
+
+  @Override
+  default IList<V> linear() {
+    return null;
   }
 }

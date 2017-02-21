@@ -19,9 +19,6 @@
     IMap
     IList
     ISet
-    IEditableList
-    IEditableSet
-    IEditableMap
     LinearList
     LinearMap
     LinearSet

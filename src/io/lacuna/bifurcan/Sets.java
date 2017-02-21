@@ -145,11 +145,6 @@ public class Sets {
       public IList<V> elements() {
         return elements;
       }
-
-      @Override
-      public IList<ISet<V>> split(int parts) {
-        return Sets.split(this, parts);
-      }
     };
   }
 
@@ -169,11 +164,6 @@ public class Sets {
       public IList<V> elements() {
         return (IList<V>) Lists.from(s.toArray());
       }
-
-      @Override
-      public IList<ISet<V>> split(int parts) {
-        return Sets.split(this, parts);
-      }
     };
   }
 
@@ -181,11 +171,11 @@ public class Sets {
     return set.elements().split(parts).stream().map(LinearSet::from).collect(Lists.collector());
   }
 
-  public static <V> String toString(IEditableSet<V> set) {
+  public static <V> String toString(ISet<V> set) {
     return toString(set, Objects::toString);
   }
 
-  public static <V> String toString(IEditableSet<V> set, Function<V, String> elementPrinter) {
+  public static <V> String toString(ISet<V> set, Function<V, String> elementPrinter) {
     StringBuilder sb = new StringBuilder("{");
 
     Iterator<V> it = set.elements().iterator();

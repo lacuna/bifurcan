@@ -1,7 +1,6 @@
 (defproject bifurcan "0.1.0-SNAPSHOT"
   :java-source-paths ["src"]
   :dependencies []
-  :plugins [[lein-virgil "0.1.0"]]
   :test-selectors {:default #(not
                                (some #{:benchmark :stress}
                                  (cons (:tag %) (keys %))))

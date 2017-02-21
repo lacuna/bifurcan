@@ -80,7 +80,7 @@ public class Maps {
     return sb.toString();
   }
 
-  public static <K, V> long hash(IEditableMap<K, V> m) {
+  public static <K, V> long hash(IMap<K, V> m) {
     return hash(m, e -> (Objects.hash(e.key()) * 31) ^ Objects.hash(e.value()), (a, b) -> a + b);
   }
 
@@ -88,7 +88,7 @@ public class Maps {
     return m.entries().stream().mapToLong(hash).reduce(combiner).orElse(0);
   }
 
-  public static <K, V> IMap<K, V> merge(IMap<K, V> a, IMap<K, V> b, IMap.ValueMerger<K, V> mergeFn) {
+  public static <K, V> IMap<K, V> merge(IMap<K, V> a, IMap<K, V> b, IMap.ValueMerger<V> mergeFn) {
     if (a.size() < b.size()) {
       return merge(b, a, mergeFn);
     }
@@ -117,11 +117,6 @@ public class Maps {
 
   public static <K, V> IMap<K, V> from(java.util.Map<K, V> map) {
     return new IMap<K, V>() {
-
-      @Override
-      public IList<IMap<K, V>> split(int parts) {
-        return entries().split(parts).stream().map(LinearMap::from).collect(Lists.collector());
-      }
 
       @Override
       public V get(K key, V defaultValue) {
@@ -154,6 +149,50 @@ public class Maps {
       @Override
       public long size() {
         return map.size();
+      }
+    };
+  }
+
+  public static <K, V> IMap<K, V> from(ISet<K> keys, Function<K, V> lookup) {
+    return new IMap<K, V>() {
+      @Override
+      public V get(K key, V defaultValue) {
+        if (keys.contains(key)) {
+          return lookup.apply(key);
+        } else {
+          return defaultValue;
+        }
+      }
+
+      @Override
+      public Optional<V> get(K key) {
+        if (keys.contains(key)) {
+          return Optional.ofNullable(lookup.apply(key));
+        } else {
+          return Optional.empty();
+        }
+      }
+
+      @Override
+      public boolean contains(K key) {
+        return keys.contains(key);
+      }
+
+      @Override
+      public IList<IEntry<K, V>> entries() {
+        return keys.elements().stream()
+            .map(k -> (IEntry<K, V>) new Entry(k, lookup.apply(k)))
+            .collect(Lists.collector());
+      }
+
+      @Override
+      public ISet<K> keys() {
+        return keys;
+      }
+
+      @Override
+      public long size() {
+        return keys.size();
       }
     };
   }
