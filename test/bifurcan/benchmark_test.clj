@@ -1,5 +1,6 @@
 (ns bifurcan.benchmark-test
   (:require
+   [proteus :refer [let-mutable]]
    [potemkin :as p :refer (doary)]
    [clojure.test :refer :all]
    [clojure.test.check.generators :as gen]
@@ -16,6 +17,7 @@
     ArrayDeque
     Collection]
    [io.lacuna.bifurcan
+    Map
     IMap
     IList
     ISet
@@ -40,29 +42,28 @@
     (.addLast l v))
   l)
 
-(defn construct-vector [v ^objects vs]
-  (let [len (alength vs)]
-    (loop [l (transient v), i 0]
-      (if (<= len i)
-        (persistent! l)
-        (recur (conj! l (aget vs i)) (unchecked-inc i))))))
+(defn construct-vector [v vs]
+  (let-mutable [l (transient v)]
+    (doary [v vs]
+      (set! l (conj! l v)))
+    l))
 
-(defn construct-linear-map [^LinearMap m vs]
-  (doary [v vs]
-    (.put m v nil))
-  m)
+(defn construct-map [^IMap m vs]
+  (let-mutable [m (.linear m)]
+    (doary [v vs]
+      (set! m (.put ^IMap m v nil)))
+    m))
 
 (defn construct-hash-map [^HashMap m vs]
   (doary [v vs]
     (.put m v nil))
   m)
 
-(defn construct-clojure-map [m ^objects vs]
-  (let [len (alength vs)]
-    (loop [m (transient m), i 0]
-      (if (<= len i)
-        (persistent! m)
-        (recur (assoc! m (aget vs i) nil) (unchecked-inc i))))))
+(defn construct-clojure-map [m vs]
+  (let-mutable [m (transient m)]
+    (doary [v vs]
+      (set! m (assoc! m v nil)))
+    (persistent! m)))
 
 (defn lookup-linear-list [^LinearList l ks]
   (doary [k ks]
@@ -76,7 +77,7 @@
   (doary[k ks]
     (nth v k)))
 
-(defn lookup-linear-map [^LinearMap m ks]
+(defn lookup-map [^IMap m ks]
   (doary [k ks]
     (.get m k nil)))
 
@@ -139,7 +140,7 @@
 
 (defn benchmark-collection [base-collection generate-entries construct lookup test?]
   (prn (class (base-collection 0)))
-  (->> (range 1 8)
+  (->> (range 1 4)
     (map #(Math/pow 10 %))
     (map (fn [n]
            (println (str "10^" (int (Math/log10 n))))
@@ -165,13 +166,15 @@
 
 (deftest ^:benchmark benchmark-collections
   (pprint
-    [:linear-list (benchmark-collection (fn [_] (LinearList.)) generate-numbers construct-linear-list lookup-linear-list  #{:construct :lookup})
-     :array-list  (benchmark-collection (fn [_] (ArrayList.)) generate-numbers construct-java-list lookup-java-list #{:construct :lookup})
-     :array-deque (benchmark-collection (fn [_] (ArrayDeque.)) generate-numbers construct-java-deque nil #{:construct})
-     :vector      (benchmark-collection (fn [_] []) generate-numbers construct-vector lookup-vector #{:construct :lookup})
+    [(comment
+       :linear-list (benchmark-collection (fn [_] (LinearList.)) generate-numbers construct-linear-list lookup-linear-list  #{:construct :lookup})
+       :array-list  (benchmark-collection (fn [_] (ArrayList.)) generate-numbers construct-java-list lookup-java-list #{:construct :lookup})
+       :array-deque (benchmark-collection (fn [_] (ArrayDeque.)) generate-numbers construct-java-deque nil #{:construct})
+       :vector      (benchmark-collection (fn [_] []) generate-numbers construct-vector lookup-vector #{:construct :lookup}))
 
-     :linear-map  (benchmark-collection (fn [_] (LinearMap.)) generate-entries construct-linear-map lookup-linear-map (constantly true))
+     :linear-map  (benchmark-collection (fn [_] (LinearMap.)) generate-entries construct-map lookup-map (constantly true))
      :linear-set  (benchmark-collection (fn [_] (LinearSet.)) generate-entries construct-linear-set lookup-linear-set (constantly true))
+     :map         (benchmark-collection (fn [_] (Map.)) generate-entries construct-map lookup-map (constantly true))
 
      :hash-set    (benchmark-collection (fn [_] (HashSet.)) generate-entries construct-hash-set lookup-hash-set (constantly true))
      :clojure-set (benchmark-collection (fn [_] #{}) generate-entries construct-clojure-set lookup-clojure-set (constantly true))

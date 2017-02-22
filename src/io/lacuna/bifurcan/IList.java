@@ -79,24 +79,7 @@ public interface IList<V> extends
   }
 
   default Iterator<V> iterator() {
-    return new Iterator<V>() {
-
-      int idx = 0;
-
-      @Override
-      public boolean hasNext() {
-        return idx < size();
-      }
-
-      @Override
-      public V next() {
-        if (hasNext()) {
-          return nth(idx++);
-        } else {
-          throw new NoSuchElementException();
-        }
-      }
-    };
+    return Lists.iterator(this);
   }
 
   /**

@@ -4,12 +4,7 @@ import io.lacuna.bifurcan.IMap.IEntry;
 import io.lacuna.bifurcan.utils.SparseIntMap;
 
 import java.lang.reflect.Array;
-import java.util.Collection;
-import java.util.EnumSet;
-import java.util.Iterator;
-import java.util.ListIterator;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.BiPredicate;
 import java.util.function.BinaryOperator;
@@ -422,6 +417,10 @@ public class Lists {
   }
 
   public static <V> IList<V> from(long size, LongFunction<V> elementFn) {
+    return from(size, elementFn, Lists::iterator);
+  }
+
+  public static <V> IList<V> from(long size, LongFunction<V> elementFn, Function<IList<V>, Iterator<V>> iteratorFn) {
     return new IList<V>() {
       @Override
       public int hashCode() {
@@ -447,6 +446,11 @@ public class Lists {
           throw new IndexOutOfBoundsException(idx + " must be within [0," + size + ")");
         }
         return elementFn.apply(idx);
+      }
+
+      @Override
+      public Iterator<V> iterator() {
+        return iteratorFn.apply(this);
       }
 
       @Override
@@ -482,6 +486,27 @@ public class Lists {
       @Override
       public Set<Characteristics> characteristics() {
         return EnumSet.of(Characteristics.IDENTITY_FINISH);
+      }
+    };
+  }
+
+  public static <V> Iterator<V> iterator(IList<V> list) {
+    return new Iterator<V>() {
+
+      int idx = 0;
+
+      @Override
+      public boolean hasNext() {
+        return idx < list.size();
+      }
+
+      @Override
+      public V next() {
+        if (hasNext()) {
+          return list.nth(idx++);
+        } else {
+          throw new NoSuchElementException();
+        }
       }
     };
   }

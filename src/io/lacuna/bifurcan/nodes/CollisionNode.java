@@ -4,6 +4,7 @@ import io.lacuna.bifurcan.IMap;
 import io.lacuna.bifurcan.Maps;
 import io.lacuna.bifurcan.utils.ArrayVector;
 
+import java.util.Iterator;
 import java.util.function.BiPredicate;
 
 /**
@@ -68,5 +69,22 @@ public class CollisionNode<K, V> implements IMapNode<K, V> {
   public IMap.IEntry<K, V> nth(long idx) {
     int i = (int) idx << 1;
     return new Maps.Entry<K, V>((K) entries[i], (V) entries[i + 1]);
+  }
+
+  @Override
+  public Iterator<IMap.IEntry<K, V>> iterator() {
+    return new Iterator<IMap.IEntry<K, V>>() {
+      int idx = 0;
+      @Override
+      public boolean hasNext() {
+        return idx < entries.length;
+      }
+
+      @Override
+      public IMap.IEntry<K, V> next() {
+        idx += 2;
+        return new Maps.Entry<K, V>((K) entries[idx - 2], (V) entries[idx - 1]);
+      }
+    };
   }
 }

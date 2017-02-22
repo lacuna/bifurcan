@@ -5,7 +5,4 @@ package io.lacuna.bifurcan;
  */
 public class List {
 
-  private static class RRBNode {
-    long[] indices;
-  }
 }

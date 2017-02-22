@@ -7,7 +7,7 @@ import java.util.function.BiPredicate;
 /**
  * @author ztellman
  */
-public interface IMapNode<K, V> {
+public interface IMapNode<K, V> extends Iterable<IMap.IEntry<K, V>> {
 
   IMapNode<K, V> put(int shift, Object editor, int hash, K key, V value, BiPredicate<K, K> equals, IMap.ValueMerger<V> merge);
 

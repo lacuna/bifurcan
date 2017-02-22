@@ -11,5 +11,6 @@
              :dev {:dependencies [[org.clojure/clojure "1.8.0"]
                                   [org.clojure/test.check "0.9.0"]
                                   [criterium "0.4.3"]
-                                  [potemkin "0.4.3"]]}}
+                                  [potemkin "0.4.3"]
+                                  [proteus "0.1.6"]]}}
   :jvm-opts ^:replace ["-server" "-XX:+UseG1GC" "-Xmx10g" "-XX:-OmitStackTraceInFastThrow"])

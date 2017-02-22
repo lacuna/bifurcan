@@ -53,7 +53,12 @@
   (.remove m e))
 
 (defn ->map [^IMap m]
-  (->> m .entries .iterator iterator-seq (map (fn [^IMap$IEntry e] [(.key e) (.value e)])) (into {})))
+  (->> m
+    .entries
+    .iterator
+    iterator-seq
+    (map (fn [^IMap$IEntry e] [(.key e) (.value e)]))
+    (into {})))
 
 (defn ->set [^ISet s]
   (->> s .elements .iterator iterator-seq (into #{})))
@@ -107,7 +112,7 @@
 
 (u/def-collection-check test-map-lookup 1e4 (map-actions)
   [m {}
-   m' (Map.)]
+   m' (.linear (Map.))]
   (= m (zipmap (keys m) (->> m keys (map #(-> ^IMap m' (.get % nil)))))))
 
 (u/def-collection-check test-linear-map-merge 1e4 (map-actions)

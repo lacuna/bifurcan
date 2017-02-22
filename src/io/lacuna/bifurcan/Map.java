@@ -2,6 +2,7 @@ package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.nodes.ChampNode;
 
+import java.util.Iterator;
 import java.util.Objects;
 import java.util.function.BiPredicate;
 import java.util.function.ToIntFunction;
@@ -15,25 +16,28 @@ public class Map<K, V>  implements IMap<K, V> {
 
   private final BiPredicate<K, K> equalsFn;
   private final ToIntFunction<K> hashFn;
-  public final ChampNode<K, V> root;
+  public ChampNode<K, V> root;
+  public final boolean linear;
 
   public Map(ToIntFunction<K> hashFn, BiPredicate<K, K> equalsFn) {
-    this(ChampNode.EMPTY, hashFn, equalsFn);
+    this(ChampNode.EMPTY, hashFn, equalsFn, false);
   }
 
   public Map() {
-    this(ChampNode.EMPTY, Objects::hashCode, Objects::equals);
+    this(ChampNode.EMPTY, Objects::hashCode, Objects::equals, false);
   }
 
-  private Map(ChampNode<K, V> root, ToIntFunction<K> hashFn, BiPredicate<K, K> equalsFn) {
+  private Map(ChampNode<K, V> root, ToIntFunction<K> hashFn, BiPredicate<K, K> equalsFn, boolean linear) {
     this.root = root;
     this.hashFn = hashFn;
     this.equalsFn = equalsFn;
+    this.linear = linear;
   }
 
   @Override
   public V get(K key, V defaultValue) {
     Object val = root.get(0, hashFn.applyAsInt(key), key, equalsFn, DEFAULT_VALUE);
+
     if (val == DEFAULT_VALUE) {
       return defaultValue;
     } else {
@@ -44,20 +48,28 @@ public class Map<K, V>  implements IMap<K, V> {
   @Override
   public IMap<K, V> put(K key, V value, ValueMerger<V> merge) {
     ChampNode<K, V> rootPrime = root.put(0, this, hashFn.applyAsInt(key), key, value, equalsFn, merge);
+
     if (rootPrime == root) {
       return this;
+    } else if (linear) {
+      root = rootPrime;
+      return this;
     } else {
-      return new Map<K, V>(rootPrime, hashFn, equalsFn);
+      return new Map<K, V>(rootPrime, hashFn, equalsFn, false);
     }
   }
 
   @Override
   public IMap<K, V> remove(K key) {
     ChampNode<K, V> rootPrime = root.remove(0, this, hashFn.applyAsInt(key), key, equalsFn);
+
     if (rootPrime == root) {
       return this;
+    } else if (linear) {
+      root = rootPrime;
+      return this;
     } else {
-      return new Map<K, V>(rootPrime, hashFn, equalsFn);
+      return new Map<K, V>(rootPrime, hashFn, equalsFn, false);
     }
   }
 
@@ -68,7 +80,7 @@ public class Map<K, V>  implements IMap<K, V> {
 
   @Override
   public IList<IEntry<K, V>> entries() {
-    return Lists.from(size(), i -> root.nth(i));
+    return Lists.from(size(), i -> root.nth(i), l -> iterator());
   }
 
   @Override
@@ -80,8 +92,31 @@ public class Map<K, V>  implements IMap<K, V> {
   }
 
   @Override
+  public IMap<K, V> forked() {
+    if (linear) {
+      return new Map<>(root, hashFn, equalsFn, false);
+    } else {
+      return this;
+    }
+  }
+
+  @Override
+  public IMap<K, V> linear() {
+    if (linear) {
+      return this;
+    } else {
+      return new Map<>(root, hashFn, equalsFn, true);
+    }
+  }
+
+  @Override
   public long size() {
     return root.size();
+  }
+
+  @Override
+  public Iterator<IEntry<K, V>> iterator() {
+    return root.iterator();
   }
 
   @Override
