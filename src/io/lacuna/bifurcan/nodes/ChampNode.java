@@ -343,7 +343,7 @@ public class ChampNode<K, V> implements IMapNode<K, V> {
     arraycopy(content, content.length - numNodes, content, content.length + 1 - numNodes, numNodes - 1 - idx);
     nodemap &= ~mask;
 
-    content[content.length - 1 - idx] = null;
+    content[content.length - numNodes] = null;
 
     return this;
   }

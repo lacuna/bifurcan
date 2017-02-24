@@ -68,7 +68,7 @@ public class CollisionNode<K, V> implements IMapNode<K, V> {
   @Override
   public IMap.IEntry<K, V> nth(long idx) {
     int i = (int) idx << 1;
-    return new Maps.Entry<K, V>((K) entries[i], (V) entries[i + 1]);
+    return new Maps.Entry<>((K) entries[i], (V) entries[i + 1]);
   }
 
   @Override
