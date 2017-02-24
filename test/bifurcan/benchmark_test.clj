@@ -8,6 +8,9 @@
    [criterium.core :as c]
    [clojure.pprint :refer (pprint)])
   (:import
+   [java.util.function
+    ToIntFunction
+    BiPredicate]
    [java.util.concurrent
     ThreadLocalRandom]
    [java.util
@@ -25,6 +28,16 @@
     LinearMap
     LinearSet
     IMap$IEntry]))
+
+(def clojure-hash
+  (reify ToIntFunction
+    (applyAsInt [_ k]
+      (clojure.lang.Util/hasheq k))))
+
+(def clojure-eq
+  (reify BiPredicate
+    (test [_ a b]
+      (clojure.lang.Util/equiv a b))))
 
 (set! *warn-on-reflection* true)
 (defn construct-linear-list [^LinearList l vs]
@@ -127,7 +140,7 @@
   (equals [this o] (identical? this o)))
 
 (defn benchmark [f]
-  (-> (c/benchmark* f {:samples 18})
+  (-> (c/quick-benchmark* f {:samples 18})
     :mean
     first
     (* 1e9)))
@@ -140,7 +153,7 @@
 
 (defn benchmark-collection [base-collection generate-entries construct lookup test?]
   (prn (class (base-collection 0)))
-  (->> (range 1 7)
+  (->> (range 1 6)
     (map #(Math/pow 10 %))
     (map (fn [n]
            (println (str "10^" (int (Math/log10 n))))
@@ -167,7 +180,8 @@
 
 (deftest ^:benchmark test-construction
   (pprint
-    [:map (benchmark-collection (fn [_] (Map.)) generate-entries construct-map lookup-map #{:construct :lookup})
+    [:map-clj-semantics (benchmark-collection (fn [_] (Map. clojure-hash clojure-eq)) generate-entries construct-map lookup-map #{:construct :lookup})
+     :map (benchmark-collection (fn [_] (Map.)) generate-entries construct-map lookup-map #{:construct :lookup})
      :clojure-map (benchmark-collection (fn [_] {}) generate-entries construct-clojure-map lookup-clojure-map #{:construct :lookup})]))
 
 (deftest ^:benchmark benchmark-collections

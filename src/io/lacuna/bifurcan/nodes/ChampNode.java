@@ -2,7 +2,6 @@ package io.lacuna.bifurcan.nodes;
 
 import io.lacuna.bifurcan.IMap;
 import io.lacuna.bifurcan.Maps;
-import io.lacuna.bifurcan.utils.ArrayVector;
 import io.lacuna.bifurcan.utils.IteratorStack;
 
 import java.util.Iterator;
@@ -12,6 +11,11 @@ import static java.lang.Integer.bitCount;
 import static java.lang.System.arraycopy;
 
 /**
+ * This is an implementation based on the one described in https://michael.steindorfer.name/publications/oopsla15.pdf.
+ *
+ * It adds in support for transient/linear updates, and allows for empty buffer space between the entries and nodes
+ * to minimize allocations when a node is repeatedly updated in-place.
+ *
  * @author ztellman
  */
 public class ChampNode<K, V> implements IMapNode<K, V> {
@@ -90,7 +94,8 @@ public class ChampNode<K, V> implements IMapNode<K, V> {
     int idx = entryIndex(mask);
 
     // there's a match
-    if (hashes[idx] == c.hash && c.equals.test(c.key, (K) content[idx << 1])) {
+    boolean collision = c.hash == hashes[idx];
+    if (collision && c.equals.test(c.key, (K) content[idx << 1])) {
 
       ChampNode<K, V> n = (c.editor == editor ? this : clone(c.editor));
       idx = (idx << 1) + 1;
@@ -103,7 +108,7 @@ public class ChampNode<K, V> implements IMapNode<K, V> {
       V value = (V) content[(idx << 1) + 1];
 
       IMapNode<K, V> node;
-      if (shift < 30) {
+      if (shift < 30 && !collision) {
         node = new ChampNode<K, V>(c.editor)
             .put(shift + SHIFT_INCREMENT, new PutCommand<>(c, hashes[idx], key, value))
             .put(shift + SHIFT_INCREMENT, c);
@@ -167,6 +172,8 @@ public class ChampNode<K, V> implements IMapNode<K, V> {
         return this;
       } else {
         ChampNode<K, V> n = c.editor == editor ? this : clone(c.editor);
+
+        // TODO: if size == 1, we should pull the entry into this node
         return nodePrime.size() == 0 ? n.removeNode(mask) : n.setNode(mask, nodePrime);
       }
 
@@ -368,4 +375,6 @@ public class ChampNode<K, V> implements IMapNode<K, V> {
   private boolean isNode(int hashMask) {
     return (nodemap & hashMask) != 0;
   }
+
+
 }

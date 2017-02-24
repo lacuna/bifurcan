@@ -13,7 +13,7 @@ import java.util.function.ToIntFunction;
 /**
  * @author ztellman
  */
-public class Map<K, V>  implements IMap<K, V> {
+public class Map<K, V> implements IMap<K, V> {
 
   private static final Object DEFAULT_VALUE = new Object();
 
@@ -39,7 +39,7 @@ public class Map<K, V>  implements IMap<K, V> {
 
   @Override
   public V get(K key, V defaultValue) {
-    Object val = root.get(0, hashFn.applyAsInt(key), key, equalsFn, DEFAULT_VALUE);
+    Object val = root.get(0, keyHash(key), key, equalsFn, DEFAULT_VALUE);
 
     if (val == DEFAULT_VALUE) {
       return defaultValue;
@@ -50,7 +50,7 @@ public class Map<K, V>  implements IMap<K, V> {
 
   @Override
   public IMap<K, V> put(K key, V value, ValueMerger<V> merge) {
-    PutCommand<K, V> command = new PutCommand<K, V>(this, hashFn.applyAsInt(key), key, value, equalsFn, merge);
+    PutCommand<K, V> command = new PutCommand<K, V>(this, keyHash(key), key, value, equalsFn, merge);
     ChampNode<K, V> rootPrime = root.put(0, command);
 
     if (rootPrime == root) {
@@ -136,5 +136,14 @@ public class Map<K, V>  implements IMap<K, V> {
   @Override
   public String toString() {
     return Maps.toString(this);
+  }
+
+  private int keyHash(K key) {
+    int hash = hashFn.applyAsInt(key);
+
+    // make sure we don't have too many collisions in the lower bits
+    hash ^= (hash >>> 20) ^ (hash >>> 12);
+    hash ^= (hash >>> 7) ^ (hash >>> 4);
+    return hash;
   }
 }
