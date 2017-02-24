@@ -7,34 +7,31 @@ import io.lacuna.bifurcan.utils.IteratorStack;
 
 import java.util.Iterator;
 import java.util.function.BiPredicate;
-import java.util.function.Predicate;
 
 import static java.lang.Integer.bitCount;
+import static java.lang.System.arraycopy;
 
 /**
  * @author ztellman
  */
 public class ChampNode<K, V> implements IMapNode<K, V> {
 
-  public static final ChampNode EMPTY;
-
-  static {
-    EMPTY = new ChampNode();
-    EMPTY.hashes = new int[0];
-    EMPTY.content = new Object[0];
-    EMPTY.editor = new Object();
-  }
+  public static final ChampNode EMPTY = new ChampNode(new Object());
 
   public static final int SHIFT_INCREMENT = 5;
 
   int datamap = 0;
   int nodemap = 0;
-  int[] hashes;
-  public Object[] content;
+  public int[] hashes = new int[2];
+  public Object[] content = new Object[4];
   Object editor;
   long size;
 
   public ChampNode() {
+  }
+
+  private ChampNode(Object editor) {
+    this.editor = editor;
   }
 
   @Override
@@ -88,79 +85,71 @@ public class ChampNode<K, V> implements IMapNode<K, V> {
     }
   }
 
-  @Override
-  public ChampNode<K, V> put(int shift, Object editor, int hash, K key, V value, BiPredicate<K, K> equals, IMap.ValueMerger<V> merge) {
-    int mask = hashMask(hash, shift);
+  // this is factored out of `put` for greater inlining joy
+  private ChampNode<K, V> insertEntry(int shift, int mask, PutCommand<K, V> c) {
+    int idx = entryIndex(mask);
 
-    // there's a potential match
-    if (isEntry(mask)) {
-      int idx = entryIndex(mask);
+    // there's a match
+    if (hashes[idx] == c.hash && c.equals.test(c.key, (K) content[idx << 1])) {
 
-      // there is a match
-      if (hashes[idx] == hash && equals.test(key, (K) content[idx << 1])) {
+      ChampNode<K, V> n = (c.editor == editor ? this : clone(c.editor));
+      idx = (idx << 1) + 1;
+      n.content[idx] = c.merge.merge((V) n.content[idx], c.value);
+      return n;
 
-        // we can overwrite it
-        if (editor == this.editor) {
-          idx = (idx << 1) + 1;
-          content[idx] = merge.merge((V) content[idx], value);
-          return this;
+      // collision, put them both in a node together
+    } else {
+      K key = (K) content[idx << 1];
+      V value = (V) content[(idx << 1) + 1];
 
-          // we can't overwrite it
-        } else {
-          return putEntry(editor, mask, true, hash, key, merge.merge((V) content[(idx << 1) + 1], value));
-        }
-
-        // create a child node
+      IMapNode<K, V> node;
+      if (shift < 30) {
+        node = new ChampNode<K, V>(c.editor)
+            .put(shift + SHIFT_INCREMENT, new PutCommand<>(c, hashes[idx], key, value))
+            .put(shift + SHIFT_INCREMENT, c);
       } else {
-        K currKey = (K) content[idx << 1];
-        V currVal = (V) content[(idx << 1) + 1];
-
-        IMapNode<K, V> node;
-
-        // we can create a branching node
-        if (shift < 30) {
-          node = ((ChampNode<K, V>) EMPTY)
-              .put(shift + SHIFT_INCREMENT, editor, hashes[idx], currKey, currVal, equals, merge)
-              .put(shift + SHIFT_INCREMENT, editor, hash, key, value, equals, merge);
-
-          // we have to create a hash collision node
-        } else {
-          node = new CollisionNode<K, V>(currKey, currVal, key, value);
-        }
-        return removeEntry(editor, mask).putNode(editor, mask, false, node, node.size());
+        node = new CollisionNode<K, V>(key, value, c.key, c.value);
       }
 
-      // we must go deeper
+      return (c.editor == editor ? this : clone(c.editor)).removeEntry(mask).putNode(mask, node);
+    }
+  }
+
+  @Override
+  public ChampNode<K, V> put(int shift, PutCommand<K, V> c) {
+    int mask = hashMask(c.hash, shift);
+
+    if (isEntry(mask)) {
+      return insertEntry(shift, mask, c);
+
     } else if (isNode(mask)) {
-      int idx = nodeIndex(mask);
-      IMapNode<K, V> node = (IMapNode<K, V>) content[idx];
+      IMapNode<K, V> node = node(mask);
       long prevSize = node.size();
-      IMapNode<K, V> nodePrime = node.put(shift + SHIFT_INCREMENT, editor, hash, key, value, equals, merge);
+      IMapNode<K, V> nodePrime = node.put(shift + SHIFT_INCREMENT, c);
 
       if (node == nodePrime) {
         size += node.size() - prevSize;
         return this;
       } else {
-        return putNode(editor, mask, true, nodePrime, nodePrime.size() - node.size());
+        return (c.editor == editor ? this : clone(c.editor)).setNode(mask, nodePrime);
       }
 
-      // no such thing
     } else {
-      return putEntry(editor, mask, false, hash, key, value);
+      return (c.editor == editor ? this : clone(c.editor)).putEntry(mask, c.hash, c.key, c.value);
     }
   }
 
   @Override
-  public ChampNode<K, V> remove(int shift, Object editor, int hash, K key, BiPredicate<K, K> equals) {
-    int mask = hashMask(hash, shift);
+  public ChampNode<K, V> remove(int shift, RemoveCommand<K, V> c) {
+    int mask = hashMask(c.hash, shift);
 
     // there's a potential match
     if (isEntry(mask)) {
       int idx = entryIndex(mask);
 
       // there is a match
-      if (hashes[idx] == hash && equals.test(key, (K) content[idx << 1])) {
-        return removeEntry(editor, mask);
+      if (hashes[idx] == c.hash && c.equals.test(c.key, (K) content[idx << 1])) {
+        return (c.editor == editor ? this : clone(c.editor)).removeEntry(mask);
 
         // nope
       } else {
@@ -169,18 +158,16 @@ public class ChampNode<K, V> implements IMapNode<K, V> {
 
       // we must go deeper
     } else if (isNode(mask)) {
-      int idx = nodeIndex(mask);
-      IMapNode<K, V> node = (IMapNode<K, V>) content[idx];
+      IMapNode<K, V> node = node(mask);
       long prevSize = node.size();
-      IMapNode<K, V> nodePrime = node.remove(shift + SHIFT_INCREMENT, editor, hash, key, equals);
+      IMapNode<K, V> nodePrime = node.remove(shift + SHIFT_INCREMENT, c);
 
       if (node == nodePrime) {
         size += node.size() - prevSize;
         return this;
-      } else if (nodePrime.size() == 0) {
-        return removeNode(editor, mask, node.size());
       } else {
-        return putNode(editor, mask, true, nodePrime, nodePrime.size() - node.size());
+        ChampNode<K, V> n = c.editor == editor ? this : clone(c.editor);
+        return nodePrime.size() == 0 ? n.removeNode(mask) : n.setNode(mask, nodePrime);
       }
 
       // no such thing
@@ -231,6 +218,18 @@ public class ChampNode<K, V> implements IMapNode<K, V> {
 
   /////
 
+  private ChampNode<K, V> clone(Object editor) {
+    ChampNode<K, V> node = new ChampNode<>();
+    node.datamap = datamap;
+    node.nodemap = nodemap;
+    node.hashes = hashes.clone();
+    node.content = content.clone();
+    node.editor = editor;
+    node.size = size;
+
+    return node;
+  }
+
   private Iterable<IMapNode<K, V>> nodes() {
     return () -> new Iterator<IMapNode<K, V>>() {
       int idx = content.length - Integer.bitCount(nodemap);
@@ -247,70 +246,99 @@ public class ChampNode<K, V> implements IMapNode<K, V> {
     };
   }
 
-  private ChampNode<K, V> removeNode(Object editor, int hashMask, long sizeDelta) {
-    ChampNode<K, V> node = editor == this.editor ? this : new ChampNode<K, V>();
-    node.datamap = datamap;
-    node.nodemap = nodemap & ~hashMask;
-    node.hashes = hashes;
-    node.editor = editor;
-    node.size = size - sizeDelta;
+  private void grow() {
+    Object[] c = new Object[content.length << 1];
+    int numNodes = bitCount(nodemap);
+    arraycopy(content, 0, c, 0, bitCount(datamap) << 1);
+    arraycopy(content, content.length - numNodes, c, c.length - numNodes, numNodes);
+    content = c;
 
-    int idx = nodeIndex(hashMask);
-    node.content = ArrayVector.remove(content, idx, 1);
-
-    return node;
+    int[] h = new int[hashes.length << 1];
+    arraycopy(hashes, 0, h, 0, bitCount(datamap));
+    hashes = h;
   }
 
-  private ChampNode<K, V> putNode(Object editor, int hashMask, boolean overwrite, Object child, long sizeDelta) {
-    ChampNode<K, V> node = editor == this.editor ? this : new ChampNode<K, V>();
-    node.datamap = datamap;
-    node.nodemap = nodemap | hashMask;
-    node.hashes = hashes;
-    node.editor = editor;
-    node.size = size + sizeDelta;
+  private ChampNode<K, V> putEntry(int mask, int hash, K key, V value) {
+    int numEntries = bitCount(datamap);
+    int count = (numEntries << 1) + bitCount(nodemap);
+    if ((count + 2) > content.length) {
+      grow();
+    }
 
-    int idx = nodeIndex(hashMask) + (overwrite ? 0 : 1);
-    node.content = overwrite
-        ? ArrayVector.set(content, idx, child)
-        : ArrayVector.insert(content, idx, child);
+    final int idx = entryIndex(mask);
+    final int entryIdx = idx << 1;
+    if (idx != numEntries) {
+      arraycopy(content, entryIdx, content, entryIdx + 2, (numEntries - idx) << 1);
+      arraycopy(hashes, idx, hashes, idx + 1, numEntries - idx);
+    }
+    datamap |= mask;
+    size++;
 
-    return node;
+    hashes[idx] = hash;
+    content[entryIdx] = key;
+    content[entryIdx + 1] = value;
+
+    return this;
   }
 
-  private ChampNode<K, V> removeEntry(Object editor, int hashMask) {
-    ChampNode<K, V> node = editor == this.editor ? this : new ChampNode<K, V>();
-    node.datamap = datamap & ~hashMask;
-    node.nodemap = nodemap;
-    node.editor = editor;
-    node.size = size - 1;
+  private ChampNode<K, V> removeEntry(final int mask) {
+    // shrink?
 
-    int idx = entryIndex(hashMask);
-    node.hashes = ArrayVector.remove(hashes, idx, 1);
+    final int idx = entryIndex(mask);
+    final int numEntries = bitCount(datamap);
+    if (idx != numEntries - 1) {
+      arraycopy(content, (idx + 1) << 1, content, idx << 1, (numEntries - 1 - idx) << 1);
+      arraycopy(hashes, idx + 1, hashes, idx, numEntries - 1 - idx);
+    }
+    datamap &= ~mask;
+    size--;
 
-    idx = idx << 1;
-    node.content = ArrayVector.remove(content, idx, 2);
+    int entryIdx = (numEntries - 1) << 1;
+    content[entryIdx] = null;
+    content[entryIdx + 1] = null;
 
-    return node;
+    return this;
   }
 
-  private ChampNode<K, V> putEntry(Object editor, int hashMask, boolean overwrite, int hash, K key, V value) {
-    ChampNode<K, V> node = editor == this.editor ? this : new ChampNode<K, V>();
-    node.datamap = datamap | hashMask;
-    node.nodemap = nodemap;
-    node.editor = editor;
-    node.size = size + (overwrite ? 0 : 1);
+  private ChampNode<K, V> setNode(int mask, IMapNode<K, V> node) {
+    int idx = content.length - 1 - nodeIndex(mask);
+    size += node.size() - ((IMapNode<K, V>) content[idx]).size();
+    content[idx] = node;
 
-    int idx = entryIndex(hashMask);
-    node.hashes = overwrite
-        ? ArrayVector.set(hashes, idx, hash)
-        : ArrayVector.insert(hashes, idx, hash);
+    return this;
+  }
 
-    idx = idx << 1;
-    node.content = overwrite
-        ? ArrayVector.set(content, idx, key, value)
-        : ArrayVector.insert(content, idx, key, value);
+  private ChampNode<K, V> putNode(final int mask, IMapNode<K, V> node) {
+    int count = (bitCount(datamap) << 1) + bitCount(nodemap);
+    if ((count + 1) > content.length) {
+      grow();
+    }
 
-    return node;
+    int idx = nodeIndex(mask);
+    int numNodes = bitCount(nodemap);
+    if (numNodes > 0) {
+      arraycopy(content, content.length - numNodes, content, content.length - 1 - numNodes, numNodes - idx);
+    }
+    nodemap |= mask;
+    size += node.size();
+
+    content[content.length - 1 - idx] = node;
+
+    return this;
+  }
+
+  private ChampNode<K, V> removeNode(final int mask) {
+    // shrink?
+
+    int idx = nodeIndex(mask);
+    int numNodes = bitCount(nodemap);
+    size -= node(mask).size();
+    arraycopy(content, content.length - numNodes, content, content.length + 1 - numNodes, numNodes - 1 - idx);
+    nodemap &= ~mask;
+
+    content[content.length - 1 - idx] = null;
+
+    return this;
   }
 
   private static int compressedIndex(int bitmap, int hashMask) {
@@ -326,11 +354,11 @@ public class ChampNode<K, V> implements IMapNode<K, V> {
   }
 
   private int nodeIndex(int hashMask) {
-    return content.length - 1 - compressedIndex(nodemap, hashMask);
+    return compressedIndex(nodemap, hashMask);
   }
 
   private IMapNode<K, V> node(int hashMask) {
-    return (IMapNode<K, V>) content[nodeIndex(hashMask)];
+    return (IMapNode<K, V>) content[content.length - 1 - nodeIndex(hashMask)];
   }
 
   private boolean isEntry(int hashMask) {

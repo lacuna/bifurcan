@@ -127,7 +127,7 @@
   (equals [this o] (identical? this o)))
 
 (defn benchmark [f]
-  (-> (c/quick-benchmark* f {:samples 18})
+  (-> (c/benchmark* f {:samples 18})
     :mean
     first
     (* 1e9)))
@@ -140,11 +140,12 @@
 
 (defn benchmark-collection [base-collection generate-entries construct lookup test?]
   (prn (class (base-collection 0)))
-  (->> (range 1 4)
+  (->> (range 1 7)
     (map #(Math/pow 10 %))
     (map (fn [n]
            (println (str "10^" (int (Math/log10 n))))
-           (let [s  (generate-entries n)
+           (let [n  (long n)
+                 s  (generate-entries n)
                  s' (generate-entries n)
                  c  (base-collection n)
                  c' (construct c s)
@@ -163,6 +164,11 @@
                          [k (int (/ v n))]))
                   (into {}))])))
     (into {})))
+
+(deftest ^:benchmark test-construction
+  (pprint
+    [:map (benchmark-collection (fn [_] (Map.)) generate-entries construct-map lookup-map #{:construct :lookup})
+     :clojure-map (benchmark-collection (fn [_] {}) generate-entries construct-clojure-map lookup-clojure-map #{:construct :lookup})]))
 
 (deftest ^:benchmark benchmark-collections
   (pprint

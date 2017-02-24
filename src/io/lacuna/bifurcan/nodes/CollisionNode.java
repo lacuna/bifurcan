@@ -32,12 +32,12 @@ public class CollisionNode<K, V> implements IMapNode<K, V> {
   }
 
   @Override
-  public IMapNode<K, V> put(int shift, Object editor, int hash, K key, V value, BiPredicate<K, K> equals, IMap.ValueMerger<V> merge) {
-    int idx = indexOf(key, equals);
+  public IMapNode<K, V> put(int shift, PutCommand<K, V> c) {
+    int idx = indexOf(c.key, c.equals);
     if (idx < 0) {
-      return new CollisionNode<K, V>(ArrayVector.append(entries, key, value));
+      return new CollisionNode<K, V>(ArrayVector.append(entries, c.key, c.value));
     } else {
-      return new CollisionNode<K, V>(ArrayVector.set(entries, idx, key, merge.merge((V) entries[idx + 1], value)));
+      return new CollisionNode<K, V>(ArrayVector.set(entries, idx, c.key, c.merge.merge((V) entries[idx + 1], c.value)));
     }
   }
 
@@ -52,8 +52,8 @@ public class CollisionNode<K, V> implements IMapNode<K, V> {
   }
 
   @Override
-  public IMapNode<K, V> remove(int shift, Object editor, int hash, K key, BiPredicate<K, K> equals) {
-    int idx = indexOf(key, equals);
+  public IMapNode<K, V> remove(int shift, RemoveCommand<K, V> c) {
+    int idx = indexOf(c.key, c.equals);
     if (idx < 0) {
       return this;
     } else {

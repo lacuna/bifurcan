@@ -1,6 +1,9 @@
 package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.nodes.ChampNode;
+import io.lacuna.bifurcan.nodes.IMapNode;
+import io.lacuna.bifurcan.nodes.IMapNode.PutCommand;
+import io.lacuna.bifurcan.nodes.IMapNode.RemoveCommand;
 
 import java.util.Iterator;
 import java.util.Objects;
@@ -47,7 +50,8 @@ public class Map<K, V>  implements IMap<K, V> {
 
   @Override
   public IMap<K, V> put(K key, V value, ValueMerger<V> merge) {
-    ChampNode<K, V> rootPrime = root.put(0, this, hashFn.applyAsInt(key), key, value, equalsFn, merge);
+    PutCommand<K, V> command = new PutCommand<K, V>(this, hashFn.applyAsInt(key), key, value, equalsFn, merge);
+    ChampNode<K, V> rootPrime = root.put(0, command);
 
     if (rootPrime == root) {
       return this;
@@ -61,7 +65,8 @@ public class Map<K, V>  implements IMap<K, V> {
 
   @Override
   public IMap<K, V> remove(K key) {
-    ChampNode<K, V> rootPrime = root.remove(0, this, hashFn.applyAsInt(key), key, equalsFn);
+    RemoveCommand<K, V> command = new RemoveCommand<K, V>(this, hashFn.applyAsInt(key), key, equalsFn);
+    ChampNode<K, V> rootPrime = root.remove(0, command);
 
     if (rootPrime == root) {
       return this;
