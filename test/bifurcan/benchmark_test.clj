@@ -18,7 +18,8 @@
     HashSet
     ArrayList
     ArrayDeque
-    Collection]
+    Collection
+    Iterator]
    [io.lacuna.bifurcan
     Map
     IMap
@@ -112,6 +113,12 @@
     (.add s v))
   s)
 
+(defn consume-iterator [^Iterator it]
+  (loop [e nil cnt 0]
+    (if (.hasNext it)
+      (recur (.next it) (unchecked-inc cnt))
+      cnt)))
+
 (defn construct-clojure-set [s ^objects vs]
   (let [len (alength vs)]
     (loop [s (transient s), i 0]
@@ -153,7 +160,7 @@
 
 (defn benchmark-collection [base-collection generate-entries construct lookup test?]
   (prn (class (base-collection 0)))
-  (->> (range 1 6)
+  (->> (range 1 7)
     (map #(Math/pow 10 %))
     (map (fn [n]
            (println (str "10^" (int (Math/log10 n))))
@@ -165,6 +172,8 @@
                  s  (-> s seq shuffle into-array)]
              [n (->>
                   (merge
+                    (when (test? :iterate)
+                      {:iterate (benchmark #(consume-iterator (.iterator ^Iterable c')))})
                     (when (test? :construct)
                       {:construct (benchmark #(construct (base-collection n) s))})
                     (when (test? :construct-duplicate)
@@ -177,12 +186,6 @@
                          [k (int (/ v n))]))
                   (into {}))])))
     (into {})))
-
-(deftest ^:benchmark test-construction
-  (pprint
-    [:map-clj-semantics (benchmark-collection (fn [_] (Map. clojure-hash clojure-eq)) generate-entries construct-map lookup-map #{:construct :lookup})
-     :map (benchmark-collection (fn [_] (Map.)) generate-entries construct-map lookup-map #{:construct :lookup})
-     :clojure-map (benchmark-collection (fn [_] {}) generate-entries construct-clojure-map lookup-clojure-map #{:construct :lookup})]))
 
 (deftest ^:benchmark benchmark-collections
   (pprint

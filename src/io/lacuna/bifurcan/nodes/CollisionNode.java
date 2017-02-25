@@ -12,13 +12,15 @@ import java.util.function.BiPredicate;
  */
 public class CollisionNode<K, V> implements IMapNode<K, V> {
 
+  public final int hash;
   public final Object[] entries;
 
-  public CollisionNode(K k1, V v1, K k2, V v2) {
-    this(new Object[] {k1, v1, k2, v2});
+  public CollisionNode(int hash, K k1, V v1, K k2, V v2) {
+    this(hash, new Object[] {k1, v1, k2, v2});
   }
 
-  private CollisionNode(Object[] entries) {
+  private CollisionNode(int hash, Object[] entries) {
+    this.hash = hash;
     this.entries = entries;
   }
 
@@ -33,11 +35,13 @@ public class CollisionNode<K, V> implements IMapNode<K, V> {
 
   @Override
   public IMapNode<K, V> put(int shift, PutCommand<K, V> c) {
-    int idx = indexOf(c.key, c.equals);
-    if (idx < 0) {
-      return new CollisionNode<K, V>(ArrayVector.append(entries, c.key, c.value));
+    if (c.hash != hash) {
+      return new ChampNode<K, V>().putNode(ChampNode.hashMask(hash, shift), this).put(shift, c);
     } else {
-      return new CollisionNode<K, V>(ArrayVector.set(entries, idx, c.key, c.merge.merge((V) entries[idx + 1], c.value)));
+      int idx = indexOf(c.key, c.equals);
+      return idx < 0
+          ? new CollisionNode<K, V>(hash, ArrayVector.append(entries, c.key, c.value))
+          : new CollisionNode<K, V>(hash, ArrayVector.set(entries, idx, c.key, c.merge.merge((V) entries[idx + 1], c.value)));
     }
   }
 
@@ -52,12 +56,17 @@ public class CollisionNode<K, V> implements IMapNode<K, V> {
   }
 
   @Override
+  public int hash(int idx) {
+    return hash;
+  }
+
+  @Override
   public IMapNode<K, V> remove(int shift, RemoveCommand<K, V> c) {
     int idx = indexOf(c.key, c.equals);
     if (idx < 0) {
       return this;
     } else {
-      return new CollisionNode<K, V>(ArrayVector.remove(entries, idx, 2));
+      return new CollisionNode<K, V>(hash, ArrayVector.remove(entries, idx, 2));
     }
   }
 
@@ -71,8 +80,7 @@ public class CollisionNode<K, V> implements IMapNode<K, V> {
     return new Maps.Entry<>((K) entries[i], (V) entries[i + 1]);
   }
 
-  @Override
-  public Iterator<IMap.IEntry<K, V>> iterator() {
+  public Iterator<IMap.IEntry<K, V>> entries() {
     return new Iterator<IMap.IEntry<K, V>>() {
       int idx = 0;
       @Override

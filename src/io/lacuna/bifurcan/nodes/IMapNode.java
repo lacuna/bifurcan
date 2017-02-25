@@ -1,13 +1,15 @@
 package io.lacuna.bifurcan.nodes;
 
 import io.lacuna.bifurcan.IMap;
+import io.lacuna.bifurcan.IMap.IEntry;
 
+import java.util.Iterator;
 import java.util.function.BiPredicate;
 
 /**
  * @author ztellman
  */
-public interface IMapNode<K, V> extends Iterable<IMap.IEntry<K, V>> {
+interface IMapNode<K, V> {
 
   class PutCommand<K, V> {
     public final Object editor;
@@ -56,7 +58,11 @@ public interface IMapNode<K, V> extends Iterable<IMap.IEntry<K, V>> {
 
   Object get(int shift, int hash, K key, BiPredicate<K, K> equals, Object defaultValue);
 
+  int hash(int idx);
+
   long size();
 
-  IMap.IEntry<K, V> nth(long idx);
+  IEntry<K, V> nth(long idx);
+
+  Iterator<IEntry<K, V>> entries();
 }

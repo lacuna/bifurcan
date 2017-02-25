@@ -17,6 +17,7 @@
    [io.lacuna.bifurcan
     Map
     IMap
+    IMap$IEntry
     IList
     ISet
     LinearList
@@ -114,6 +115,11 @@
   [m {}
    m' (.linear (Map.))]
   (= m (zipmap (keys m) (->> m keys (map #(-> ^IMap m' (.get % nil)))))))
+
+(u/def-collection-check test-map-iterator 1e4 (map-actions)
+  [m {}
+   m' (.linear (Map.))]
+  (= m (->> ^Iterable m' .iterator iterator-seq (map (fn [^IMap$IEntry e] [(.key e) (.value e)])) (into {}))))
 
 (u/def-collection-check test-linear-map-merge 1e4 (map-actions)
   [m {}

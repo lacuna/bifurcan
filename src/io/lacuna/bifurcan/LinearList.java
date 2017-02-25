@@ -3,6 +3,7 @@ package io.lacuna.bifurcan;
 import io.lacuna.bifurcan.utils.Bits;
 
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.Optional;
 
 import static io.lacuna.bifurcan.utils.Bits.log2Ceil;
@@ -40,6 +41,18 @@ public class LinearList<V> implements IList<V> {
     LinearList<V> list = new LinearList<V>(collection.size());
     for (V value : collection) {
       list.elements[list.size++] = value;
+    }
+    return list;
+  }
+
+  public static <V> LinearList<V> from(Iterable<V> iterable) {
+    return from(iterable.iterator());
+  }
+
+  public static <V> LinearList<V> from(Iterator<V> iterator) {
+    LinearList<V> list = new LinearList<V>();
+    while (iterator.hasNext()) {
+      list.addLast(iterator.next());
     }
     return list;
   }

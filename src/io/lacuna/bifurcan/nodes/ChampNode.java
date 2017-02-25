@@ -1,10 +1,14 @@
 package io.lacuna.bifurcan.nodes;
 
+import io.lacuna.bifurcan.IList;
 import io.lacuna.bifurcan.IMap;
+import io.lacuna.bifurcan.IMap.IEntry;
+import io.lacuna.bifurcan.LinearList;
 import io.lacuna.bifurcan.Maps;
 import io.lacuna.bifurcan.utils.IteratorStack;
 
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 import java.util.function.BiPredicate;
 
 import static java.lang.Integer.bitCount;
@@ -44,7 +48,7 @@ public class ChampNode<K, V> implements IMapNode<K, V> {
   }
 
   @Override
-  public IMap.IEntry<K, V> nth(long idx) {
+  public IEntry<K, V> nth(long idx) {
 
     // see if the entry is local to this node
     int entries = Integer.bitCount(datamap);
@@ -69,6 +73,26 @@ public class ChampNode<K, V> implements IMapNode<K, V> {
   }
 
   @Override
+  public Iterator<IEntry<K, V>> entries() {
+    int numEntries = bitCount(datamap);
+    return new Iterator<IEntry<K, V>>() {
+
+      int idx = 0;
+
+      @Override
+      public boolean hasNext() {
+        return idx < numEntries;
+      }
+
+      @Override
+      public IEntry<K, V> next() {
+        int entryIdx = idx++ << 1;
+        return new Maps.Entry<>((K) content[entryIdx], (V) content[entryIdx + 1]);
+      }
+    };
+  }
+
+  @Override
   public Object get(int shift, int hash, K key, BiPredicate<K, K> equals, Object defaultValue) {
     int mask = hashMask(hash, shift);
 
@@ -87,6 +111,11 @@ public class ChampNode<K, V> implements IMapNode<K, V> {
     } else {
       return defaultValue;
     }
+  }
+
+  @Override
+  public int hash(int idx) {
+    return hashes[idx];
   }
 
   // this is factored out of `put` for greater inlining joy
@@ -113,11 +142,15 @@ public class ChampNode<K, V> implements IMapNode<K, V> {
             .put(shift + SHIFT_INCREMENT, new PutCommand<>(c, hashes[idx], key, value))
             .put(shift + SHIFT_INCREMENT, c);
       } else {
-        node = new CollisionNode<K, V>(key, value, c.key, c.value);
+        node = new CollisionNode<K, V>(c.hash, key, value, c.key, c.value);
       }
 
       return (c.editor == editor ? this : clone(c.editor)).removeEntry(mask).putNode(mask, node);
     }
+  }
+
+  public ChampNode<K, V> put(int shift, Object editor, int hash, K key, V value, BiPredicate<K, K> equals, IMap.ValueMerger<V> merge) {
+    return put(shift, new PutCommand<>(editor, hash, key, value, equals, merge));
   }
 
   @Override
@@ -142,6 +175,10 @@ public class ChampNode<K, V> implements IMapNode<K, V> {
     } else {
       return (c.editor == editor ? this : clone(c.editor)).putEntry(mask, c.hash, c.key, c.value);
     }
+  }
+
+  public ChampNode<K, V> remove(int shift, Object editor, int hash, K key, BiPredicate<K, K> equals) {
+    return remove(shift, new RemoveCommand<>(editor, hash, key, equals));
   }
 
   @Override
@@ -173,8 +210,15 @@ public class ChampNode<K, V> implements IMapNode<K, V> {
       } else {
         ChampNode<K, V> n = c.editor == editor ? this : clone(c.editor);
 
-        // TODO: if size == 1, we should pull the entry into this node
-        return nodePrime.size() == 0 ? n.removeNode(mask) : n.setNode(mask, nodePrime);
+        switch ((int) nodePrime.size()) {
+          case 0:
+            return n.removeNode(mask);
+          case 1:
+            IEntry<K, V> e = nodePrime.nth(0);
+            return n.removeNode(mask).putEntry(mask, nodePrime.hash(0), e.key(), e.value());
+          default:
+            return n.setNode(mask, nodePrime);
+        }
       }
 
       // no such thing
@@ -183,30 +227,34 @@ public class ChampNode<K, V> implements IMapNode<K, V> {
     }
   }
 
-  @Override
-  public Iterator<IMap.IEntry<K, V>> iterator() {
-    final int entries = Integer.bitCount(datamap);
-    return new Iterator<IMap.IEntry<K, V>>() {
+  public Iterator<IEntry<K, V>> iterator() {
 
-      int idx = 0;
-      IteratorStack<IMap.IEntry<K, V>> stack = new IteratorStack<>();
+    return new Iterator<IEntry<K, V>>() {
+
+      final IList<IMapNode<K, V>> nodes = LinearList.from(nodes());
+      Iterator<IEntry<K, V>> iterator = entries();
 
       @Override
       public boolean hasNext() {
-        return idx < size();
+        return iterator.hasNext() || nodes.size() > 0;
       }
 
       @Override
-      public IMap.IEntry<K, V> next() {
-        int i = idx++;
-        if (i < entries) {
-          return new Maps.Entry((K) content[i << 1], (V) content[(i << 1) + 1]);
-        } else if (i == entries) {
-          nodes().forEach(n -> stack.addLast(n.iterator()));
-          return stack.next();
-        } else {
-          return stack.next();
+      public IEntry<K, V> next() {
+        while (!iterator.hasNext()) {
+          if (nodes.size() == 0) {
+            throw new NoSuchElementException();
+          }
+
+          IMapNode<K, V> node = nodes.first();
+          nodes.removeFirst();
+          iterator = node.entries();
+          if (node instanceof ChampNode) {
+            ((ChampNode<K, V>) node).nodes().forEach(n -> nodes.addLast(n));
+          }
         }
+
+        return iterator.next();
       }
     };
   }
@@ -265,7 +313,7 @@ public class ChampNode<K, V> implements IMapNode<K, V> {
     hashes = h;
   }
 
-  private ChampNode<K, V> putEntry(int mask, int hash, K key, V value) {
+  ChampNode<K, V> putEntry(int mask, int hash, K key, V value) {
     int numEntries = bitCount(datamap);
     int count = (numEntries << 1) + bitCount(nodemap);
     if ((count + 2) > content.length) {
@@ -288,7 +336,7 @@ public class ChampNode<K, V> implements IMapNode<K, V> {
     return this;
   }
 
-  private ChampNode<K, V> removeEntry(final int mask) {
+  ChampNode<K, V> removeEntry(final int mask) {
     // shrink?
 
     final int idx = entryIndex(mask);
@@ -307,7 +355,7 @@ public class ChampNode<K, V> implements IMapNode<K, V> {
     return this;
   }
 
-  private ChampNode<K, V> setNode(int mask, IMapNode<K, V> node) {
+  ChampNode<K, V> setNode(int mask, IMapNode<K, V> node) {
     int idx = content.length - 1 - nodeIndex(mask);
     size += node.size() - ((IMapNode<K, V>) content[idx]).size();
     content[idx] = node;
@@ -315,7 +363,7 @@ public class ChampNode<K, V> implements IMapNode<K, V> {
     return this;
   }
 
-  private ChampNode<K, V> putNode(final int mask, IMapNode<K, V> node) {
+  ChampNode<K, V> putNode(final int mask, IMapNode<K, V> node) {
     int count = (bitCount(datamap) << 1) + bitCount(nodemap);
     if ((count + 1) > content.length) {
       grow();
@@ -334,7 +382,7 @@ public class ChampNode<K, V> implements IMapNode<K, V> {
     return this;
   }
 
-  private ChampNode<K, V> removeNode(final int mask) {
+  ChampNode<K, V> removeNode(final int mask) {
     // shrink?
 
     int idx = nodeIndex(mask);
@@ -348,11 +396,11 @@ public class ChampNode<K, V> implements IMapNode<K, V> {
     return this;
   }
 
-  private static int compressedIndex(int bitmap, int hashMask) {
+  static int compressedIndex(int bitmap, int hashMask) {
     return bitCount(bitmap & (hashMask - 1));
   }
 
-  private static int hashMask(int hash, int shift) {
+  static int hashMask(int hash, int shift) {
     return 1 << ((hash >>> shift) & 31);
   }
 
@@ -375,6 +423,4 @@ public class ChampNode<K, V> implements IMapNode<K, V> {
   private boolean isNode(int hashMask) {
     return (nodemap & hashMask) != 0;
   }
-
-
 }
