@@ -36,7 +36,7 @@ public class CollisionNode<K, V> implements IMapNode<K, V> {
   @Override
   public IMapNode<K, V> put(int shift, PutCommand<K, V> c) {
     if (c.hash != hash) {
-      return new ChampNode<K, V>().putNode(ChampNode.hashMask(hash, shift), this).put(shift, c);
+      return new ChampNode<K, V>(c.editor).putNode(ChampNode.hashMask(hash, shift), this).put(shift, c);
     } else {
       int idx = indexOf(c.key, c.equals);
       return idx < 0

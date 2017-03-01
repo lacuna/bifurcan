@@ -38,7 +38,7 @@ public class ChampNode<K, V> implements IMapNode<K, V> {
   public ChampNode() {
   }
 
-  private ChampNode(Object editor) {
+  ChampNode(Object editor) {
     this.editor = editor;
     this.hashes = new int[2];
     this.content = new Object[4];
