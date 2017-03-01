@@ -195,6 +195,14 @@
                   (into {}))])))
     (into {})))
 
+(deftest ^:benchmark benchmark-lists
+  (pprint
+    [:linear-list (benchmark-collection (fn [_] (LinearList.)) generate-numbers construct-list lookup-list  #{:construct :lookup :iterate})
+     :list        (benchmark-collection (fn [_] (List.)) generate-numbers construct-list lookup-list  #{:construct :lookup :iterate})
+     :clojure-vector (benchmark-collection (fn [_] []) generate-numbers construct-vector lookup-vector #{:construct :lookup :iterate})
+]
+    ))
+
 (deftest ^:benchmark benchmark-collections
   (pprint
     [:linear-list (benchmark-collection (fn [_] (LinearList.)) generate-numbers construct-list lookup-list  #{:construct :lookup :iterate})

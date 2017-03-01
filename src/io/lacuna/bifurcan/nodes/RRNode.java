@@ -11,7 +11,7 @@ import static java.lang.System.arraycopy;
  */
 public class RRNode {
 
-  public final static RRNode EMPTY = new RRNode(new Object(), 5);
+  public final static RRNode EMPTY = new RRNode(new Object(), true, 5);
 
   public static class Leaf implements IListNode {
     public final byte size;
@@ -47,6 +47,7 @@ public class RRNode {
   }
 
   Object editor;
+  public boolean strict;
   public int shift;
   public int numNodes;
   public int[] offsets;
@@ -55,7 +56,8 @@ public class RRNode {
   RRNode() {
   }
 
-  public RRNode(Object editor, int shift) {
+  public RRNode(Object editor, boolean strict, int shift) {
+    this.strict = strict;
     this.editor = editor;
     this.shift = shift;
     this.numNodes = 0;
@@ -75,6 +77,7 @@ public class RRNode {
 
   RRNode clone(Object editor) {
     RRNode n = new RRNode();
+    n.strict = strict;
     n.editor = editor;
     n.numNodes = numNodes;
     n.offsets = offsets.clone();
@@ -95,7 +98,12 @@ public class RRNode {
   }
 
   int indexOf(int idx) {
-    for (int i = ((idx >> shift) & 31); i < nodes.length; i++) {
+    int estimate = ((idx >> shift) & 31);
+    if (strict) {
+      return estimate;
+    }
+
+    for (int i = estimate; i < nodes.length; i++) {
       if (idx < offsets[i]) {
         return i;
       }
@@ -107,10 +115,13 @@ public class RRNode {
     return idx == 0 ? 0 : offsets[idx - 1];
   }
 
-  public Object nth(int idx) {
+  private Object relaxedNth(int idx) {
     RRNode node = this;
     int nodeIdx = node.indexOf(idx);
     while (node.shift > 5) {
+      if (node.strict) {
+        return strictNth(idx);
+      }
       idx -= node.offset(nodeIdx);
       node = (RRNode) node.nodes[nodeIdx];
       nodeIdx = node.indexOf(idx);
@@ -118,6 +129,21 @@ public class RRNode {
 
     Leaf leaf = (Leaf) node.nodes[nodeIdx];
     return leaf.elements[idx - node.offset(nodeIdx)];
+  }
+
+  private Object strictNth(int idx) {
+    RRNode node = this;
+    while (node.shift > 5) {
+      node = (RRNode) node.nodes[(idx >> node.shift) & 31];
+      idx &= ~(31 << (node.shift + 5));
+    }
+
+    Leaf leaf = (Leaf) node.nodes[(idx >> 5) & 31];
+    return leaf.elements[idx & 31];
+  }
+
+  public Object nth(int idx) {
+    return strict ? strictNth(idx) : relaxedNth(idx);
   }
 
   public int size() {
@@ -196,7 +222,7 @@ public class RRNode {
     int startIdx = indexOf(start);
     int endIdx = indexOf(end - 1);
 
-    RRNode rn = new RRNode(editor, shift);
+    RRNode rn = new RRNode(editor, false, shift);
     if (startIdx == endIdx) {
       int offset = offset(startIdx);
       IListNode n = ((IListNode) nodes[startIdx]).slice(editor, start - offset, end - offset);
@@ -235,7 +261,7 @@ public class RRNode {
 
     // we need to add a new level
     if (numNodes == 32 && isFull(31)) {
-      return new RRNode(editor, shift + 5)
+      return new RRNode(editor, strict, shift + 5)
           .pushLast(this, this.size())
           .pushLast(node, size);
     }
@@ -243,7 +269,7 @@ public class RRNode {
     // we need to append
     if (numNodes == 0 || isFull(numNodes - 1)) {
       if (shift > 5 && node instanceof Leaf) {
-        node = new RRNode(editor, shift - 5).pushLast(node, size);
+        node = new RRNode(editor, true, shift - 5).pushLast(node, size);
       }
 
       if (numNodes == nodes.length) {
@@ -257,12 +283,8 @@ public class RRNode {
       // we need to go deeper
     } else {
       int idx = numNodes - 1;
-      RRNode rn = (RRNode) nodes[idx];
-      int prevSize = rn.size();
-
-      RRNode rnPrime = rn.addLast(editor, node, size);
-      offsets[idx] += rnPrime.size() - prevSize;
-      nodes[idx] = rnPrime;
+      nodes[idx] = ((RRNode) nodes[idx]).addLast(editor, node, size);
+      offsets[idx] += size;
     }
 
     return this;
@@ -272,7 +294,7 @@ public class RRNode {
 
     // we need to add a new level
     if (numNodes == 32 && isFull(0)) {
-      return new RRNode(editor, shift + 5)
+      return new RRNode(editor, false, shift + 5)
           .pushFirst(this, this.size())
           .pushFirst(node, size);
     }
@@ -280,7 +302,7 @@ public class RRNode {
     // we need to prepend
     if (numNodes == 0 || isFull(0)) {
       if (shift > 5 && node instanceof Leaf) {
-        node = new RRNode(editor, shift - 5).pushLast(node, size);
+        node = new RRNode(editor, false, shift - 5).pushLast(node, size);
       }
 
       if (numNodes == nodes.length) {
@@ -299,17 +321,20 @@ public class RRNode {
     } else {
       RRNode rn = (RRNode) nodes[0];
       nodes[0] = rn.addFirst(editor, node, size);
+
       for (int i = 0; i < numNodes; i++) {
         offsets[i] += size;
       }
     }
 
+    strict = false;
     return this;
   }
 
   private RRNode popFirst() {
     if (numNodes == 0) {
       return this;
+
     } else if (shift == 5) {
       numNodes--;
       int size = offsets[0];
@@ -319,22 +344,39 @@ public class RRNode {
         offsets[i] = offsets[i + 1] - size;
       }
       offsets[numNodes] = 0;
+
     } else {
-      nodes[0] = ((RRNode) nodes[0]).popFirst();
+      RRNode rn = (RRNode) nodes[0];
+      int prevSize = rn.size();
+      RRNode rnPrime = rn.popFirst();
+      int delta = rnPrime.size() - prevSize;
+
+      nodes[0] = rnPrime;
+      for (int i = 0; i < numNodes; i++) {
+        offsets[i] += delta;
+      }
     }
 
+    strict = false;
     return this;
   }
 
   private RRNode popLast() {
     if (numNodes == 0) {
       return this;
+
     } else if (shift == 5) {
       numNodes--;
       nodes[numNodes] = null;
       offsets[numNodes] = 0;
+
     } else {
-      nodes[numNodes - 1] = ((RRNode) nodes[numNodes - 1]).popLast();
+      RRNode rn = (RRNode) nodes[numNodes - 1];
+      int prevSize = rn.size();
+      RRNode rnPrime = rn.popLast();
+
+      nodes[numNodes - 1] = rnPrime;
+      offsets[numNodes - 1] += rnPrime.size() - prevSize;
     }
 
     return this;

@@ -22,7 +22,7 @@ import java.util.stream.IntStream;
 public class Lists {
 
   /**
-   * A dense concatenation of n-many ReadLists.  This creates a flattened list of all the lists, which in the worst
+   * A strict concatenation of n-many ReadLists.  This creates a flattened list of all the lists, which in the worst
    * case is O(N^2), but avoids the issue of left-leaning concatenation trees which blow the stack on lookup.  An ideal
    * approach would involve self-balancing trees, but this should suffice for now.
    */
