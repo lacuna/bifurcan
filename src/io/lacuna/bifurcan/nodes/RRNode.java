@@ -13,17 +13,36 @@ public class RRNode {
 
   public final static RRNode EMPTY = new RRNode(new Object(), 5);
 
-  public static class Leaf {
+  public static class Leaf implements IListNode {
     public final byte size;
     public final Object[] elements;
+    public final Object editor;
 
-    public Leaf(Object[] elements) {
+    public Leaf(Object editor, Object[] elements) {
+      this.editor = editor;
       this.elements = elements;
       this.size = (byte) elements.length;
     }
 
+    public Leaf set(Object editor, int idx, Object value) {
+      if (editor == this.editor) {
+        elements[idx] = value;
+        return this;
+      } else {
+        Leaf leaf = new Leaf(editor, elements.clone());
+        leaf.elements[idx] = value;
+        return leaf;
+      }
+    }
+
+    public Leaf slice(Object editor, int start, int end) {
+      Object[] ary = new Object[end - start];
+      arraycopy(elements, start, ary, 0, ary.length);
+      return new Leaf(editor, ary);
+    }
+
     public Leaf clone() {
-      return new Leaf(elements.clone());
+      return new Leaf(editor, elements.clone());
     }
   }
 
@@ -153,6 +172,10 @@ public class RRNode {
     };
   }
 
+  public RRNode set(Object editor, int idx, Object value) {
+    return (editor == this.editor ? this : clone(editor)).overwrite(editor, idx, value);
+  }
+
   public RRNode removeFirst(Object editor) {
     return (editor == this.editor ? this : clone(editor)).popFirst();
   }
@@ -167,6 +190,45 @@ public class RRNode {
 
   public RRNode addFirst(Object editor, Object node, int size) {
     return (editor == this.editor ? this : clone(editor)).pushFirst(node, size);
+  }
+
+  public RRNode slice(Object editor, int start, int end) {
+    int startIdx = indexOf(start);
+    int endIdx = indexOf(end - 1);
+
+    RRNode rn = new RRNode(editor, shift);
+    if (startIdx == endIdx) {
+      int offset = offset(startIdx);
+      IListNode n = ((IListNode) nodes[startIdx]).slice(editor, start - offset, end - offset);
+      rn.addLast(editor, n, end - start);
+    } else {
+      int sLower = offset(startIdx);
+      int sUpper = offset(startIdx + 1);
+      rn.addLast(editor, ((IListNode) nodes[startIdx]).slice(editor, start - sLower, sUpper - sLower), sUpper - start);
+
+      for (int i = startIdx + 1; i < endIdx; i++) {
+        rn.addLast(editor, nodes[i], offset(i + 1) - offset(i));
+      }
+
+      int eLower = offset(endIdx);
+      rn.addLast(editor, ((IListNode) nodes[endIdx]).slice(editor, 0, end - eLower), end - eLower);
+    }
+
+    return rn;
+  }
+
+  ///
+
+  private RRNode overwrite(Object editor, int idx, Object value) {
+    int nodeIdx = indexOf(idx);
+    if (shift > 5) {
+      nodes[nodeIdx] = ((RRNode) nodes[nodeIdx]).set(editor, idx - offset(nodeIdx), value);
+    } else {
+      Leaf l = (Leaf) nodes[nodeIdx];
+      nodes[nodeIdx] = l.set(editor, idx, value);
+    }
+
+    return this;
   }
 
   private RRNode pushLast(Object node, int size) {

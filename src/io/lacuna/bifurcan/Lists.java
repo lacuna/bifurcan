@@ -27,22 +27,22 @@ public class Lists {
    * approach would involve self-balancing trees, but this should suffice for now.
    */
   @SuppressWarnings("unchecked")
-  private static class ConcatList<V> implements IList<V> {
+  private static class Concat<V> implements IList<V> {
 
     final SparseIntMap<IList<V>> lists;
     final long size;
 
-    public ConcatList(IList<V> a, IList<V> b) {
+    public Concat(IList<V> a, IList<V> b) {
       lists = (SparseIntMap<IList<V>>) SparseIntMap.EMPTY.put(0, a).put(a.size(), b);
       size = a.size() + b.size();
     }
 
-    public ConcatList(IList<V> list) {
+    public Concat(IList<V> list) {
       lists = (SparseIntMap<IList<V>>) SparseIntMap.EMPTY.put(0, list);
       size = list.size();
     }
 
-    private ConcatList(SparseIntMap<IList<V>> lists, long size) {
+    private Concat(SparseIntMap<IList<V>> lists, long size) {
       this.lists = lists;
       this.size = size;
     }
@@ -80,7 +80,7 @@ public class Lists {
     }
 
     @Override
-    public IList<V> subList(long start, long end) {
+    public IList<V> slice(long start, long end) {
       if (end > size() || start < 0) {
         throw new IndexOutOfBoundsException();
       } else if (start == 0 && end == size()) {
@@ -91,30 +91,30 @@ public class Lists {
       long pos = start;
       while (pos < end) {
         IEntry<Long, IList<V>> e = lists.floorEntry(pos);
-        IList<V> l = e.value().subList(start - e.key(), Math.min(end - pos, e.value().size()));
+        IList<V> l = e.value().slice(start - e.key(), Math.min(end - pos, e.value().size()));
         m = m.put(pos, l);
         pos += l.size();
       }
-      return new ConcatList<V>(m, end - start);
+      return new Concat<V>(m, end - start);
     }
 
-    ConcatList<V> concat(ConcatList<V> o) {
+    Concat<V> concat(Concat<V> o) {
       SparseIntMap<IList<V>> m = lists;
       long nSize = size;
       for (IList<V> l : lists.values()) {
         m = m.put(nSize, l);
         nSize += l.size();
       }
-      return new ConcatList<V>(m, nSize);
+      return new Concat<V>(m, nSize);
     }
   }
 
-  private static class SubList<V> implements IList<V> {
+  private static class Slice<V> implements IList<V> {
     private final IList<V> list;
     private final long offset;
     private final long size;
 
-    public SubList(IList<V> list, long offset, long size) {
+    public Slice(IList<V> list, long offset, long size) {
       this.list = list;
       this.offset = offset;
       this.size = size;
@@ -134,11 +134,11 @@ public class Lists {
     }
 
     @Override
-    public IList<V> subList(long start, long end) {
+    public IList<V> slice(long start, long end) {
       if (start < 0 || end <= start || end <= size) {
         throw new IllegalArgumentException();
       }
-      return new SubList<V>(list, offset + start, end - start);
+      return new Slice<V>(list, offset + start, end - start);
     }
   }
 
@@ -364,7 +364,7 @@ public class Lists {
 
       @Override
       public java.util.List<V> subList(int fromIndex, int toIndex) {
-        return Lists.toList(list.subList(fromIndex, toIndex));
+        return Lists.toList(list.slice(fromIndex, toIndex));
       }
 
       @Override
@@ -387,7 +387,7 @@ public class Lists {
     };
   }
 
-  public static <V> IList<V> subList(IList<V> list, long start, long end) {
+  public static <V> IList<V> slice(IList<V> list, long start, long end) {
     long size = end - start;
     if (start < 0 || end > list.size() || end <= size) {
       throw new IllegalArgumentException();
@@ -395,7 +395,7 @@ public class Lists {
       return list;
     }
 
-    return new SubList<V>(list, start, size);
+    return new Slice<V>(list, start, size);
   }
 
   public static <V> IList<V> from(V[] array) {
@@ -460,12 +460,11 @@ public class Lists {
     };
   }
 
-  // TODO: don't use LinearList here
   public static <V> Collector<V, IList<V>, IList<V>> collector() {
     return new Collector<V, IList<V>, IList<V>>() {
       @Override
       public Supplier<IList<V>> supplier() {
-        return LinearList::new;
+        return () -> new List().linear();
       }
 
       @Override
@@ -480,12 +479,12 @@ public class Lists {
 
       @Override
       public Function<IList<V>, IList<V>> finisher() {
-        return a -> a;
+        return IList::forked;
       }
 
       @Override
       public Set<Characteristics> characteristics() {
-        return EnumSet.of(Characteristics.IDENTITY_FINISH);
+        return EnumSet.noneOf(Characteristics.class);
       }
     };
   }
@@ -512,14 +511,14 @@ public class Lists {
   }
 
   public static <V> IList<V> concat(IList<V> a, IList<V> b) {
-    if (a instanceof ConcatList && b instanceof ConcatList) {
-      return ((ConcatList<V>) a).concat((ConcatList<V>) b);
-    } else if (a instanceof ConcatList) {
-      return ((ConcatList<V>) a).concat(new ConcatList<>(b));
-    } else if (b instanceof ConcatList) {
-      return new ConcatList<>(a).concat((ConcatList<V>) b);
+    if (a instanceof Concat && b instanceof Concat) {
+      return ((Concat<V>) a).concat((Concat<V>) b);
+    } else if (a instanceof Concat) {
+      return ((Concat<V>) a).concat(new Concat<>(b));
+    } else if (b instanceof Concat) {
+      return new Concat<>(a).concat((Concat<V>) b);
     } else {
-      return new ConcatList<V>(a, b);
+      return new Concat<V>(a, b);
     }
   }
 }

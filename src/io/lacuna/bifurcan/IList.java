@@ -115,7 +115,7 @@ public interface IList<V> extends
     long subSize = size() / parts;
     long offset = 0;
     for (int i = 0; i < parts; i++) {
-      ary[i] = Lists.subList(this, offset, i == (parts - 1) ? size() : offset + subSize);
+      ary[i] = Lists.slice(this, offset, i == (parts - 1) ? size() : offset + subSize);
     }
 
     return Lists.from(ary);
@@ -126,8 +126,8 @@ public interface IList<V> extends
    * @param end the exclusive end of the range
    * @return a read-only view into this sub-range of the list
    */
-  default IList<V> subList(long start, long end) {
-    return Lists.subList(this, start, end);
+  default IList<V> slice(long start, long end) {
+    return Lists.slice(this, start, end);
   }
 
   /**

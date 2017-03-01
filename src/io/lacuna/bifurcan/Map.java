@@ -18,6 +18,7 @@ public class Map<K, V> implements IMap<K, V> {
   private final ToIntFunction<K> hashFn;
   public ChampNode<K, V> root;
   public final boolean linear;
+  private final Object editor = new Object();
 
   public Map(ToIntFunction<K> hashFn, BiPredicate<K, K> equalsFn) {
     this(ChampNode.EMPTY, hashFn, equalsFn, false);
@@ -47,7 +48,7 @@ public class Map<K, V> implements IMap<K, V> {
 
   @Override
   public IMap<K, V> put(K key, V value, ValueMerger<V> merge) {
-    ChampNode<K, V> rootPrime = root.put(0, this, keyHash(key), key, value, equalsFn, merge);
+    ChampNode<K, V> rootPrime = root.put(0, editor, keyHash(key), key, value, equalsFn, merge);
 
     if (rootPrime == root) {
       return this;
@@ -61,7 +62,7 @@ public class Map<K, V> implements IMap<K, V> {
 
   @Override
   public IMap<K, V> remove(K key) {
-    ChampNode<K, V> rootPrime = root.remove(0, this, keyHash(key), key, equalsFn);
+    ChampNode<K, V> rootPrime = root.remove(0, editor, keyHash(key), key, equalsFn);
 
     if (rootPrime == root) {
       return this;
