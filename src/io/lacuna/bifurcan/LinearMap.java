@@ -124,7 +124,7 @@ public class LinearMap<K, V> implements IMap<K, V> {
       int keyIndex = Row.keyIndex(row);
       int lastKeyIndex = size << 1;
 
-      // if we're not the last entry, swap the last entry into our slot, so we remain strict
+      // if we're not the last entry, swap the last entry into our slot, so we remain dense
       if (keyIndex != lastKeyIndex) {
         K lastKey = (K) entries[lastKeyIndex];
         V lastValue = (V) entries[lastKeyIndex + 1];
