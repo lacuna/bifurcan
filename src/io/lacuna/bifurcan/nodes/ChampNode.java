@@ -17,7 +17,7 @@ import static java.lang.System.arraycopy;
 /**
  * This is an implementation based on the one described in https://michael.steindorfer.name/publications/oopsla15.pdf.
  *
- * It adds in support for transient/linear updates, and allows for empty buffer space between the entries and nodes
+ * It adds in support for transient/linear updates, and allows for empty buffer space between the nodes and nodes
  * to minimize allocations when a node is repeatedly updated in-place.
  *
  * @author ztellman
@@ -30,8 +30,8 @@ public class ChampNode<K, V> implements IMapNode<K, V> {
 
   int datamap = 0;
   int nodemap = 0;
-  public int[] hashes = new int[2];
-  public Object[] content = new Object[4];
+  public int[] hashes;
+  public Object[] content;
   Object editor;
   long size;
 
@@ -40,6 +40,8 @@ public class ChampNode<K, V> implements IMapNode<K, V> {
 
   private ChampNode(Object editor) {
     this.editor = editor;
+    this.hashes = new int[2];
+    this.content = new Object[4];
   }
 
   @Override
@@ -242,10 +244,6 @@ public class ChampNode<K, V> implements IMapNode<K, V> {
       @Override
       public IEntry<K, V> next() {
         while (!iterator.hasNext()) {
-          if (nodes.size() == 0) {
-            throw new NoSuchElementException();
-          }
-
           IMapNode<K, V> node = nodes.first();
           nodes.removeFirst();
           iterator = node.entries();
@@ -259,7 +257,7 @@ public class ChampNode<K, V> implements IMapNode<K, V> {
     };
   }
 
-  public ChampNode<K, V> merge(Object editor, ChampNode node, IMap.ValueMerger<V> merge) {
+  public ChampNode<K, V> merge(Object editor, ChampNode<K, V> node, IMap.ValueMerger<V> merge) {
     return null;
   }
 
@@ -306,11 +304,11 @@ public class ChampNode<K, V> implements IMapNode<K, V> {
     int numNodes = bitCount(nodemap);
     arraycopy(content, 0, c, 0, bitCount(datamap) << 1);
     arraycopy(content, content.length - numNodes, c, c.length - numNodes, numNodes);
-    content = c;
+    this.content = c;
 
     int[] h = new int[hashes.length << 1];
     arraycopy(hashes, 0, h, 0, bitCount(datamap));
-    hashes = h;
+    this.hashes = h;
   }
 
   ChampNode<K, V> putEntry(int mask, int hash, K key, V value) {

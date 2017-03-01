@@ -1,0 +1,288 @@
+
+lein test bifurcan.benchmark-test
+io.lacuna.bifurcan.LinearMap
+10^1
+WARNING: Final GC required 1.115205832810661 % of runtime
+WARNING: Final GC required 4.567429634544247 % of runtime
+WARNING: Final GC required 3.3541334032885 % of runtime
+WARNING: Final GC required 3.0664970851190376 % of runtime
+WARNING: Final GC required 4.0688276344068495 % of runtime
+WARNING: Final GC required 4.324889095521494 % of runtime
+10^2
+WARNING: Final GC required 3.145303058115763 % of runtime
+WARNING: Final GC required 3.625074145738954 % of runtime
+WARNING: Final GC required 3.2267564307339653 % of runtime
+WARNING: Final GC required 3.026297675804113 % of runtime
+WARNING: Final GC required 2.9883508523235918 % of runtime
+10^3
+WARNING: Final GC required 3.039939822115286 % of runtime
+WARNING: Final GC required 3.044085586574084 % of runtime
+WARNING: Final GC required 3.255486760571005 % of runtime
+WARNING: Final GC required 2.91146302993226 % of runtime
+WARNING: Final GC required 2.986290322358195 % of runtime
+10^4
+WARNING: Final GC required 2.996422532387101 % of runtime
+WARNING: Final GC required 3.328395823108913 % of runtime
+WARNING: Final GC required 3.228111807499437 % of runtime
+WARNING: Final GC required 3.004487457811027 % of runtime
+WARNING: Final GC required 3.1993394192141444 % of runtime
+10^5
+WARNING: Final GC required 3.775876965856261 % of runtime
+WARNING: Final GC required 6.448969353498912 % of runtime
+WARNING: Final GC required 5.715619683476815 % of runtime
+WARNING: Final GC required 3.7512998143543523 % of runtime
+WARNING: Final GC required 3.0848934065697877 % of runtime
+10^6
+WARNING: Final GC required 12.63900411716898 % of runtime
+WARNING: Final GC required 63.23421760866567 % of runtime
+WARNING: Final GC required 29.72876505441848 % of runtime
+WARNING: Final GC required 7.23695925362274 % of runtime
+WARNING: Final GC required 2.861147268206242 % of runtime
+io.lacuna.bifurcan.LinearSet
+10^1
+WARNING: Final GC required 3.2431324023631913 % of runtime
+WARNING: Final GC required 3.474583611404517 % of runtime
+WARNING: Final GC required 3.364972461042103 % of runtime
+WARNING: Final GC required 3.77591715970335 % of runtime
+WARNING: Final GC required 3.864431141169894 % of runtime
+10^2
+WARNING: Final GC required 4.7429477272896685 % of runtime
+WARNING: Final GC required 2.826333598849589 % of runtime
+WARNING: Final GC required 3.097047340597896 % of runtime
+WARNING: Final GC required 3.275935068625001 % of runtime
+WARNING: Final GC required 3.136181178990872 % of runtime
+10^3
+WARNING: Final GC required 4.489945031629311 % of runtime
+WARNING: Final GC required 3.126670242685186 % of runtime
+WARNING: Final GC required 2.951356151194731 % of runtime
+WARNING: Final GC required 2.801728667888309 % of runtime
+WARNING: Final GC required 2.98720622507035 % of runtime
+10^4
+WARNING: Final GC required 4.420115803724053 % of runtime
+WARNING: Final GC required 3.183816834077681 % of runtime
+WARNING: Final GC required 3.180122054512907 % of runtime
+WARNING: Final GC required 2.9340023385238423 % of runtime
+WARNING: Final GC required 3.185745462864019 % of runtime
+10^5
+WARNING: Final GC required 3.8738591762926107 % of runtime
+WARNING: Final GC required 6.0878868753807565 % of runtime
+WARNING: Final GC required 5.798456878405713 % of runtime
+WARNING: Final GC required 3.6883209590272386 % of runtime
+WARNING: Final GC required 2.975148081378982 % of runtime
+10^6
+WARNING: Final GC required 13.90929956374488 % of runtime
+WARNING: Final GC required 27.729817104347198 % of runtime
+WARNING: Final GC required 32.99649764693268 % of runtime
+WARNING: Final GC required 8.643997442344011 % of runtime
+WARNING: Final GC required 3.622021174028298 % of runtime
+io.lacuna.bifurcan.Map
+10^1
+WARNING: Final GC required 4.975352688320951 % of runtime
+WARNING: Final GC required 3.201277171416586 % of runtime
+WARNING: Final GC required 3.3260540444018 % of runtime
+WARNING: Final GC required 3.528362705964601 % of runtime
+WARNING: Final GC required 3.835604582253521 % of runtime
+10^2
+WARNING: Final GC required 4.456137026385134 % of runtime
+WARNING: Final GC required 3.04025103845844 % of runtime
+WARNING: Final GC required 3.205044208720432 % of runtime
+WARNING: Final GC required 2.916788246517978 % of runtime
+WARNING: Final GC required 3.0926651982312428 % of runtime
+10^3
+WARNING: Final GC required 4.102184403630145 % of runtime
+WARNING: Final GC required 3.969411354410009 % of runtime
+WARNING: Final GC required 3.477746445744337 % of runtime
+WARNING: Final GC required 3.145514000216271 % of runtime
+WARNING: Final GC required 3.031648060261543 % of runtime
+10^4
+WARNING: Final GC required 4.172991464725266 % of runtime
+WARNING: Final GC required 4.428213043633165 % of runtime
+WARNING: Final GC required 4.282896385579334 % of runtime
+WARNING: Final GC required 3.416057164813017 % of runtime
+WARNING: Final GC required 2.856041762944248 % of runtime
+10^5
+WARNING: Final GC required 4.675093765411246 % of runtime
+WARNING: Final GC required 21.45104086911091 % of runtime
+WARNING: Final GC required 20.09081856604989 % of runtime
+WARNING: Final GC required 4.786372368138949 % of runtime
+WARNING: Final GC required 3.091752692771402 % of runtime
+10^6
+WARNING: Final GC required 18.52139468593222 % of runtime
+WARNING: Final GC required 97.59818857705582 % of runtime
+WARNING: Final GC required 48.64219111889214 % of runtime
+WARNING: Final GC required 12.037859373736499 % of runtime
+WARNING: Final GC required 2.3881465615039352 % of runtime
+java.util.HashSet
+10^1
+WARNING: Final GC required 3.483907773090166 % of runtime
+WARNING: Final GC required 3.468501954088432 % of runtime
+WARNING: Final GC required 4.069705418076043 % of runtime
+WARNING: Final GC required 4.6647491000939745 % of runtime
+WARNING: Final GC required 4.924423395907514 % of runtime
+10^2
+WARNING: Final GC required 3.194590292480138 % of runtime
+WARNING: Final GC required 3.277434692868054 % of runtime
+WARNING: Final GC required 3.590025639601958 % of runtime
+WARNING: Final GC required 3.173852371300144 % of runtime
+WARNING: Final GC required 3.078116581816853 % of runtime
+10^3
+WARNING: Final GC required 3.081241862350486 % of runtime
+WARNING: Final GC required 4.150067252889673 % of runtime
+WARNING: Final GC required 3.552300221774016 % of runtime
+WARNING: Final GC required 2.974658083480531 % of runtime
+WARNING: Final GC required 2.960414849519069 % of runtime
+10^4
+WARNING: Final GC required 3.186455327408624 % of runtime
+WARNING: Final GC required 5.649407228107815 % of runtime
+WARNING: Final GC required 4.681404084383445 % of runtime
+WARNING: Final GC required 3.1732402261122705 % of runtime
+WARNING: Final GC required 3.042428797710007 % of runtime
+10^5
+WARNING: Final GC required 4.615851071803261 % of runtime
+WARNING: Final GC required 27.300486628405157 % of runtime
+WARNING: Final GC required 24.443115445716458 % of runtime
+WARNING: Final GC required 4.798151494034674 % of runtime
+WARNING: Final GC required 2.9909671614635513 % of runtime
+10^6
+WARNING: Final GC required 26.272522623523447 % of runtime
+WARNING: Final GC required 232.97291287547682 % of runtime
+WARNING: Final GC required 164.6112300788333 % of runtime
+WARNING: Final GC required 23.23740305463133 % of runtime
+WARNING: Final GC required 3.187937483521367 % of runtime
+clojure.lang.PersistentHashSet
+10^1
+WARNING: Final GC required 3.367052037303522 % of runtime
+WARNING: Final GC required 3.172521871872961 % of runtime
+WARNING: Final GC required 3.288098861232232 % of runtime
+WARNING: Final GC required 3.2532728100606674 % of runtime
+WARNING: Final GC required 3.225664924512131 % of runtime
+10^2
+WARNING: Final GC required 3.163288795952726 % of runtime
+WARNING: Final GC required 3.173844580603681 % of runtime
+WARNING: Final GC required 3.3169241752273106 % of runtime
+WARNING: Final GC required 3.129155278499787 % of runtime
+WARNING: Final GC required 3.1753253571856646 % of runtime
+10^3
+WARNING: Final GC required 3.2786811167914056 % of runtime
+WARNING: Final GC required 3.5989593697278996 % of runtime
+WARNING: Final GC required 3.436796862699799 % of runtime
+WARNING: Final GC required 3.122872666151393 % of runtime
+WARNING: Final GC required 2.954112650624958 % of runtime
+10^4
+WARNING: Final GC required 3.453048237596485 % of runtime
+WARNING: Final GC required 4.160745414253901 % of runtime
+WARNING: Final GC required 4.4302817778215955 % of runtime
+WARNING: Final GC required 3.070335382711588 % of runtime
+WARNING: Final GC required 3.2709742930207524 % of runtime
+10^5
+WARNING: Final GC required 4.2102060786074755 % of runtime
+WARNING: Final GC required 14.52958101392058 % of runtime
+WARNING: Final GC required 14.638740673639381 % of runtime
+WARNING: Final GC required 4.161393144697246 % of runtime
+WARNING: Final GC required 2.9115224467692777 % of runtime
+10^6
+WARNING: Final GC required 19.12855522915759 % of runtime
+WARNING: Final GC required 68.34457956205478 % of runtime
+WARNING: Final GC required 36.701708558119414 % of runtime
+WARNING: Final GC required 9.977530542167537 % of runtime
+WARNING: Final GC required 2.701587585278426 % of runtime
+java.util.HashMap
+10^1
+
+lein test :only bifurcan.benchmark-test/benchmark-collections
+
+ERROR in (benchmark-collections) (benchmark_test.clj:176)
+Uncaught exception, not in assertion.
+expected: nil
+  actual: java.lang.ClassCastException: java.util.HashMap cannot be cast to java.lang.Iterable
+ at bifurcan.benchmark_test$benchmark_collection$fn__2658$fn__2663.invoke (benchmark_test.clj:176)
+    criterium.core$run_benchmark.invokeStatic (core.clj:478)
+    criterium.core$run_benchmark.invoke (core.clj:470)
+    criterium.core$benchmark_STAR_.invokeStatic (core.clj:826)
+    criterium.core$benchmark_STAR_.invoke (core.clj:812)
+    criterium.core$quick_benchmark_STAR_.invokeStatic (core.clj:862)
+    criterium.core$quick_benchmark_STAR_.invoke (core.clj:859)
+    bifurcan.benchmark_test$benchmark.invokeStatic (benchmark_test.clj:150)
+    bifurcan.benchmark_test$benchmark.invoke (benchmark_test.clj:149)
+    bifurcan.benchmark_test$benchmark_collection$fn__2658.invoke (benchmark_test.clj:176)
+    clojure.core$map$fn__4785.invoke (core.clj:2644)
+    clojure.lang.LazySeq.sval (LazySeq.java:40)
+    clojure.lang.LazySeq.seq (LazySeq.java:49)
+    clojure.lang.RT.seq (RT.java:521)
+    clojure.core$seq__4357.invokeStatic (core.clj:137)
+    clojure.core.protocols$seq_reduce.invokeStatic (protocols.clj:24)
+    clojure.core.protocols$fn__6738.invokeStatic (protocols.clj:75)
+    clojure.core.protocols/fn (protocols.clj:75)
+    clojure.core.protocols$fn__6684$G__6679__6697.invoke (protocols.clj:13)
+    clojure.core$reduce.invokeStatic (core.clj:6545)
+    clojure.core$into.invokeStatic (core.clj:6610)
+    clojure.core$into.invoke (core.clj:6604)
+    bifurcan.benchmark_test$benchmark_collection.invokeStatic (benchmark_test.clj:188)
+    bifurcan.benchmark_test$benchmark_collection.invoke (benchmark_test.clj:161)
+    bifurcan.benchmark_test$fn__2677.invokeStatic (benchmark_test.clj:204)
+    bifurcan.benchmark_test/fn (benchmark_test.clj:190)
+    clojure.test$test_var$fn__7983.invoke (test.clj:716)
+    clojure.test$test_var.invokeStatic (test.clj:716)
+    clojure.test$test_var.invoke (test.clj:707)
+    clojure.test$test_vars$fn__8005$fn__8010.invoke (test.clj:734)
+    clojure.test$default_fixture.invokeStatic (test.clj:686)
+    clojure.test$default_fixture.invoke (test.clj:682)
+    clojure.test$test_vars$fn__8005.invoke (test.clj:734)
+    clojure.test$default_fixture.invokeStatic (test.clj:686)
+    clojure.test$default_fixture.invoke (test.clj:682)
+    clojure.test$test_vars.invokeStatic (test.clj:730)
+    clojure.test$test_all_vars.invokeStatic (test.clj:736)
+    clojure.test$test_ns.invokeStatic (test.clj:757)
+    clojure.test$test_ns.invoke (test.clj:742)
+    user$eval85$fn__136.invoke (form-init1830409996068080737.clj:1)
+    clojure.lang.AFn.applyToHelper (AFn.java:156)
+    clojure.lang.AFn.applyTo (AFn.java:144)
+    clojure.core$apply.invokeStatic (core.clj:648)
+    clojure.core$apply.invoke (core.clj:641)
+    leiningen.core.injected$compose_hooks$fn__19.doInvoke (form-init1830409996068080737.clj:1)
+    clojure.lang.RestFn.applyTo (RestFn.java:137)
+    clojure.core$apply.invokeStatic (core.clj:646)
+    clojure.core$apply.invoke (core.clj:641)
+    leiningen.core.injected$run_hooks.invokeStatic (form-init1830409996068080737.clj:1)
+    leiningen.core.injected$run_hooks.invoke (form-init1830409996068080737.clj:1)
+    leiningen.core.injected$prepare_for_hooks$fn__24$fn__25.doInvoke (form-init1830409996068080737.clj:1)
+    clojure.lang.RestFn.applyTo (RestFn.java:137)
+    clojure.lang.AFunction$1.doInvoke (AFunction.java:29)
+    clojure.lang.RestFn.invoke (RestFn.java:408)
+    clojure.core$map$fn__4785.invoke (core.clj:2646)
+    clojure.lang.LazySeq.sval (LazySeq.java:40)
+    clojure.lang.LazySeq.seq (LazySeq.java:49)
+    clojure.lang.Cons.next (Cons.java:39)
+    clojure.lang.RT.boundedLength (RT.java:1749)
+    clojure.lang.RestFn.applyTo (RestFn.java:130)
+    clojure.core$apply.invokeStatic (core.clj:648)
+    clojure.test$run_tests.invokeStatic (test.clj:767)
+    clojure.test$run_tests.doInvoke (test.clj:767)
+    clojure.lang.RestFn.applyTo (RestFn.java:137)
+    clojure.core$apply.invokeStatic (core.clj:646)
+    clojure.core$apply.invoke (core.clj:641)
+    user$eval85$fn__148$fn__179.invoke (form-init1830409996068080737.clj:1)
+    user$eval85$fn__148$fn__149.invoke (form-init1830409996068080737.clj:1)
+    user$eval85$fn__148.invoke (form-init1830409996068080737.clj:1)
+    user$eval85.invokeStatic (form-init1830409996068080737.clj:1)
+    user$eval85.invoke (form-init1830409996068080737.clj:1)
+    clojure.lang.Compiler.eval (Compiler.java:6927)
+    clojure.lang.Compiler.eval (Compiler.java:6917)
+    clojure.lang.Compiler.load (Compiler.java:7379)
+    clojure.lang.Compiler.loadFile (Compiler.java:7317)
+    clojure.main$load_script.invokeStatic (main.clj:275)
+    clojure.main$init_opt.invokeStatic (main.clj:277)
+    clojure.main$init_opt.invoke (main.clj:277)
+    clojure.main$initialize.invokeStatic (main.clj:308)
+    clojure.main$null_opt.invokeStatic (main.clj:342)
+    clojure.main$null_opt.invoke (main.clj:339)
+    clojure.main$main.invokeStatic (main.clj:421)
+    clojure.main$main.doInvoke (main.clj:384)
+    clojure.lang.RestFn.invoke (RestFn.java:421)
+    clojure.lang.Var.invoke (Var.java:383)
+    clojure.lang.AFn.applyToHelper (AFn.java:156)
+    clojure.lang.Var.applyTo (Var.java:700)
+    clojure.main.main (main.java:37)
+
+Ran 1 tests containing 1 assertions.
+0 failures, 1 errors.

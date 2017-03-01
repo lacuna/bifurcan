@@ -1,7 +1,6 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.utils.Bits;
-
+import java.util.Iterator;
 import java.util.Objects;
 import java.util.function.*;
 
@@ -159,10 +158,31 @@ public class LinearMap<K, V> implements IMap<K, V> {
 
   @Override
   public IList<IEntry<K, V>> entries() {
-    return Lists.from(size, i -> {
-      int idx = ((int) i) << 1;
-      return new Maps.Entry<>((K) entries[idx], (V) entries[idx + 1]);
-    });
+    return Lists.from(
+        size,
+        i -> {
+          int idx = ((int) i) << 1;
+          return new Maps.Entry<>((K) entries[idx], (V) entries[idx + 1]);
+        },
+        l -> iterator());
+  }
+
+  @Override
+  public Iterator<IEntry<K, V>> iterator() {
+    return new Iterator<IEntry<K, V>>() {
+      int i = 0;
+
+      @Override
+      public boolean hasNext() {
+        return i < size;
+      }
+
+      @Override
+      public IEntry<K, V> next() {
+        int idx = i++ << 1;
+        return new Maps.Entry<>((K) entries[idx], (V) entries[idx + 1]);
+      }
+    };
   }
 
   @Override

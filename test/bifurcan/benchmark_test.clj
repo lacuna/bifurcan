@@ -22,6 +22,7 @@
     Iterator]
    [io.lacuna.bifurcan
     Map
+    List
     IMap
     IList
     ISet
@@ -41,10 +42,11 @@
       (clojure.lang.Util/equiv a b))))
 
 (set! *warn-on-reflection* true)
-(defn construct-linear-list [^LinearList l vs]
-  (doary [v vs]
-    (.addLast l v))
-  l)
+(defn construct-list [^IList l vs]
+  (let-mutable [l (.linear l)]
+    (doary [v vs]
+      (set! l (.addLast ^IList l v)))
+    l))
 
 (defn construct-java-list [^java.util.List l vs]
   (doary [v vs]
@@ -60,7 +62,7 @@
   (let-mutable [l (transient v)]
     (doary [v vs]
       (set! l (conj! l v)))
-    l))
+    (persistent! l)))
 
 (defn construct-map [^IMap m vs]
   (let-mutable [m (.linear m)]
@@ -79,7 +81,7 @@
       (set! m (assoc! m v nil)))
     (persistent! m)))
 
-(defn lookup-linear-list [^LinearList l ks]
+(defn lookup-list [^IList l ks]
   (doary [k ks]
     (.nth l k)))
 
@@ -114,10 +116,10 @@
   s)
 
 (defn consume-iterator [^Iterator it]
-  (loop [e nil cnt 0]
-    (if (.hasNext it)
-      (recur (.next it) (unchecked-inc cnt))
-      cnt)))
+  (loop []
+    (when (.hasNext it)
+      (.next it)
+      (recur))))
 
 (defn construct-clojure-set [s ^objects vs]
   (let [len (alength vs)]
@@ -173,7 +175,13 @@
              [n (->>
                   (merge
                     (when (test? :iterate)
-                      {:iterate (benchmark #(consume-iterator (.iterator ^Iterable c')))})
+                      {:iterate
+                       (if (instance? java.util.Map c')
+                         (benchmark #(consume-iterator (-> ^java.util.Map c' .entrySet .iterator)))
+                         (benchmark #(try
+                                       (consume-iterator (.iterator ^Iterable c'))
+                                       (catch Throwable e
+                                         (prn c' s)))))})
                     (when (test? :construct)
                       {:construct (benchmark #(construct (base-collection n) s))})
                     (when (test? :construct-duplicate)
@@ -187,13 +195,21 @@
                   (into {}))])))
     (into {})))
 
+(deftest ^:benchmark benchmark-lists
+  (pprint
+    [:linear-list (benchmark-collection (fn [_] (LinearList.)) generate-numbers construct-list lookup-list  #{:construct :lookup :iterate})
+     :list        (benchmark-collection (fn [_] (List.)) generate-numbers construct-list lookup-list  #{:construct :lookup :iterate})
+     :clojure-vector (benchmark-collection (fn [_] []) generate-numbers construct-vector lookup-vector #{:construct :lookup :iterate})
+]
+    ))
+
 (deftest ^:benchmark benchmark-collections
   (pprint
-    [(comment
-       :linear-list (benchmark-collection (fn [_] (LinearList.)) generate-numbers construct-linear-list lookup-linear-list  #{:construct :lookup})
-       :array-list  (benchmark-collection (fn [_] (ArrayList.)) generate-numbers construct-java-list lookup-java-list #{:construct :lookup})
-       :array-deque (benchmark-collection (fn [_] (ArrayDeque.)) generate-numbers construct-java-deque nil #{:construct})
-       :vector      (benchmark-collection (fn [_] []) generate-numbers construct-vector lookup-vector #{:construct :lookup}))
+    [:linear-list (benchmark-collection (fn [_] (LinearList.)) generate-numbers construct-list lookup-list  #{:construct :lookup :iterate})
+     :list        (benchmark-collection (fn [_] (List.)) generate-numbers construct-list lookup-list  #{:construct :lookup :iterate})
+     :array-list  (benchmark-collection (fn [_] (ArrayList.)) generate-numbers construct-java-list lookup-java-list #{:construct :lookup :iterate})
+     :array-deque (benchmark-collection (fn [_] (ArrayDeque.)) generate-numbers construct-java-deque nil #{:construct :iterate})
+     :clojure-vector (benchmark-collection (fn [_] []) generate-numbers construct-vector lookup-vector #{:construct :lookup :iterate})
 
      :linear-map  (benchmark-collection (fn [_] (LinearMap.)) generate-entries construct-map lookup-map (constantly true))
      :linear-set  (benchmark-collection (fn [_] (LinearSet.)) generate-entries construct-linear-set lookup-linear-set (constantly true))

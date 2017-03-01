@@ -103,7 +103,6 @@ public class SparseIntMap<V> {
 
   public IMap.IEntry<Long, V> floorEntry(long key) {
     int idx = BitIntSet.indexOf(keys, keyBits, vals.length, key);
-    System.out.println(key + " " + idx);
     idx = idx < 0 ? -idx - 2 : idx;
     return idx < 0 ? null : new Maps.Entry<>(BitIntSet.get(keys, keyBits, idx), (V) vals[idx]);
   }

@@ -16,6 +16,7 @@
     SparseIntMap]
    [io.lacuna.bifurcan
     Map
+    List
     IMap
     IMap$IEntry
     IList
@@ -99,7 +100,12 @@
 (u/def-collection-check test-linear-list 1e4 (list-actions)
   [v []
    l (LinearList.)]
-  (= (seq v) (-> ^LinearList l .iterator iterator-seq)))
+  (= (seq v) (-> ^IList l .iterator iterator-seq)))
+
+(u/def-collection-check test-list 1e4 (list-actions)
+  [v []
+   l (List.)]
+  (= (seq v) (-> ^IList l .iterator iterator-seq)))
 
 (u/def-collection-check test-linear-map-equality 1e4 (map-actions)
   [m {}

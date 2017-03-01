@@ -66,4 +66,8 @@ public class Bits {
     return (n & (n - 1)) == 0;
   }
 
+  public static int nextBit(long n, int offset) {
+    return bitOffset(lowestBit(n & ~maskBelow(offset)));
+  }
+
 }
