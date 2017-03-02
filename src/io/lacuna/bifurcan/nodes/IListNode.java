@@ -3,6 +3,6 @@ package io.lacuna.bifurcan.nodes;
 /**
  * @author ztellman
  */
-public interface IListNode {
+interface IListNode {
   IListNode slice(Object editor, int start, int end);
 }

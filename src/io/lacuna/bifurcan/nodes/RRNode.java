@@ -218,24 +218,62 @@ public class RRNode {
     return (editor == this.editor ? this : clone(editor)).pushFirst(node, size);
   }
 
+  public RRNode concat(Object editor, RRNode node) {
+
+    // same level
+    if (shift == node.shift) {
+      return new RRNode(editor, false, shift + 5)
+          .addLast(editor, this, this.size())
+          .addLast(editor, node, node.size());
+
+      // we're down one level
+    } else if (shift == node.shift - 5) {
+      return node.addFirst(editor, this, this.size());
+
+      // we're up one level
+    } else if (shift == node.shift + 5) {
+      return addFirst(editor, node, node.size());
+
+      // we're down multiple levels
+    } else if (shift < node.shift) {
+      return new RRNode(editor, false, shift + 5)
+          .addLast(editor, this, this.size())
+          .concat(editor, node);
+
+      // we're up multiple levels
+    } else {
+      return concat(editor,
+          new RRNode(editor, false, node.shift + 5)
+              .addLast(editor, node, node.size()));
+    }
+  }
+
   public RRNode slice(Object editor, int start, int end) {
     int startIdx = indexOf(start);
     int endIdx = indexOf(end - 1);
 
     RRNode rn = new RRNode(editor, false, shift);
+
+    // we're slicing within a single node
     if (startIdx == endIdx) {
       int offset = offset(startIdx);
       IListNode n = ((IListNode) nodes[startIdx]).slice(editor, start - offset, end - offset);
       rn.addLast(editor, n, end - start);
+
+      // we're slicing across multiple nodes
     } else {
+
+      // first partial node
       int sLower = offset(startIdx);
       int sUpper = offset(startIdx + 1);
       rn.addLast(editor, ((IListNode) nodes[startIdx]).slice(editor, start - sLower, sUpper - sLower), sUpper - start);
 
+      // intermediate full nodes
       for (int i = startIdx + 1; i < endIdx; i++) {
         rn.addLast(editor, nodes[i], offset(i + 1) - offset(i));
       }
 
+      // last partial node
       int eLower = offset(endIdx);
       rn.addLast(editor, ((IListNode) nodes[endIdx]).slice(editor, 0, end - eLower), end - eLower);
     }

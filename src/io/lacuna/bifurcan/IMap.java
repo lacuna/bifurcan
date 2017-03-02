@@ -54,6 +54,13 @@ public interface IMap<K, V> extends
   long size();
 
   /**
+   * @return true, if the collection is linear
+   */
+  default boolean isLinear() {
+    return false;
+  }
+
+  /**
    * @return the collection, represented as a normal Java {@code io.lacuna.bifurcan.Map}, which will throw {@code UnsupportedOperationException} on writes
    */
   default java.util.Map<K, V> toMap() {
@@ -77,15 +84,15 @@ public interface IMap<K, V> extends
   }
 
   default IMap<K, V> difference(ISet<K> keys) {
-    IMap<K, V> m = this;
+    IMap<K, V> m = this.linear();
     for (K key : keys) {
       m = m.remove(key);
     }
-    return m;
+    return m.forked();
   }
 
   default IMap<K, V> intersection(ISet<K> keys) {
-    return null;
+    return Maps.intersection(new Map<K, V>().linear(), this, keys).forked();
   }
 
   default IMap<K, V> union(IMap<K, V> m) {

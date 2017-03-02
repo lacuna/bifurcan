@@ -48,7 +48,7 @@ public class Map<K, V> implements IMap<K, V> {
 
   @Override
   public IMap<K, V> put(K key, V value, ValueMerger<V> merge) {
-    ChampNode<K, V> rootPrime = root.put(0, editor, keyHash(key), key, value, equalsFn, merge);
+    ChampNode<K, V> rootPrime = (ChampNode<K, V>) root.put(0, editor, keyHash(key), key, value, equalsFn, merge);
 
     if (rootPrime == root) {
       return this;
@@ -62,7 +62,7 @@ public class Map<K, V> implements IMap<K, V> {
 
   @Override
   public IMap<K, V> remove(K key) {
-    ChampNode<K, V> rootPrime = root.remove(0, editor, keyHash(key), key, equalsFn);
+    ChampNode<K, V> rootPrime = (ChampNode<K, V>) root.remove(0, editor, keyHash(key), key, equalsFn);
 
     if (rootPrime == root) {
       return this;
@@ -93,7 +93,7 @@ public class Map<K, V> implements IMap<K, V> {
   }
 
   @Override
-  public IMap<K, V> forked() {
+  public Map<K, V> forked() {
     if (linear) {
       return new Map<>(root, hashFn, equalsFn, false);
     } else {
@@ -102,7 +102,7 @@ public class Map<K, V> implements IMap<K, V> {
   }
 
   @Override
-  public IMap<K, V> linear() {
+  public Map<K, V> linear() {
     if (linear) {
       return this;
     } else {
@@ -111,8 +111,61 @@ public class Map<K, V> implements IMap<K, V> {
   }
 
   @Override
+  public IMap<K, V> merge(IMap<K, V> b, ValueMerger<V> mergeFn) {
+    if (b instanceof Map) {
+      ChampNode<K, V> rootPrime = root.merge(0, editor, ((Map) b).root, equalsFn, mergeFn);
+      return linear ? this : new Map<>(rootPrime, hashFn, equalsFn, false);
+    } else {
+      return Maps.merge(this, b, mergeFn);
+    }
+  }
+
+  @Override
+  public IMap<K, V> difference(ISet<K> keys) {
+    if (keys instanceof Set) {
+      return difference((IMap<K, ?>) ((Set) keys).map);
+    } else {
+      return Maps.difference(this, keys);
+    }
+  }
+
+  @Override
+  public IMap<K, V> intersection(ISet<K> keys) {
+    if (keys instanceof Set) {
+      return intersection((IMap<K, ?>) ((Set) keys).map);
+    } else {
+      return Maps.intersection(new Map().linear(), this, keys).forked();
+    }
+  }
+
+  @Override
+  public IMap<K, V> difference(IMap<K, ?> m) {
+    if (m instanceof Map) {
+      ChampNode<K, V> rootPrime = root.difference(0, editor, ((Map) m).root, equalsFn);
+      return linear ? this : new Map<>(rootPrime, hashFn, equalsFn, false);
+    } else {
+      return difference(m.keys());
+    }
+  }
+
+  @Override
+  public IMap<K, V> intersection(IMap<K, ?> m) {
+    if (m instanceof Map) {
+      ChampNode<K, V> rootPrime = root.intersection(0, editor, ((Map) m).root, equalsFn);
+      return linear ? this : new Map<>(rootPrime, hashFn, equalsFn, false);
+    } else {
+      return intersection(m.keys());
+    }
+  }
+
+  @Override
   public long size() {
     return root.size();
+  }
+
+  @Override
+  public boolean isLinear() {
+    return linear;
   }
 
   @Override

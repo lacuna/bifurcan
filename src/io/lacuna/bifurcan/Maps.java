@@ -4,7 +4,6 @@ import io.lacuna.bifurcan.IMap.IEntry;
 
 import java.util.Collection;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -17,6 +16,8 @@ import static io.lacuna.bifurcan.Lists.lazyMap;
  */
 @SuppressWarnings("unchecked")
 public class Maps {
+
+  private static final Object DEFAULT_VALUE = new Object();
 
   public static IMap.ValueMerger MERGE_LAST_WRITE_WINS = (a, b) -> b;
 
@@ -88,18 +89,6 @@ public class Maps {
     return m.entries().stream().mapToLong(hash).reduce(combiner).orElse(0);
   }
 
-  public static <K, V> IMap<K, V> merge(IMap<K, V> a, IMap<K, V> b, IMap.ValueMerger<V> mergeFn) {
-    if (a.size() < b.size()) {
-      return merge(b, a, mergeFn);
-    }
-
-    LinearMap<K, V> m = LinearMap.from(a);
-    for (IEntry<K, V> e : b.entries()) {
-      m = m.put(e.key(), e.value(), mergeFn);
-    }
-    return m;
-  }
-
   public static <K, V> boolean equals(IMap<K, V> a, IMap<K, V> b) {
     return equals(a, b, Objects::equals);
   }
@@ -135,10 +124,10 @@ public class Maps {
 
       @Override
       public IList<IEntry<K, V>> entries() {
-        Set<Map.Entry<K, V>> entries = map.entrySet();
+        Set<java.util.Map.Entry<K, V>> entries = map.entrySet();
         return entries.stream()
-                .map(e -> (IEntry<K, V>) new Entry(e.getKey(), e.getValue()))
-                .collect(Lists.collector());
+            .map(e -> (IEntry<K, V>) new Entry(e.getKey(), e.getValue()))
+            .collect(Lists.collector());
       }
 
       @Override
@@ -236,7 +225,7 @@ public class Maps {
       }
 
       @Override
-      public void putAll(Map<? extends K, ? extends V> m) {
+      public void putAll(java.util.Map<? extends K, ? extends V> m) {
         throw new UnsupportedOperationException();
       }
 
@@ -248,8 +237,8 @@ public class Maps {
       @Override
       public Set<K> keySet() {
         return Sets.toSet(
-                lazyMap(map.entries(), IEntry::key),
-                k -> map.get(k).isPresent());
+            lazyMap(map.entries(), IEntry::key),
+            k -> map.get(k).isPresent());
       }
 
       @Override
@@ -260,8 +249,8 @@ public class Maps {
       @Override
       public Set<Entry<K, V>> entrySet() {
         return Sets.toSet(
-                lazyMap(map.entries(), Maps::toEntry),
-                e -> map.get(e.getKey()).map(v -> Objects.equals(v, e.getValue())).orElse(false));
+            lazyMap(map.entries(), Maps::toEntry),
+            e -> map.get(e.getKey()).map(v -> Objects.equals(v, e.getValue())).orElse(false));
       }
 
       @Override
@@ -284,8 +273,8 @@ public class Maps {
     };
   }
 
-  public static <K, V> Map.Entry<K, V> toEntry(IEntry<K, V> entry) {
-    return new Map.Entry<K, V>() {
+  public static <K, V> java.util.Map.Entry<K, V> toEntry(IEntry<K, V> entry) {
+    return new java.util.Map.Entry<K, V>() {
       @Override
       public K getKey() {
         return entry.key();
@@ -301,5 +290,41 @@ public class Maps {
         throw new UnsupportedOperationException();
       }
     };
+  }
+
+  static <K, V> IMap<K, V> difference(IMap<K, V> map, ISet<K> keys) {
+    for (K key : keys) {
+      map = map.remove(key);
+    }
+    return map;
+  }
+
+  static <K, V> IMap<K, V> intersection(IMap<K, V> accumulator, IMap<K, V> map, ISet<K> keys) {
+    if (map.size() < keys.size()) {
+      for (IEntry<K, V> entry : map.entries()) {
+        if (keys.contains(entry.key())) {
+          accumulator.put(entry.key(), entry.value());
+        }
+      }
+    } else {
+      for (K key : keys) {
+        Object value = ((IMap) map).get(key, DEFAULT_VALUE);
+        if (value != DEFAULT_VALUE) {
+          accumulator = accumulator.put(key, (V) value);
+        }
+      }
+    }
+    return accumulator;
+  }
+
+  static <K, V> IMap<K, V> merge(IMap<K, V> a, IMap<K, V> b, IMap.ValueMerger<V> mergeFn) {
+    if (a.size() < b.size()) {
+      return merge(b, a, (x, y) -> mergeFn.merge(y, x));
+    } else {
+      for (IEntry<K, V> e : b.entries()) {
+        a = a.put(e.key(), e.value(), mergeFn);
+      }
+      return a;
+    }
   }
 }

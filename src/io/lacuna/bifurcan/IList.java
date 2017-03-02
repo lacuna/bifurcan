@@ -162,7 +162,7 @@ public interface IList<V> extends
 
   @Override
   default IList<V> forked() {
-    return null;
+    return this;
   }
 
   @Override

@@ -52,7 +52,15 @@ interface IMapNode<K, V> {
     }
   }
 
+  default IMapNode<K, V> put(int shift, Object editor, int hash, K key, V value, BiPredicate<K, K> equals, IMap.ValueMerger<V> merge) {
+    return put(shift, new PutCommand<>(editor, hash, key, value, equals, merge));
+  }
+
   IMapNode<K, V> put(int shift, PutCommand<K, V> command);
+
+  default IMapNode<K, V> remove(int shift, Object editor, int hash, K key, BiPredicate<K, K> equals) {
+    return remove(shift, new RemoveCommand<>(editor, hash, key, equals));
+  }
 
   IMapNode<K, V> remove(int shift, RemoveCommand<K, V> command);
 

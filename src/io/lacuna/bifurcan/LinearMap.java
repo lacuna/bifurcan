@@ -196,6 +196,11 @@ public class LinearMap<K, V> implements IMap<K, V> {
   }
 
   @Override
+  public boolean isLinear() {
+    return true;
+  }
+
+  @Override
   public IMap<K, V> forked() {
     throw new IllegalStateException("a LinearMap cannot be efficiently transformed into a forked representation");
   }

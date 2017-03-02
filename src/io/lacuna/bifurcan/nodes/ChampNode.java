@@ -5,10 +5,8 @@ import io.lacuna.bifurcan.IMap;
 import io.lacuna.bifurcan.IMap.IEntry;
 import io.lacuna.bifurcan.LinearList;
 import io.lacuna.bifurcan.Maps;
-import io.lacuna.bifurcan.utils.IteratorStack;
 
 import java.util.Iterator;
-import java.util.NoSuchElementException;
 import java.util.function.BiPredicate;
 
 import static java.lang.Integer.bitCount;
@@ -121,7 +119,7 @@ public class ChampNode<K, V> implements IMapNode<K, V> {
   }
 
   // this is factored out of `put` for greater inlining joy
-  private ChampNode<K, V> insertEntry(int shift, int mask, PutCommand<K, V> c) {
+  private ChampNode<K, V> mergeEntry(int shift, int mask, PutCommand<K, V> c) {
     int idx = entryIndex(mask);
 
     // there's a match
@@ -151,17 +149,15 @@ public class ChampNode<K, V> implements IMapNode<K, V> {
     }
   }
 
-  public ChampNode<K, V> put(int shift, Object editor, int hash, K key, V value, BiPredicate<K, K> equals, IMap.ValueMerger<V> merge) {
-    return put(shift, new PutCommand<>(editor, hash, key, value, equals, merge));
-  }
-
   @Override
   public ChampNode<K, V> put(int shift, PutCommand<K, V> c) {
     int mask = hashMask(c.hash, shift);
 
+    // overwrite potential collision
     if (isEntry(mask)) {
-      return insertEntry(shift, mask, c);
+      return mergeEntry(shift, mask, c);
 
+      // we have to go deeper
     } else if (isNode(mask)) {
       IMapNode<K, V> node = node(mask);
       long prevSize = node.size();
@@ -174,13 +170,10 @@ public class ChampNode<K, V> implements IMapNode<K, V> {
         return (c.editor == editor ? this : clone(c.editor)).setNode(mask, nodePrime);
       }
 
+      // no existing entry
     } else {
       return (c.editor == editor ? this : clone(c.editor)).putEntry(mask, c.hash, c.key, c.value);
     }
-  }
-
-  public ChampNode<K, V> remove(int shift, Object editor, int hash, K key, BiPredicate<K, K> equals) {
-    return remove(shift, new RemoveCommand<>(editor, hash, key, equals));
   }
 
   @Override
@@ -257,19 +250,172 @@ public class ChampNode<K, V> implements IMapNode<K, V> {
     };
   }
 
-  public ChampNode<K, V> merge(Object editor, ChampNode<K, V> node, IMap.ValueMerger<V> merge) {
-    return null;
+  /////
+
+  private static final int NONE_NONE = 0;
+  private static final int NODE_NONE = 0x1;
+  private static final int ENTRY_NONE = 0x2;
+  private static final int NONE_NODE = 0x4;
+  private static final int NONE_ENTRY = 0x8;
+  private static final int ENTRY_NODE = ENTRY_NONE | NONE_NODE;
+  private static final int NODE_ENTRY = NODE_NONE | NONE_ENTRY;
+  private static final int ENTRY_ENTRY = ENTRY_NONE | NONE_ENTRY;
+  private static final int NODE_NODE = NODE_NONE | NONE_NODE;
+
+  private static final Object DEFAULT_VALUE = new Object();
+
+  private int mergeState(int mask, int nodeA, int dataA, int nodeB, int dataB) {
+    int state = 0;
+    state |= (mask & nodeA) > 0 ? 0x1 : 0;
+    state |= (mask & dataA) > 0 ? 0x2 : 0;
+    state |= (mask & nodeB) > 0 ? 0x4 : 0;
+    state |= (mask & dataB) > 0 ? 0x8 : 0;
+
+    return state;
   }
 
-  public ChampNode<K, V> difference(Object editor, ChampNode node) {
-    return null;
+  public ChampNode<K, V> merge(int shift, Object editor, ChampNode<K, V> o, BiPredicate<K, K> equals, IMap.ValueMerger<V> merge) {
+    ChampNode<K, V> node = new ChampNode<K, V>(editor);
+    for (int i = 0; i < 32; i++) {
+      int mask = 1 << i;
+      int state = mergeState(mask, nodemap, datamap, o.nodemap, o.datamap);
+      int idx;
+      switch (state) {
+        case NODE_NONE:
+        case NONE_NODE:
+          node = node.transferNode(mask, state == NODE_NONE ? this : o);
+          break;
+        case ENTRY_NONE:
+        case NONE_ENTRY:
+          node = node.transferEntry(mask, state == ENTRY_NONE ? this : o);
+          break;
+        case ENTRY_ENTRY:
+          node = node.transferEntry(mask, this).transferEntry(mask, o);
+          break;
+        case NODE_NODE:
+          // complicated
+          node = node.transferNode(mask, null);
+          break;
+        case NODE_ENTRY:
+          idx = o.entryIndex(mask);
+          node = (ChampNode<K, V>) node
+              .putNode(mask, node(mask))
+              .put(shift, editor, o.hash(idx), (K) o.content[idx << 1], (V) o.content[(idx << 1) + 1], equals, merge);
+          break;
+        case ENTRY_NODE:
+          idx = entryIndex(mask);
+          node = (ChampNode<K, V>) node
+              .putNode(mask, o.node(mask))
+              .put(shift, editor, hash(idx), (K) content[idx << 1], (V) content[(idx << 1) + 1], equals, (a, b) -> merge.merge(b, a));
+          break;
+        case NONE_NONE:
+          break;
+      }
+    }
+
+    return node;
   }
 
-  public ChampNode<K, V> intersection(Object editor, ChampNode node) {
-    return null;
+  public ChampNode<K, V> difference(int shift, Object editor, ChampNode<K, V> o, BiPredicate<K, K> equals) {
+    ChampNode<K, V> node = new ChampNode<K, V>(editor);
+
+    for (int i = 0; i < 32; i++) {
+      int mask = 1 << i;
+      int state = mergeState(mask, nodemap, datamap, o.nodemap, o.datamap);
+      int idx;
+      switch (state) {
+        case NODE_NONE:
+          node = node.transferNode(mask, this);
+          break;
+        case ENTRY_NONE:
+          node = node.transferEntry(mask, this);
+          break;
+        case ENTRY_ENTRY:
+          int ia = o.entryIndex(mask);
+          int ib = entryIndex(mask);
+          if (o.hashes[ia] != hashes[ib] || !equals.test((K) o.content[ia << 1], (K) content[ib << 1])) {
+            node.transferEntry(mask, this);
+          }
+          break;
+        case NODE_NODE:
+          // complicated
+          node = node.transferNode(mask, null);
+          break;
+        case NODE_ENTRY:
+          idx = o.entryIndex(mask);
+          node = (ChampNode<K, V>) node(mask).remove(shift + 5, editor, o.hashes[idx], (K) o.content[idx << 1], equals);
+          break;
+        case ENTRY_NODE:
+          idx = entryIndex(mask);
+          if (o.get(shift, hashes[idx], (K) content[idx << 1], equals, DEFAULT_VALUE) == DEFAULT_VALUE) {
+            node = transferEntry(mask, this);
+          }
+          break;
+        case NONE_ENTRY:
+        case NONE_NODE:
+        case NONE_NONE:
+          break;
+      }
+    }
+
+    return node;
   }
+
+  public ChampNode<K, V> intersection(int shift, Object editor, ChampNode<K, V> o, BiPredicate<K, K> equals) {
+    ChampNode<K, V> node = new ChampNode<K, V>(editor);
+
+    for (int i = 0; i < 32; i++) {
+      int mask = 1 << i;
+      int state = mergeState(mask, nodemap, datamap, o.nodemap, o.datamap);
+      int idx;
+      switch (state) {
+        case ENTRY_ENTRY:
+          int ia = o.entryIndex(mask);
+          int ib = entryIndex(mask);
+          if (o.hashes[ia] == hashes[ib] && equals.test((K) o.content[ia << 1], (K) content[ib << 1])) {
+            node.transferEntry(mask, this);
+          }
+          break;
+        case NODE_NODE:
+          // complicated
+          node = node.transferNode(mask, null);
+          break;
+        case NODE_ENTRY:
+          idx = o.entryIndex(mask);
+          if (get(shift, o.hashes[idx], (K) o.content[idx << 1], equals, DEFAULT_VALUE) != DEFAULT_VALUE) {
+            node = transferEntry(mask, o);
+          }
+          break;
+        case ENTRY_NODE:
+          idx = entryIndex(mask);
+          if (o.get(shift, hashes[idx], (K) content[idx << 1], equals, DEFAULT_VALUE) != DEFAULT_VALUE) {
+            node = transferEntry(mask, this);
+          }
+          break;
+        case ENTRY_NONE:
+        case NODE_NONE:
+        case NONE_ENTRY:
+        case NONE_NODE:
+        case NONE_NONE:
+          break;
+      }
+    }
+
+    return node;
+  }
+
+  private ChampNode<K, V> transferNode(int mask, ChampNode<K, V> node) {
+    return putNode(mask, node.node(mask));
+  }
+
+  private ChampNode<K, V> transferEntry(int mask, ChampNode<K, V> node) {
+    int idx = node.entryIndex(mask);
+    return putEntry(mask, node.hashes[idx], (K) node.content[idx << 1], (V) node.content[(idx << 1) + 1]);
+  }
+
 
   /////
+
 
   private ChampNode<K, V> clone(Object editor) {
     ChampNode<K, V> node = new ChampNode<>();

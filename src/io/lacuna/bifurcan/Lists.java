@@ -399,12 +399,7 @@ public class Lists {
   }
 
   public static <V> IList<V> from(V[] array) {
-    return Lists.from(array.length, idx -> {
-      if (idx > Integer.MAX_VALUE) {
-        throw new IndexOutOfBoundsException();
-      }
-      return array[(int) idx];
-    });
+    return Lists.from(array.length, idx -> array[(int) idx]);
   }
 
   public static <V> IList<V> from(java.util.List<V> list) {
@@ -483,7 +478,7 @@ public class Lists {
       }
 
       @Override
-      public Set<Characteristics> characteristics() {
+      public java.util.Set<Characteristics> characteristics() {
         return EnumSet.noneOf(Characteristics.class);
       }
     };
@@ -520,5 +515,9 @@ public class Lists {
     } else {
       return new Concat<V>(a, b);
     }
+  }
+
+  public static <V> IList<V> concat(IList<V>... lists) {
+    return Arrays.stream(lists).reduce(Lists::concat).orElseGet(List::new);
   }
 }

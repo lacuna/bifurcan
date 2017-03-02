@@ -59,7 +59,7 @@ public class Sets {
   }
 
   public static <V> java.util.Set<V> toSet(IList<V> elements, Predicate<V> contains) {
-    return new Set<V>() {
+    return new java.util.Set<V>() {
       @Override
       public int size() {
         return (int) elements.size();
@@ -213,7 +213,7 @@ public class Sets {
       }
 
       @Override
-      public Set<Characteristics> characteristics() {
+      public java.util.Set<Characteristics> characteristics() {
         return EnumSet.of(Characteristics.IDENTITY_FINISH);
       }
     };
