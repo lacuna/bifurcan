@@ -1,14 +1,13 @@
 package io.lacuna.bifurcan.nodes;
 
-import io.lacuna.bifurcan.IList;
-import io.lacuna.bifurcan.IMap;
-import io.lacuna.bifurcan.LinearList;
-import io.lacuna.bifurcan.Maps;
+import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.utils.ArrayVector;
 
 import java.util.Iterator;
 import java.util.function.BiPredicate;
 
+import static io.lacuna.bifurcan.nodes.Util.compressedIndex;
+import static io.lacuna.bifurcan.nodes.Util.hashMask;
 import static java.lang.Integer.bitCount;
 import static java.lang.System.arraycopy;
 
@@ -85,7 +84,7 @@ public class MapNodes {
 
     IMap.IEntry<K, V> nth(long idx);
 
-    Iterator<IMap.IEntry<K, V>> entries();
+    Iterable<IMap.IEntry<K, V>> entries();
   }
 
   private static final int NONE_NONE = 0;
@@ -241,6 +240,42 @@ public class MapNodes {
     return result;
   }
 
+  public static <K, V> IList<Node<K, V>> split(Object editor, Node<K, V> node, int targetSize) {
+    IList<Node<K, V>> result = new LinearList<>();
+    if ((node.size() >> 1) < targetSize) {
+      result.addLast(node);
+    } else {
+      Node<K, V> acc = new Node<>(editor);
+      for (int i = 0; i < 32; i++) {
+        int mask = 1 << i;
+
+        if (acc.size() >= targetSize) {
+          result.addLast(acc);
+          acc = new Node<>(editor);
+        }
+
+        if (node.isEntry(mask)) {
+          acc = transferEntry(mask, node, acc);
+        } else if (node.isNode(mask)) {
+          INode<K, V> child = node.node(mask);
+          if (child instanceof Node && child.size() >= (targetSize << 1)) {
+            split(editor, (Node<K, V>) child, targetSize).stream()
+                .map(n -> new Node<K, V>(editor).putNode(mask, n))
+                .forEach(result::addLast);
+          } else {
+            acc = acc.putNode(mask, child);
+          }
+        }
+      }
+
+      if (acc.size() > 0) {
+        result.addLast(acc);
+      }
+    }
+
+    return result;
+  }
+
   private static <K, V> Node<K, V> transferNode(int mask, Node<K, V> src, Node<K, V> dst) {
     return dst.putNode(mask, src.node(mask));
   }
@@ -276,7 +311,7 @@ public class MapNodes {
     @Override
     public INode<K, V> put(int shift, PutCommand<K, V> c) {
       if (c.hash != hash) {
-        return new Node<K, V>(c.editor).putNode(Node.hashMask(hash, shift), this).put(shift, c);
+        return new Node<K, V>(c.editor).putNode(hashMask(hash, shift), this).put(shift, c);
       } else {
         int idx = indexOf(c.key, c.equals);
         return idx < 0
@@ -320,8 +355,8 @@ public class MapNodes {
       return new Maps.Entry<>((K) entries[i], (V) entries[i + 1]);
     }
 
-    public Iterator<IMap.IEntry<K, V>> entries() {
-      return new Iterator<IMap.IEntry<K, V>>() {
+    public Iterable<IMap.IEntry<K, V>> entries() {
+      return () -> new Iterator<IMap.IEntry<K, V>>() {
         int idx = 0;
         @Override
         public boolean hasNext() {
@@ -390,9 +425,9 @@ public class MapNodes {
     }
 
     @Override
-    public Iterator<IMap.IEntry<K, V>> entries() {
+    public Iterable<IMap.IEntry<K, V>> entries() {
       int numEntries = bitCount(datamap);
-      return new Iterator<IMap.IEntry<K, V>>() {
+      return () -> new Iterator<IMap.IEntry<K, V>>() {
 
         int idx = 0;
 
@@ -544,7 +579,7 @@ public class MapNodes {
       return new Iterator<IMap.IEntry<K, V>>() {
 
         final IList<INode<K, V>> nodes = LinearList.from(nodes());
-        Iterator<IMap.IEntry<K, V>> iterator = entries();
+        Iterator<IMap.IEntry<K, V>> iterator = entries().iterator();
 
         @Override
         public boolean hasNext() {
@@ -556,7 +591,7 @@ public class MapNodes {
           while (!iterator.hasNext()) {
             INode<K, V> node = nodes.first();
             nodes.removeFirst();
-            iterator = node.entries();
+            iterator = node.entries().iterator();
             if (node instanceof Node) {
               ((Node<K, V>) node).nodes().forEach(n -> nodes.addLast(n));
             }
@@ -567,12 +602,7 @@ public class MapNodes {
       };
     }
 
-    public IList<Node<K, V>> split(int parts) {
-      return null;
-    }
-
     /////
-
 
     private Node<K, V> clone(Object editor) {
       Node<K, V> node = new Node<>();
@@ -695,14 +725,6 @@ public class MapNodes {
       content[content.length - numNodes] = null;
 
       return this;
-    }
-
-    static int compressedIndex(int bitmap, int hashMask) {
-      return bitCount(bitmap & (hashMask - 1));
-    }
-
-    static int hashMask(int hash, int shift) {
-      return 1 << ((hash >>> shift) & 31);
     }
 
     private int entryIndex(int hashMask) {

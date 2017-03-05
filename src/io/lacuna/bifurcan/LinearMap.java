@@ -186,11 +186,6 @@ public class LinearMap<K, V> implements IMap<K, V> {
   }
 
   @Override
-  public ISet<K> keys() {
-    return Sets.from(lazyMap(entries(), IEntry::key), this::contains);
-  }
-
-  @Override
   public long size() {
     return size;
   }

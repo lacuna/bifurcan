@@ -1,6 +1,8 @@
 package io.lacuna.bifurcan.nodes;
 
 import io.lacuna.bifurcan.IMap;
+import io.lacuna.bifurcan.IMap.IEntry;
+import io.lacuna.bifurcan.Maps;
 import io.lacuna.bifurcan.utils.IteratorStack;
 
 import java.util.Iterator;
@@ -10,7 +12,7 @@ import static io.lacuna.bifurcan.utils.Bits.bitOffset;
 import static io.lacuna.bifurcan.utils.Bits.highestBit;
 
 /**
- * Created by zach on 3/3/17.
+ * @author ztellman
  */
 public class IntMapNodes {
 
@@ -18,11 +20,11 @@ public class IntMapNodes {
     return bitOffset(highestBit(a ^ b, 1)) & ~0x3;
   }
 
-  interface INode<V> {
+  public interface INode<V> {
 
     long size();
 
-    Iterator<V> iterator();
+    Iterator<IEntry<Long, V>> iterator();
 
     INode<V> merge(Object editor, INode<V> node, IMap.ValueMerger<V> f);
 
@@ -36,7 +38,7 @@ public class IntMapNodes {
 
     INode<V> remove(Object editor, long k);
 
-    V get(long k, V defaultVal);
+    Object get(long k, Object defaultVal);
   }
 
   // 2-way top-level branch
@@ -54,8 +56,8 @@ public class IntMapNodes {
       return a.size() + b.size();
     }
 
-    public Iterator<V> iterator() {
-      return new IteratorStack<V>(a.iterator(), b.iterator());
+    public Iterator<IEntry<Long, V>> iterator() {
+      return new IteratorStack<>(a.iterator(), b.iterator());
     }
 
     public INode<V> range(Object editor, long min, long max) {
@@ -131,7 +133,7 @@ public class IntMapNodes {
       }
     }
 
-    public V get(long k, V defaultVal) {
+    public Object get(long k, Object defaultVal) {
       return k < 0 ? a.get(k, defaultVal) : b.get(k, defaultVal);
     }
   }
@@ -203,11 +205,18 @@ public class IntMapNodes {
       return new Branch<>(editor, prefix, offset, children);
     }
 
-    public Iterator<V> iterator() {
-      return null;
+    public Iterator<IEntry<Long, V>> iterator() {
+      IteratorStack<IEntry<Long, V>> stack = new IteratorStack<>();
+      for (int i = 0; i < children.length; i++) {
+        INode<V> n = children[i];
+        if (n != null) {
+          stack.addLast(n.iterator());
+        }
+      }
+      return stack;
     }
 
-    public V get(long k, V defaultVal) {
+    public Object get(long k, Object defaultVal) {
       INode<V> n = children[indexOf(k)];
       return n == null ? defaultVal : n.get(k, defaultVal);
     }
@@ -360,8 +369,8 @@ public class IntMapNodes {
       this.value = value;
     }
 
-    public Iterator<V> iterator() {
-      return new Iterator<V>() {
+    public Iterator<IEntry<Long, V>> iterator() {
+      return new Iterator<IEntry<Long, V>>() {
 
         boolean iterated = false;
 
@@ -369,12 +378,12 @@ public class IntMapNodes {
           return !iterated;
         }
 
-        public V next() {
+        public IEntry<Long, V> next() {
           if (iterated) {
             throw new NoSuchElementException();
           } else {
             iterated = true;
-            return value;
+            return new Maps.Entry<>(key, value);
           }
         }
       };
@@ -425,7 +434,7 @@ public class IntMapNodes {
       }
     }
 
-    public V get(long k, V defaultVal) {
+    public Object get(long k, Object defaultVal) {
       return k == key ? value : defaultVal;
     }
   }
@@ -454,19 +463,19 @@ public class IntMapNodes {
     }
 
     @Override
-    public V get(long k, V defaultVal) {
+    public Object get(long k, Object defaultVal) {
       return defaultVal;
     }
 
     @Override
-    public Iterator<V> iterator() {
-      return new Iterator<V>() {
+    public Iterator<IEntry<Long, V>> iterator() {
+      return new Iterator<IEntry<Long, V>>() {
 
         public boolean hasNext() {
           return false;
         }
 
-        public V next() {
+        public IEntry<Long, V> next() {
           throw new NoSuchElementException();
         }
       };

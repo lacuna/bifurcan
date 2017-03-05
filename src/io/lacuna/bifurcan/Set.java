@@ -92,4 +92,23 @@ public class Set<V> implements ISet<V> {
   public ISet<V> intersection(ISet<V> s) {
     return null;
   }
+
+  @Override
+  public int hashCode() {
+    return (int) Sets.hash(this);
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (obj instanceof ISet) {
+      return Sets.equals(this, (ISet<V>) obj);
+    } else {
+      return false;
+    }
+  }
+
+  @Override
+  public String toString() {
+    return Sets.toString(this);
+  }
 }

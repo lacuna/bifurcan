@@ -46,7 +46,9 @@ public interface IMap<K, V> extends
   /**
    * @return a set representing all keys in the map
    */
-  ISet<K> keys();
+  default ISet<K> keys() {
+    return Sets.from(Lists.lazyMap(entries(), IEntry::key), this::contains);
+  }
 
   /**
    * @return the number of entries in the map

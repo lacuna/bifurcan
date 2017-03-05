@@ -86,14 +86,6 @@ public class Map<K, V> implements IMap<K, V> {
   }
 
   @Override
-  public ISet<K> keys() {
-    IList<IEntry<K, V>> entries = entries();
-    return Sets.from(
-        Lists.from(size(), i -> entries.nth(i).key()),
-        this::contains);
-  }
-
-  @Override
   public Map<K, V> forked() {
     if (linear) {
       return new Map<>(root, hashFn, equalsFn, false);
@@ -109,6 +101,16 @@ public class Map<K, V> implements IMap<K, V> {
     } else {
       return new Map<>(root, hashFn, equalsFn, true);
     }
+  }
+
+  @Override
+  public IList<IMap<K, V>> split(int parts) {
+    IList<IMap<K, V>> list = new List<IMap<K, V>>().linear();
+    MapNodes.split(new Object(), root, (int) Math.ceil(size() / (float) parts))
+        .stream()
+        .map(n -> new Map<K, V>(n, hashFn, equalsFn, false))
+        .forEach(list::addLast);
+    return list.forked();
   }
 
   @Override
@@ -172,6 +174,11 @@ public class Map<K, V> implements IMap<K, V> {
   @Override
   public Iterator<IEntry<K, V>> iterator() {
     return root.iterator();
+  }
+
+  @Override
+  public int hashCode() {
+    return (int) Maps.hash(this);
   }
 
   @Override
