@@ -1,6 +1,9 @@
 package io.lacuna.bifurcan;
 
 import java.util.Iterator;
+import java.util.Objects;
+import java.util.function.BiPredicate;
+import java.util.function.ToIntFunction;
 
 /**
  * @author ztellman
@@ -8,6 +11,14 @@ import java.util.Iterator;
 public class Set<V> implements ISet<V> {
 
   IMap<V, ?> map;
+
+  public Set() {
+    this(Objects::hashCode, Objects::equals);
+  }
+
+  public Set(ToIntFunction<V> hashFn, BiPredicate<V, V> equalsFn) {
+    map = new Map<V, Void>(hashFn, equalsFn);
+  }
 
   private Set(IMap<V, ?> map) {
     this.map = map;

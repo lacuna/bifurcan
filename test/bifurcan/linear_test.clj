@@ -17,6 +17,7 @@
    [io.lacuna.bifurcan
     Map
     List
+    Set
     IMap
     IMap$IEntry
     IList
@@ -67,6 +68,24 @@
 
 ;;;
 
+(defn map= [a ^IMap b]
+  (and
+    (= a
+      (zipmap (.keys b) (->> b .keys (map #(.get b % nil))))
+      (->map b))))
+
+(defn set= [a ^ISet b]
+  (= a
+    (->set b)
+    (->> b ->set (filter #(.contains b %)) (into #{}))))
+
+(defn list= [a ^IList b]
+  (= (seq a)
+    (-> b .iterator iterator-seq)
+    (->> (.size b) range (map #(.nth b %)) seq)))
+
+;;;
+
 (defn list-actions []
   {:add-first (u/action [gen/pos-int] #(cons %2 %1) list-add-first)
    :add-last (u/action [gen/pos-int] #(conj (vec %1) %2) list-add-last)
@@ -97,42 +116,37 @@
                 (LinearMap.))]
     [a b]))
 
+(u/def-collection-check test-linear-map 1e4 (map-actions)
+  [m {}
+   m' (LinearMap.)]
+  (map= m m'))
+
+(u/def-collection-check test-map 1e4 (map-actions)
+  [m {}
+   m' (.linear (Map.))]
+  (map= m m'))
+
+(u/def-collection-check test-linear-set 1e4 (set-actions)
+  [s #{}
+   s' (LinearSet.)]
+  (set= s s'))
+
+(u/def-collection-check test-set 1e4 (set-actions)
+  [s #{}
+   s' (Set.)]
+  (set= s s'))
+
 (u/def-collection-check test-linear-list 1e4 (list-actions)
   [v []
    l (LinearList.)]
-  (= (seq v) (-> ^IList l .iterator iterator-seq)))
+  (list= v l))
 
 (u/def-collection-check test-list 1e4 (list-actions)
   [v []
    l (List.)]
-  (= (seq v) (-> ^IList l .iterator iterator-seq)))
-
-(u/def-collection-check test-linear-map-equality 1e4 (map-actions)
-  [m {}
-   m' (LinearMap.)]
-  (= m (->map m')))
-
-(u/def-collection-check test-linear-map-lookup 1e4 (map-actions)
-  [m {}
-   m' (LinearMap.)]
-  (= m (zipmap (keys m) (->> m keys (map #(-> ^IMap m' (.get % nil)))))))
-
-(u/def-collection-check test-map-lookup 1e4 (map-actions)
-  [m {}
-   m' (.linear (Map.))]
-  (= m (zipmap (keys m) (->> m keys (map #(-> ^IMap m' (.get % nil)))))))
-
-(u/def-collection-check test-map-iterator 1e4 (map-actions)
-  [m {}
-   m' (.linear (Map.))]
-  (= m (->> ^Iterable m' .iterator iterator-seq (map (fn [^IMap$IEntry e] [(.key e) (.value e)])) (into {}))))
+  (list= v l))
 
 (u/def-collection-check test-linear-map-merge 1e4 (map-actions)
   [m {}
    m' (LinearMap.)]
   (= m' (->> (.split ^IMap m' 8) (reduce #(.union ^IMap %1 %2)))))
-
-(u/def-collection-check test-linear-set 1e4 (set-actions)
-  [s #{}
-   s' (LinearSet.)]
-  (= s (->set s')))

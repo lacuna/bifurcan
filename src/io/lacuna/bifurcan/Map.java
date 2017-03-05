@@ -1,6 +1,7 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.nodes.ChampNode;
+import io.lacuna.bifurcan.nodes.MapNodes;
+import io.lacuna.bifurcan.nodes.MapNodes.Node;
 
 import java.util.Iterator;
 import java.util.Objects;
@@ -16,19 +17,19 @@ public class Map<K, V> implements IMap<K, V> {
 
   private final BiPredicate<K, K> equalsFn;
   private final ToIntFunction<K> hashFn;
-  public ChampNode<K, V> root;
+  public Node<K, V> root;
   public final boolean linear;
   private final Object editor = new Object();
 
   public Map(ToIntFunction<K> hashFn, BiPredicate<K, K> equalsFn) {
-    this(ChampNode.EMPTY, hashFn, equalsFn, false);
+    this(Node.EMPTY, hashFn, equalsFn, false);
   }
 
   public Map() {
-    this(ChampNode.EMPTY, Objects::hashCode, Objects::equals, false);
+    this(Node.EMPTY, Objects::hashCode, Objects::equals, false);
   }
 
-  private Map(ChampNode<K, V> root, ToIntFunction<K> hashFn, BiPredicate<K, K> equalsFn, boolean linear) {
+  private Map(Node<K, V> root, ToIntFunction<K> hashFn, BiPredicate<K, K> equalsFn, boolean linear) {
     this.root = root;
     this.hashFn = hashFn;
     this.equalsFn = equalsFn;
@@ -48,7 +49,7 @@ public class Map<K, V> implements IMap<K, V> {
 
   @Override
   public IMap<K, V> put(K key, V value, ValueMerger<V> merge) {
-    ChampNode<K, V> rootPrime = (ChampNode<K, V>) root.put(0, editor, keyHash(key), key, value, equalsFn, merge);
+    Node<K, V> rootPrime = (Node<K, V>) root.put(0, editor, keyHash(key), key, value, equalsFn, merge);
 
     if (rootPrime == root) {
       return this;
@@ -62,7 +63,7 @@ public class Map<K, V> implements IMap<K, V> {
 
   @Override
   public IMap<K, V> remove(K key) {
-    ChampNode<K, V> rootPrime = (ChampNode<K, V>) root.remove(0, editor, keyHash(key), key, equalsFn);
+    Node<K, V> rootPrime = (Node<K, V>) root.remove(0, editor, keyHash(key), key, equalsFn);
 
     if (rootPrime == root) {
       return this;
@@ -113,7 +114,7 @@ public class Map<K, V> implements IMap<K, V> {
   @Override
   public IMap<K, V> merge(IMap<K, V> b, ValueMerger<V> mergeFn) {
     if (b instanceof Map) {
-      ChampNode<K, V> rootPrime = root.merge(0, editor, ((Map) b).root, equalsFn, mergeFn);
+      Node<K, V> rootPrime = MapNodes.merge(0, editor, root, ((Map) b).root, equalsFn, mergeFn);
       return linear ? this : new Map<>(rootPrime, hashFn, equalsFn, false);
     } else {
       return Maps.merge(this, b, mergeFn);
@@ -141,7 +142,7 @@ public class Map<K, V> implements IMap<K, V> {
   @Override
   public IMap<K, V> difference(IMap<K, ?> m) {
     if (m instanceof Map) {
-      ChampNode<K, V> rootPrime = root.difference(0, editor, ((Map) m).root, equalsFn);
+      Node<K, V> rootPrime = MapNodes.difference(0, editor, root, ((Map) m).root, equalsFn);
       return linear ? this : new Map<>(rootPrime, hashFn, equalsFn, false);
     } else {
       return difference(m.keys());
@@ -151,7 +152,7 @@ public class Map<K, V> implements IMap<K, V> {
   @Override
   public IMap<K, V> intersection(IMap<K, ?> m) {
     if (m instanceof Map) {
-      ChampNode<K, V> rootPrime = root.intersection(0, editor, ((Map) m).root, equalsFn);
+      Node<K, V> rootPrime = MapNodes.intersection(0, editor, root, ((Map) m).root, equalsFn);
       return linear ? this : new Map<>(rootPrime, hashFn, equalsFn, false);
     } else {
       return intersection(m.keys());

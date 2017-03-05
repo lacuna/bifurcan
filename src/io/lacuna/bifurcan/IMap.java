@@ -61,7 +61,7 @@ public interface IMap<K, V> extends
   }
 
   /**
-   * @return the collection, represented as a normal Java {@code io.lacuna.bifurcan.Map}, which will throw {@code UnsupportedOperationException} on writes
+   * @return the collection, represented as a normal Java {@code io.lacuna.bifurcan.MapNodes}, which will throw {@code UnsupportedOperationException} on writes
    */
   default java.util.Map<K, V> toMap() {
     return Maps.toMap(this);

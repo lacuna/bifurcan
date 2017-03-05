@@ -62,7 +62,7 @@ public class LinearSet<V> implements ISet<V> {
 
   @Override
   public boolean contains(V value) {
-    return !map.contains(value);
+    return map.contains(value);
   }
 
   @Override

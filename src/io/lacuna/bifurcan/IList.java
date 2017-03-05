@@ -102,7 +102,7 @@ public interface IList<V> extends
   }
 
   /**
-   * @return the collection, represented as a normal Java {@code List}, which will throw an {@code UnsupportedOperationException} for any write
+   * @return the collection, represented as a normal Java {@code ListNodes}, which will throw an {@code UnsupportedOperationException} for any write
    */
   default java.util.List<V> toList() {
     return Lists.toList(this);

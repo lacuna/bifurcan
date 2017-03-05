@@ -15,6 +15,12 @@ public class IteratorStack<V> implements Iterator<V> {
   public IteratorStack() {
   }
 
+  public IteratorStack(Iterator<V>... its) {
+    for (Iterator<V> it : its) {
+      iterators.addFirst(it);
+    }
+  }
+
   private void primeIterator() {
     while (iterators.size() > 0 && !iterators.first().hasNext()) {
       iterators.removeFirst();

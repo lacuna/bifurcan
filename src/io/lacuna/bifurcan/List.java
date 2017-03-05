@@ -1,7 +1,8 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.nodes.RRNode;
-import io.lacuna.bifurcan.nodes.RRNode.Leaf;
+import io.lacuna.bifurcan.nodes.ListNodes;
+import io.lacuna.bifurcan.nodes.ListNodes.Leaf;
+import io.lacuna.bifurcan.nodes.ListNodes.Node;
 
 import java.util.Iterator;
 
@@ -13,7 +14,7 @@ import static java.lang.System.arraycopy;
 public class List<V> implements IList<V> {
 
   boolean linear;
-  public RRNode root;
+  public Node<V> root;
   public byte prefixLen;
   public Object[] prefix;
   public byte suffixLen;
@@ -23,14 +24,14 @@ public class List<V> implements IList<V> {
 
   public List() {
     linear = false;
-    root = RRNode.EMPTY;
+    root = Node.EMPTY;
     prefixLen = 0;
     prefix = null;
     suffixLen = 0;
     suffix = null;
   }
 
-  List(boolean linear, RRNode root, byte prefixLen, Object[] prefix, byte suffixLen, Object[] suffix) {
+  List(boolean linear, Node root, byte prefixLen, Object[] prefix, byte suffixLen, Object[] suffix) {
     this.linear = linear;
     this.root = root;
     this.prefixLen = prefixLen;
@@ -176,7 +177,7 @@ public class List<V> implements IList<V> {
   public IList<V> concat(IList<V> l) {
     if (l instanceof List) {
       List<V> b = (List<V>) l;
-      RRNode r = root;
+      Node r = root;
 
       // append our own suffix
       if (suffix != null) {
