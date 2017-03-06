@@ -127,6 +127,11 @@
    m' (.linear (Map.))]
   (map= m m'))
 
+(u/def-collection-check test-int-map 1e3 (map-actions)
+  [m {}
+   m' (IntMap.)]
+  (map= m m'))
+
 (u/def-collection-check test-linear-set 1e4 (set-actions)
   [s #{}
    s' (LinearSet.)]

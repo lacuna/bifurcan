@@ -64,7 +64,7 @@ public class IntMap<V> implements IMap<Long, V> {
 
   @Override
   public IList<IEntry<Long, V>> entries() {
-    return Lists.from(size(), i -> (IEntry<Long, V>) null, l -> root.iterator());
+    return Lists.from(size(), i -> root.nth((int) i), l -> root.iterator());
   }
 
   @Override

@@ -20,9 +20,15 @@ public class IntMapNodes {
     return bitOffset(highestBit(a ^ b, 1)) & ~0x3;
   }
 
+  private static boolean overlap(long min0, long max0, long min1, long max1) {
+    return (max1 - min0) >= 0 && (max0 - min1) >= 0;
+  }
+
   public interface INode<V> {
 
-    long size();
+    int size();
+
+    IEntry<Long, V> nth(int idx);
 
     Iterator<IEntry<Long, V>> iterator();
 
@@ -44,7 +50,6 @@ public class IntMapNodes {
   // 2-way top-level branch
   public static class BinaryBranch<V> implements INode<V> {
 
-    public Object editor;
     public INode<V> a, b;
 
     public BinaryBranch(INode<V> a, INode<V> b) {
@@ -52,7 +57,12 @@ public class IntMapNodes {
       this.b = b;
     }
 
-    public long size() {
+    @Override
+    public IEntry<Long, V> nth(int idx) {
+      return idx < a.size() ? a.nth(idx) : b.nth(idx - a.size());
+    }
+
+    public int size() {
       return a.size() + b.size();
     }
 
@@ -145,24 +155,15 @@ public class IntMapNodes {
     public Object editor;
     public final long prefix, mask;
     public final int offset;
-    long size;
+    int size;
     public final INode[] children;
 
-    public Branch(Object editor, long prefix, int offset, long size, INode[] children) {
+    public Branch(Object editor, long prefix, int offset, int size, INode[] children) {
       this.editor = editor;
       this.prefix = prefix;
       this.offset = offset;
       this.mask = 0xfL << offset;
       this.size = size;
-      this.children = children;
-    }
-
-    public Branch(Object editor, long prefix, int offset, INode[] children) {
-      this.editor = editor;
-      this.prefix = prefix;
-      this.offset = offset;
-      this.mask = 0xfL << offset;
-      this.size = -1;
       this.children = children;
     }
 
@@ -176,8 +177,20 @@ public class IntMapNodes {
       return copy;
     }
 
-    private static boolean overlap(long min0, long max0, long min1, long max1) {
-      return (max1 - min0) >= 0 && (max0 - min1) >= 0;
+    @Override
+    public IEntry<Long, V> nth(int idx) {
+      for (int i = 0; i < 16; i++) {
+        INode<V> c = this.children[i];
+        if (c != null) {
+          if (idx < c.size()) {
+            return c.nth(idx);
+          } else {
+            idx -= c.size();
+          }
+        }
+      }
+
+      throw new IndexOutOfBoundsException();
     }
 
     public INode<V> range(Object editor, long min, long max) {
@@ -192,17 +205,20 @@ public class IntMapNodes {
 
       INode[] children = new INode[16];
       long lowerBits = (1L << offset) - 1;
+      int size = 0;
       for (long i = 0; i < 16; i++) {
         INode c = this.children[(int) i];
         if (c != null) {
           long childMin = ((prefix & ~mask) | (i << offset)) & ~lowerBits;
           long childMax = childMin | lowerBits;
           if (overlap(min, max, childMin, childMax)) {
-            children[(int) i] = c.range(editor, min, max);
+            INode<V> cPrime = c.range(editor, min, max);
+            size += cPrime.size();
+            children[(int) i] = cPrime;
           }
         }
       }
-      return new Branch<>(editor, prefix, offset, children);
+      return new Branch<>(editor, prefix, offset, size, children);
     }
 
     public Iterator<IEntry<Long, V>> iterator() {
@@ -221,13 +237,7 @@ public class IntMapNodes {
       return n == null ? defaultVal : n.get(k, defaultVal);
     }
 
-    public long size() {
-      int size = 0;
-      for (int i = 0; i < 16; i++) {
-        INode n = children[i];
-        if (n != null) size += n.size();
-      }
-      this.size = size;
+    public int size() {
       return size;
     }
 
@@ -243,7 +253,7 @@ public class IntMapNodes {
         }
 
         if (offsetPrime > offset && offsetPrime > branch.offset) {
-          return new Branch<V>(editor, prefix, offset(prefix, branch.prefix), new INode[16])
+          return new Branch<V>(editor, prefix, offset(prefix, branch.prefix), 0, new INode[16])
               .merge(editor, this, mergeFn)
               .merge(editor, node, mergeFn);
         }
@@ -253,9 +263,9 @@ public class IntMapNodes {
           int idx = indexOf(branch.prefix);
           INode[] children = arraycopy();
           INode n = children[idx];
+          int prevSize = n == null ? 0 : n.size();
           children[idx] = n != null ? n.merge(editor, node, mergeFn) : node;
-          return new Branch<>(editor, prefix, offset, children);
-
+          return new Branch<>(editor, prefix, offset, size + (children[idx].size() - prevSize), children);
         }
 
         if (offset < branch.offset) {
@@ -265,7 +275,7 @@ public class IntMapNodes {
         INode[] children = new INode[16];
         INode[] branchChildren = branch.children;
         int offset = this.offset;
-
+        int size = 0;
         for (int i = 0; i < 16; i++) {
           INode n = this.children[i];
           INode nPrime = branchChildren[i];
@@ -276,8 +286,9 @@ public class IntMapNodes {
           } else {
             children[i] = n.merge(editor, nPrime, mergeFn);
           }
+          size += children[i].size();
         }
-        return new Branch<>(editor, prefix, offset, children);
+        return new Branch<>(editor, prefix, offset, size, children);
 
       } else {
         return node.merge(editor, this, (x, y) -> mergeFn.merge(y, x));
@@ -303,7 +314,7 @@ public class IntMapNodes {
       } else if (k < 0 && prefix >= 0) {
         return new BinaryBranch<>(new Leaf<>(k, v), this);
       } else if (offsetPrime > this.offset) {
-        return new Branch<V>(editor, k, offsetPrime, new INode[16])
+        return new Branch<V>(editor, k, offsetPrime, 0, new INode[16])
             .merge(editor, this, null)
             .put(editor, k, v, mergeFn);
 
@@ -314,22 +325,23 @@ public class IntMapNodes {
         if (n == null) {
           if (editor == this.editor) {
             children[idx] = new Leaf<V>(k, v);
-            size = -1;
+            size++;
             return this;
           } else {
             INode[] children = arraycopy();
             children[idx] = new Leaf<V>(k, v);
-            return new Branch<V>(editor, prefix, offset, size, children);
+            return new Branch<V>(editor, prefix, offset, size + 1, children);
           }
         } else {
+          int prevSize = n.size();
           INode<V> nPrime = n.put(editor, k, v, mergeFn);
           if (nPrime == n) {
-            size = -1;
+            size += nPrime.size() - prevSize;
             return this;
           } else {
             INode[] children = arraycopy();
             children[idx] = nPrime;
-            return new Branch<>(editor, prefix, offset, size, children);
+            return new Branch<>(editor, prefix, offset, size + (nPrime.size() - prevSize), children);
           }
         }
       }
@@ -341,16 +353,17 @@ public class IntMapNodes {
       if (n == null) {
         return this;
       } else {
+        int prevSize = n.size();
         INode nPrime = n.remove(editor, k);
         if (nPrime == n) {
-          size = -1;
+          size += n.size() - prevSize;
           return this;
         } else {
           INode[] children = arraycopy();
           children[idx] = nPrime;
           for (int i = 0; i < 16; i++) {
             if (children[i] != null) {
-              return new Branch(editor, prefix, offset, children);
+              return new Branch(editor, prefix, offset, size + (nPrime.size() - prevSize), children);
             }
           }
           return null;
@@ -389,11 +402,19 @@ public class IntMapNodes {
       };
     }
 
+    @Override
+    public IEntry<Long, V> nth(int idx) {
+      if (idx == 0) {
+        return new Maps.Entry<>(key, value);
+      }
+      throw new IndexOutOfBoundsException();
+    }
+
     public INode<V> range(Object editor, long min, long max) {
       return (min <= key && key <= max) ? this : null;
     }
 
-    public long size() {
+    public int size() {
       return 1;
     }
 
@@ -420,7 +441,7 @@ public class IntMapNodes {
       } else if (k < 0 && key >= 0) {
         return new BinaryBranch<>(new Leaf<>(k, v), this);
       } else {
-        return new Branch<V>(editor, k, offset(k, key), new INode[16])
+        return new Branch<V>(editor, k, offset(k, key), 0, new INode[16])
             .put(editor, key, value, mergeFn)
             .put(editor, k, v, mergeFn);
       }
@@ -428,7 +449,7 @@ public class IntMapNodes {
 
     public INode<V> remove(Object editor, long k) {
       if (key == k) {
-        return null;
+        return Empty.EMPTY;
       } else {
         return this;
       }
@@ -445,6 +466,11 @@ public class IntMapNodes {
     public static Empty EMPTY = new Empty();
 
     Empty() {
+    }
+
+    @Override
+    public IEntry<Long, V> nth(int idx) {
+      throw new IndexOutOfBoundsException();
     }
 
     @Override
@@ -482,7 +508,7 @@ public class IntMapNodes {
     }
 
     @Override
-    public long size() {
+    public int size() {
       return 0;
     }
 
