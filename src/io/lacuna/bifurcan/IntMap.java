@@ -1,7 +1,8 @@
 package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.nodes.IntMapNodes;
-import io.lacuna.bifurcan.nodes.IntMapNodes.INode;
+import io.lacuna.bifurcan.nodes.IntMapNodes.Node;
+import io.lacuna.bifurcan.utils.IteratorStack;
 
 import java.util.Optional;
 
@@ -14,62 +15,106 @@ public class IntMap<V> implements IMap<Long, V> {
 
   private final Object editor = new Object();
   private final boolean linear;
-  public INode<V> root;
+  public Node<V> neg, pos;
 
   public IntMap() {
-    this.root = IntMapNodes.Empty.EMPTY;
+    this.neg = Node.NEG_EMPTY;
+    this.pos = Node.POS_EMPTY;
     this.linear = false;
   }
 
-  public IntMap(INode<V> root, boolean linear) {
-    this.root = root;
+  public IntMap(Node<V> neg, Node<V> pos, boolean linear) {
+    this.neg = neg;
+    this.pos = pos;
     this.linear = linear;
   }
 
-  @Override
-  public IMap<Long, V> put(Long key, V value, ValueMerger<V> merge) {
-    INode<V> rootPrime = root.put(editor, key, value, merge);
-    if (root == rootPrime) {
-      return this;
-    } else if (linear) {
-      root = rootPrime;
-      return this;
+  public IntMap<V> put(long key, V value, ValueMerger<V> merge) {
+    if (key < 0) {
+      Node<V> negPrime = neg.put(editor, key, value, merge);
+      if (neg == negPrime) {
+        return this;
+      } else if (linear) {
+        neg = negPrime;
+        return this;
+      } else {
+        return new IntMap<V>(negPrime, pos, false);
+      }
     } else {
-      return new IntMap<V>(rootPrime, false);
+      Node<V> posPrime = pos.put(editor, key, value, merge);
+      if (pos == posPrime) {
+        return this;
+      } else if (linear) {
+        pos = posPrime;
+        return this;
+      } else {
+        return new IntMap<>(neg, posPrime, false);
+      }
     }
   }
 
   @Override
-  public IMap<Long, V> remove(Long key) {
-    INode<V> rootPrime = root.remove(editor, key);
-    if (root == rootPrime) {
-      return this;
-    } else if (linear) {
-      root = rootPrime;
-      return this;
+  public IntMap<V> put(Long key, V value, ValueMerger<V> merge) {
+    return put((long) key, value, merge);
+  }
+
+  public IntMap<V> remove(long key) {
+    if (key < 0) {
+      Node<V> negPrime = neg.remove(editor, key);
+      if (neg == negPrime) {
+        return this;
+      } else if (linear) {
+        neg = negPrime;
+        return this;
+      } else {
+        return new IntMap<V>(negPrime, pos, false);
+      }
     } else {
-      return new IntMap<V>(rootPrime, false);
+      Node<V> posPrime = pos.remove(editor, key);
+      if (pos == posPrime) {
+        return this;
+      } else if (linear) {
+        pos = posPrime;
+        return this;
+      } else {
+        return new IntMap<>(neg, posPrime, false);
+      }
     }
+  }
+
+  @Override
+  public IntMap<V> remove(Long key) {
+    return remove((long) key);
+  }
+
+  public V get(long key, V defaultValue) {
+    return (V) (key < 0 ? neg : pos).get(key, defaultValue);
   }
 
   @Override
   public V get(Long key, V defaultValue) {
-    return (V) root.get(key, defaultValue);
+    return get((long) key, defaultValue);
+  }
+
+  public boolean contains(long key) {
+    return (key < 0 ? neg : pos).get(key, DEFAULT_VALUE) != DEFAULT_VALUE;
   }
 
   @Override
   public boolean contains(Long key) {
-    return root.get(key, DEFAULT_VALUE) != DEFAULT_VALUE;
+    return contains((long) key);
   }
 
   @Override
   public IList<IEntry<Long, V>> entries() {
-    return Lists.from(size(), i -> root.nth((int) i), l -> root.iterator());
+    return Lists.from(size(),
+        i -> (i < neg.size()) ? neg.nth((int) i) : pos.nth((int) (i - neg.size())),
+        l -> new IteratorStack<>(neg.iterator(), pos.iterator()));
   }
 
   @Override
   public long size() {
-    return root.size();
+    return neg.size() + pos.size();
   }
 
   @Override
@@ -79,12 +124,12 @@ public class IntMap<V> implements IMap<Long, V> {
 
   @Override
   public IMap<Long, V> forked() {
-    return linear ? new IntMap<V>(root, false) : this;
+    return linear ? new IntMap<V>(neg, pos, false) : this;
   }
 
   @Override
   public IMap<Long, V> linear() {
-    return linear ? this : new IntMap<V>(root, true);
+    return linear ? this : new IntMap<V>(neg, pos, true);
   }
 
   @Override

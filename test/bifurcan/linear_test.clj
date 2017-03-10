@@ -94,8 +94,8 @@
    :remove-last (u/action [] butlast list-remove-last)})
 
 (defn map-actions []
-  {:put    (u/action [gen/large-integer gen/pos-int] assoc map-put)
-   :remove (u/action [gen/large-integer] dissoc map-remove)})
+  {:put    (u/action [gen/large-integer gen/pos-int] assoc! map-put)
+   :remove (u/action [gen/large-integer] dissoc! map-remove)})
 
 (defn set-actions []
   {:add    (u/action [gen/large-integer] conj set-add)
@@ -118,19 +118,19 @@
     [a b]))
 
 (u/def-collection-check test-linear-map 1e4 (map-actions)
-  [m {}
+  [m (transient {})
    m' (LinearMap.)]
-  (map= m m'))
+  (map= (persistent! m) m'))
 
 (u/def-collection-check test-map 1e4 (map-actions)
-  [m {}
+  [m (transient {})
    m' (.linear (Map.))]
-  (map= m m'))
+  (map= (persistent! m) m'))
 
-(u/def-collection-check test-int-map 1e3 (map-actions)
-  [m {}
-   m' (IntMap.)]
-  (map= m m'))
+(u/def-collection-check test-int-map 1e4 (map-actions)
+  [m (transient {})
+   m' (.linear (IntMap.))]
+  (map= (persistent! m) m'))
 
 (u/def-collection-check test-linear-set 1e4 (set-actions)
   [s #{}
@@ -153,11 +153,11 @@
   (list= v l))
 
 (u/def-collection-check test-linear-map-merge 1e4 (map-actions)
-  [m {}
+  [m (transient {})
    m' (LinearMap.)]
   (= m' (->> (.split ^IMap m' 8) (reduce #(.union ^IMap %1 %2)))))
 
 (u/def-collection-check test-map-merge 1e4 (map-actions)
-  [m {}
+  [m (transient {})
    m' (Map.)]
-  (= m' (->> (.split ^IMap m' 8) (reduce #(.union ^IMap %1 %2)))))
+  (= m' (->> (.split ^IMap m' 8) (reduce (fn ([x] x) ([x y] (.union ^IMap x y)))))))

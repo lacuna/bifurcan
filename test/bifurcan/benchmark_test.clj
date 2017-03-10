@@ -21,6 +21,7 @@
     Collection
     Iterator]
    [io.lacuna.bifurcan
+    IntMap
     Map
     List
     IMap
@@ -195,12 +196,12 @@
                   (into {}))])))
     (into {})))
 
-(deftest ^:benchmark benchmark-lists
+(deftest ^:benchmark benchmark-maps
   (pprint
-    [:linear-list (benchmark-collection (fn [_] (LinearList.)) generate-numbers construct-list lookup-list  #{:construct :lookup :iterate})
-     :list        (benchmark-collection (fn [_] (List.)) generate-numbers construct-list lookup-list  #{:construct :lookup :iterate})
-     :clojure-vector (benchmark-collection (fn [_] []) generate-numbers construct-vector lookup-vector #{:construct :lookup :iterate})
-]
+    [:map         (benchmark-collection (fn [_] (Map.)) generate-entries construct-map lookup-map (constantly true))
+     :int-map     (benchmark-collection (fn [_] (IntMap.)) generate-numbers construct-map lookup-map (constantly true))
+     :linear-map  (benchmark-collection (fn [_] (LinearMap.)) generate-entries construct-map lookup-map (constantly true))
+     :clojure-map (benchmark-collection (fn [_] {}) generate-entries construct-clojure-map lookup-clojure-map (constantly true))]
     ))
 
 (deftest ^:benchmark benchmark-collections
@@ -214,6 +215,7 @@
      :linear-map  (benchmark-collection (fn [_] (LinearMap.)) generate-entries construct-map lookup-map (constantly true))
      :linear-set  (benchmark-collection (fn [_] (LinearSet.)) generate-entries construct-linear-set lookup-linear-set (constantly true))
      :map         (benchmark-collection (fn [_] (Map.)) generate-entries construct-map lookup-map (constantly true))
+     :int-map     (benchmark-collection (fn [_] (IntMap.)) generate-numbers construct-map lookup-map (constantly true))
 
      :hash-set    (benchmark-collection (fn [_] (HashSet.)) generate-entries construct-hash-set lookup-hash-set (constantly true))
      :clojure-set (benchmark-collection (fn [_] #{}) generate-entries construct-clojure-set lookup-clojure-set (constantly true))

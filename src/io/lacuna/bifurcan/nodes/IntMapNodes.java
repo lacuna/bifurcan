@@ -1,15 +1,21 @@
 package io.lacuna.bifurcan.nodes;
 
+import io.lacuna.bifurcan.IList;
 import io.lacuna.bifurcan.IMap;
 import io.lacuna.bifurcan.IMap.IEntry;
+import io.lacuna.bifurcan.LinearList;
 import io.lacuna.bifurcan.Maps;
 import io.lacuna.bifurcan.utils.IteratorStack;
 
 import java.util.Iterator;
-import java.util.NoSuchElementException;
+import java.util.PrimitiveIterator;
 
+import static io.lacuna.bifurcan.nodes.Util.compressedIndex;
 import static io.lacuna.bifurcan.utils.Bits.bitOffset;
 import static io.lacuna.bifurcan.utils.Bits.highestBit;
+import static io.lacuna.bifurcan.utils.Bits.lowestBit;
+import static java.lang.Integer.bitCount;
+import static java.lang.System.arraycopy;
 
 /**
  * @author ztellman
@@ -24,168 +30,110 @@ public class IntMapNodes {
     return (max1 - min0) >= 0 && (max0 - min1) >= 0;
   }
 
-  public interface INode<V> {
-
-    int size();
-
-    IEntry<Long, V> nth(int idx);
-
-    Iterator<IEntry<Long, V>> iterator();
-
-    INode<V> merge(Object editor, INode<V> node, IMap.ValueMerger<V> f);
-
-    INode<V> difference(Object editor, INode<V> node);
-
-    INode<V> intersection(Object editor, INode<V> node);
-
-    INode<V> range(Object editor, long min, long max);
-
-    INode<V> put(Object editor, long k, V v, IMap.ValueMerger<V> mergeFn);
-
-    INode<V> remove(Object editor, long k);
-
-    Object get(long k, Object defaultVal);
+  static long keyMask(long key, int shift) {
+    return 1L << ((key >>> shift) & 15);
   }
 
-  // 2-way top-level branch
-  public static class BinaryBranch<V> implements INode<V> {
-
-    public INode<V> a, b;
-
-    public BinaryBranch(INode<V> a, INode<V> b) {
-      this.a = a;
-      this.b = b;
-    }
-
-    @Override
-    public IEntry<Long, V> nth(int idx) {
-      return idx < a.size() ? a.nth(idx) : b.nth(idx - a.size());
-    }
-
-    public int size() {
-      return a.size() + b.size();
-    }
-
-    public Iterator<IEntry<Long, V>> iterator() {
-      return new IteratorStack<>(a.iterator(), b.iterator());
-    }
-
-    public INode<V> range(Object editor, long min, long max) {
-      if (max < 0) {
-        return a.range(editor, min, max);
-      } else if (min >= 0) {
-        return b.range(editor, min, max);
-      } else {
-        INode<V> aPrime = a.range(editor, min, max);
-        INode<V> bPrime = b.range(editor, min, max);
-
-        if (aPrime == null && bPrime == null) {
-          return Empty.EMPTY;
-        } else if (aPrime == null) {
-          return bPrime;
-        } else if (bPrime == null) {
-          return aPrime;
-        } else {
-          return new BinaryBranch<>(aPrime, bPrime);
-        }
-      }
-    }
-
-    public INode<V> merge(Object editor, INode<V> node, IMap.ValueMerger<V> mergeFn) {
-      if (node instanceof BinaryBranch) {
-        BinaryBranch<V> bin = (BinaryBranch<V>) node;
-        return new BinaryBranch<>(a.merge(editor, bin.a, mergeFn), b.merge(editor, bin.b, mergeFn));
-      } else if (node instanceof Branch) {
-        Branch<V> branch = (Branch<V>) node;
-        return branch.prefix < 0
-            ? new BinaryBranch<>(a.merge(editor, node, mergeFn), b)
-            : new BinaryBranch<>(a, b.merge(editor, node, mergeFn));
-      } else {
-        return node.merge(editor, this, (x, y) -> mergeFn.merge(y, x));
-      }
-    }
-
-    @Override
-    public INode<V> difference(Object editor, INode<V> node) {
-      return null;
-    }
-
-    @Override
-    public INode<V> intersection(Object editor, INode<V> node) {
-      return null;
-    }
-
-    public INode<V> put(Object editor, long k, V v, IMap.ValueMerger<V> mergeFn) {
-      if (k < 0) {
-        INode<V> aPrime = a.put(editor, k, v, mergeFn);
-        return a == aPrime ? this : new BinaryBranch<>(aPrime, b);
-      } else {
-        INode<V> bPrime = b.put(editor, k, v, mergeFn);
-        return b == bPrime ? this : new BinaryBranch<>(a, bPrime);
-      }
-    }
-
-    public INode<V> remove(Object editor, long k) {
-      if (k < 0) {
-        INode<V> aPrime = a.remove(editor, k);
-        return aPrime == null
-            ? b
-            : (a == aPrime)
-            ? this
-            : new BinaryBranch<>(aPrime, b);
-      } else {
-        INode<V> bPrime = b.remove(editor, k);
-        return bPrime == null
-            ? a
-            : (b == bPrime)
-            ? this
-            : new BinaryBranch<>(a, bPrime);
-      }
-    }
-
-    public Object get(long k, Object defaultVal) {
-      return k < 0 ? a.get(k, defaultVal) : b.get(k, defaultVal);
-    }
+  private static int startIndex(int bitmap) {
+    return bitOffset(lowestBit(bitmap));
   }
 
-  // 16-way branch node
+  private static int endIndex(int bitmap) {
+    return bitOffset(highestBit(bitmap));
+  }
 
-  public static class Branch<V> implements INode<V> {
+  public static class Node<V> {
 
-    public Object editor;
-    public final long prefix, mask;
+    public final static Node POS_EMPTY = new Node(new Object(), 0, 0);
+    public final static Node NEG_EMPTY = new Node(new Object(), -1, 0);
+
+    public final Object editor;
+    public final long prefix;
     public final int offset;
-    int size;
-    public final INode[] children;
 
-    public Branch(Object editor, long prefix, int offset, int size, INode[] children) {
+    public int datamap;
+    public int nodemap;
+    public int size;
+
+    public long[] keys;
+    public Object[] content;
+
+    private Node(Object editor, long prefix, int offset, boolean empty) {
       this.editor = editor;
       this.prefix = prefix;
       this.offset = offset;
-      this.mask = 0xfL << offset;
-      this.size = size;
-      this.children = children;
     }
 
-    public int indexOf(long key) {
-      return (int) ((key & mask) >>> offset);
+    public Node(Object editor, long prefix, int offset) {
+      this.editor = editor;
+      this.prefix = prefix;
+      this.offset = offset;
+      this.keys = new long[2];
+      this.content = new Object[2];
     }
 
-    private INode[] arraycopy() {
-      INode[] copy = new INode[16];
-      System.arraycopy(children, 0, copy, 0, 16);
-      return copy;
+    private long keyMask() {
+      return 0xFL << offset;
     }
 
-    @Override
+    public int mask(long key) {
+      return 1 << ((key & keyMask()) >>> offset);
+    }
+
+    public boolean isEntry(int mask) {
+      return (datamap & mask) != 0;
+    }
+
+    public boolean isNode(int mask) {
+      return (nodemap & mask) != 0;
+    }
+
+    private int entryIndex(int mask) {
+      return compressedIndex(datamap, mask);
+    }
+
+    private int nodeIndex(int mask) {
+      return compressedIndex(nodemap, mask);
+    }
+
+    private boolean overlap(long min, long max) {
+      long mask = ((1L << (offset + 4)) - 1);
+      long nMin = prefix & ~mask;
+      long nMax = prefix | mask;
+      return IntMapNodes.overlap(min, max, nMin, nMax);
+    }
+
+    private boolean contains(long min, long max) {
+      long mask = ((1L << (offset + 4)) - 1);
+      long nMin = prefix & ~mask;
+      long nMax = prefix | mask;
+      return min <= nMin && nMax <= max;
+    }
+
+    private Node<V> node(int mask) {
+      return (Node<V>) content[content.length - 1 - nodeIndex(mask)];
+    }
+
+    private PrimitiveIterator.OfInt masks() {
+      return Util.masks(nodemap | datamap);
+    }
+
     public IEntry<Long, V> nth(int idx) {
-      for (int i = 0; i < 16; i++) {
-        INode<V> c = this.children[i];
-        if (c != null) {
-          if (idx < c.size()) {
-            return c.nth(idx);
+      PrimitiveIterator.OfInt masks = masks();
+      while (masks.hasNext()) {
+        int mask = masks.nextInt();
+        if (isEntry(mask)) {
+          if (idx-- == 0) {
+            int entryIdx = entryIndex(mask);
+            return new Maps.Entry<>(keys[entryIdx], (V) content[entryIdx]);
+          }
+
+        } else if (isNode(mask)) {
+          Node<V> node = node(mask);
+          if (idx < node.size()) {
+            return node.nth(idx);
           } else {
-            idx -= c.size();
+            idx -= node.size();
           }
         }
       }
@@ -193,339 +141,323 @@ public class IntMapNodes {
       throw new IndexOutOfBoundsException();
     }
 
-    public INode<V> range(Object editor, long min, long max) {
-      if (offset < 60) {
-        long nodeMask = ((1L << (offset + 4)) - 1);
-        long nodeMin = prefix & ~nodeMask;
-        long nodeMax = prefix | nodeMask;
-        if (!overlap(min, max, nodeMin, nodeMax)) {
-          return null;
+    public Node<V> range(Object editor, long min, long max) {
+
+      if (offset < 60 && !overlap(min, max)) {
+        return null;
+      } else if (contains(min, max)) {
+        return this;
+      }
+
+      Node<V> n = new Node<V>(editor, prefix, offset);
+
+      PrimitiveIterator.OfInt masks = masks();
+      while (masks.hasNext()) {
+        int mask = masks.nextInt();
+        if (isEntry(mask)) {
+          int idx = entryIndex(mask);
+          n = n.put(editor, keys[idx], (V) content[idx], null);
+        } else if (isNode(mask)) {
+          // TODO: change to putNode
+          n = n.putNode(mask, node(mask).range(editor, min, max));
         }
       }
 
-      INode[] children = new INode[16];
-      long lowerBits = (1L << offset) - 1;
-      int size = 0;
-      for (long i = 0; i < 16; i++) {
-        INode c = this.children[(int) i];
-        if (c != null) {
-          long childMin = ((prefix & ~mask) | (i << offset)) & ~lowerBits;
-          long childMax = childMin | lowerBits;
-          if (overlap(min, max, childMin, childMax)) {
-            INode<V> cPrime = c.range(editor, min, max);
-            size += cPrime.size();
-            children[(int) i] = cPrime;
-          }
-        }
-      }
-      return new Branch<>(editor, prefix, offset, size, children);
+      return n;
     }
 
     public Iterator<IEntry<Long, V>> iterator() {
-      IteratorStack<IEntry<Long, V>> stack = new IteratorStack<>();
-      for (int i = 0; i < children.length; i++) {
-        INode<V> n = children[i];
-        if (n != null) {
-          stack.addLast(n.iterator());
+
+      return new Iterator<IMap.IEntry<Long, V>>() {
+
+        final IList<Node<V>> nodes = LinearList.from(nodes());
+        Iterator<IMap.IEntry<Long, V>> iterator = entries().iterator();
+
+        @Override
+        public boolean hasNext() {
+          return iterator.hasNext() || nodes.size() > 0;
         }
-      }
-      return stack;
+
+        @Override
+        public IMap.IEntry<Long, V> next() {
+          while (!iterator.hasNext()) {
+            Node<V> node = nodes.first();
+            nodes.removeFirst();
+            iterator = node.entries().iterator();
+            node.nodes().forEach(nodes::addLast);
+          }
+          return iterator.next();
+        }
+      };
     }
 
     public Object get(long k, Object defaultVal) {
-      INode<V> n = children[indexOf(k)];
-      return n == null ? defaultVal : n.get(k, defaultVal);
+      int mask = mask(k);
+      if (isEntry(mask)) {
+        return content[entryIndex(mask)];
+      } else if (isNode(mask)) {
+        return node(mask).get(k, defaultVal);
+      } else {
+        return defaultVal;
+      }
     }
 
     public int size() {
       return size;
     }
 
-    public INode<V> merge(Object editor, INode<V> node, IMap.ValueMerger<V> mergeFn) {
-      if (node instanceof Branch) {
-        Branch<V> branch = (Branch) node;
-        int offsetPrime = offset(prefix, branch.prefix);
+    public Node<V> merge(Object editor, Node<V> node, IMap.ValueMerger<V> mergeFn) {
 
-        if (branch.prefix < 0 && this.prefix >= 0) {
-          return new BinaryBranch<>(branch, this);
-        } else if (branch.prefix >= 0 && this.prefix < 0) {
-          return new BinaryBranch<>(this, branch);
+      if (editor != this.editor) {
+        return clone(editor).merge(editor, node, mergeFn);
+      }
+
+      int offsetPrime = offset(prefix, node.prefix);
+
+      // don't overlap, share a common parent
+      if (offsetPrime > offset && offsetPrime > node.offset) {
+        return new Node<V>(editor, prefix, offsetPrime)
+            .merge(editor, this, mergeFn)
+            .merge(editor, node, mergeFn);
+      }
+
+      // we contain the other node
+      if (offset > node.offset) {
+        int mask = mask(node.prefix);
+        if (isEntry(mask)) {
+          int idx = entryIndex(mask);
+          return node.put(editor, keys[idx], (V) content[idx], (a, b) -> mergeFn.merge(b, a));
+        } else if (isNode(mask)) {
+          return setNode(mask, node(mask).merge(editor, node, mergeFn));
+        } else {
+          return setNode(mask, node);
         }
-
-        if (offsetPrime > offset && offsetPrime > branch.offset) {
-          return new Branch<V>(editor, prefix, offset(prefix, branch.prefix), 0, new INode[16])
-              .merge(editor, this, mergeFn)
-              .merge(editor, node, mergeFn);
-        }
-
-        // we contain the other node
-        if (offset > branch.offset) {
-          int idx = indexOf(branch.prefix);
-          INode[] children = arraycopy();
-          INode n = children[idx];
-          int prevSize = n == null ? 0 : n.size();
-          children[idx] = n != null ? n.merge(editor, node, mergeFn) : node;
-          return new Branch<>(editor, prefix, offset, size + (children[idx].size() - prevSize), children);
-        }
-
-        if (offset < branch.offset) {
-          return branch.merge(editor, this, (x, y) -> mergeFn.merge(y, x));
-        }
-
-        INode[] children = new INode[16];
-        INode[] branchChildren = branch.children;
-        int offset = this.offset;
-        int size = 0;
-        for (int i = 0; i < 16; i++) {
-          INode n = this.children[i];
-          INode nPrime = branchChildren[i];
-          if (n == null) {
-            children[i] = nPrime;
-          } else if (nPrime == null) {
-            children[i] = n;
-          } else {
-            children[i] = n.merge(editor, nPrime, mergeFn);
-          }
-          size += children[i].size();
-        }
-        return new Branch<>(editor, prefix, offset, size, children);
-
-      } else {
+      } else if (offset < node.offset) {
         return node.merge(editor, this, (x, y) -> mergeFn.merge(y, x));
+      } else {
+        // TODO
+        return null;
       }
     }
 
-    @Override
-    public INode<V> difference(Object editor, INode<V> node) {
+    public Node<V> difference(Object editor, Node<V> node) {
       return null;
     }
 
-    @Override
-    public INode<V> intersection(Object editor, INode<V> node) {
+    public Node<V> intersection(Object editor, Node<V> node) {
       return null;
     }
 
-    public INode<V> put(Object editor, long k, V v, IMap.ValueMerger<V> mergeFn) {
+    public Node<V> put(Object editor, long k, V v, IMap.ValueMerger<V> mergeFn) {
+
+      if (editor != this.editor) {
+        return clone(editor).put(editor, k, v, mergeFn);
+      }
+
       int offsetPrime = offset(k, prefix);
 
-      // need a new branch above us both
-      if (prefix < 0 && k >= 0) {
-        return new BinaryBranch<>(this, new Leaf<>(k, v));
-      } else if (k < 0 && prefix >= 0) {
-        return new BinaryBranch<>(new Leaf<>(k, v), this);
-      } else if (offsetPrime > this.offset) {
-        return new Branch<V>(editor, k, offsetPrime, 0, new INode[16])
-            .merge(editor, this, null)
-            .put(editor, k, v, mergeFn);
+      // common parent
+      if (offsetPrime > this.offset) {
+        Node<V> n = new Node<V>(editor, k, offsetPrime);
+        if (size() > 0) {
+          n = n.putNode(n.mask(prefix), this);
+        }
+        return n.putEntry(n.mask(k), k, v);
 
         // somewhere at or below our level
       } else {
-        int idx = indexOf(k);
-        INode<V> n = children[idx];
-        if (n == null) {
-          if (editor == this.editor) {
-            children[idx] = new Leaf<V>(k, v);
-            size++;
-            return this;
-          } else {
-            INode[] children = arraycopy();
-            children[idx] = new Leaf<V>(k, v);
-            return new Branch<V>(editor, prefix, offset, size + 1, children);
-          }
-        } else {
-          int prevSize = n.size();
-          INode<V> nPrime = n.put(editor, k, v, mergeFn);
-          if (nPrime == n) {
-            size += nPrime.size() - prevSize;
-            return this;
-          } else {
-            INode[] children = arraycopy();
-            children[idx] = nPrime;
-            return new Branch<>(editor, prefix, offset, size + (nPrime.size() - prevSize), children);
-          }
-        }
-      }
-    }
 
-    public INode remove(Object editor, long k) {
-      int idx = indexOf(k);
-      INode n = children[idx];
-      if (n == null) {
-        return this;
-      } else {
-        int prevSize = n.size();
-        INode nPrime = n.remove(editor, k);
-        if (nPrime == n) {
-          size += n.size() - prevSize;
+        int mask = mask(k);
+        if (isEntry(mask)) {
+          int idx = entryIndex(mask);
+          if (k == keys[idx]) {
+            content[idx] = mergeFn.merge((V) content[idx], v);
+            return this;
+          } else {
+            Node<V> n = new Node<V>(editor, k, offset(k, keys[idx]));
+            n = n.putEntry(n.mask(keys[idx]), keys[idx], (V) content[idx]).putEntry(n.mask(k), k, v);
+            return removeEntry(mask).putNode(mask, n);
+          }
+        } else if (isNode(mask)) {
+          Node<V> n = node(mask);
+          int prevSize = n.size();
+          Node<V> nPrime = n.put(editor, k, v, mergeFn);
+          setNode(mask, nPrime);
+          if (n == nPrime) {
+            size += nPrime.size() - prevSize;
+          }
           return this;
         } else {
-          INode[] children = arraycopy();
-          children[idx] = nPrime;
-          for (int i = 0; i < 16; i++) {
-            if (children[i] != null) {
-              return new Branch(editor, prefix, offset, size + (nPrime.size() - prevSize), children);
-            }
-          }
-          return null;
+          return putEntry(mask, k, v);
         }
       }
     }
-  }
 
-  // leaf node
-  public static class Leaf<V> implements INode<V> {
-    public final long key;
-    public final V value;
-
-    public Leaf(long key, V value) {
-      this.key = key;
-      this.value = value;
-    }
-
-    public Iterator<IEntry<Long, V>> iterator() {
-      return new Iterator<IEntry<Long, V>>() {
-
-        boolean iterated = false;
-
-        public boolean hasNext() {
-          return !iterated;
-        }
-
-        public IEntry<Long, V> next() {
-          if (iterated) {
-            throw new NoSuchElementException();
-          } else {
-            iterated = true;
-            return new Maps.Entry<>(key, value);
-          }
-        }
-      };
-    }
-
-    @Override
-    public IEntry<Long, V> nth(int idx) {
-      if (idx == 0) {
-        return new Maps.Entry<>(key, value);
-      }
-      throw new IndexOutOfBoundsException();
-    }
-
-    public INode<V> range(Object editor, long min, long max) {
-      return (min <= key && key <= max) ? this : null;
-    }
-
-    public int size() {
-      return 1;
-    }
-
-    public INode<V> merge(Object editor, INode<V> node, IMap.ValueMerger<V> mergeFn) {
-      return node.put(editor, key, value, (x, y) -> mergeFn.merge(y, x));
-    }
-
-    @Override
-    public INode<V> difference(Object editor, INode<V> node) {
-      return null;
-    }
-
-    @Override
-    public INode<V> intersection(Object editor, INode<V> node) {
-      return null;
-    }
-
-    public INode<V> put(Object editor, long k, V v, IMap.ValueMerger<V> mergeFn) {
-      if (k == key) {
-        v = mergeFn.merge(value, v);
-        return new Leaf<>(k, v);
-      } else if (key < 0 && k >= 0) {
-        return new BinaryBranch<>(this, new Leaf<>(k, v));
-      } else if (k < 0 && key >= 0) {
-        return new BinaryBranch<>(new Leaf<>(k, v), this);
-      } else {
-        return new Branch<V>(editor, k, offset(k, key), 0, new INode[16])
-            .put(editor, key, value, mergeFn)
-            .put(editor, k, v, mergeFn);
-      }
-    }
-
-    public INode<V> remove(Object editor, long k) {
-      if (key == k) {
-        return Empty.EMPTY;
-      } else {
+    public Node<V> remove(Object editor, long k) {
+      int mask = mask(k);
+      if ((mask & (nodemap | datamap)) == 0) {
         return this;
+      } else if (editor != this.editor) {
+        return clone(editor).remove(editor, k);
       }
-    }
 
-    public Object get(long k, Object defaultVal) {
-      return k == key ? value : defaultVal;
-    }
-  }
+      if (isEntry(mask)) {
+        int idx = entryIndex(mask);
+        return keys[idx] == k ? removeEntry(mask) : this;
+      } else if (isNode(mask)) {
+        Node<V> n = node(mask);
+        int prevSize = n.size();
+        Node<V> nPrime = n.remove(editor, k);
+        if (n == nPrime) {
+          size -= prevSize - nPrime.size();
+        }
+        return nPrime.size() == 0 ? removeNode(mask) : setNode(mask, nPrime);
+      }
 
-  // empty node
-  public static class Empty<V> implements INode<V> {
-
-    public static Empty EMPTY = new Empty();
-
-    Empty() {
-    }
-
-    @Override
-    public IEntry<Long, V> nth(int idx) {
-      throw new IndexOutOfBoundsException();
-    }
-
-    @Override
-    public INode<V> range(Object editor, long min, long max) {
       return this;
     }
 
-    @Override
-    public INode<V> put(Object editor, long k, V v, IMap.ValueMerger<V> mergeFn) {
-      return new Leaf<>(k, v);
+    ///
+
+    private Node<V> clone(Object editor) {
+      Node<V> n = new Node<V>(editor, prefix, offset, false);
+      n.datamap = datamap;
+      n.nodemap = nodemap;
+      n.size = size;
+      n.content = content.clone();
+      n.keys = keys.clone();
+
+      return n;
     }
 
-    @Override
-    public INode<V> remove(Object editor, long k) {
-      return this;
-    }
+    public Iterable<Node<V>> nodes() {
+      return () -> new Iterator<Node<V>>() {
+        int idx = content.length - Integer.bitCount(nodemap);
 
-    @Override
-    public Object get(long k, Object defaultVal) {
-      return defaultVal;
-    }
-
-    @Override
-    public Iterator<IEntry<Long, V>> iterator() {
-      return new Iterator<IEntry<Long, V>>() {
-
+        @Override
         public boolean hasNext() {
-          return false;
+          return idx < content.length;
         }
 
-        public IEntry<Long, V> next() {
-          throw new NoSuchElementException();
+        @Override
+        public Node<V> next() {
+          return (Node<V>) content[idx++];
         }
       };
     }
 
-    @Override
-    public int size() {
-      return 0;
+    private Iterable<IMap.IEntry<Long, V>> entries() {
+      int numEntries = bitCount(datamap);
+      return () -> new Iterator<IMap.IEntry<Long, V>>() {
+
+        int idx = 0;
+
+        @Override
+        public boolean hasNext() {
+          return idx < numEntries;
+        }
+
+        @Override
+        public IMap.IEntry<Long, V> next() {
+          int entryIdx = idx++;
+          return new Maps.Entry<>(keys[entryIdx], (V) content[entryIdx]);
+        }
+      };
     }
 
-    @Override
-    public INode<V> merge(Object editor, INode<V> node, IMap.ValueMerger<V> mergeFn) {
-      return node;
+    private void grow() {
+      Object[] c = new Object[content.length << 1];
+      int numNodes = bitCount(nodemap);
+      arraycopy(content, 0, c, 0, bitCount(datamap));
+      arraycopy(content, content.length - numNodes, c, c.length - numNodes, numNodes);
+      this.content = c;
+
+      long[] k = new long[keys.length << 1];
+      arraycopy(keys, 0, k, 0, bitCount(datamap));
+      this.keys = k;
     }
 
-    @Override
-    public INode<V> difference(Object editor, INode<V> node) {
+    Node<V> putEntry(int mask, long key, V value) {
+      int numEntries = bitCount(datamap);
+      int count = numEntries + bitCount(nodemap);
+      if ((count + 1) > content.length) {
+        grow();
+      }
+
+      int idx = entryIndex(mask);
+      if (idx != numEntries) {
+        arraycopy(content, idx, content, idx + 1, numEntries - idx);
+        arraycopy(keys, idx, keys, idx + 1, numEntries - idx);
+      }
+      datamap |= mask;
+      size++;
+
+      keys[idx] = key;
+      content[idx] = value;
+
       return this;
     }
 
-    @Override
-    public INode<V> intersection(Object editor, INode<V> node) {
+    Node<V> removeEntry(final int mask) {
+      // shrink?
+
+      final int idx = entryIndex(mask);
+      final int numEntries = bitCount(datamap);
+      if (idx != numEntries - 1) {
+        arraycopy(content, idx + 1, content, idx, numEntries - 1 - idx);
+        arraycopy(keys, idx + 1, keys, idx, numEntries - 1 - idx);
+      }
+      datamap &= ~mask;
+      size--;
+
+      content[numEntries - 1] = null;
+      keys[numEntries - 1] = 0;
+
       return this;
     }
+
+    Node<V> setNode(int mask, Node<V> node) {
+      int idx = content.length - 1 - nodeIndex(mask);
+      size += node.size() - ((Node<V>) content[idx]).size();
+      content[idx] = node;
+
+      return this;
+    }
+
+    Node<V> putNode(final int mask, Node<V> node) {
+      int numNodes = bitCount(nodemap);
+      int count = bitCount(datamap) + numNodes;
+      if ((count + 1) > content.length) {
+        grow();
+      }
+
+      int idx = nodeIndex(mask);
+      if (numNodes > 0) {
+        arraycopy(content, content.length - numNodes, content, content.length - 1 - numNodes, numNodes - idx);
+      }
+      nodemap |= mask;
+      size += node.size();
+
+      content[content.length - 1 - idx] = node;
+
+      return this;
+    }
+
+    Node<V> removeNode(final int mask) {
+      // shrink?
+
+      int idx = nodeIndex(mask);
+      int numNodes = bitCount(nodemap);
+      size -= node(mask).size();
+      arraycopy(content, content.length - numNodes, content, content.length + 1 - numNodes, numNodes - 1 - idx);
+      nodemap &= ~mask;
+
+      content[content.length - numNodes] = null;
+
+      return this;
+    }
+
   }
+
 
 }
