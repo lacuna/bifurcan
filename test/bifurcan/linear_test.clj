@@ -17,8 +17,11 @@
    [io.lacuna.bifurcan
     IntMap
     Map
+    Maps
     List
+    Lists
     Set
+    Sets
     IMap
     IMap$IEntry
     IList

@@ -50,6 +50,10 @@ public interface IMap<K, V> extends
     return Sets.from(Lists.lazyMap(entries(), IEntry::key), this::contains);
   }
 
+  default IList<V> values() {
+    return Lists.lazyMap(entries(), IEntry::value);
+  }
+
   /**
    * @return the number of entries in the map
    */

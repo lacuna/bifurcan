@@ -14,6 +14,7 @@
    [java.util.concurrent
     ThreadLocalRandom]
    [java.util
+    Map$Entry
     HashMap
     HashSet
     ArrayList
@@ -30,7 +31,9 @@
     LinearList
     LinearMap
     LinearSet
-    IMap$IEntry]))
+    IMap$IEntry]
+   [io.lacuna.bifurcan.utils
+    SparseIntMap]))
 
 (def clojure-hash
   (reify ToIntFunction
@@ -71,6 +74,12 @@
       (set! m (.put ^IMap m v nil)))
     m))
 
+(defn construct-sparse-int-map [^SparseIntMap m vs]
+  (let-mutable [m m]
+    (doary [v vs]
+      (set! m (.put ^SparseIntMap m v nil)))
+    m))
+
 (defn construct-hash-map [^HashMap m vs]
   (doary [v vs]
     (.put m v nil))
@@ -89,6 +98,10 @@
 (defn lookup-java-list [^java.util.List l ks]
   (doary [k ks]
     (.get l k)))
+
+(defn lookup-sparse-int-map [^SparseIntMap m ks]
+  (doary [k ks]
+    (.get m k)))
 
 (defn lookup-vector [v ks]
   (doary[k ks]
@@ -120,6 +133,18 @@
   (loop []
     (when (.hasNext it)
       (.next it)
+      (recur))))
+
+(defn consume-entry-iterator [^Iterator it]
+  (loop []
+    (when (.hasNext it)
+      (.key ^IMap$IEntry (.next it))
+      (recur))))
+
+(defn consume-java-entry-iterator [^Iterator it]
+  (loop []
+    (when (.hasNext it)
+      (.getKey ^Map$Entry (.next it))
       (recur))))
 
 (defn construct-clojure-set [s ^objects vs]
@@ -177,8 +202,16 @@
                   (merge
                     (when (test? :iterate)
                       {:iterate
-                       (if (instance? java.util.Map c')
-                         (benchmark #(consume-iterator (-> ^java.util.Map c' .entrySet .iterator)))
+                       (cond
+                         (instance? java.util.Map c')
+                         (benchmark #(consume-java-entry-iterator
+                                       (-> ^java.util.Map c' .entrySet .iterator)))
+
+                         (instance? io.lacuna.bifurcan.IMap c')
+                         (benchmark #(consume-entry-iterator (.iterator ^Iterable c')))
+
+
+                         :else
                          (benchmark #(try
                                        (consume-iterator (.iterator ^Iterable c'))
                                        (catch Throwable e
@@ -198,27 +231,48 @@
 
 (deftest ^:benchmark benchmark-maps
   (pprint
-    [:map         (benchmark-collection (fn [_] (Map.)) generate-entries construct-map lookup-map (constantly true))
-     :int-map     (benchmark-collection (fn [_] (IntMap.)) generate-numbers construct-map lookup-map (constantly true))
-     :linear-map  (benchmark-collection (fn [_] (LinearMap.)) generate-entries construct-map lookup-map (constantly true))
-     :clojure-map (benchmark-collection (fn [_] {}) generate-entries construct-clojure-map lookup-clojure-map (constantly true))]
+    [:map
+     (benchmark-collection (fn [_] (Map.)) generate-entries construct-map lookup-map (constantly true))
+     :int-map
+     (benchmark-collection (fn [_] (IntMap.)) generate-numbers construct-map lookup-map (constantly true))
+     :linear-map
+     #_(benchmark-collection (fn [_] (LinearMap.)) generate-entries construct-map lookup-map (constantly true))
+     :clojure-map
+     #_(benchmark-collection (fn [_] {}) generate-entries construct-clojure-map lookup-clojure-map (constantly true))
+     :sparse-int-map
+     #_(benchmark-collection (fn [_] SparseIntMap/EMPTY) generate-numbers construct-sparse-int-map lookup-sparse-int-map #{:construct :lookup :lookup-misses})]
     ))
 
 (deftest ^:benchmark benchmark-collections
   (pprint
-    [:linear-list (benchmark-collection (fn [_] (LinearList.)) generate-numbers construct-list lookup-list  #{:construct :lookup :iterate})
-     :list        (benchmark-collection (fn [_] (List.)) generate-numbers construct-list lookup-list  #{:construct :lookup :iterate})
-     :array-list  (benchmark-collection (fn [_] (ArrayList.)) generate-numbers construct-java-list lookup-java-list #{:construct :lookup :iterate})
-     :array-deque (benchmark-collection (fn [_] (ArrayDeque.)) generate-numbers construct-java-deque nil #{:construct :iterate})
-     :clojure-vector (benchmark-collection (fn [_] []) generate-numbers construct-vector lookup-vector #{:construct :lookup :iterate})
+    [:linear-list
+     (benchmark-collection (fn [_] (LinearList.)) generate-numbers construct-list lookup-list  #{:construct :lookup :iterate})
+     :list
+     (benchmark-collection (fn [_] (List.)) generate-numbers construct-list lookup-list  #{:construct :lookup :iterate})
+     :array-list
+     (benchmark-collection (fn [_] (ArrayList.)) generate-numbers construct-java-list lookup-java-list #{:construct :lookup :iterate})
+     :array-deque
+     (benchmark-collection (fn [_] (ArrayDeque.)) generate-numbers construct-java-deque nil #{:construct :iterate})
+     :clojure-vector
+     (benchmark-collection (fn [_] []) generate-numbers construct-vector lookup-vector #{:construct :lookup :iterate})
 
-     :linear-map  (benchmark-collection (fn [_] (LinearMap.)) generate-entries construct-map lookup-map (constantly true))
-     :linear-set  (benchmark-collection (fn [_] (LinearSet.)) generate-entries construct-linear-set lookup-linear-set (constantly true))
-     :map         (benchmark-collection (fn [_] (Map.)) generate-entries construct-map lookup-map (constantly true))
-     :int-map     (benchmark-collection (fn [_] (IntMap.)) generate-numbers construct-map lookup-map (constantly true))
+     :linear-map
+     (benchmark-collection (fn [_] (LinearMap.)) generate-entries construct-map lookup-map (constantly true))
+     :linear-set
+     (benchmark-collection (fn [_] (LinearSet.)) generate-entries construct-linear-set lookup-linear-set (constantly true))
+     :map
+     (benchmark-collection (fn [_] (Map.)) generate-entries construct-map lookup-map (constantly true))
+     :int-map
+     (benchmark-collection (fn [_] (IntMap.)) generate-numbers construct-map lookup-map (constantly true))
+     :sparse-int-map
+     (benchmark-collection (fn [_] SparseIntMap/EMPTY) generate-numbers construct-sparse-int-map lookup-sparse-int-map #{:construct :lookup :lookup-misses})
 
-     :hash-set    (benchmark-collection (fn [_] (HashSet.)) generate-entries construct-hash-set lookup-hash-set (constantly true))
-     :clojure-set (benchmark-collection (fn [_] #{}) generate-entries construct-clojure-set lookup-clojure-set (constantly true))
-     :hash-map    (benchmark-collection (fn [_] (HashMap.)) generate-entries construct-hash-map lookup-hash-map (constantly true))
-     :clojure-map (benchmark-collection (fn [_] {}) generate-entries construct-clojure-map lookup-clojure-map (constantly true))]
+     :hash-set
+     (benchmark-collection (fn [_] (HashSet.)) generate-entries construct-hash-set lookup-hash-set (constantly true))
+     :clojure-set
+     (benchmark-collection (fn [_] #{}) generate-entries construct-clojure-set lookup-clojure-set (constantly true))
+     :hash-map
+     (benchmark-collection (fn [_] (HashMap.)) generate-entries construct-hash-map lookup-hash-map (constantly true))
+     :clojure-map
+     (benchmark-collection (fn [_] {}) generate-entries construct-clojure-map lookup-clojure-map (constantly true))]
     ))

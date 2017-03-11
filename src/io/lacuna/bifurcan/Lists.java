@@ -1,7 +1,6 @@
 package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.IMap.IEntry;
-import io.lacuna.bifurcan.utils.SparseIntMap;
 
 import java.lang.reflect.Array;
 import java.util.*;
@@ -19,30 +18,28 @@ import java.util.stream.IntStream;
 /**
  * @author ztellman
  */
+@SuppressWarnings("unchecked")
 public class Lists {
 
   /**
-   * A dense concatenation of n-many ReadLists.  This creates a flattened list of all the lists, which in the worst
-   * case is O(N^2), but avoids the issue of left-leaning concatenation trees which blow the stack on lookup.  An ideal
-   * approach would involve self-balancing trees, but this should suffice for now.
+   * A concatenation wrapper that doesn't blow up the stack due to left-leaning trees.
    */
-  @SuppressWarnings("unchecked")
   private static class Concat<V> implements IList<V> {
 
-    final SparseIntMap<IList<V>> lists;
+    final IntMap<IList<V>> lists;
     final long size;
 
     public Concat(IList<V> a, IList<V> b) {
-      lists = (SparseIntMap<IList<V>>) SparseIntMap.EMPTY.put(0, a).put(a.size(), b);
+      lists = new IntMap<IList<V>>().linear().put(0, a).put(a.size(), b).forked();
       size = a.size() + b.size();
     }
 
     public Concat(IList<V> list) {
-      lists = (SparseIntMap<IList<V>>) SparseIntMap.EMPTY.put(0, list);
+      lists = new IntMap<IList<V>>().linear().put(0, list).linear();
       size = list.size();
     }
 
-    private Concat(SparseIntMap<IList<V>> lists, long size) {
+    private Concat(IntMap<IList<V>> lists, long size) {
       this.lists = lists;
       this.size = size;
     }
@@ -52,7 +49,7 @@ public class Lists {
       if (idx < 0 || size <= idx) {
         throw new IndexOutOfBoundsException(idx + " must be within [0," + size + ")");
       }
-      IEntry<Long, IList<V>> entry = lists.floorEntry(idx);
+      IEntry<Long, IList<V>> entry = lists.floor(idx);
       return entry.value().nth(idx - entry.key());
     }
 
@@ -87,25 +84,25 @@ public class Lists {
         return this;
       }
 
-      SparseIntMap<IList<V>> m = SparseIntMap.EMPTY;
+      IntMap<IList<V>> m = new IntMap<IList<V>>().linear();
       long pos = start;
       while (pos < end) {
-        IEntry<Long, IList<V>> e = lists.floorEntry(pos);
+        IEntry<Long, IList<V>> e = lists.floor(pos);
         IList<V> l = e.value().slice(start - e.key(), Math.min(end - pos, e.value().size()));
         m = m.put(pos, l);
         pos += l.size();
       }
-      return new Concat<V>(m, end - start);
+      return new Concat<V>(m.forked(), end - start);
     }
 
     Concat<V> concat(Concat<V> o) {
-      SparseIntMap<IList<V>> m = lists;
+      IntMap<IList<V>> m = lists.linear();
       long nSize = size;
-      for (IList<V> l : lists.values()) {
+      for (IList<V> l : o.lists.values()) {
         m = m.put(nSize, l);
         nSize += l.size();
       }
-      return new Concat<V>(m, nSize);
+      return new Concat<V>(m.forked(), nSize);
     }
   }
 

@@ -23,8 +23,16 @@ public class Bits {
     return n & -n;
   }
 
+  public static int lowestBit(int n) {
+    return n & -n;
+  }
+
   public static long highestBit(long n) {
-    return highestBit(n, 1);
+    return Long.highestOneBit(n);
+  }
+
+  public static int highestBit(int n) {
+    return Integer.highestOneBit(n);
   }
 
   public static int log2Floor(long n) {
@@ -34,16 +42,6 @@ public class Bits {
   public static int log2Ceil(long n) {
     int log2 = log2Floor(n);
     return isPowerOfTwo(n) ? log2 : log2 + 1;
-  }
-
-  public static long highestBit(long n, long estimate) {
-    long x = n & ~(estimate - 1);
-    long m;
-    while (true) {
-      m = lowestBit(x);
-      if (x == m) return m;
-      x -= m;
-    }
   }
 
   public static long maskBelow(int bits) {
@@ -64,10 +62,6 @@ public class Bits {
 
   public static boolean isPowerOfTwo(long n) {
     return (n & (n - 1)) == 0;
-  }
-
-  public static int nextBit(long n, int offset) {
-    return bitOffset(lowestBit(n & ~maskBelow(offset)));
   }
 
 }

@@ -64,4 +64,25 @@ public class Util {
     };
   }
 
+  static PrimitiveIterator.OfInt reverseMasks(int bitmap) {
+    long start = 1L << startIndex(bitmap);
+    long end = 1L << endIndex(bitmap);
+
+    return new PrimitiveIterator.OfInt() {
+      long mask = end;
+      @Override
+      public int nextInt() {
+        long result = mask;
+        mask >>= 1;
+        return (int) result;
+      }
+
+      @Override
+      public boolean hasNext() {
+        return mask >= start;
+      }
+    };
+  }
+
+
 }

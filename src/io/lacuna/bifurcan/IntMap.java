@@ -29,6 +29,10 @@ public class IntMap<V> implements IMap<Long, V> {
     this.linear = linear;
   }
 
+  public IntMap<V> put(long key, V value) {
+    return put(key, value, (ValueMerger<V>) Maps.MERGE_LAST_WRITE_WINS);
+  }
+
   public IntMap<V> put(long key, V value, ValueMerger<V> merge) {
     if (key < 0) {
       Node<V> negPrime = neg.put(editor, key, value, merge);
@@ -51,6 +55,11 @@ public class IntMap<V> implements IMap<Long, V> {
         return new IntMap<>(neg, posPrime, false);
       }
     }
+  }
+
+  @Override
+  public IntMap<V> put(Long key, V value) {
+    return put(key, value, (ValueMerger<V>) Maps.MERGE_LAST_WRITE_WINS);
   }
 
   @Override
@@ -112,6 +121,32 @@ public class IntMap<V> implements IMap<Long, V> {
         l -> new IteratorStack<>(neg.iterator(), pos.iterator()));
   }
 
+  public IEntry<Long, V> floor(long key) {
+    if (key < 0) {
+      return neg.floor(key);
+    } else {
+      IEntry<Long, V> entry = pos.floor(key);
+      if (entry != null) {
+        return entry;
+      } else {
+        return neg.size() > 0 ? neg.nth(pos.size() - 1) : null;
+      }
+    }
+  }
+
+  public IEntry<Long, V> ceil(long key) {
+    if (key >= 0) {
+      return pos.ceil(key);
+    } else {
+      IEntry<Long, V> entry = neg.ceil(key);
+      if (entry != null) {
+        return entry;
+      } else {
+        return pos.size() > 0 ? pos.nth(0) : null;
+      }
+    }
+  }
+
   @Override
   public long size() {
     return neg.size() + pos.size();
@@ -123,12 +158,12 @@ public class IntMap<V> implements IMap<Long, V> {
   }
 
   @Override
-  public IMap<Long, V> forked() {
+  public IntMap<V> forked() {
     return linear ? new IntMap<V>(neg, pos, false) : this;
   }
 
   @Override
-  public IMap<Long, V> linear() {
+  public IntMap<V> linear() {
     return linear ? this : new IntMap<V>(neg, pos, true);
   }
 

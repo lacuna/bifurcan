@@ -5,6 +5,7 @@ import io.lacuna.bifurcan.IMap;
 import io.lacuna.bifurcan.IMap.IEntry;
 import io.lacuna.bifurcan.LinearList;
 import io.lacuna.bifurcan.Maps;
+import io.lacuna.bifurcan.utils.Bits;
 import io.lacuna.bifurcan.utils.IteratorStack;
 
 import java.util.Iterator;
@@ -15,6 +16,7 @@ import static io.lacuna.bifurcan.utils.Bits.bitOffset;
 import static io.lacuna.bifurcan.utils.Bits.highestBit;
 import static io.lacuna.bifurcan.utils.Bits.lowestBit;
 import static java.lang.Integer.bitCount;
+import static java.lang.Integer.highestOneBit;
 import static java.lang.System.arraycopy;
 
 /**
@@ -23,7 +25,7 @@ import static java.lang.System.arraycopy;
 public class IntMapNodes {
 
   public static int offset(long a, long b) {
-    return bitOffset(highestBit(a ^ b, 1)) & ~0x3;
+    return bitOffset(highestBit(a ^ b)) & ~0x3;
   }
 
   private static boolean overlap(long min0, long max0, long min1, long max1) {
@@ -96,18 +98,20 @@ public class IntMapNodes {
       return compressedIndex(nodemap, mask);
     }
 
+    private long min() {
+      return prefix & ~(offset == 60 ? -1 : ((1L << (offset + 4)) - 1));
+    }
+
+    private long max() {
+      return prefix | (offset == 60 ? -1 : ((1L << (offset + 4)) - 1));
+    }
+
     private boolean overlap(long min, long max) {
-      long mask = ((1L << (offset + 4)) - 1);
-      long nMin = prefix & ~mask;
-      long nMax = prefix | mask;
-      return IntMapNodes.overlap(min, max, nMin, nMax);
+      return IntMapNodes.overlap(min, max, min(), max());
     }
 
     private boolean contains(long min, long max) {
-      long mask = ((1L << (offset + 4)) - 1);
-      long nMin = prefix & ~mask;
-      long nMax = prefix | mask;
-      return min <= nMin && nMax <= max;
+      return min() <= min && max <= max();
     }
 
     private Node<V> node(int mask) {
@@ -116,6 +120,10 @@ public class IntMapNodes {
 
     private PrimitiveIterator.OfInt masks() {
       return Util.masks(nodemap | datamap);
+    }
+
+    private PrimitiveIterator.OfInt reverseMasks() {
+      return Util.reverseMasks(nodemap | datamap);
     }
 
     public IEntry<Long, V> nth(int idx) {
@@ -141,6 +149,83 @@ public class IntMapNodes {
       throw new IndexOutOfBoundsException();
     }
 
+    public IEntry<Long, V> floor(long key) {
+
+      // all possible values are higher than the key
+      if (min() > key) {
+        return null;
+
+        // all possible values are lower than the key
+      } else if (max() < key) {
+        int mask = Bits.highestBit(nodemap | datamap);
+        if (isEntry(mask)) {
+          int idx = entryIndex(mask);
+          return new Maps.Entry<>(keys[idx], (V) content[idx]);
+        } else {
+          return node(mask).floor(key);
+        }
+
+        // somewhere in between
+      } else {
+        PrimitiveIterator.OfInt masks = reverseMasks();
+        while (masks.hasNext()) {
+          int mask = masks.next();
+          if (isEntry(mask)) {
+            int idx = entryIndex(mask);
+            if (keys[idx] <= key) {
+              return new Maps.Entry<>(keys[idx], (V) content[idx]);
+            }
+          } else if (isNode(mask)) {
+            IEntry<Long, V> entry = node(mask).floor(key);
+            if (entry != null) {
+              return entry;
+            }
+          }
+        }
+      }
+
+      return null;
+    }
+
+    public IEntry<Long, V> ceil(long key) {
+
+      // all possible values are lower than the key
+      if (max() < key) {
+        return null;
+
+        // all possible values are higher than the key
+      } else if (min() > key) {
+        int mask = Bits.lowestBit(nodemap | datamap);
+        if (isEntry(mask)) {
+          int idx = entryIndex(mask);
+          return new Maps.Entry<>(keys[idx], (V) content[idx]);
+        } else {
+          return node(mask).ceil(key);
+        }
+
+        // somewhere in between
+      } else {
+        PrimitiveIterator.OfInt masks = masks();
+        while (masks.hasNext()) {
+          int mask = masks.next();
+          if (isEntry(mask)) {
+            int idx = entryIndex(mask);
+            if (keys[idx] >= key) {
+              return new Maps.Entry<>(keys[idx], (V) content[idx]);
+            }
+          } else if (isNode(mask)) {
+            IEntry<Long, V> entry = node(mask).ceil(key);
+            if (entry != null) {
+              return entry;
+            }
+          }
+        }
+      }
+
+      return null;
+    }
+
+
     public Node<V> range(Object editor, long min, long max) {
 
       if (offset < 60 && !overlap(min, max)) {
@@ -158,7 +243,6 @@ public class IntMapNodes {
           int idx = entryIndex(mask);
           n = n.put(editor, keys[idx], (V) content[idx], null);
         } else if (isNode(mask)) {
-          // TODO: change to putNode
           n = n.putNode(mask, node(mask).range(editor, min, max));
         }
       }
