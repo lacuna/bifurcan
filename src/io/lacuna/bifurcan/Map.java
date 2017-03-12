@@ -194,12 +194,20 @@ public class Map<K, V> implements IMap<K, V> {
   }
 
   @Override
+  public boolean equals(IMap<K, V> m, BiPredicate<V, V> valEquals) {
+    if (m instanceof Map) {
+      return root.equals(((Map<K, V>) m).root, equalsFn, valEquals);
+    } else {
+      return Maps.equals(this, m, valEquals);
+    }
+  }
+
+  @Override
   public boolean equals(Object obj) {
     if (obj instanceof IMap) {
-      return Maps.equals(this, (IMap<K, V>) obj);
-    } else {
-      return false;
+      return equals((IMap<K, V>) obj);
     }
+    return false;
   }
 
   @Override

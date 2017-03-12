@@ -90,18 +90,18 @@
 ;;;
 
 (defn list-actions []
-  {:add-first (u/action [gen/pos-int] #(cons %2 %1) list-add-first)
-   :add-last (u/action [gen/pos-int] #(conj (vec %1) %2) list-add-last)
-   :remove-first (u/action [] rest list-remove-first)
-   :remove-last (u/action [] butlast list-remove-last)})
+  {:add-first (u/action [gen/pos-int] list-add-first #(cons %2 %1))
+   :add-last (u/action [gen/pos-int] list-add-last #(conj (vec %1) %2))
+   :remove-first (u/action [] list-remove-first #(or (rest %) []))
+   :remove-last (u/action [] list-remove-last #(or (butlast %) []))})
 
 (defn map-actions []
-  {:put    (u/action [gen/large-integer gen/pos-int] assoc! map-put)
-   :remove (u/action [gen/large-integer] dissoc! map-remove)})
+  {:put    (u/action [gen/large-integer gen/pos-int] map-put assoc!)
+   :remove (u/action [gen/large-integer] map-remove dissoc!)})
 
 (defn set-actions []
-  {:add    (u/action [gen/large-integer] conj set-add)
-   :remove (u/action [gen/large-integer] disj set-remove)})
+  {:add    (u/action [gen/large-integer] set-add conj)
+   :remove (u/action [gen/large-integer] set-remove disj)})
 
 (defn construct-lists [actions]
   (let [[a b] (u/apply-actions
@@ -120,46 +120,44 @@
     [a b]))
 
 (u/def-collection-check test-linear-map 1e4 (map-actions)
-  [m (transient {})
-   m' (LinearMap.)]
+  [m' (LinearMap.)
+   m (transient {})]
   (map= (persistent! m) m'))
 
 (u/def-collection-check test-map 1e4 (map-actions)
-  [m (transient {})
-   m' (.linear (Map.))]
+  [m' (.linear (Map.))
+   m (transient {})]
   (map= (persistent! m) m'))
 
 (u/def-collection-check test-int-map 1e4 (map-actions)
-  [m (transient {})
-   m' (.linear (IntMap.))]
+  [m' (.linear (IntMap.))
+   m (transient {})]
   (map= (persistent! m) m'))
 
 (u/def-collection-check test-linear-set 1e4 (set-actions)
-  [s #{}
-   s' (LinearSet.)]
+  [s' (LinearSet.)
+   s #{}]
   (set= s s'))
 
 (u/def-collection-check test-set 1e4 (set-actions)
-  [s #{}
-   s' (Set.)]
+  [s' (Set.)
+   s #{}]
   (set= s s'))
 
 (u/def-collection-check test-linear-list 1e4 (list-actions)
-  [v []
-   l (LinearList.)]
+  [l (LinearList.)
+   v []]
   (list= v l))
 
 (u/def-collection-check test-list 1e4 (list-actions)
-  [v []
-   l (List.)]
+  [l (List.)
+   v []]
   (list= v l))
 
 (u/def-collection-check test-linear-map-merge 1e4 (map-actions)
-  [m (transient {})
-   m' (LinearMap.)]
+  [m' (LinearMap.)]
   (= m' (->> (.split ^IMap m' 8) (reduce #(.union ^IMap %1 %2)))))
 
 (u/def-collection-check test-map-merge 1e4 (map-actions)
-  [m (transient {})
-   m' (Map.)]
-  (= m' (->> (.split ^IMap m' 8) (reduce (fn ([x] x) ([x y] (.union ^IMap x y)))))))
+  [m' (Map.)]
+  (= m' (->> (.split ^IMap m' 8) (reduce #(.union ^IMap %1 %2)))))

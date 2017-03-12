@@ -7,8 +7,10 @@ import io.lacuna.bifurcan.LinearList;
 import io.lacuna.bifurcan.Maps;
 import io.lacuna.bifurcan.utils.Bits;
 
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.PrimitiveIterator;
+import java.util.function.BiPredicate;
 import java.util.function.BinaryOperator;
 
 import static io.lacuna.bifurcan.nodes.Util.compressedIndex;
@@ -211,7 +213,6 @@ public class IntMapNodes {
       return null;
     }
 
-
     public Node<V> range(Object editor, long min, long max) {
 
       if (offset < 60 && !overlap(min, max)) {
@@ -385,6 +386,27 @@ public class IntMapNodes {
       }
 
       return this;
+    }
+
+    public boolean equals(Node<V> n, BiPredicate<V, V> equalsFn) {
+      if (datamap == n.datamap && nodemap == n.nodemap && Arrays.equals(keys, n.keys)) {
+        int numEntries = bitCount(datamap);
+        for (int i = 0; i < numEntries; i++) {
+          if (!equalsFn.test((V) content[i], (V) n.content[i])) {
+            return false;
+          }
+        }
+
+        for (int i = content.length - 1 - bitCount(nodemap); i < content.length; i++) {
+          Node<V> child = (Node<V>) content[i];
+          if (!child.equals((Node<V>) n.content[i], equalsFn)) {
+            return false;
+          }
+        }
+
+        return true;
+      }
+      return false;
     }
 
     ///

@@ -24,12 +24,12 @@
       [a b]
       (let [[action & args] (first s)
             {:keys [fa fb]} (get actions->generator action)]
-        (recur (apply fa a args) (apply fb b args) (rest s))))))
+        (recur (when a (apply fa a args)) (when b (apply fb b args)) (rest s))))))
 
 (defmacro def-collection-check
   [name num-checks action-spec [a a-gen, b b-gen] & predicate]
   `(defspec ~name ~num-checks
      (let [a# ~action-spec]
        (prop/for-all [actions# (actions->generator a#)]
-         (let [[~a ~b] (apply-actions a# actions# ~a-gen ~b-gen)]
+         (let [[~a ~(or b '_)] (apply-actions a# actions# ~a-gen ~b-gen)]
            ~@predicate)))))

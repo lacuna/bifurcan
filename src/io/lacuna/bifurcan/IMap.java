@@ -1,7 +1,9 @@
 package io.lacuna.bifurcan;
 
 import java.util.Iterator;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.function.BiPredicate;
 import java.util.function.BinaryOperator;
 
 /**
@@ -18,6 +20,10 @@ public interface IMap<K, V> extends
     K key();
 
     V value();
+
+    default boolean equals(IEntry<K, V> o, BiPredicate<K, K> keyEquals, BiPredicate<V, V> valEquals) {
+      return keyEquals.test(key(), o.key()) && valEquals.test(value(), o.value());
+    }
   }
 
   V get(K key, V defaultValue);
@@ -152,6 +158,14 @@ public interface IMap<K, V> extends
         .stream()
         .map(ks -> Maps.from(ks, k -> get(k, null)))
         .collect(Lists.collector());
+  }
+
+  default boolean equals(IMap<K, V> m) {
+    return equals(m, Objects::equals);
+  }
+
+  default boolean equals(IMap<K, V> m, BiPredicate<V, V> valEquals) {
+    return Maps.equals(this, m, valEquals);
   }
 
 }

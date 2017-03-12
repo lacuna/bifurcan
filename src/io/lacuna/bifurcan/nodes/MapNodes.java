@@ -1,6 +1,7 @@
 package io.lacuna.bifurcan.nodes;
 
 import io.lacuna.bifurcan.*;
+import io.lacuna.bifurcan.IMap.IEntry;
 import io.lacuna.bifurcan.utils.ArrayVector;
 
 import java.util.Iterator;
@@ -83,9 +84,11 @@ public class MapNodes {
 
     long size();
 
-    IMap.IEntry<K, V> nth(long idx);
+    IEntry<K, V> nth(long idx);
 
-    Iterable<IMap.IEntry<K, V>> entries();
+    Iterable<IEntry<K, V>> entries();
+
+    boolean equals(INode<K, V> n, BiPredicate<K, K> keyEquals, BiPredicate<V, V> valEquals);
   }
 
   public static class Node<K, V> implements INode<K, V> {
@@ -116,7 +119,7 @@ public class MapNodes {
     }
 
     @Override
-    public IMap.IEntry<K, V> nth(long idx) {
+    public IEntry<K, V> nth(long idx) {
 
       // see if the entry is local to this node
       int entries = Integer.bitCount(datamap);
@@ -141,9 +144,9 @@ public class MapNodes {
     }
 
     @Override
-    public Iterable<IMap.IEntry<K, V>> entries() {
+    public Iterable<IEntry<K, V>> entries() {
       int numEntries = bitCount(datamap);
-      return () -> new Iterator<IMap.IEntry<K, V>>() {
+      return () -> new Iterator<IEntry<K, V>>() {
 
         int idx = 0;
 
@@ -153,7 +156,7 @@ public class MapNodes {
         }
 
         @Override
-        public IMap.IEntry<K, V> next() {
+        public IEntry<K, V> next() {
           int entryIdx = idx++ << 1;
           return new Maps.Entry<>((K) content[entryIdx], (V) content[entryIdx + 1]);
         }
@@ -277,7 +280,7 @@ public class MapNodes {
             case 0:
               return n.removeNode(mask);
             case 1:
-              IMap.IEntry<K, V> e = nodePrime.nth(0);
+              IEntry<K, V> e = nodePrime.nth(0);
               return n.removeNode(mask).putEntry(mask, nodePrime.hash(0), e.key(), e.value());
             default:
               return n.setNode(mask, nodePrime);
@@ -290,12 +293,12 @@ public class MapNodes {
       }
     }
 
-    public Iterator<IMap.IEntry<K, V>> iterator() {
+    public Iterator<IEntry<K, V>> iterator() {
 
-      return new Iterator<IMap.IEntry<K, V>>() {
+      return new Iterator<IEntry<K, V>>() {
 
         final IList<INode<K, V>> nodes = LinearList.from(nodes());
-        Iterator<IMap.IEntry<K, V>> iterator = entries().iterator();
+        Iterator<IEntry<K, V>> iterator = entries().iterator();
 
         @Override
         public boolean hasNext() {
@@ -303,7 +306,7 @@ public class MapNodes {
         }
 
         @Override
-        public IMap.IEntry<K, V> next() {
+        public IEntry<K, V> next() {
           while (!iterator.hasNext()) {
             INode<K, V> node = nodes.first();
             nodes.removeFirst();
@@ -316,6 +319,33 @@ public class MapNodes {
           return iterator.next();
         }
       };
+    }
+
+    public boolean equals(INode<K, V> o, BiPredicate<K, K> keyEquals, BiPredicate<V, V> valEquals) {
+      if (o instanceof Node) {
+        Node<K, V> n = (Node<K, V>) o;
+        if (n.datamap == datamap && n.nodemap == nodemap) {
+          Iterator<IEntry<K, V>> ea = entries().iterator();
+          Iterator<IEntry<K, V>> eb = n.entries().iterator();
+          while (ea.hasNext()) {
+            if (!ea.next().equals(eb.next(), keyEquals, valEquals)) {
+              return false;
+            }
+          }
+
+          Iterator<INode<K, V>> na = nodes().iterator();
+          Iterator<INode<K, V>> nb = n.nodes().iterator();
+          while (na.hasNext()) {
+            if (!na.next().equals(nb.next(), keyEquals, valEquals)) {
+              return false;
+            }
+          }
+
+          return true;
+        }
+      }
+
+      return false;
     }
 
     /////
@@ -331,7 +361,6 @@ public class MapNodes {
 
       return node;
     }
-
 
     private Iterable<INode<K, V>> nodes() {
       return () -> new Iterator<INode<K, V>>() {
@@ -530,13 +559,34 @@ public class MapNodes {
     }
 
     @Override
-    public IMap.IEntry<K, V> nth(long idx) {
+    public IEntry<K, V> nth(long idx) {
       int i = (int) idx << 1;
       return new Maps.Entry<>((K) entries[i], (V) entries[i + 1]);
     }
 
-    public Iterable<IMap.IEntry<K, V>> entries() {
-      return () -> new Iterator<IMap.IEntry<K, V>>() {
+    @Override
+    public boolean equals(INode<K, V> o, BiPredicate<K, K> keyEquals, BiPredicate<V, V> valEquals) {
+      if (o instanceof Collision) {
+        Collision<K, V> n = (Collision<K, V>) o;
+        if (n.size() == size()) {
+          Iterator<IEntry<K, V>> it = entries().iterator();
+          while (it.hasNext()) {
+            IEntry<K, V> e = it.next();
+            int idx = n.indexOf(e.key(), keyEquals);
+            if (idx < 0 || !valEquals.test(e.value(), (V) entries[idx + 1])) {
+              return false;
+            }
+          }
+
+          return true;
+        }
+      }
+
+      return false;
+    }
+
+    public Iterable<IEntry<K, V>> entries() {
+      return () -> new Iterator<IEntry<K, V>>() {
         int idx = 0;
         @Override
         public boolean hasNext() {
@@ -544,7 +594,7 @@ public class MapNodes {
         }
 
         @Override
-        public IMap.IEntry<K, V> next() {
+        public IEntry<K, V> next() {
           idx += 2;
           return new Maps.Entry<K, V>((K) entries[idx - 2], (V) entries[idx - 1]);
         }

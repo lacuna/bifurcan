@@ -10,7 +10,7 @@ import java.util.function.ToIntFunction;
  */
 public class Set<V> implements ISet<V> {
 
-  Map<V, ?> map;
+  Map<V, Void> map;
 
   public Set() {
     this(Objects::hashCode, Objects::equals);
@@ -20,7 +20,7 @@ public class Set<V> implements ISet<V> {
     map = new Map<V, Void>(hashFn, equalsFn);
   }
 
-  private Set(Map<V, ?> map) {
+  private Set(Map<V, Void> map) {
     this.map = map;
   }
 
@@ -42,7 +42,7 @@ public class Set<V> implements ISet<V> {
 
   @Override
   public Set<V> add(V value) {
-    Map<V, ?> mapPrime = map.put(value, null);
+    Map<V, Void> mapPrime = map.put(value, null);
     if (map.isLinear()) {
       map = mapPrime;
       return this;
@@ -53,7 +53,7 @@ public class Set<V> implements ISet<V> {
 
   @Override
   public Set<V> remove(V value) {
-    Map<V, ?> mapPrime = map.remove(value);
+    Map<V, Void> mapPrime = map.remove(value);
     if (map.isLinear()) {
       map = mapPrime;
       return this;
@@ -110,7 +110,9 @@ public class Set<V> implements ISet<V> {
 
   @Override
   public boolean equals(Object obj) {
-    if (obj instanceof ISet) {
+    if (obj instanceof Set) {
+      return map.equals(((Set<V>) obj).map, (a, b) -> true);
+    } else if (obj instanceof ISet) {
       return Sets.equals(this, (ISet<V>) obj);
     } else {
       return false;

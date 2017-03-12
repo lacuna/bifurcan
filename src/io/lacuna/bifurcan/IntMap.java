@@ -4,7 +4,9 @@ import io.lacuna.bifurcan.nodes.IntMapNodes;
 import io.lacuna.bifurcan.nodes.IntMapNodes.Node;
 import io.lacuna.bifurcan.utils.IteratorStack;
 
+import java.util.Objects;
 import java.util.Optional;
+import java.util.function.BiPredicate;
 import java.util.function.BinaryOperator;
 
 /**
@@ -175,9 +177,19 @@ public class IntMap<V> implements IMap<Long, V> {
   }
 
   @Override
+  public boolean equals(IMap<Long, V> o, BiPredicate<V, V> valEquals) {
+    if (o instanceof IntMap) {
+      IntMap<V> m = (IntMap<V>) o;
+      return neg.equals(m.neg, valEquals) && pos.equals(m.pos, valEquals);
+    } else {
+      return Maps.equals(this, o, valEquals);
+    }
+  }
+
+  @Override
   public boolean equals(Object obj) {
     if (obj instanceof IMap) {
-      return Maps.equals(this, (IMap<Long, V>) obj);
+      return equals((IMap<Long, V>) obj, Objects::equals);
     } else {
       return false;
     }
