@@ -6,17 +6,15 @@ import io.lacuna.bifurcan.IMap.IEntry;
 import io.lacuna.bifurcan.LinearList;
 import io.lacuna.bifurcan.Maps;
 import io.lacuna.bifurcan.utils.Bits;
-import io.lacuna.bifurcan.utils.IteratorStack;
 
 import java.util.Iterator;
 import java.util.PrimitiveIterator;
+import java.util.function.BinaryOperator;
 
 import static io.lacuna.bifurcan.nodes.Util.compressedIndex;
 import static io.lacuna.bifurcan.utils.Bits.bitOffset;
 import static io.lacuna.bifurcan.utils.Bits.highestBit;
-import static io.lacuna.bifurcan.utils.Bits.lowestBit;
 import static java.lang.Integer.bitCount;
-import static java.lang.Integer.highestOneBit;
 import static java.lang.System.arraycopy;
 
 /**
@@ -30,18 +28,6 @@ public class IntMapNodes {
 
   private static boolean overlap(long min0, long max0, long min1, long max1) {
     return (max1 - min0) >= 0 && (max0 - min1) >= 0;
-  }
-
-  static long keyMask(long key, int shift) {
-    return 1L << ((key >>> shift) & 15);
-  }
-
-  private static int startIndex(int bitmap) {
-    return bitOffset(lowestBit(bitmap));
-  }
-
-  private static int endIndex(int bitmap) {
-    return bitOffset(highestBit(bitmap));
   }
 
   public static class Node<V> {
@@ -290,7 +276,7 @@ public class IntMapNodes {
       return size;
     }
 
-    public Node<V> merge(Object editor, Node<V> node, IMap.ValueMerger<V> mergeFn) {
+    public Node<V> merge(Object editor, Node<V> node, BinaryOperator<V> mergeFn) {
 
       if (editor != this.editor) {
         return clone(editor).merge(editor, node, mergeFn);
@@ -310,14 +296,14 @@ public class IntMapNodes {
         int mask = mask(node.prefix);
         if (isEntry(mask)) {
           int idx = entryIndex(mask);
-          return node.put(editor, keys[idx], (V) content[idx], (a, b) -> mergeFn.merge(b, a));
+          return node.put(editor, keys[idx], (V) content[idx], (a, b) -> mergeFn.apply(b, a));
         } else if (isNode(mask)) {
           return setNode(mask, node(mask).merge(editor, node, mergeFn));
         } else {
           return setNode(mask, node);
         }
       } else if (offset < node.offset) {
-        return node.merge(editor, this, (x, y) -> mergeFn.merge(y, x));
+        return node.merge(editor, this, (x, y) -> mergeFn.apply(y, x));
       } else {
         // TODO
         return null;
@@ -332,7 +318,7 @@ public class IntMapNodes {
       return null;
     }
 
-    public Node<V> put(Object editor, long k, V v, IMap.ValueMerger<V> mergeFn) {
+    public Node<V> put(Object editor, long k, V v, BinaryOperator<V> mergeFn) {
 
       if (editor != this.editor) {
         return clone(editor).put(editor, k, v, mergeFn);
@@ -355,7 +341,7 @@ public class IntMapNodes {
         if (isEntry(mask)) {
           int idx = entryIndex(mask);
           if (k == keys[idx]) {
-            content[idx] = mergeFn.merge((V) content[idx], v);
+            content[idx] = mergeFn.apply((V) content[idx], v);
             return this;
           } else {
             Node<V> n = new Node<V>(editor, k, offset(k, keys[idx]));

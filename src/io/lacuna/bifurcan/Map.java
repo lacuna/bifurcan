@@ -6,6 +6,7 @@ import io.lacuna.bifurcan.nodes.MapNodes.Node;
 import java.util.Iterator;
 import java.util.Objects;
 import java.util.function.BiPredicate;
+import java.util.function.BinaryOperator;
 import java.util.function.ToIntFunction;
 
 /**
@@ -48,7 +49,12 @@ public class Map<K, V> implements IMap<K, V> {
   }
 
   @Override
-  public IMap<K, V> put(K key, V value, ValueMerger<V> merge) {
+  public Map<K, V> put(K key, V value) {
+    return put(key, value, (BinaryOperator<V>) Maps.MERGE_LAST_WRITE_WINS);
+  }
+
+  @Override
+  public Map<K, V> put(K key, V value, BinaryOperator<V> merge) {
     Node<K, V> rootPrime = (Node<K, V>) root.put(0, editor, keyHash(key), key, value, equalsFn, merge);
 
     if (rootPrime == root) {
@@ -62,7 +68,7 @@ public class Map<K, V> implements IMap<K, V> {
   }
 
   @Override
-  public IMap<K, V> remove(K key) {
+  public Map<K, V> remove(K key) {
     Node<K, V> rootPrime = (Node<K, V>) root.remove(0, editor, keyHash(key), key, equalsFn);
 
     if (rootPrime == root) {
@@ -82,7 +88,7 @@ public class Map<K, V> implements IMap<K, V> {
 
   @Override
   public IList<IEntry<K, V>> entries() {
-    return Lists.from(size(), i -> root.nth(i), l -> iterator());
+    return Lists.from(size(), i -> root.nth(i), () -> iterator());
   }
 
   @Override
@@ -114,35 +120,41 @@ public class Map<K, V> implements IMap<K, V> {
   }
 
   @Override
-  public IMap<K, V> merge(IMap<K, V> b, ValueMerger<V> mergeFn) {
-    if (b instanceof Map) {
+  public Map<K, V> union(IMap<K, V> m) {
+    return merge(m, (BinaryOperator<V>) Maps.MERGE_LAST_WRITE_WINS);
+  }
+
+  @Override
+  public Map<K, V> merge(IMap<K, V> b, BinaryOperator<V> mergeFn) {
+    // TODO
+    if (false) /*(b instanceof Map)*/ {
       Node<K, V> rootPrime = MapNodes.merge(0, editor, root, ((Map) b).root, equalsFn, mergeFn);
       return linear ? this : new Map<>(rootPrime, hashFn, equalsFn, false);
     } else {
-      return Maps.merge(this, b, mergeFn);
+      return (Map<K, V>) Maps.merge(this, b, mergeFn);
     }
   }
 
   @Override
-  public IMap<K, V> difference(ISet<K> keys) {
+  public Map<K, V> difference(ISet<K> keys) {
     if (keys instanceof Set) {
-      return difference((IMap<K, ?>) ((Set) keys).map);
+      return difference(((Set<K>) keys).map);
     } else {
-      return Maps.difference(this, keys);
+      return (Map<K, V>) Maps.difference(this, keys);
     }
   }
 
   @Override
-  public IMap<K, V> intersection(ISet<K> keys) {
+  public Map<K, V> intersection(ISet<K> keys) {
     if (keys instanceof Set) {
-      return intersection((IMap<K, ?>) ((Set) keys).map);
+      return intersection(((Set<K>) keys).map);
     } else {
-      return Maps.intersection(new Map().linear(), this, keys).forked();
+      return (Map<K, V>) Maps.intersection(new Map<K, V>().linear(), this, keys).forked();
     }
   }
 
   @Override
-  public IMap<K, V> difference(IMap<K, ?> m) {
+  public Map<K, V> difference(IMap<K, ?> m) {
     if (m instanceof Map) {
       Node<K, V> rootPrime = MapNodes.difference(0, editor, root, ((Map) m).root, equalsFn);
       return linear ? this : new Map<>(rootPrime, hashFn, equalsFn, false);
@@ -152,7 +164,7 @@ public class Map<K, V> implements IMap<K, V> {
   }
 
   @Override
-  public IMap<K, V> intersection(IMap<K, ?> m) {
+  public Map<K, V> intersection(IMap<K, ?> m) {
     if (m instanceof Map) {
       Node<K, V> rootPrime = MapNodes.intersection(0, editor, root, ((Map) m).root, equalsFn);
       return linear ? this : new Map<>(rootPrime, hashFn, equalsFn, false);

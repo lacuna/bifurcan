@@ -10,7 +10,7 @@ import java.util.function.ToIntFunction;
  */
 public class Set<V> implements ISet<V> {
 
-  IMap<V, ?> map;
+  Map<V, ?> map;
 
   public Set() {
     this(Objects::hashCode, Objects::equals);
@@ -20,7 +20,7 @@ public class Set<V> implements ISet<V> {
     map = new Map<V, Void>(hashFn, equalsFn);
   }
 
-  private Set(IMap<V, ?> map) {
+  private Set(Map<V, ?> map) {
     this.map = map;
   }
 
@@ -37,12 +37,12 @@ public class Set<V> implements ISet<V> {
   @Override
   public IList<V> elements() {
     IList<IMap.IEntry> entries = ((IMap) map).entries();
-    return Lists.from(size(), i -> (V) entries.nth(i).key(), l -> iterator());
+    return Lists.from(size(), i -> (V) entries.nth(i).key(), () -> iterator());
   }
 
   @Override
-  public ISet<V> add(V value) {
-    IMap<V, ?> mapPrime = map.put(value, null);
+  public Set<V> add(V value) {
+    Map<V, ?> mapPrime = map.put(value, null);
     if (map.isLinear()) {
       map = mapPrime;
       return this;
@@ -52,8 +52,8 @@ public class Set<V> implements ISet<V> {
   }
 
   @Override
-  public ISet<V> remove(V value) {
-    IMap<V, ?> mapPrime = map.remove(value);
+  public Set<V> remove(V value) {
+    Map<V, ?> mapPrime = map.remove(value);
     if (map.isLinear()) {
       map = mapPrime;
       return this;
@@ -79,18 +79,28 @@ public class Set<V> implements ISet<V> {
   }
 
   @Override
-  public ISet<V> union(ISet<V> s) {
+  public Set<V> union(ISet<V> s) {
     return null;
   }
 
   @Override
-  public ISet<V> difference(ISet<V> s) {
+  public Set<V> difference(ISet<V> s) {
     return null;
   }
 
   @Override
-  public ISet<V> intersection(ISet<V> s) {
+  public Set<V> intersection(ISet<V> s) {
     return null;
+  }
+
+  @Override
+  public Set<V> forked() {
+    return map.isLinear() ? new Set<V>(map.forked()) : this;
+  }
+
+  @Override
+  public Set<V> linear() {
+    return map.isLinear() ? this : new Set<V>(map.linear());
   }
 
   @Override

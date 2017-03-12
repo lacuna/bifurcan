@@ -2,12 +2,11 @@ package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.IMap.IEntry;
 
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.Set;
 import java.util.function.*;
+import java.util.stream.Collector;
+import java.util.stream.Collectors;
 
 import static io.lacuna.bifurcan.Lists.lazyMap;
 
@@ -19,7 +18,7 @@ public class Maps {
 
   private static final Object DEFAULT_VALUE = new Object();
 
-  public static IMap.ValueMerger MERGE_LAST_WRITE_WINS = (a, b) -> b;
+  public static BinaryOperator MERGE_LAST_WRITE_WINS = (a, b) -> b;
 
   public static class Entry<K, V> implements IEntry<K, V> {
     public final K key;
@@ -317,14 +316,79 @@ public class Maps {
     return accumulator;
   }
 
-  static <K, V> IMap<K, V> merge(IMap<K, V> a, IMap<K, V> b, IMap.ValueMerger<V> mergeFn) {
-    if (a.size() < b.size()) {
-      return merge(b, a, (x, y) -> mergeFn.merge(y, x));
-    } else {
-      for (IEntry<K, V> e : b.entries()) {
-        a = a.put(e.key(), e.value(), mergeFn);
-      }
-      return a;
+  static <K, V> IMap<K, V> merge(IMap<K, V> a, IMap<K, V> b, BinaryOperator<V> mergeFn) {
+    for (IEntry<K, V> e : b.entries()) {
+      a = a.put(e.key(), e.value(), mergeFn);
     }
+    return a;
+  }
+
+  public static <T, K, V> Collector<T, LinearMap<K, V>, LinearMap<K, V>> linearCollector(Function<T, K> keyFn, Function<T, V> valFn) {
+    return linearCollector(keyFn, valFn, Maps.MERGE_LAST_WRITE_WINS);
+  }
+
+  public static <T, K, V> Collector<T, LinearMap<K, V>, LinearMap<K, V>> linearCollector(
+      Function<T, K> keyFn,
+      Function<T, V> valFn,
+      BinaryOperator<V> mergeFn) {
+    return new Collector<T, LinearMap<K, V>, LinearMap<K, V>>() {
+      @Override
+      public Supplier<LinearMap<K, V>> supplier() {
+        return LinearMap::new;
+      }
+
+      @Override
+      public BiConsumer<LinearMap<K, V>, T> accumulator() {
+        return (m, e) -> m.put(keyFn.apply(e), valFn.apply(e));
+      }
+
+      @Override
+      public BinaryOperator<LinearMap<K, V>> combiner() {
+        return (a, b) -> a.merge(b, mergeFn);
+      }
+
+      @Override
+      public Function<LinearMap<K, V>, LinearMap<K, V>> finisher() {
+        return x -> x;
+      }
+
+      @Override
+      public Set<Characteristics> characteristics() {
+        return EnumSet.of(Characteristics.IDENTITY_FINISH);
+      }
+    };
+  }
+
+  public static <T, K, V> Collector<T, Map<K, V>, Map<K, V>> collector(Function<T, K> keyFn, Function<T, V> valFn) {
+    return collector(keyFn, valFn, Maps.MERGE_LAST_WRITE_WINS);
+  }
+
+  public static <T, K, V> Collector<T, Map<K, V>, Map<K, V>> collector(Function<T, K> keyFn, Function<T, V> valFn, BinaryOperator<V> mergeFn) {
+    return new Collector<T, Map<K, V>, Map<K, V>>() {
+      @Override
+      public Supplier<Map<K, V>> supplier() {
+        return () -> new Map<K, V>().linear();
+      }
+
+      @Override
+      public BiConsumer<Map<K, V>, T> accumulator() {
+        return (m, e) -> m.put(keyFn.apply(e), valFn.apply(e));
+      }
+
+      @Override
+      public BinaryOperator<Map<K, V>> combiner() {
+        return (a, b) -> a.merge(b, mergeFn);
+      }
+
+      @Override
+      public Function<Map<K, V>, Map<K, V>> finisher() {
+        return Map::forked;
+      }
+
+      @Override
+      public Set<Characteristics> characteristics() {
+        return EnumSet.noneOf(Characteristics.class);
+      }
+    };
   }
 }

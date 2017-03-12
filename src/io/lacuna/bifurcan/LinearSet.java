@@ -73,7 +73,7 @@ public class LinearSet<V> implements ISet<V> {
   @Override
   public IList<V> elements() {
     IList<IMap.IEntry<V, Void>> entries = map.entries();
-    return Lists.from(entries.size(), i -> entries.nth(i).key(), l -> iterator());
+    return Lists.from(entries.size(), i -> entries.nth(i).key(), () -> iterator());
   }
 
   @Override
@@ -93,7 +93,7 @@ public class LinearSet<V> implements ISet<V> {
   }
 
   @Override
-  public ISet<V> union(ISet<V> s) {
+  public LinearSet<V> union(ISet<V> s) {
     if (s instanceof LinearSet) {
       map.union(((LinearSet<V>) s).map);
     } else {
@@ -105,7 +105,7 @@ public class LinearSet<V> implements ISet<V> {
   }
 
   @Override
-  public ISet<V> difference(ISet<V> s) {
+  public LinearSet<V> difference(ISet<V> s) {
     if (s instanceof LinearSet) {
       map.difference(((LinearSet<V>) s).map);
     } else {
@@ -117,7 +117,7 @@ public class LinearSet<V> implements ISet<V> {
   }
 
   @Override
-  public ISet<V> intersection(ISet<V> s) {
+  public LinearSet<V> intersection(ISet<V> s) {
     if (s instanceof LinearSet) {
       map.intersection(((LinearSet<V>) s).map);
     } else {
@@ -136,7 +136,7 @@ public class LinearSet<V> implements ISet<V> {
   }
 
   @Override
-  public ISet<V> linear() {
+  public LinearSet<V> linear() {
     return this;
   }
 

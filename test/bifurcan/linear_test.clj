@@ -12,8 +12,7 @@
     Collection]
    [io.lacuna.bifurcan.utils
     BitVector
-    Bits
-    SparseIntMap]
+    Bits]
    [io.lacuna.bifurcan
     IntMap
     Map

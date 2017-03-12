@@ -106,7 +106,7 @@ public class LinearMap<K, V> implements IMap<K, V> {
   }
 
   @Override
-  public LinearMap<K, V> put(K key, V value, IMap.ValueMerger<V> merge) {
+  public LinearMap<K, V> put(K key, V value, BinaryOperator<V> merge) {
     if ((size << 1) == entries.length) {
       resize(size << 1);
     }
@@ -164,7 +164,7 @@ public class LinearMap<K, V> implements IMap<K, V> {
           int idx = ((int) i) << 1;
           return new Maps.Entry<>((K) entries[idx], (V) entries[idx + 1]);
         },
-        l -> iterator());
+        () -> iterator());
   }
 
   @Override
@@ -274,7 +274,7 @@ public class LinearMap<K, V> implements IMap<K, V> {
   }
 
   @Override
-  public LinearMap<K, V> merge(IMap<K, V> o, ValueMerger<V> mergeFn) {
+  public LinearMap<K, V> merge(IMap<K, V> o, BinaryOperator<V> mergeFn) {
     if (o.size() == 0) {
       return this;
     } else if (o instanceof LinearMap) {
@@ -408,12 +408,12 @@ public class LinearMap<K, V> implements IMap<K, V> {
   }
 
   // factored out for better inlining
-  private boolean putCheckEquality(int idx, K key, V value, IMap.ValueMerger<V> mergeFn) {
+  private boolean putCheckEquality(int idx, K key, V value, BinaryOperator<V> mergeFn) {
     long row = table[idx];
     int keyIndex = Row.keyIndex(row);
     K currKey = (K) entries[keyIndex];
     if (equalsFn.test(key, currKey)) {
-      entries[keyIndex + 1] = mergeFn.merge((V) entries[keyIndex + 1], value);
+      entries[keyIndex + 1] = mergeFn.apply((V) entries[keyIndex + 1], value);
       table[idx] = Row.removeTombstone(row);
       return true;
     } else {
@@ -421,7 +421,7 @@ public class LinearMap<K, V> implements IMap<K, V> {
     }
   }
 
-  private void put(int hash, K key, V value, IMap.ValueMerger<V> mergeFn) {
+  private void put(int hash, K key, V value, BinaryOperator<V> mergeFn) {
     for (int idx = estimatedIndex(hash), dist = 0; ; idx = nextIndex(idx), dist++) {
       long row = table[idx];
       int currHash = Row.hash(row);

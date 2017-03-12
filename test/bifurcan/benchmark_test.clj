@@ -31,9 +31,7 @@
     LinearList
     LinearMap
     LinearSet
-    IMap$IEntry]
-   [io.lacuna.bifurcan.utils
-    SparseIntMap]))
+    IMap$IEntry]))
 
 (def clojure-hash
   (reify ToIntFunction
@@ -74,12 +72,6 @@
       (set! m (.put ^IMap m v nil)))
     m))
 
-(defn construct-sparse-int-map [^SparseIntMap m vs]
-  (let-mutable [m m]
-    (doary [v vs]
-      (set! m (.put ^SparseIntMap m v nil)))
-    m))
-
 (defn construct-hash-map [^HashMap m vs]
   (doary [v vs]
     (.put m v nil))
@@ -98,10 +90,6 @@
 (defn lookup-java-list [^java.util.List l ks]
   (doary [k ks]
     (.get l k)))
-
-(defn lookup-sparse-int-map [^SparseIntMap m ks]
-  (doary [k ks]
-    (.get m k)))
 
 (defn lookup-vector [v ks]
   (doary[k ks]
@@ -238,9 +226,7 @@
      :linear-map
      #_(benchmark-collection (fn [_] (LinearMap.)) generate-entries construct-map lookup-map (constantly true))
      :clojure-map
-     #_(benchmark-collection (fn [_] {}) generate-entries construct-clojure-map lookup-clojure-map (constantly true))
-     :sparse-int-map
-     #_(benchmark-collection (fn [_] SparseIntMap/EMPTY) generate-numbers construct-sparse-int-map lookup-sparse-int-map #{:construct :lookup :lookup-misses})]
+     #_(benchmark-collection (fn [_] {}) generate-entries construct-clojure-map lookup-clojure-map (constantly true))]
     ))
 
 (deftest ^:benchmark benchmark-collections
@@ -264,8 +250,6 @@
      (benchmark-collection (fn [_] (Map.)) generate-entries construct-map lookup-map (constantly true))
      :int-map
      (benchmark-collection (fn [_] (IntMap.)) generate-numbers construct-map lookup-map (constantly true))
-     :sparse-int-map
-     (benchmark-collection (fn [_] SparseIntMap/EMPTY) generate-numbers construct-sparse-int-map lookup-sparse-int-map #{:construct :lookup :lookup-misses})
 
      :hash-set
      (benchmark-collection (fn [_] (HashSet.)) generate-entries construct-hash-set lookup-hash-set (constantly true))

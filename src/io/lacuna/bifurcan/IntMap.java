@@ -5,6 +5,7 @@ import io.lacuna.bifurcan.nodes.IntMapNodes.Node;
 import io.lacuna.bifurcan.utils.IteratorStack;
 
 import java.util.Optional;
+import java.util.function.BinaryOperator;
 
 /**
  * @author ztellman
@@ -30,10 +31,10 @@ public class IntMap<V> implements IMap<Long, V> {
   }
 
   public IntMap<V> put(long key, V value) {
-    return put(key, value, (ValueMerger<V>) Maps.MERGE_LAST_WRITE_WINS);
+    return put(key, value, (BinaryOperator<V>) Maps.MERGE_LAST_WRITE_WINS);
   }
 
-  public IntMap<V> put(long key, V value, ValueMerger<V> merge) {
+  public IntMap<V> put(long key, V value, BinaryOperator<V> merge) {
     if (key < 0) {
       Node<V> negPrime = neg.put(editor, key, value, merge);
       if (neg == negPrime) {
@@ -59,11 +60,11 @@ public class IntMap<V> implements IMap<Long, V> {
 
   @Override
   public IntMap<V> put(Long key, V value) {
-    return put(key, value, (ValueMerger<V>) Maps.MERGE_LAST_WRITE_WINS);
+    return put(key, value, (BinaryOperator<V>) Maps.MERGE_LAST_WRITE_WINS);
   }
 
   @Override
-  public IntMap<V> put(Long key, V value, ValueMerger<V> merge) {
+  public IntMap<V> put(Long key, V value, BinaryOperator<V> merge) {
     return put((long) key, value, merge);
   }
 
@@ -116,9 +117,10 @@ public class IntMap<V> implements IMap<Long, V> {
 
   @Override
   public IList<IEntry<Long, V>> entries() {
-    return Lists.from(size(),
+    return Lists.from(
+        size(),
         i -> (i < neg.size()) ? neg.nth((int) i) : pos.nth((int) (i - neg.size())),
-        l -> new IteratorStack<>(neg.iterator(), pos.iterator()));
+        () -> new IteratorStack<>(neg.iterator(), pos.iterator()));
   }
 
   public IEntry<Long, V> floor(long key) {

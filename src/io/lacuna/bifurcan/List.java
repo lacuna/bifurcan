@@ -69,27 +69,27 @@ public class List<V> implements IList<V> {
   }
 
   @Override
-  public IList<V> addLast(V value) {
+  public List<V> addLast(V value) {
     return (linear ? this : clone()).pushLast(value);
   }
 
   @Override
-  public IList<V> addFirst(V value) {
+  public List<V> addFirst(V value) {
     return (linear ? this : clone()).pushFirst(value);
   }
 
   @Override
-  public IList<V> removeLast() {
+  public List<V> removeLast() {
     return (linear ? this : clone()).popLast();
   }
 
   @Override
-  public IList<V> removeFirst() {
+  public List<V> removeFirst() {
     return (linear ? this : clone()).popFirst();
   }
 
   @Override
-  public IList<V> set(long idx, V value) {
+  public List<V> set(long idx, V value) {
     int size = (int) size();
     if (idx < 0 || idx > size) {
       throw new IndexOutOfBoundsException();
@@ -150,7 +150,7 @@ public class List<V> implements IList<V> {
   }
 
   @Override
-  public IList<V> slice(long start, long end) {
+  public List<V> slice(long start, long end) {
     if (start < 0 || end > size()) {
       throw new IndexOutOfBoundsException();
     }
@@ -206,12 +206,12 @@ public class List<V> implements IList<V> {
   }
 
   @Override
-  public IList<V> forked() {
+  public List<V> forked() {
     return linear ? new List(false, root, prefixLen, prefix, suffixLen, suffix) : this;
   }
 
   @Override
-  public IList<V> linear() {
+  public List<V> linear() {
     return linear ? this : new List(true, root, prefixLen, prefix, suffixLen, suffix);
   }
 

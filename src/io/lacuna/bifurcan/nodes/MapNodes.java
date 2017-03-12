@@ -6,6 +6,7 @@ import io.lacuna.bifurcan.utils.ArrayVector;
 import java.util.Iterator;
 import java.util.PrimitiveIterator;
 import java.util.function.BiPredicate;
+import java.util.function.BinaryOperator;
 
 import static io.lacuna.bifurcan.nodes.Util.*;
 import static java.lang.Integer.bitCount;
@@ -27,9 +28,9 @@ public class MapNodes {
     public final K key;
     public final V value;
     public final BiPredicate<K, K> equals;
-    public final IMap.ValueMerger<V> merge;
+    public final BinaryOperator<V> merge;
 
-    public PutCommand(Object editor, int hash, K key, V value, BiPredicate<K, K> equals, IMap.ValueMerger<V> merge) {
+    public PutCommand(Object editor, int hash, K key, V value, BiPredicate<K, K> equals, BinaryOperator<V> merge) {
       this.editor = editor;
       this.hash = hash;
       this.key = key;
@@ -64,7 +65,7 @@ public class MapNodes {
 
   interface INode<K, V> {
 
-    default INode<K, V> put(int shift, Object editor, int hash, K key, V value, BiPredicate<K, K> equals, IMap.ValueMerger<V> merge) {
+    default INode<K, V> put(int shift, Object editor, int hash, K key, V value, BiPredicate<K, K> equals, BinaryOperator<V> merge) {
       return put(shift, new PutCommand<>(editor, hash, key, value, equals, merge));
     }
 
@@ -195,7 +196,7 @@ public class MapNodes {
 
         Node<K, V> n = (c.editor == editor ? this : clone(c.editor));
         idx = (idx << 1) + 1;
-        n.content[idx] = c.merge.merge((V) n.content[idx], c.value);
+        n.content[idx] = c.merge.apply((V) n.content[idx], c.value);
         return n;
 
         // collision, put them both in a node together
@@ -495,7 +496,7 @@ public class MapNodes {
         int idx = indexOf(c.key, c.equals);
         return idx < 0
             ? new Collision<K, V>(hash, ArrayVector.append(entries, c.key, c.value))
-            : new Collision<K, V>(hash, ArrayVector.set(entries, idx, c.key, c.merge.merge((V) entries[idx + 1], c.value)));
+            : new Collision<K, V>(hash, ArrayVector.set(entries, idx, c.key, c.merge.apply((V) entries[idx + 1], c.value)));
       }
     }
 
@@ -559,7 +560,7 @@ public class MapNodes {
     return 1 << ((hash >>> shift) & 31);
   }
 
-  public static <K, V> Node<K, V> merge(int shift, Object editor, Node<K, V> a, Node<K, V> b, BiPredicate<K, K> equals, IMap.ValueMerger<V> merge) {
+  public static <K, V> Node<K, V> merge(int shift, Object editor, Node<K, V> a, Node<K, V> b, BiPredicate<K, K> equals, BinaryOperator<V> merge) {
     Node<K, V> result = new Node<K, V>(editor);
 
     PrimitiveIterator.OfInt masks = Util.masks(a.datamap | a.nodemap | b.datamap | b.nodemap);
@@ -582,7 +583,7 @@ public class MapNodes {
           break;
         case NODE_NODE:
           // complicated
-          result = transferNode(mask, null, result);
+          // result = transferNode(mask, null, result);
           break;
         case NODE_ENTRY:
           idx = b.entryIndex(mask);
@@ -594,7 +595,7 @@ public class MapNodes {
           idx = a.entryIndex(mask);
           result = (Node<K, V>) result
               .putNode(mask, b.node(mask))
-              .put(shift, editor, a.hash(idx), (K) a.content[idx << 1], (V) a.content[(idx << 1) + 1], equals, (x, y) -> merge.merge(y, x));
+              .put(shift, editor, a.hash(idx), (K) a.content[idx << 1], (V) a.content[(idx << 1) + 1], equals, (x, y) -> merge.apply(y, x));
           break;
         case NONE_NONE:
           break;

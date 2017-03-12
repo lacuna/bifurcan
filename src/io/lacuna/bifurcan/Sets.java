@@ -190,31 +190,60 @@ public class Sets {
     return sb.toString();
   }
 
-  public static <V> Collector<V, ISet<V>, ISet<V>> collector() {
-    return new Collector<V, ISet<V>, ISet<V>>() {
+  public static <V> Collector<V, LinearSet<V>, LinearSet<V>> linearCollector() {
+    return new Collector<V, LinearSet<V>, LinearSet<V>>() {
       @Override
-      public Supplier<ISet<V>> supplier() {
+      public Supplier<LinearSet<V>> supplier() {
         return LinearSet::new;
       }
 
       @Override
-      public BiConsumer<ISet<V>, V> accumulator() {
-        return (s, e) -> ((LinearSet<V>) s).add(e);
+      public BiConsumer<LinearSet<V>, V> accumulator() {
+        return LinearSet::add;
       }
 
       @Override
-      public BinaryOperator<ISet<V>> combiner() {
-        return ISet::union;
+      public BinaryOperator<LinearSet<V>> combiner() {
+        return LinearSet::union;
       }
 
       @Override
-      public Function<ISet<V>, ISet<V>> finisher() {
-        return a -> a;
+      public Function<LinearSet<V>, LinearSet<V>> finisher() {
+        return s -> s;
       }
 
       @Override
       public java.util.Set<Characteristics> characteristics() {
-        return EnumSet.of(Characteristics.IDENTITY_FINISH);
+        return EnumSet.of(Characteristics.IDENTITY_FINISH, Characteristics.UNORDERED);
+      }
+    };
+  }
+
+  public static <V> Collector<V, Set<V>, Set<V>> collector() {
+    return new Collector<V, Set<V>, Set<V>>() {
+      @Override
+      public Supplier<Set<V>> supplier() {
+        return () -> new Set<V>().linear();
+      }
+
+      @Override
+      public BiConsumer<Set<V>, V> accumulator() {
+        return Set::add;
+      }
+
+      @Override
+      public BinaryOperator<Set<V>> combiner() {
+        return Set::union;
+      }
+
+      @Override
+      public Function<Set<V>, Set<V>> finisher() {
+        return Set::forked;
+      }
+
+      @Override
+      public java.util.Set<Characteristics> characteristics() {
+        return EnumSet.of(Characteristics.UNORDERED);
       }
     };
   }

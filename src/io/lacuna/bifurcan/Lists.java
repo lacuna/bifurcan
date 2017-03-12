@@ -4,6 +4,7 @@ import io.lacuna.bifurcan.IMap.IEntry;
 
 import java.lang.reflect.Array;
 import java.util.*;
+import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BiPredicate;
 import java.util.function.BinaryOperator;
@@ -21,6 +22,8 @@ import java.util.stream.IntStream;
 @SuppressWarnings("unchecked")
 public class Lists {
 
+  public static final IList EMPTY = from(0, i -> null);
+
   /**
    * A concatenation wrapper that doesn't blow up the stack due to left-leaning trees.
    */
@@ -29,12 +32,13 @@ public class Lists {
     final IntMap<IList<V>> lists;
     final long size;
 
-    public Concat(IList<V> a, IList<V> b) {
+    // both constructors assume the lists are non-empty
+    Concat(IList<V> a, IList<V> b) {
       lists = new IntMap<IList<V>>().linear().put(0, a).put(a.size(), b).forked();
       size = a.size() + b.size();
     }
 
-    public Concat(IList<V> list) {
+    Concat(IList<V> list) {
       lists = new IntMap<IList<V>>().linear().put(0, list).linear();
       size = list.size();
     }
@@ -51,6 +55,28 @@ public class Lists {
       }
       IEntry<Long, IList<V>> entry = lists.floor(idx);
       return entry.value().nth(idx - entry.key());
+    }
+
+    @Override
+    public Iterator<V> iterator() {
+      Iterator<IEntry<Long, IList<V>>> entries = lists.iterator();
+      return new Iterator<V>() {
+
+        Iterator<V> it = entries.next().value().iterator();
+
+        @Override
+        public boolean hasNext() {
+          return it.hasNext() || entries.hasNext();
+        }
+
+        @Override
+        public V next() {
+          if (!it.hasNext()) {
+            it = entries.next().value().iterator();
+          }
+          return it.next();
+        }
+      };
     }
 
     @Override
@@ -82,6 +108,8 @@ public class Lists {
         throw new IndexOutOfBoundsException();
       } else if (start == 0 && end == size()) {
         return this;
+      } else if (start == end) {
+        return EMPTY;
       }
 
       IntMap<IList<V>> m = new IntMap<IList<V>>().linear();
@@ -137,16 +165,50 @@ public class Lists {
       }
       return new Slice<V>(list, offset + start, end - start);
     }
+
+    @Override
+    public int hashCode() {
+      return (int) Lists.hash(this);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (obj instanceof IList) {
+        return Lists.equals(this, (IList<V>) obj);
+      }
+      return false;
+    }
+
+    @Override
+    public String toString() {
+      return Lists.toString(this);
+    }
   }
 
+  /**
+   * Returns a list which will lazily, and repeatedly, transform each element of the input list on lookup.
+   *
+   * @param l   a list
+   * @param f   a transform function for the elements of the list
+   * @param <V> the element type for the input list
+   * @param <U> the element type for the result list
+   * @return the result list
+   */
   public static <V, U> IList<U> lazyMap(IList<V> l, Function<V, U> f) {
     return Lists.from(l.size(), i -> f.apply(l.nth(i)));
   }
 
+  /**
+   * @return true if the two lists are equal, otherwise false
+   */
   public static <V> boolean equals(IList<V> a, IList<V> b) {
     return equals(a, b, Objects::equals);
   }
 
+  /**
+   * @param equals a comparison predicate for the lists of the element
+   * @return true if the two lists are equal, otherwise false
+   */
   public static <V> boolean equals(IList<V> a, IList<V> b, BiPredicate<V, V> equals) {
     if (a.size() != b.size()) {
       return false;
@@ -161,18 +223,33 @@ public class Lists {
     return true;
   }
 
+  /**
+   * @return a hash for the list, which mimics the standard Java hash calculation
+   */
   public static <V> long hash(IList<V> l) {
     return hash(l, Objects::hashCode, (a, b) -> (a * 31) + b);
   }
 
+  /**
+   * @param hash     a function which provides a hash for each element
+   * @param combiner a function which combines the accumulated hash and element hash
+   * @return a hash for the list
+   */
   public static <V> long hash(IList<V> l, ToLongFunction<V> hash, LongBinaryOperator combiner) {
     return l.stream().mapToLong(hash).reduce(combiner).orElse(0);
   }
 
+  /**
+   * @return a string representation of the list, using toString() to represent each element
+   */
   public static <V> String toString(IList<V> l) {
     return toString(l, Objects::toString);
   }
 
+  /**
+   * @param printer a function which returns a string representation of an element
+   * @return a string representation fo the list
+   */
   public static <V> String toString(IList<V> l, Function<V, String> printer) {
     StringBuilder sb = new StringBuilder("[");
 
@@ -188,6 +265,9 @@ public class Lists {
     return sb.toString();
   }
 
+  /**
+   * @return a shim around the input list, presenting it as a standard Java List object
+   */
   public static <V> java.util.List<V> toList(IList<V> list) {
     return new java.util.List<V>() {
 
@@ -287,18 +367,18 @@ public class Lists {
       @Override
       public int indexOf(Object o) {
         return IntStream.range(0, size())
-                .filter(idx -> Objects.equals(get(idx), o))
-                .findFirst()
-                .orElse(-1);
+            .filter(idx -> Objects.equals(get(idx), o))
+            .findFirst()
+            .orElse(-1);
       }
 
       @Override
       public int lastIndexOf(Object o) {
         return size() -
-                IntStream.range(0, size())
-                        .filter(idx -> Objects.equals(get(size() - (idx + 1)), o))
-                        .findFirst()
-                        .orElse(size() + 1);
+            IntStream.range(0, size())
+                .filter(idx -> Objects.equals(get(size() - (idx + 1)), o))
+                .findFirst()
+                .orElse(size() + 1);
       }
 
       @Override
@@ -384,6 +464,11 @@ public class Lists {
     };
   }
 
+  /**
+   * @param start the inclusive start index of the slice
+   * @param end   the exclusive end index of the slice
+   * @return a subset view of the list, which holds onto a reference to the original
+   */
   public static <V> IList<V> slice(IList<V> list, long start, long end) {
     long size = end - start;
     if (start < 0 || end > list.size() || end <= size) {
@@ -395,24 +480,71 @@ public class Lists {
     return new Slice<V>(list, start, size);
   }
 
+  /**
+   * @return a view of the array as an IList
+   */
   public static <V> IList<V> from(V[] array) {
     return Lists.from(array.length, idx -> array[(int) idx]);
   }
 
+  /**
+   * @return a view of the Java list as an IList
+   */
   public static <V> IList<V> from(java.util.List<V> list) {
-    return Lists.from(list.size(), idx -> {
-      if (idx > Integer.MAX_VALUE) {
-        throw new IndexOutOfBoundsException();
-      }
-      return list.get((int) idx);
-    });
+    return Lists.from(list.size(), idx -> list.get((int) idx), () -> list.iterator());
   }
 
+  /**
+   * Creates a list which repeatedly uses the element function for each lookup.
+   *
+   * @param size the size of the list
+   * @param elementFn a function which returns the list for the given element
+   * @return a list
+   */
   public static <V> IList<V> from(long size, LongFunction<V> elementFn) {
-    return from(size, elementFn, Lists::iterator);
+    return new IList<V>() {
+      @Override
+      public int hashCode() {
+        return (int) Lists.hash(this);
+      }
+
+      @Override
+      public boolean equals(Object obj) {
+        if (obj instanceof IList) {
+          return Lists.equals(this, (IList<V>) obj);
+        }
+        return false;
+      }
+
+      @Override
+      public String toString() {
+        return Lists.toString(this);
+      }
+
+      @Override
+      public V nth(long idx) {
+        if (idx < 0 || size <= idx) {
+          throw new IndexOutOfBoundsException(idx + " must be within [0," + size + ")");
+        }
+        return elementFn.apply(idx);
+      }
+
+      @Override
+      public long size() {
+        return size;
+      }
+    };
   }
 
-  public static <V> IList<V> from(long size, LongFunction<V> elementFn, Function<IList<V>, Iterator<V>> iteratorFn) {
+  /**
+   * Creates a list which repeatedly uses the element function for each lookup.
+   *
+   * @param size the size of the list
+   * @param elementFn a function which returns the list for the given element
+   * @param iteratorFn a function which generates an iterator for the list
+   * @return a list
+   */
+  public static <V> IList<V> from(long size, LongFunction<V> elementFn, Supplier<Iterator<V>> iteratorFn) {
     return new IList<V>() {
       @Override
       public int hashCode() {
@@ -442,7 +574,7 @@ public class Lists {
 
       @Override
       public Iterator<V> iterator() {
-        return iteratorFn.apply(this);
+        return iteratorFn.get();
       }
 
       @Override
@@ -452,26 +584,61 @@ public class Lists {
     };
   }
 
-  public static <V> Collector<V, IList<V>, IList<V>> collector() {
-    return new Collector<V, IList<V>, IList<V>>() {
+  /**
+   * @return a Java stream collection which can be used to construct a LinearList
+   */
+  public static <V> Collector<V, LinearList<V>, LinearList<V>> linearCollector() {
+    return new Collector<V, LinearList<V>, LinearList<V>>() {
       @Override
-      public Supplier<IList<V>> supplier() {
+      public Supplier<LinearList<V>> supplier() {
+        return LinearList::new;
+      }
+
+      @Override
+      public BiConsumer<LinearList<V>, V> accumulator() {
+        return LinearList::addLast;
+      }
+
+      @Override
+      public BinaryOperator<LinearList<V>> combiner() {
+        return LinearList::concat;
+      }
+
+      @Override
+      public Function<LinearList<V>, LinearList<V>> finisher() {
+        return x -> x;
+      }
+
+      @Override
+      public Set<Characteristics> characteristics() {
+        return EnumSet.of(Characteristics.IDENTITY_FINISH);
+      }
+    };
+  }
+
+  /**
+   * @return a Java stream collector which can be used to construct a List
+   */
+  public static <V> Collector<V, List<V>, List<V>> collector() {
+    return new Collector<V, List<V>, List<V>>() {
+      @Override
+      public Supplier<List<V>> supplier() {
         return () -> new List().linear();
       }
 
       @Override
-      public BiConsumer<IList<V>, V> accumulator() {
-        return IList::addLast;
+      public BiConsumer<List<V>, V> accumulator() {
+        return List::addLast;
       }
 
       @Override
-      public BinaryOperator<IList<V>> combiner() {
-        return IList::concat;
+      public BinaryOperator<List<V>> combiner() {
+        return (a, b) -> (List<V>) a.concat(b);
       }
 
       @Override
-      public Function<IList<V>, IList<V>> finisher() {
-        return IList::forked;
+      public Function<List<V>, List<V>> finisher() {
+        return List::forked;
       }
 
       @Override
@@ -481,6 +648,9 @@ public class Lists {
     };
   }
 
+  /**
+   * @return an iterator over the list which repeatedly calls nth()
+   */
   public static <V> Iterator<V> iterator(IList<V> list) {
     return new Iterator<V>() {
 
@@ -502,8 +672,15 @@ public class Lists {
     };
   }
 
+  /**
+   * @return a concatenation of the two lists
+   */
   public static <V> IList<V> concat(IList<V> a, IList<V> b) {
-    if (a instanceof Concat && b instanceof Concat) {
+    if (a.size() == 0) {
+      return b;
+    } else if (b.size() == 0) {
+      return a;
+    } else if (a instanceof Concat && b instanceof Concat) {
       return ((Concat<V>) a).concat((Concat<V>) b);
     } else if (a instanceof Concat) {
       return ((Concat<V>) a).concat(new Concat<>(b));
@@ -514,6 +691,9 @@ public class Lists {
     }
   }
 
+  /**
+   * @return a concatenation of all the lists
+   */
   public static <V> IList<V> concat(IList<V>... lists) {
     return Arrays.stream(lists).reduce(Lists::concat).orElseGet(List::new);
   }

@@ -2,6 +2,7 @@ package io.lacuna.bifurcan;
 
 import java.util.Iterator;
 import java.util.Optional;
+import java.util.function.BinaryOperator;
 
 /**
  * @author ztellman
@@ -17,10 +18,6 @@ public interface IMap<K, V> extends
     K key();
 
     V value();
-  }
-
-  interface ValueMerger<V> {
-    V merge(V current, V updated);
   }
 
   V get(K key, V defaultValue);
@@ -85,7 +82,7 @@ public interface IMap<K, V> extends
    * @param mergeFn a function which, in the case of key collisions, returns the resulting
    * @return
    */
-  default IMap<K, V> merge(IMap<K, V> b, ValueMerger<V> mergeFn) {
+  default IMap<K, V> merge(IMap<K, V> b, BinaryOperator<V> mergeFn) {
     return Maps.merge(this, b, mergeFn);
   }
 
@@ -120,7 +117,7 @@ public interface IMap<K, V> extends
    *              old and new value, to determine what should be stored in the map
    * @return an updated map
    */
-  default IMap<K, V> put(K key, V value, ValueMerger<V> merge) {
+  default IMap<K, V> put(K key, V value, BinaryOperator<V> merge) {
     return null;
   }
 
