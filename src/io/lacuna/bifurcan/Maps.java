@@ -1,9 +1,9 @@
 package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.IMap.IEntry;
+import io.lacuna.bifurcan.utils.Iterators;
 
 import java.util.*;
-import java.util.Set;
 import java.util.function.*;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
@@ -19,6 +19,48 @@ public class Maps {
   private static final Object DEFAULT_VALUE = new Object();
 
   public static BinaryOperator MERGE_LAST_WRITE_WINS = (a, b) -> b;
+
+  public static final IMap EMPTY = new IMap() {
+    @Override
+    public Object get(Object key, Object defaultValue) {
+      return defaultValue;
+    }
+
+    @Override
+    public boolean contains(Object key) {
+      return false;
+    }
+
+    @Override
+    public IList<IEntry> entries() {
+      return Lists.EMPTY;
+    }
+
+    @Override
+    public long size() {
+      return 0;
+    }
+
+    @Override
+    public IMap put(Object key, Object value, BinaryOperator merge) {
+      return new Map().put(key, value, merge);
+    }
+
+    @Override
+    public IMap remove(Object key) {
+      return this;
+    }
+
+    @Override
+    public IMap forked() {
+      return this;
+    }
+
+    @Override
+    public IMap linear() {
+      return new Map().linear();
+    }
+  };
 
   public static class Entry<K, V> implements IEntry<K, V> {
     public final K key;
@@ -54,6 +96,133 @@ public class Maps {
         return Objects.equals(key, e.key()) && Objects.equals(value, e.value());
       }
       return false;
+    }
+  }
+
+  static class Proxy<K, V> implements IMap<K, V> {
+
+    private IMap<K, V> canonical = null;
+
+    private IMap<K, V> map, added;
+    private ISet<K> removed, shadowed;
+    private final boolean linear;
+
+    public Proxy(IMap<K, V> map) {
+      this(map, Maps.EMPTY, Sets.EMPTY, Sets.EMPTY, false);
+    }
+
+    private Proxy(IMap<K, V> map, IMap<K, V> added, ISet<K> removed, ISet<K> shadowed, boolean linear) {
+      this.map = map;
+      this.added = added;
+      this.removed = removed;
+      this.shadowed = shadowed;
+      this.linear = linear;
+    }
+
+    private synchronized void canonicalize() {
+      if (canonical != null) {
+        return;
+      }
+
+      canonical = Map.from(map).union(added).difference(removed);
+      if (linear) {
+        canonical = canonical.linear();
+      }
+
+      map = null;
+      added = null;
+      removed = null;
+    }
+
+    @Override
+    public synchronized V get(K key, V defaultValue) {
+      if (canonical != null) {
+        return canonical.get(key, defaultValue);
+      } else if (removed.contains(key)) {
+        return defaultValue;
+      } else {
+        V val = added.get(key, defaultValue);
+        return val == defaultValue ? map.get(key, defaultValue) : val;
+      }
+    }
+
+    @Override
+    public synchronized IMap<K, V> put(K key, V value, BinaryOperator<V> merge) {
+      if (canonical != null) {
+        return canonical.put(key, value, merge);
+      } else if (added.contains(key) || !map.contains(key)) {
+        IMap<K, V> addedPrime = added.put(key, value, merge);
+        return linear ? this : new Proxy<K, V>(map, addedPrime, removed, shadowed, false);
+      } else {
+        IMap<K, V> addedPrime = added.put(key, merge.apply(added.get(key).orElse(null), value));
+        ISet<K> shadowedPrime = shadowed.add(key);
+        ISet<K> removedPrime = removed.remove(key);
+
+        return linear ? this : new Proxy<K, V>(map, addedPrime, removedPrime, shadowedPrime, false);
+      }
+    }
+
+    @Override
+    public synchronized IMap<K, V> remove(K key) {
+      if (canonical != null) {
+        return canonical.remove(key);
+      } else if (!contains(key)) {
+        return this;
+      } else {
+        IMap<K, V> addedPrime = added.remove(key);
+
+        if (shadowed.contains(key)) {
+          ISet<K> shadowedPrime = shadowed.remove(key);
+          ISet<K> removedPrime = removed.add(key);
+          return linear ? this : new Proxy<K, V>(map, addedPrime, removedPrime, shadowedPrime, false);
+        } else {
+          return linear ? this : new Proxy<K, V>(map, addedPrime, removed, shadowed, false);
+        }
+      }
+    }
+
+    @Override
+    public synchronized IMap<K, V> forked() {
+      if (canonical != null) {
+        return canonical.forked();
+      } else {
+        return linear ? new Proxy<K, V>(map, added.forked(), removed.forked(), shadowed.forked(), false) : this;
+      }
+    }
+
+    @Override
+    public synchronized IMap<K, V> linear() {
+      if (canonical != null) {
+        return canonical.linear();
+      } else {
+        return linear ? this : new Proxy<K, V>(map, added.linear(), removed.linear(), shadowed.linear(), true);
+      }
+    }
+
+    @Override
+    public synchronized boolean contains(K key) {
+      if (canonical != null) {
+        return canonical.contains(key);
+      } else {
+        return added.contains(key) || (!removed.contains(key) && map.contains(key));
+      }
+    }
+
+    @Override
+    public Iterator<IEntry<K, V>> iterator() {
+      //TODO
+      return null;
+    }
+
+    @Override
+    public synchronized IList<IEntry<K, V>> entries() {
+      canonicalize();
+      return canonical.entries();
+    }
+
+    @Override
+    public synchronized long size() {
+      return map.size() + (added.size() - shadowed.size()) - removed.size();
     }
   }
 
@@ -122,9 +291,13 @@ public class Maps {
       }
 
       @Override
+      public Iterator<IEntry<K, V>> iterator() {
+        return Iterators.map(map.entrySet().iterator(), e -> new Entry<K, V>(e.getKey(), e.getValue()));
+      }
+
+      @Override
       public IList<IEntry<K, V>> entries() {
-        Set<java.util.Map.Entry<K, V>> entries = map.entrySet();
-        return entries.stream()
+        return map.entrySet().stream()
             .map(e -> (IEntry<K, V>) new Entry(e.getKey(), e.getValue()))
             .collect(Lists.collector());
       }
@@ -234,7 +407,7 @@ public class Maps {
       }
 
       @Override
-      public Set<K> keySet() {
+      public java.util.Set<K> keySet() {
         return Sets.toSet(
             lazyMap(map.entries(), IEntry::key),
             k -> map.get(k).isPresent());
@@ -246,7 +419,7 @@ public class Maps {
       }
 
       @Override
-      public Set<Entry<K, V>> entrySet() {
+      public java.util.Set<Entry<K, V>> entrySet() {
         return Sets.toSet(
             lazyMap(map.entries(), Maps::toEntry),
             e -> map.get(e.getKey()).map(v -> Objects.equals(v, e.getValue())).orElse(false));
@@ -353,7 +526,7 @@ public class Maps {
       }
 
       @Override
-      public Set<Characteristics> characteristics() {
+      public java.util.Set<Characteristics> characteristics() {
         return EnumSet.of(Characteristics.IDENTITY_FINISH);
       }
     };
@@ -386,7 +559,7 @@ public class Maps {
       }
 
       @Override
-      public Set<Characteristics> characteristics() {
+      public java.util.Set<Characteristics> characteristics() {
         return EnumSet.noneOf(Characteristics.class);
       }
     };

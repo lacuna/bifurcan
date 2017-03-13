@@ -147,6 +147,18 @@ public class LinearList<V> implements IList<V> {
     return (V) elements[(offset + (int) idx) & mask];
   }
 
+  public V popFirst() {
+    V val = first();
+    removeFirst();
+    return val;
+  }
+
+  public V popLast() {
+    V val = last();
+    removeLast();
+    return val;
+  }
+
   @Override
   public long size() {
     return size;

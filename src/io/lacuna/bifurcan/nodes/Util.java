@@ -1,5 +1,6 @@
 package io.lacuna.bifurcan.nodes;
 
+import java.util.NoSuchElementException;
 import java.util.PrimitiveIterator;
 
 import static io.lacuna.bifurcan.utils.Bits.bitOffset;
@@ -11,6 +12,18 @@ import static java.lang.Integer.bitCount;
  * @author ztellman
  */
 public class Util {
+
+  private static final PrimitiveIterator.OfInt EMPTY_INT = new PrimitiveIterator.OfInt() {
+    @Override
+    public int nextInt() {
+      throw new NoSuchElementException();
+    }
+
+    @Override
+    public boolean hasNext() {
+      return false;
+    }
+  };
 
   static final int NONE_NONE = 0;
   static final int NODE_NONE = 0x1;
@@ -45,6 +58,10 @@ public class Util {
   }
 
   static PrimitiveIterator.OfInt masks(int bitmap) {
+    if (bitmap == 0) {
+      return EMPTY_INT;
+    }
+
     long start = 1L << startIndex(bitmap);
     long end = 1L << (endIndex(bitmap) + 1);
 
@@ -65,6 +82,10 @@ public class Util {
   }
 
   static PrimitiveIterator.OfInt reverseMasks(int bitmap) {
+    if (bitmap == 0) {
+      return EMPTY_INT;
+    }
+
     long start = 1L << startIndex(bitmap);
     long end = 1L << endIndex(bitmap);
 

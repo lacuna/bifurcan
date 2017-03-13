@@ -1,10 +1,12 @@
 package io.lacuna.bifurcan;
 
-import java.util.Iterator;
-import java.util.Objects;
-import java.util.Optional;
+import io.lacuna.bifurcan.Maps.Proxy;
+
+import java.util.*;
 import java.util.function.BiPredicate;
 import java.util.function.BinaryOperator;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 /**
  * @author ztellman
@@ -83,6 +85,15 @@ public interface IMap<K, V> extends
     return entries().iterator();
   }
 
+  default Stream<IEntry<K, V>> stream() {
+    return StreamSupport.stream(spliterator(), false);
+  }
+
+  @Override
+  default Spliterator<IEntry<K, V>> spliterator() {
+    return Spliterators.spliterator(iterator(), size(), Spliterator.DISTINCT);
+  }
+
   /**
    * @param b       another map
    * @param mergeFn a function which, in the case of key collisions, returns the resulting
@@ -124,7 +135,7 @@ public interface IMap<K, V> extends
    * @return an updated map
    */
   default IMap<K, V> put(K key, V value, BinaryOperator<V> merge) {
-    return null;
+    return new Proxy<>(this).put(key, value, merge);
   }
 
   /**
@@ -138,7 +149,7 @@ public interface IMap<K, V> extends
    * @return the map, without anything stored under {@code key}
    */
   default IMap<K, V> remove(K key) {
-    return null;
+    return new Proxy<>(this).remove(key);
   }
 
   @Override

@@ -6,9 +6,11 @@ import io.lacuna.bifurcan.IMap.IEntry;
 import io.lacuna.bifurcan.LinearList;
 import io.lacuna.bifurcan.Maps;
 import io.lacuna.bifurcan.utils.Bits;
+import io.lacuna.bifurcan.utils.Iterators;
 
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 import java.util.PrimitiveIterator;
 import java.util.function.BiPredicate;
 import java.util.function.BinaryOperator;
@@ -238,26 +240,43 @@ public class IntMapNodes {
     }
 
     public Iterator<IEntry<Long, V>> iterator() {
-
       return new Iterator<IMap.IEntry<Long, V>>() {
 
-        final IList<Node<V>> nodes = LinearList.from(nodes());
-        Iterator<IMap.IEntry<Long, V>> iterator = entries().iterator();
+        final LinearList<Node<V>> nodeStack = new LinearList<>();
+        final LinearList<PrimitiveIterator.OfInt> maskStack = new LinearList<>();
+        Node<V> node = Node.this;
+        PrimitiveIterator.OfInt masks = node.masks();
 
         @Override
         public boolean hasNext() {
-          return iterator.hasNext() || nodes.size() > 0;
+          return masks.hasNext() || nodeStack.size() > 0;
         }
 
         @Override
         public IMap.IEntry<Long, V> next() {
-          while (!iterator.hasNext()) {
-            Node<V> node = nodes.first();
-            nodes.removeFirst();
-            iterator = node.entries().iterator();
-            node.nodes().forEach(nodes::addLast);
+          while (true) {
+
+            if (!masks.hasNext()) {
+              if (nodeStack.size() == 0) {
+                throw new NoSuchElementException();
+              }
+              node = nodeStack.popLast();
+              masks = maskStack.popLast();
+            }
+
+            int mask = masks.nextInt();
+            if (node.isEntry(mask)) {
+              int idx = node.entryIndex(mask);
+              return new Maps.Entry<>(node.keys[idx], (V) node.content[idx]);
+            } else if (node.isNode(mask)) {
+              if (masks.hasNext()) {
+                nodeStack.addLast(node);
+                maskStack.addLast(masks);
+              }
+              node = node.node(mask);
+              masks = node.masks();
+            }
           }
-          return iterator.next();
         }
       };
     }
@@ -423,38 +442,17 @@ public class IntMapNodes {
     }
 
     public Iterable<Node<V>> nodes() {
-      return () -> new Iterator<Node<V>>() {
-        int idx = content.length - Integer.bitCount(nodemap);
-
-        @Override
-        public boolean hasNext() {
-          return idx < content.length;
-        }
-
-        @Override
-        public Node<V> next() {
-          return (Node<V>) content[idx++];
-        }
-      };
+      return () ->
+          Iterators.range(
+              content.length - Integer.bitCount(nodemap),
+              content.length,
+              i -> (Node<V>) content[(int) i]);
     }
 
     private Iterable<IMap.IEntry<Long, V>> entries() {
-      int numEntries = bitCount(datamap);
-      return () -> new Iterator<IMap.IEntry<Long, V>>() {
-
-        int idx = 0;
-
-        @Override
-        public boolean hasNext() {
-          return idx < numEntries;
-        }
-
-        @Override
-        public IMap.IEntry<Long, V> next() {
-          int entryIdx = idx++;
-          return new Maps.Entry<>(keys[entryIdx], (V) content[entryIdx]);
-        }
-      };
+      return () ->
+          Iterators.range(bitCount(datamap),
+              i -> new Maps.Entry<>(keys[(int) i], (V) content[(int) i]));
     }
 
     private void grow() {

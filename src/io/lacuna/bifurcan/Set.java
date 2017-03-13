@@ -1,5 +1,7 @@
 package io.lacuna.bifurcan;
 
+import io.lacuna.bifurcan.utils.Iterators;
+
 import java.util.Iterator;
 import java.util.Objects;
 import java.util.function.BiPredicate;
@@ -64,18 +66,7 @@ public class Set<V> implements ISet<V> {
 
   @Override
   public Iterator<V> iterator() {
-    Iterator<IMap.IEntry> entries = ((IMap) map).iterator();
-    return new Iterator<V>() {
-      @Override
-      public boolean hasNext() {
-        return entries.hasNext();
-      }
-
-      @Override
-      public V next() {
-        return (V) entries.next().key();
-      }
-    };
+    return Iterators.map(map.iterator(), e -> e.key());
   }
 
   @Override

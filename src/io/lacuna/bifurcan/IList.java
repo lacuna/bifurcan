@@ -1,5 +1,7 @@
 package io.lacuna.bifurcan;
 
+import io.lacuna.bifurcan.Lists.Proxy;
+
 import java.lang.reflect.Array;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
@@ -34,28 +36,28 @@ public interface IList<V> extends
    * @return a new list, with {@code value} appended
    */
   default IList<V> addLast(V value) {
-    return null;
+    return new Proxy<>(this).addLast(value);
   }
 
   /**
    * @return a new list, with {@code value} prepended
    */
   default IList<V> addFirst(V value) {
-    return null;
+    return new Proxy<>(this).addFirst(value);
   }
 
   /**
    * @return a new list with the last value removed, or the same list if already empty
    */
   default IList<V> removeLast() {
-    return null;
+    return new Proxy<V>(this).removeLast();
   }
 
   /**
    * @return a new list with the first value removed, or the same value if already empty
    */
   default IList<V> removeFirst() {
-    return null;
+    return new Proxy<V>(this).removeFirst();
   }
 
   /**
@@ -75,7 +77,7 @@ public interface IList<V> extends
 
   @Override
   default Spliterator<V> spliterator() {
-    return Spliterators.spliteratorUnknownSize(iterator(), Spliterator.ORDERED);
+    return Spliterators.spliterator(iterator(), size(), Spliterator.ORDERED);
   }
 
   default Iterator<V> iterator() {
@@ -167,6 +169,6 @@ public interface IList<V> extends
 
   @Override
   default IList<V> linear() {
-    return null;
+    return new Proxy<V>(this).linear();
   }
 }

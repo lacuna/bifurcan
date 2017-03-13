@@ -3,6 +3,7 @@ package io.lacuna.bifurcan.nodes;
 import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.IMap.IEntry;
 import io.lacuna.bifurcan.utils.ArrayVector;
+import io.lacuna.bifurcan.utils.Iterators;
 
 import java.util.Iterator;
 import java.util.PrimitiveIterator;
@@ -145,22 +146,12 @@ public class MapNodes {
 
     @Override
     public Iterable<IEntry<K, V>> entries() {
-      int numEntries = bitCount(datamap);
-      return () -> new Iterator<IEntry<K, V>>() {
-
-        int idx = 0;
-
-        @Override
-        public boolean hasNext() {
-          return idx < numEntries;
-        }
-
-        @Override
-        public IEntry<K, V> next() {
-          int entryIdx = idx++ << 1;
-          return new Maps.Entry<>((K) content[entryIdx], (V) content[entryIdx + 1]);
-        }
-      };
+      return () ->
+          Iterators.range(bitCount(datamap),
+              i -> {
+                int idx = (int) (i << 1);
+                return new Maps.Entry<>((K) content[idx], (V) content[idx + 1]);
+              });
     }
 
     @Override
@@ -363,19 +354,11 @@ public class MapNodes {
     }
 
     private Iterable<INode<K, V>> nodes() {
-      return () -> new Iterator<INode<K, V>>() {
-        int idx = content.length - Integer.bitCount(nodemap);
-
-        @Override
-        public boolean hasNext() {
-          return idx < content.length;
-        }
-
-        @Override
-        public INode<K, V> next() {
-          return (INode<K, V>) content[idx++];
-        }
-      };
+      return () ->
+          Iterators.range(
+              content.length - Integer.bitCount(nodemap),
+              content.length,
+              i -> (INode<K, V>) content[(int) i]);
     }
 
     private void grow() {
@@ -586,19 +569,12 @@ public class MapNodes {
     }
 
     public Iterable<IEntry<K, V>> entries() {
-      return () -> new Iterator<IEntry<K, V>>() {
-        int idx = 0;
-        @Override
-        public boolean hasNext() {
-          return idx < entries.length;
-        }
-
-        @Override
-        public IEntry<K, V> next() {
-          idx += 2;
-          return new Maps.Entry<K, V>((K) entries[idx - 2], (V) entries[idx - 1]);
-        }
-      };
+      return () ->
+          Iterators.range(entries.length >> 1,
+              i -> {
+                int idx = (int) (i << 1);
+                return new Maps.Entry<>((K) entries[idx], (V) entries[idx + 1]);
+              });
     }
   }
 

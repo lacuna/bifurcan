@@ -30,6 +30,14 @@ public class Map<K, V> implements IMap<K, V> {
     this(Node.EMPTY, Objects::hashCode, Objects::equals, false);
   }
 
+  public static <K, V>  Map<K, V> from(IMap<K, V> map) {
+    if (map instanceof Map) {
+      return (Map<K, V>) map;
+    }
+
+    return map.stream().collect(Maps.collector(IEntry::key, IEntry::value));
+  }
+
   private Map(Node<K, V> root, ToIntFunction<K> hashFn, BiPredicate<K, K> equalsFn, boolean linear) {
     this.root = root;
     this.hashFn = hashFn;

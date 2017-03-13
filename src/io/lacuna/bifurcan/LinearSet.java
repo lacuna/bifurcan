@@ -1,5 +1,7 @@
 package io.lacuna.bifurcan;
 
+import io.lacuna.bifurcan.utils.Iterators;
+
 import java.util.Iterator;
 import java.util.Objects;
 import java.util.function.BiPredicate;
@@ -78,18 +80,7 @@ public class LinearSet<V> implements ISet<V> {
 
   @Override
   public Iterator<V> iterator() {
-    Iterator<IMap.IEntry<V, Void>> iterator = map.iterator();
-    return new Iterator<V>() {
-      @Override
-      public boolean hasNext() {
-        return iterator.hasNext();
-      }
-
-      @Override
-      public V next() {
-        return iterator.next().key();
-      }
-    };
+    return Iterators.map(map.iterator(), IMap.IEntry::key);
   }
 
   @Override

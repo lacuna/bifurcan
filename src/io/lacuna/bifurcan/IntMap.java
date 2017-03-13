@@ -4,8 +4,8 @@ import io.lacuna.bifurcan.nodes.IntMapNodes;
 import io.lacuna.bifurcan.nodes.IntMapNodes.Node;
 import io.lacuna.bifurcan.utils.IteratorStack;
 
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
+import java.util.Map;
 import java.util.function.BiPredicate;
 import java.util.function.BinaryOperator;
 
@@ -26,10 +26,26 @@ public class IntMap<V> implements IMap<Long, V> {
     this.linear = false;
   }
 
-  public IntMap(Node<V> neg, Node<V> pos, boolean linear) {
+  private IntMap(Node<V> neg, Node<V> pos, boolean linear) {
     this.neg = neg;
     this.pos = pos;
     this.linear = linear;
+  }
+
+  public static <V> IntMap<V> from(IMap<Number, V> m) {
+    IntMap<V> map = new IntMap<V>().linear();
+    for (IEntry<Number, V> e : m) {
+      map = map.put((long) e.key(), e.value());
+    }
+    return map.forked();
+  }
+
+  public static <V> IntMap<V> from(java.util.Map<Number, V> m) {
+    IntMap<V> map = new IntMap<V>().linear();
+    for (Map.Entry<Number, V> e : m.entrySet()) {
+      map = map.put((long) e.getKey(), e.getValue());
+    }
+    return map.forked();
   }
 
   public IntMap<V> put(long key, V value) {
@@ -122,7 +138,12 @@ public class IntMap<V> implements IMap<Long, V> {
     return Lists.from(
         size(),
         i -> (i < neg.size()) ? neg.nth((int) i) : pos.nth((int) (i - neg.size())),
-        () -> new IteratorStack<>(neg.iterator(), pos.iterator()));
+        this::iterator);
+  }
+
+  @Override
+  public Iterator<IEntry<Long, V>> iterator() {
+    return new IteratorStack<>(neg.iterator(), pos.iterator());
   }
 
   public IEntry<Long, V> floor(long key) {

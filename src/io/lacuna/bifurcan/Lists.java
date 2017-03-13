@@ -1,6 +1,7 @@
 package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.IMap.IEntry;
+import io.lacuna.bifurcan.utils.Iterators;
 
 import java.lang.reflect.Array;
 import java.util.*;
@@ -22,7 +23,56 @@ import java.util.stream.IntStream;
 @SuppressWarnings("unchecked")
 public class Lists {
 
-  public static final IList EMPTY = from(0, i -> null);
+  public static final IList EMPTY = new IList() {
+    @Override
+    public Object nth(long idx) {
+      throw new IndexOutOfBoundsException();
+    }
+
+    @Override
+    public long size() {
+      return 0;
+    }
+
+    @Override
+    public IList set(long idx, Object value) {
+      if (idx == 0) {
+        return addLast(value);
+      } else {
+        throw new IndexOutOfBoundsException();
+      }
+    }
+
+    @Override
+    public IList addLast(Object value) {
+      return new List().addLast(value);
+    }
+
+    @Override
+    public IList addFirst(Object value) {
+      return new List().addFirst(value);
+    }
+
+    @Override
+    public IList removeLast() {
+      return this;
+    }
+
+    @Override
+    public IList removeFirst() {
+      return this;
+    }
+
+    @Override
+    public IList forked() {
+      return this;
+    }
+
+    @Override
+    public IList linear() {
+      return new List().linear();
+    }
+  };
 
   /**
    * A concatenation wrapper that doesn't blow up the stack due to left-leaning trees.
@@ -59,24 +109,7 @@ public class Lists {
 
     @Override
     public Iterator<V> iterator() {
-      Iterator<IEntry<Long, IList<V>>> entries = lists.iterator();
-      return new Iterator<V>() {
-
-        Iterator<V> it = entries.next().value().iterator();
-
-        @Override
-        public boolean hasNext() {
-          return it.hasNext() || entries.hasNext();
-        }
-
-        @Override
-        public V next() {
-          if (!it.hasNext()) {
-            it = entries.next().value().iterator();
-          }
-          return it.next();
-        }
-      };
+      return Iterators.flatMap(lists.iterator(), e -> e.value().iterator());
     }
 
     @Override
@@ -182,6 +215,102 @@ public class Lists {
     @Override
     public String toString() {
       return Lists.toString(this);
+    }
+  }
+
+  static class Proxy<V> implements IList<V> {
+
+    private IList<V> prefix, list, suffix;
+    private final boolean linear;
+
+    public Proxy(IList<V> list) {
+      this(Lists.EMPTY, list, Lists.EMPTY, false);
+    }
+
+    private Proxy(IList<V> prefix, IList<V> list, IList<V> suffix, boolean linear) {
+      this.prefix = prefix;
+      this.list = list;
+      this.suffix = suffix;
+      this.linear = linear;
+    }
+
+    @Override
+    public V nth(long idx) {
+      long prefixSize = prefix.size();
+      long listSize = list.size();
+
+      if (idx < prefixSize) {
+        return prefix.nth(idx);
+      } else if (idx < (prefixSize + listSize)) {
+        return list.nth(idx - prefixSize);
+      } else {
+        return suffix.nth(idx - (prefixSize + listSize));
+      }
+    }
+
+    @Override
+    public long size() {
+      return prefix.size() + list.size() + suffix.size();
+    }
+
+    @Override
+    public IList<V> addLast(V value) {
+      IList<V> suffixPrime = suffix.addLast(value);
+      return linear ? this : new Proxy<V>(prefix, list, suffixPrime, false);
+    }
+
+    @Override
+    public IList<V> addFirst(V value) {
+      IList<V> prefixPrime = prefix.addFirst(value);
+      return linear ? this : new Proxy<V>(prefixPrime, list, suffix, false);
+    }
+
+    @Override
+    public IList<V> removeLast() {
+      if (suffix.size() > 0) {
+        IList<V> suffixPrime = suffix.removeLast();
+        return linear ? this : new Proxy<V>(prefix, list, suffixPrime, false);
+      } else {
+        IList<V> listPrime = list.slice(0, list.size() - 1);
+        if (linear) {
+          list = listPrime;
+          return this;
+        } else {
+          return new Proxy<V>(prefix, listPrime, suffix, false);
+        }
+      }
+    }
+
+    @Override
+    public IList<V> removeFirst() {
+      if (prefix.size() > 0) {
+        IList<V> prefixPrime = prefix.removeFirst();
+        return linear ? this : new Proxy<V>(prefixPrime, list, suffix, false);
+      } else {
+        IList<V> listPrime = list.slice(1, list.size());
+        if (linear) {
+          list = listPrime;
+          return this;
+        } else {
+          return new Proxy<V>(prefix, listPrime, suffix, false);
+        }
+      }
+    }
+
+    @Override
+    public IList<V> set(long idx, V value) {
+      // TODO
+      return null;
+    }
+
+    @Override
+    public IList<V> forked() {
+      return linear ? new Proxy<V>(prefix.forked(), list, suffix.forked(), false) : this;
+    }
+
+    @Override
+    public IList<V> linear() {
+      return linear ? this : new Proxy<V>(prefix.linear(), list, suffix.linear(), true);
     }
   }
 
@@ -652,24 +781,7 @@ public class Lists {
    * @return an iterator over the list which repeatedly calls nth()
    */
   public static <V> Iterator<V> iterator(IList<V> list) {
-    return new Iterator<V>() {
-
-      int idx = 0;
-
-      @Override
-      public boolean hasNext() {
-        return idx < list.size();
-      }
-
-      @Override
-      public V next() {
-        if (hasNext()) {
-          return list.nth(idx++);
-        } else {
-          throw new NoSuchElementException();
-        }
-      }
-    };
+    return Iterators.range(list.size(), list::nth);
   }
 
   /**

@@ -11,6 +11,33 @@ import java.util.stream.IntStream;
  */
 public class Sets {
 
+  public static final ISet EMPTY = new ISet() {
+    @Override
+    public boolean contains(Object value) {
+      return false;
+    }
+
+    @Override
+    public long size() {
+      return 0;
+    }
+
+    @Override
+    public IList elements() {
+      return Lists.EMPTY;
+    }
+
+    @Override
+    public ISet add(Object value) {
+      return new Set().add(value);
+    }
+
+    @Override
+    public ISet remove(Object value) {
+      return this;
+    }
+  };
+
   public static <V> long hash(ISet<V> s) {
     return hash(s, Objects::hashCode, (a, b) -> a + b);
   }

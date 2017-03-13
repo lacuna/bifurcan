@@ -156,8 +156,8 @@
 
 (u/def-collection-check test-linear-map-merge 1e4 (map-actions)
   [m' (LinearMap.)]
-  (= m' (->> (.split ^IMap m' 8) (reduce #(.union ^IMap %1 %2)))))
+  (= m' (->> (.split ^IMap m' 8) (reduce #(.union ^IMap %1 %2) (LinearMap.)))))
 
 (u/def-collection-check test-map-merge 1e4 (map-actions)
   [m' (Map.)]
-  (= m' (->> (.split ^IMap m' 8) (reduce #(.union ^IMap %1 %2)))))
+  (= m' (->> (.split ^IMap m' 8) (reduce #(.union ^IMap %1 %2) (Map.)))))
