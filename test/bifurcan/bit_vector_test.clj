@@ -53,32 +53,28 @@
 
 (def gen-idx (gen/choose 0 999))
 
-(defn vector-actions [bits max-val]
+(defn vector-actions [max-val]
   (let [gen-element (gen/large-integer* {:min 0, :max max-val})]
-    {:remove (u/action [gen-idx]
-               (wrap-idx count list-remove)
-               (wrap-idx (bit-vector-count bits) #(bit-vector-remove %1 bits %2)))
-     :insert (u/action [gen-idx gen-element]
-               (wrap-idx count list-insert)
-               (wrap-idx (bit-vector-count bits) #(bit-vector-insert %1 bits %2 %3)))
-     :append (u/action [gen-element]
-               list-append
-               #(bit-vector-append %1 bits %2))}))
+    {:remove [gen-idx]
+     :insert [gen-idx gen-element]
+     :append [gen-element]}))
 
-(defn construct-colls [bits actions]
-  (let [[l [len v]] (u/apply-actions
-                      (vector-actions bits 0)
-                      actions
-                      (ArrayList.)
-                      [0 (BitVector/create 0)])]
-    [l (bit-vector-seq bits (/ len bits) v)]))
+(defn bit-vector [bits]
+  {:remove (wrap-idx (bit-vector-count bits) #(bit-vector-remove %1 bits %2))
+   :insert (wrap-idx (bit-vector-count bits) #(bit-vector-insert %1 bits %2 %3))
+   :append #(bit-vector-append %1 bits %2)})
 
-(u/def-collection-check test-bit-vector-16 1e4 (vector-actions 16 16384)
-  [a (ArrayList.)
-   [len v] [0 (BitVector/create 0)]]
+(def java-list
+  {:remove (wrap-idx count list-remove)
+   :insert (wrap-idx count list-insert)
+   :append list-append})
+
+(u/def-collection-check test-bit-vector-16 1e4 (vector-actions 16384)
+  [a (ArrayList.) java-list
+   [len v] [0 (BitVector/create 0)] (bit-vector 16)]
   (= a (bit-vector-seq 16 (/ len 16) v)))
 
-(u/def-collection-check test-bit-vector-48 1e4 (vector-actions 48 Integer/MAX_VALUE)
-  [a (ArrayList.)
-   [len v] [0 (BitVector/create 0)]]
+(u/def-collection-check test-bit-vector-48 1e4 (vector-actions Integer/MAX_VALUE)
+  [a (ArrayList.) java-list
+   [len v] [0 (BitVector/create 0)] (bit-vector 48)]
   (= a (bit-vector-seq 48 (/ len 48) v)))

@@ -21,7 +21,7 @@ This library builds only on the primitives provided by the Java 8 standard libra
 
 Functional collections are typically *persistent*, meaning that every version of the data structure can be accessed, even after changes are made.  This can be done efficiently by using trees for storage, and sharing common structure between all the versions.  Even so, these implementations require more time and memory than their mutable counterparts.
 
-Persistent data structures keep us from having to worry what other functions or threads are doing to our data.  However, if no one else can see our data, we don't need such strong guarantees.  If we need to construct a map with a thousand entries, we don't care about every intermediate version, just the final one.
+Persistent data structures keep us from having to worry what other functions or threads are doing to our data.  However, if no one else can see our data, we don't need such strong guarantees.  If we need to construct a list with a thousand entries, we don't care about every intermediate version, just the final one.
 
 In the literature, non-persistent data structures are called *ephemeral*, and in Clojure they're called *transient*.  Any persistent Clojure data structure can be turned into a transient version of itself, updated, and then returned to a persistent state.  Since transient data structures are allowed to overwrite previous versions of themselves, they can narrow (but not close) the performance gap with mutable data structures.
 

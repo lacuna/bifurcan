@@ -6,7 +6,6 @@ import io.lacuna.bifurcan.utils.Iterators;
 import java.util.*;
 import java.util.function.*;
 import java.util.stream.Collector;
-import java.util.stream.Collectors;
 
 import static io.lacuna.bifurcan.Lists.lazyMap;
 
@@ -103,34 +102,36 @@ public class Maps {
 
     private IMap<K, V> canonical = null;
 
-    private IMap<K, V> map, added;
+    private IMap<K, V> base, added;
     private ISet<K> removed, shadowed;
     private final boolean linear;
 
-    public Proxy(IMap<K, V> map) {
-      this(map, Maps.EMPTY, Sets.EMPTY, Sets.EMPTY, false);
+    public Proxy(IMap<K, V> base) {
+      this(base, Maps.EMPTY, Sets.EMPTY, Sets.EMPTY, false);
     }
 
-    private Proxy(IMap<K, V> map, IMap<K, V> added, ISet<K> removed, ISet<K> shadowed, boolean linear) {
-      this.map = map;
+    private Proxy(IMap<K, V> base, IMap<K, V> added, ISet<K> removed, ISet<K> shadowed, boolean linear) {
+      this.base = base;
       this.added = added;
       this.removed = removed;
       this.shadowed = shadowed;
       this.linear = linear;
     }
 
-    private synchronized void canonicalize() {
+    private void canonicalize() {
       if (canonical != null) {
         return;
       }
 
-      canonical = Map.from(map).union(added).difference(removed);
+      canonical = Map.from(base).union(added).difference(removed);
       if (linear) {
         canonical = canonical.linear();
       }
 
-      map = null;
+      // don't hold onto more memory than we have to
+      base = null;
       added = null;
+      shadowed = null;
       removed = null;
     }
 
@@ -142,7 +143,7 @@ public class Maps {
         return defaultValue;
       } else {
         V val = added.get(key, defaultValue);
-        return val == defaultValue ? map.get(key, defaultValue) : val;
+        return val == defaultValue ? base.get(key, defaultValue) : val;
       }
     }
 
@@ -150,15 +151,15 @@ public class Maps {
     public synchronized IMap<K, V> put(K key, V value, BinaryOperator<V> merge) {
       if (canonical != null) {
         return canonical.put(key, value, merge);
-      } else if (added.contains(key) || !map.contains(key)) {
+      } else if (added.contains(key) || !base.contains(key)) {
         IMap<K, V> addedPrime = added.put(key, value, merge);
-        return linear ? this : new Proxy<K, V>(map, addedPrime, removed, shadowed, false);
+        return linear ? this : new Proxy<K, V>(base, addedPrime, removed, shadowed, false);
       } else {
         IMap<K, V> addedPrime = added.put(key, merge.apply(added.get(key).orElse(null), value));
         ISet<K> shadowedPrime = shadowed.add(key);
         ISet<K> removedPrime = removed.remove(key);
 
-        return linear ? this : new Proxy<K, V>(map, addedPrime, removedPrime, shadowedPrime, false);
+        return linear ? this : new Proxy<K, V>(base, addedPrime, removedPrime, shadowedPrime, false);
       }
     }
 
@@ -174,9 +175,9 @@ public class Maps {
         if (shadowed.contains(key)) {
           ISet<K> shadowedPrime = shadowed.remove(key);
           ISet<K> removedPrime = removed.add(key);
-          return linear ? this : new Proxy<K, V>(map, addedPrime, removedPrime, shadowedPrime, false);
+          return linear ? this : new Proxy<K, V>(base, addedPrime, removedPrime, shadowedPrime, false);
         } else {
-          return linear ? this : new Proxy<K, V>(map, addedPrime, removed, shadowed, false);
+          return linear ? this : new Proxy<K, V>(base, addedPrime, removed, shadowed, false);
         }
       }
     }
@@ -186,7 +187,7 @@ public class Maps {
       if (canonical != null) {
         return canonical.forked();
       } else {
-        return linear ? new Proxy<K, V>(map, added.forked(), removed.forked(), shadowed.forked(), false) : this;
+        return linear ? new Proxy<K, V>(base, added.forked(), removed.forked(), shadowed.forked(), false) : this;
       }
     }
 
@@ -195,7 +196,7 @@ public class Maps {
       if (canonical != null) {
         return canonical.linear();
       } else {
-        return linear ? this : new Proxy<K, V>(map, added.linear(), removed.linear(), shadowed.linear(), true);
+        return linear ? this : new Proxy<K, V>(base, added.linear(), removed.linear(), shadowed.linear(), true);
       }
     }
 
@@ -204,7 +205,7 @@ public class Maps {
       if (canonical != null) {
         return canonical.contains(key);
       } else {
-        return added.contains(key) || (!removed.contains(key) && map.contains(key));
+        return added.contains(key) || (!removed.contains(key) && base.contains(key));
       }
     }
 
@@ -222,7 +223,7 @@ public class Maps {
 
     @Override
     public synchronized long size() {
-      return map.size() + (added.size() - shadowed.size()) - removed.size();
+      return base.size() + (added.size() - shadowed.size()) - removed.size();
     }
   }
 
@@ -311,6 +312,24 @@ public class Maps {
       public long size() {
         return map.size();
       }
+
+      @Override
+      public int hashCode() {
+        return (int) Maps.hash(this);
+      }
+
+      @Override
+      public boolean equals(Object obj) {
+        if (obj instanceof IMap) {
+          return Maps.equals(this, (Map<K, V>) obj);
+        }
+        return false;
+      }
+
+      @Override
+      public String toString() {
+        return Maps.toString(this);
+      }
     };
   }
 
@@ -354,6 +373,24 @@ public class Maps {
       @Override
       public long size() {
         return keys.size();
+      }
+
+      @Override
+      public int hashCode() {
+        return (int) Maps.hash(this);
+      }
+
+      @Override
+      public boolean equals(Object obj) {
+        if (obj instanceof IMap) {
+          return Maps.equals(this, (IMap<K, V>) obj);
+        }
+        return false;
+      }
+
+      @Override
+      public String toString() {
+        return Maps.toString(this);
       }
     };
   }

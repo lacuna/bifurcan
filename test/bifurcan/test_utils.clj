@@ -4,32 +4,33 @@
    [clojure.test.check.properties :as prop]
    [clojure.test.check.clojure-test :as ct :refer (defspec)]))
 
-(defn action [generators fa fb]
-  {:generators generators
-   :fa fa
-   :fb fb})
-
 (defn actions->generator [actions]
   (->> actions
-    (map (fn [[name {:keys [generators]}]]
-           (apply gen/tuple
-             (gen/return name)
-             generators)))
+    (map
+      (fn [[name generators]]
+        (apply gen/tuple
+          (gen/return name)
+          generators)))
     gen/one-of
     gen/list))
 
-(defn apply-actions [actions->generator actions a b]
-  (loop [a a, b b, s actions]
-    (if (empty? s)
-      [a b]
-      (let [[action & args] (first s)
-            {:keys [fa fb]} (get actions->generator action)]
-        (recur (when a (apply fa a args)) (when b (apply fb b args)) (rest s))))))
+(defn apply-actions [actions coll action->fn]
+  (reduce
+    (fn [c [action & args]] (apply (action->fn action) c args))
+    coll
+    actions))
 
 (defmacro def-collection-check
-  [name num-checks action-spec [a a-gen, b b-gen] & predicate]
-  `(defspec ~name ~num-checks
-     (let [a# ~action-spec]
-       (prop/for-all [actions# (actions->generator a#)]
-         (let [[~a ~(or b '_)] (apply-actions a# actions# ~a-gen ~b-gen)]
+  [name iterations action-spec colls & predicate]
+  (let [actions (gensym "actions")]
+    `(defspec ~name ~iterations
+       (prop/for-all [~actions (actions->generator ~action-spec)]
+         (let [~@(->> (zipmap
+                        (->> colls (partition 3) (map first))
+                        (->> colls
+                          (partition 3)
+                          (map
+                            (fn [[_ coll action->fn]]
+                              `(apply-actions ~actions ~coll ~action->fn)))))
+                   (apply concat))]
            ~@predicate)))))

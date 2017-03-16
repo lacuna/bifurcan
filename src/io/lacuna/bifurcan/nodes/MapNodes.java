@@ -3,6 +3,7 @@ package io.lacuna.bifurcan.nodes;
 import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.IMap.IEntry;
 import io.lacuna.bifurcan.utils.ArrayVector;
+import io.lacuna.bifurcan.utils.Bits;
 import io.lacuna.bifurcan.utils.Iterators;
 
 import java.util.Iterator;
@@ -16,7 +17,7 @@ import static java.lang.System.arraycopy;
 
 /**
  * This is an implementation based on the one described in https://michael.steindorfer.name/publications/oopsla15.pdf.
- *
+ * <p>
  * It adds in support for transient/linear updates, and allows for empty buffer space between the nodes and nodes
  * to minimize allocations when a node is repeatedly updated in-place.
  *
@@ -181,7 +182,7 @@ public class MapNodes {
     }
 
     // this is factored out of `put` for greater inlining joy
-    private Node<K, V> mergeEntry(int shift, int mask, PutCommand<K, V> c) {
+    private Node<K, V>  mergeEntry(int shift, int mask, PutCommand<K, V> c) {
       int idx = entryIndex(mask);
 
       // there's a match
@@ -199,12 +200,12 @@ public class MapNodes {
         V value = (V) content[(idx << 1) + 1];
 
         INode<K, V> node;
-        if (shift < 30 && !collision) {
+        if (collision) {
+          node = new Collision<K, V>(c.hash, key, value, c.key, c.value);
+        } else {
           node = new Node<K, V>(c.editor)
               .put(shift + SHIFT_INCREMENT, new PutCommand<>(c, hashes[idx], key, value))
               .put(shift + SHIFT_INCREMENT, c);
-        } else {
-          node = new Collision<K, V>(c.hash, key, value, c.key, c.value);
         }
 
         return (c.editor == editor ? this : clone(c.editor)).removeEntry(mask).putNode(mask, node);
@@ -225,12 +226,7 @@ public class MapNodes {
         long prevSize = node.size();
         INode<K, V> nodePrime = node.put(shift + SHIFT_INCREMENT, c);
 
-        if (node == nodePrime) {
-          size += node.size() - prevSize;
-          return this;
-        } else {
-          return (c.editor == editor ? this : clone(c.editor)).setNode(mask, nodePrime);
-        }
+        return (c.editor == editor ? this : clone(c.editor)).setNode(mask, nodePrime, nodePrime.size() - prevSize);
 
         // no existing entry
       } else {
@@ -239,7 +235,7 @@ public class MapNodes {
     }
 
     @Override
-    public Node<K, V> remove(int shift, RemoveCommand<K, V> c) {
+    public INode<K, V> remove(int shift, RemoveCommand<K, V> c) {
       int mask = hashMask(c.hash, shift);
 
       // there's a potential match
@@ -248,7 +244,7 @@ public class MapNodes {
 
         // there is a match
         if (hashes[idx] == c.hash && c.equals.test(c.key, (K) content[idx << 1])) {
-          return (c.editor == editor ? this : clone(c.editor)).removeEntry(mask);
+          return (c.editor == editor ? this : clone(c.editor)).removeEntry(mask).collapse(shift);
 
           // nope
         } else {
@@ -261,23 +257,16 @@ public class MapNodes {
         long prevSize = node.size();
         INode<K, V> nodePrime = node.remove(shift + SHIFT_INCREMENT, c);
 
-        if (node == nodePrime) {
-          size += node.size() - prevSize;
-          return this;
-        } else {
-          Node<K, V> n = c.editor == editor ? this : clone(c.editor);
-
-          switch ((int) nodePrime.size()) {
-            case 0:
-              return n.removeNode(mask);
-            case 1:
-              IEntry<K, V> e = nodePrime.nth(0);
-              return n.removeNode(mask).putEntry(mask, nodePrime.hash(0), e.key(), e.value());
-            default:
-              return n.setNode(mask, nodePrime);
-          }
+        Node<K, V> n = c.editor == editor ? this : clone(c.editor);
+        switch ((int) nodePrime.size()) {
+          case 0:
+            return n.removeNode(mask, prevSize).collapse(shift);
+          case 1:
+            IEntry<K, V> e = nodePrime.nth(0);
+            return n.removeNode(mask, prevSize).putEntry(mask, nodePrime.hash(0), e.key(), e.value());
+          default:
+            return n.setNode(mask, nodePrime, nodePrime.size() - prevSize).collapse(shift);
         }
-
         // no such thing
       } else {
         return this;
@@ -288,7 +277,7 @@ public class MapNodes {
 
       return new Iterator<IEntry<K, V>>() {
 
-        final IList<INode<K, V>> nodes = LinearList.from(nodes());
+        final LinearList<INode<K, V>> nodes = LinearList.from(nodes());
         Iterator<IEntry<K, V>> iterator = entries().iterator();
 
         @Override
@@ -299,8 +288,7 @@ public class MapNodes {
         @Override
         public IEntry<K, V> next() {
           while (!iterator.hasNext()) {
-            INode<K, V> node = nodes.first();
-            nodes.removeFirst();
+            INode<K, V> node = nodes.popFirst();
             iterator = node.entries().iterator();
             if (node instanceof Node) {
               ((Node<K, V>) node).nodes().forEach(n -> nodes.addLast(n));
@@ -361,6 +349,12 @@ public class MapNodes {
               i -> (INode<K, V>) content[(int) i]);
     }
 
+    private INode<K, V> collapse(int shift) {
+      return (shift > 0 && datamap == 0 && Bits.isPowerOfTwo(nodemap) && node(nodemap) instanceof Collision)
+          ? node(nodemap)
+          : this;
+    }
+
     private void grow() {
       Object[] c = new Object[content.length << 1];
       int numNodes = bitCount(nodemap);
@@ -415,11 +409,9 @@ public class MapNodes {
       return this;
     }
 
-    Node<K, V> setNode(int mask, INode<K, V> node) {
-      int idx = content.length - 1 - nodeIndex(mask);
-      size += node.size() - ((INode<K, V>) content[idx]).size();
-      content[idx] = node;
-
+    Node<K, V> setNode(int mask, INode<K, V> node, long sizeDelta) {
+      content[content.length - 1 - nodeIndex(mask)] = node;
+      size += sizeDelta;
       return this;
     }
 
@@ -442,12 +434,12 @@ public class MapNodes {
       return this;
     }
 
-    Node<K, V> removeNode(final int mask) {
+    Node<K, V> removeNode(final int mask, long nodeSize) {
       // shrink?
 
       int idx = nodeIndex(mask);
       int numNodes = bitCount(nodemap);
-      size -= node(mask).size();
+      size -= nodeSize;
       arraycopy(content, content.length - numNodes, content, content.length + 1 - numNodes, numNodes - 1 - idx);
       nodemap &= ~mask;
 
@@ -477,13 +469,13 @@ public class MapNodes {
     }
   }
 
-  static class Collision<K, V> implements INode<K, V> {
+  public static class Collision<K, V> implements INode<K, V> {
 
     public final int hash;
     public final Object[] entries;
 
     public Collision(int hash, K k1, V v1, K k2, V v2) {
-      this(hash, new Object[] {k1, v1, k2, v2});
+      this(hash, new Object[]{k1, v1, k2, v2});
     }
 
     private Collision(int hash, Object[] entries) {
@@ -580,10 +572,45 @@ public class MapNodes {
 
   ///
 
-  private static final Object DEFAULT_VALUE = new Object();
-
   private static int hashMask(int hash, int shift) {
     return 1 << ((hash >>> shift) & 31);
+  }
+
+  public static <K, V> INode<K, V> mergeNodes(int shift, Object editor, INode<K, V> a, INode<K, V> b, BiPredicate<K, K> equals, BinaryOperator<V> merge) {
+    Collision<K, V> ca, cb;
+    Node<K, V> na, nb;
+
+    // Node / Node
+    if (a instanceof Node && b instanceof Node) {
+      return merge(shift + 5, editor, (Node<K, V>) a, (Node<K, V>) b, equals, merge);
+
+      // Node / Collision
+    } else if (a instanceof Node && b instanceof Collision) {
+      na = (Node<K, V>) a;
+      cb = (Collision<K, V>) b;
+      for (IEntry<K, V> e : cb.entries()) {
+        na = (Node<K, V>) na.put(shift + 5, editor, cb.hash, e.key(), e.value(), equals, merge);
+      }
+      return na;
+
+      // Collision / Node
+    } else if (a instanceof Collision && b instanceof Node) {
+      BinaryOperator<V> inverted = (x, y) -> merge.apply(y, x);
+      ca = (Collision<K, V>) a;
+      nb = (Node<K, V>) b;
+      for (IEntry<K, V> e : ca.entries()) {
+        nb = (Node<K, V>) nb.put(shift + 5, editor, ca.hash, e.key(), e.value(), equals, inverted);
+      }
+      return nb;
+
+      // Collision / Collision
+    } else {
+      cb = (Collision<K, V>) b;
+      for (IEntry<K, V> e : cb.entries()) {
+        a = a.put(shift + 5, editor, cb.hash, e.key(), e.value(), equals, merge);
+      }
+      return a;
+    }
   }
 
   public static <K, V> Node<K, V> merge(int shift, Object editor, Node<K, V> a, Node<K, V> b, BiPredicate<K, K> equals, BinaryOperator<V> merge) {
@@ -608,8 +635,7 @@ public class MapNodes {
           result = transferEntry(mask, b, result);
           break;
         case NODE_NODE:
-          // complicated
-          // result = transferNode(mask, null, result);
+          result = result.putNode(mask, mergeNodes(shift, editor, a.node(mask), b.node(mask), equals, merge));
           break;
         case NODE_ENTRY:
           idx = b.entryIndex(mask);
@@ -654,6 +680,7 @@ public class MapNodes {
           }
           break;
         case NODE_NODE:
+
           // complicated
           result = transferNode(mask, null, result);
           break;
@@ -684,11 +711,11 @@ public class MapNodes {
     while (masks.hasNext()) {
       int mask = masks.nextInt();
       int state = mergeState(mask, a.nodemap, a.datamap, b.nodemap, b.datamap);
-      int idx;
+      int idx, ia, ib;
       switch (state) {
         case ENTRY_ENTRY:
-          int ia = a.entryIndex(mask);
-          int ib = b.entryIndex(mask);
+          ia = a.entryIndex(mask);
+          ib = b.entryIndex(mask);
           if (b.hashes[ib] == a.hashes[ia] && equals.test((K) b.content[ib << 1], (K) a.content[ia << 1])) {
             result = transferEntry(mask, a, result);
           }
@@ -699,8 +726,11 @@ public class MapNodes {
           break;
         case NODE_ENTRY:
           idx = b.entryIndex(mask);
-          if (a.get(shift, b.hashes[idx], (K) b.content[idx << 1], equals, DEFAULT_VALUE) != DEFAULT_VALUE) {
-            result = transferEntry(mask, b, result);
+          int hash = b.hashes[idx];
+          K key = (K) b.content[idx << 1];
+          Object val = a.get(shift, hash, key, equals, DEFAULT_VALUE);
+          if (val != DEFAULT_VALUE) {
+            result = (Node<K, V>) result.put(shift, editor, hash, key, (V) val, equals, null);
           }
           break;
         case ENTRY_NODE:

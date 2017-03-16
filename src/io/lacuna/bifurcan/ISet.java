@@ -98,6 +98,7 @@ public interface ISet<V> extends
 
   @Override
   default IList<ISet<V>> split(int parts) {
-    return Sets.split(this, parts);
+    parts = Math.max(1, Math.min((int) size(), parts));
+    return elements().split(parts).stream().map(LinearSet::from).collect(Lists.collector());
   }
 }

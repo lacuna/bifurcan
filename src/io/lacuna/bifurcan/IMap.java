@@ -116,7 +116,7 @@ public interface IMap<K, V> extends
   }
 
   default IMap<K, V> union(IMap<K, V> m) {
-    return Maps.merge(this, m, Maps.MERGE_LAST_WRITE_WINS);
+    return merge(m, Maps.MERGE_LAST_WRITE_WINS);
   }
 
   default IMap<K, V> difference(IMap<K, ?> m) {

@@ -128,14 +128,8 @@ public class Map<K, V> implements IMap<K, V> {
   }
 
   @Override
-  public Map<K, V> union(IMap<K, V> m) {
-    return merge(m, (BinaryOperator<V>) Maps.MERGE_LAST_WRITE_WINS);
-  }
-
-  @Override
   public Map<K, V> merge(IMap<K, V> b, BinaryOperator<V> mergeFn) {
-    // TODO
-    if (false) /*(b instanceof Map)*/ {
+    if (b instanceof Map) {
       Node<K, V> rootPrime = MapNodes.merge(0, editor, root, ((Map) b).root, equalsFn, mergeFn);
       return linear ? this : new Map<>(rootPrime, hashFn, equalsFn, false);
     } else {

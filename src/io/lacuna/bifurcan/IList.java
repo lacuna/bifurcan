@@ -112,12 +112,14 @@ public interface IList<V> extends
 
   @Override
   default IList<IList<V>> split(int parts) {
+    parts = Math.max(1, Math.min((int) size(), parts));
     IList<V>[] ary = new IList[parts];
 
     long subSize = size() / parts;
     long offset = 0;
     for (int i = 0; i < parts; i++) {
       ary[i] = Lists.slice(this, offset, i == (parts - 1) ? size() : offset + subSize);
+      offset += subSize;
     }
 
     return Lists.from(ary);
@@ -146,7 +148,7 @@ public interface IList<V> extends
    */
   default V first() {
     if (size() == 0) {
-      throw new NoSuchElementException();
+      throw new IndexOutOfBoundsException();
     }
     return nth(0);
   }
@@ -157,7 +159,7 @@ public interface IList<V> extends
    */
   default V last() {
     if (size() == 0) {
-      throw new NoSuchElementException();
+      throw new IndexOutOfBoundsException();
     }
     return nth(size() - 1);
   }

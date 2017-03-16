@@ -38,6 +38,38 @@ public class Sets {
     }
   };
 
+  public static class Proxy<V> implements ISet<V> {
+    @Override
+    public boolean contains(V value) {
+      return false;
+    }
+
+    @Override
+    public long size() {
+      return 0;
+    }
+
+    @Override
+    public IList<V> elements() {
+      return null;
+    }
+
+    @Override
+    public ISet<V> add(V value) {
+      return null;
+    }
+
+    @Override
+    public ISet<V> remove(V value) {
+      return null;
+    }
+
+    @Override
+    public Iterator<V> iterator() {
+      return null;
+    }
+  }
+
   public static <V> long hash(ISet<V> s) {
     return hash(s, Objects::hashCode, (a, b) -> a + b);
   }
@@ -192,10 +224,6 @@ public class Sets {
         return (IList<V>) Lists.from(s.toArray());
       }
     };
-  }
-
-  public static <V> IList<ISet<V>> split(ISet<V> set, int parts) {
-    return set.elements().split(parts).stream().map(LinearSet::from).collect(Lists.collector());
   }
 
   public static <V> String toString(ISet<V> set) {

@@ -47,6 +47,45 @@ public class IntMap<V> implements IMap<Long, V> {
     }
     return map.forked();
   }
+  
+  public IntMap<V> slice(long min, long max) {
+    Node<V> negPrime = neg.slice(editor, min, max);
+    Node<V> posPrime = pos.slice(editor, min, max);
+    return new IntMap<V>(
+        negPrime == null ? Node.NEG_EMPTY : negPrime,
+        posPrime == null ? Node.POS_EMPTY : posPrime,
+        linear);
+  }
+
+  @Override
+  public IntMap<V> merge(IMap<Long, V> b, BinaryOperator<V> mergeFn) {
+    if (b instanceof IntMap) {
+      IntMap<V> m = (IntMap<V>) b;
+      return new IntMap<V>(neg.merge(new Object(), m.neg, mergeFn), pos.merge(new Object(), m.pos, mergeFn), linear);
+    } else {
+      return (IntMap<V>) Maps.merge(this, b, mergeFn);
+    }
+  }
+
+  @Override
+  public IntMap<V> difference(IMap<Long, ?> b) {
+    if (b instanceof IntMap) {
+      IntMap<V> m = (IntMap<V>) b;
+      return new IntMap<V>(neg.difference(new Object(), m.neg), pos.difference(new Object(), m.pos), linear);
+    } else {
+      return (IntMap<V>) Maps.difference(this, b.keys());
+    }
+  }
+
+  @Override
+  public IntMap<V> intersection(IMap<Long, ?> b) {
+    if (b instanceof IntMap) {
+      IntMap<V> m = (IntMap<V>) b;
+      return new IntMap<V>(neg.intersection(new Object(), m.neg), pos.intersection(new Object(), m.pos), linear);
+    } else {
+      return (IntMap<V>) Maps.intersection(new IntMap<V>().linear(), this, b.keys()).forked();
+    }
+  }
 
   public IntMap<V> put(long key, V value) {
     return put(key, value, (BinaryOperator<V>) Maps.MERGE_LAST_WRITE_WINS);
@@ -190,6 +229,37 @@ public class IntMap<V> implements IMap<Long, V> {
   @Override
   public IntMap<V> linear() {
     return linear ? this : new IntMap<V>(neg, pos, true);
+  }
+
+  @Override
+  public IList<IMap<Long, V>> split(int parts) {
+    // Java's generics are such a trash fire
+    List<IMap<Long, V>> result = new List<IMap<Long, V>>().linear();
+
+    parts = Math.max(1, Math.min((int) size(), parts));
+    if (parts == 1 || size() == 0) {
+      return result.addLast(this).forked();
+    }
+
+    int estParts = (int) Math.min(parts - 1, Math.max(1, (neg.size() / (double) size()) * parts));
+    int negParts = pos.size() == 0 ? parts : (neg.size == 0 ? 0 : estParts);
+    int posParts = parts - negParts;
+
+    if (negParts > 0) {
+      IntMapNodes.split(new Object(), neg, neg.size() / negParts)
+          .stream()
+          .map(n -> new IntMap<V>(n, Node.POS_EMPTY, linear))
+          .forEach(m -> result.addLast((IMap<Long, V>) m));
+    }
+
+    if (posParts > 0) {
+      IntMapNodes.split(new Object(), pos, pos.size() / posParts)
+          .stream()
+          .map(n -> new IntMap<V>(Node.NEG_EMPTY, n, false))
+          .forEach(m -> result.addLast((IMap<Long, V>) m));
+    }
+
+    return result.forked();
   }
 
   @Override

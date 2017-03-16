@@ -220,16 +220,16 @@ public class Lists {
 
   static class Proxy<V> implements IList<V> {
 
-    private IList<V> prefix, list, suffix;
+    private IList<V> prefix, base, suffix;
     private final boolean linear;
 
-    public Proxy(IList<V> list) {
-      this(Lists.EMPTY, list, Lists.EMPTY, false);
+    public Proxy(IList<V> base) {
+      this(Lists.EMPTY, base, Lists.EMPTY, false);
     }
 
-    private Proxy(IList<V> prefix, IList<V> list, IList<V> suffix, boolean linear) {
+    private Proxy(IList<V> prefix, IList<V> base, IList<V> suffix, boolean linear) {
       this.prefix = prefix;
-      this.list = list;
+      this.base = base;
       this.suffix = suffix;
       this.linear = linear;
     }
@@ -237,12 +237,12 @@ public class Lists {
     @Override
     public V nth(long idx) {
       long prefixSize = prefix.size();
-      long listSize = list.size();
+      long listSize = base.size();
 
       if (idx < prefixSize) {
         return prefix.nth(idx);
       } else if (idx < (prefixSize + listSize)) {
-        return list.nth(idx - prefixSize);
+        return base.nth(idx - prefixSize);
       } else {
         return suffix.nth(idx - (prefixSize + listSize));
       }
@@ -250,30 +250,30 @@ public class Lists {
 
     @Override
     public long size() {
-      return prefix.size() + list.size() + suffix.size();
+      return prefix.size() + base.size() + suffix.size();
     }
 
     @Override
     public IList<V> addLast(V value) {
       IList<V> suffixPrime = suffix.addLast(value);
-      return linear ? this : new Proxy<V>(prefix, list, suffixPrime, false);
+      return linear ? this : new Proxy<V>(prefix, base, suffixPrime, false);
     }
 
     @Override
     public IList<V> addFirst(V value) {
       IList<V> prefixPrime = prefix.addFirst(value);
-      return linear ? this : new Proxy<V>(prefixPrime, list, suffix, false);
+      return linear ? this : new Proxy<V>(prefixPrime, base, suffix, false);
     }
 
     @Override
     public IList<V> removeLast() {
       if (suffix.size() > 0) {
         IList<V> suffixPrime = suffix.removeLast();
-        return linear ? this : new Proxy<V>(prefix, list, suffixPrime, false);
+        return linear ? this : new Proxy<V>(prefix, base, suffixPrime, false);
       } else {
-        IList<V> listPrime = list.slice(0, list.size() - 1);
+        IList<V> listPrime = base.slice(0, base.size() - 1);
         if (linear) {
-          list = listPrime;
+          base = listPrime;
           return this;
         } else {
           return new Proxy<V>(prefix, listPrime, suffix, false);
@@ -285,11 +285,11 @@ public class Lists {
     public IList<V> removeFirst() {
       if (prefix.size() > 0) {
         IList<V> prefixPrime = prefix.removeFirst();
-        return linear ? this : new Proxy<V>(prefixPrime, list, suffix, false);
+        return linear ? this : new Proxy<V>(prefixPrime, base, suffix, false);
       } else {
-        IList<V> listPrime = list.slice(1, list.size());
+        IList<V> listPrime = base.slice(1, base.size());
         if (linear) {
-          list = listPrime;
+          base = listPrime;
           return this;
         } else {
           return new Proxy<V>(prefix, listPrime, suffix, false);
@@ -305,12 +305,12 @@ public class Lists {
 
     @Override
     public IList<V> forked() {
-      return linear ? new Proxy<V>(prefix.forked(), list, suffix.forked(), false) : this;
+      return linear ? new Proxy<V>(prefix.forked(), base, suffix.forked(), false) : this;
     }
 
     @Override
     public IList<V> linear() {
-      return linear ? this : new Proxy<V>(prefix.linear(), list, suffix.linear(), true);
+      return linear ? this : new Proxy<V>(prefix.linear(), base, suffix.linear(), true);
     }
   }
 
@@ -600,10 +600,10 @@ public class Lists {
    */
   public static <V> IList<V> slice(IList<V> list, long start, long end) {
     long size = end - start;
-    if (start < 0 || end > list.size() || end <= size) {
-      throw new IllegalArgumentException();
-    } else if (size == list.size()) {
+    if (size == list.size()) {
       return list;
+    } else if (start < 0 || end > list.size()) {
+      throw new IllegalArgumentException();
     }
 
     return new Slice<V>(list, start, size);

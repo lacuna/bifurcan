@@ -25,6 +25,8 @@ public class Util {
     }
   };
 
+  static final Object DEFAULT_VALUE = new Object();
+
   static final int NONE_NONE = 0;
   static final int NODE_NONE = 0x1;
   static final int ENTRY_NONE = 0x2;
@@ -37,10 +39,10 @@ public class Util {
 
   static int mergeState(int mask, int nodeA, int dataA, int nodeB, int dataB) {
     int state = 0;
-    state |= (mask & nodeA) > 0 ? 0x1 : 0;
-    state |= (mask & dataA) > 0 ? 0x2 : 0;
-    state |= (mask & nodeB) > 0 ? 0x4 : 0;
-    state |= (mask & dataB) > 0 ? 0x8 : 0;
+    state |= (mask & nodeA) != 0 ? 0x1 : 0;
+    state |= (mask & dataA) != 0 ? 0x2 : 0;
+    state |= (mask & nodeB) != 0 ? 0x4 : 0;
+    state |= (mask & dataB) != 0 ? 0x8 : 0;
 
     return state;
   }

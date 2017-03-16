@@ -1,4 +1,5 @@
 (ns bifurcan.bit-int-set-test
+  (:refer-clojure :exclude [bit-set])
   (:require
    [clojure.test :refer :all]
    [clojure.test.check.generators :as gen]
@@ -38,29 +39,25 @@
 
 ;;;
 
-(defn set-actions [bits max-val]
+(defn set-actions [max-val]
   (let [gen-element (gen/large-integer* {:min 0, :max max-val})]
-    {:add    (u/action [gen-element]
-               hash-add
-               #(bit-set-add %1 bits %2))
-     :remove (u/action [gen-element]
-               hash-remove
-               #(bit-set-remove %1 bits %2))}))
+    {:add    [gen-element]
+     :remove [gen-element]}))
 
-(defn construct-colls [bits actions]
-  (let [[l [len v]] (u/apply-actions
-                      (set-actions bits 0)
-                      actions
-                      (HashSet.)
-                      [0 (BitIntSet/create)])]
-    [l (bit-int-set [len v] bits)]))
+(def java-set
+  {:add    hash-add
+   :remove hash-remove})
 
-(u/def-collection-check test-bit-int-set-16 1e4 (set-actions 16 16384)
-  [s (HashSet.)
-   [len v] [0 (BitIntSet/create)]]
+(defn bit-set [bits]
+  {:add    #(bit-set-add %1 bits %2)
+   :remove #(bit-set-remove %1 bits %2)})
+
+(u/def-collection-check test-bit-int-set-16 1e4 (set-actions 16384)
+  [s (HashSet.) java-set
+   [len v] [0 (BitIntSet/create)] (bit-set 16)]
   (= s (bit-int-set [len v] 16)))
 
-(u/def-collection-check test-bit-int-set-48 1e4 (set-actions 48 Integer/MAX_VALUE)
-  [s (HashSet.)
-   [len v] [0 (BitIntSet/create)]]
+(u/def-collection-check test-bit-int-set-48 1e4 (set-actions Integer/MAX_VALUE)
+  [s (HashSet.) java-set
+   [len v] [0 (BitIntSet/create)] (bit-set 48)]
   (= s (bit-int-set [len v] 48)))
