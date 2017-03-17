@@ -71,17 +71,29 @@ public class Set<V> implements ISet<V> {
 
   @Override
   public Set<V> union(ISet<V> s) {
-    return null;
+    if (s instanceof Set) {
+      return new Set<V>(map.union(((Set<V>) s).map));
+    } else {
+      return (Set<V>) Sets.union(this, s);
+    }
   }
 
   @Override
   public Set<V> difference(ISet<V> s) {
-    return null;
+    if (s instanceof Set) {
+      return new Set<V>(map.difference(((Set<V>) s).map));
+    } else {
+      return (Set<V>) Sets.difference(this, s);
+    }
   }
 
   @Override
   public Set<V> intersection(ISet<V> s) {
-    return null;
+    if (s instanceof Set) {
+      return new Set<V>(map.intersection(((Set<V>) s).map));
+    } else {
+      return (Set<V>) Sets.intersection(new Set<V>().linear(), this, s).forked();
+    }
   }
 
   @Override

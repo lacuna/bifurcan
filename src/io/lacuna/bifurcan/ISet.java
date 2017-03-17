@@ -55,7 +55,7 @@ public interface ISet<V> extends
   }
 
   default ISet<V> intersection(ISet<V> s) {
-    return Sets.difference(this, s);
+    return Sets.intersection(new Set().linear(), this, s).forked();
   }
 
   /**

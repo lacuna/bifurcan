@@ -119,6 +119,8 @@
 
 (def iterations 1e4)
 
+;;;
+
 (u/def-collection-check test-linear-map iterations map-actions
   [a (transient {}) clj-map
    b (LinearMap.) bifurcan-map]
@@ -182,21 +184,6 @@
     (list= a b)
     (list= a c)))
 
-(u/def-collection-check test-linear-map-split iterations map-actions
-  [m (LinearMap.) bifurcan-map]
-  (let [m' (->> (.split ^IMap m 8) (reduce #(.union ^IMap %1 %2) (LinearMap.)))]
-    (= m m')))
-
-(u/def-collection-check test-map-split iterations map-actions
-  [m (Map.) bifurcan-map]
-  (let [m' (->> (.split ^IMap m 8) (reduce #(.union ^IMap %1 %2) (Map.)))]
-    (= m m')))
-
-(u/def-collection-check test-int-map-split iterations map-actions
-  [m (IntMap.) bifurcan-map]
-  (let [m' (->> (.split ^IMap m 8) (reduce #(.union ^IMap %1 %2) (IntMap.)))]
-    (= m m')))
-
 ;;;
 
 (defn map-gen [init]
@@ -207,6 +194,48 @@
 
 (defn list-gen [init]
   (->> list-actions u/actions->generator (gen/fmap #(u/apply-actions %1 (init) bifurcan-list))))
+
+;; Collection split/merge
+
+(defn map-union [maps init]
+  (reduce #(.union ^IMap %1 %2) init maps))
+
+(defn set-union [sets init]
+  (reduce #(.union ^ISet %1 %2) init sets))
+
+(defspec test-linear-map-split iterations
+  (prop/for-all [m (map-gen #(LinearMap.))]
+    (-> m (.split 2) (map-union (LinearMap.)))))
+
+(defspec test-map-split iterations
+  (prop/for-all [m (map-gen #(Map.))]
+    (-> m (.split 2) (map-union (Map.)))))
+
+(defspec test-int-map-split iterations
+  (prop/for-all [m (map-gen #(IntMap.))]
+    (-> m (.split 2) (map-union (IntMap.)))))
+
+(defspec test-linear-list-split iterations
+  (prop/for-all [l (list-gen #(LinearList.))]
+    (-> l (.split 2) into-array Lists/concat)))
+
+(defspec test-list-split iterations
+  (prop/for-all [l (list-gen #(List.))]
+    (-> l (.split 2) into-array Lists/concat)))
+
+(defspec test-unreified-list-split iterations
+  (prop/for-all [l (list-gen #(Lists/from []))]
+    (-> l (.split 2) into-array Lists/concat)))
+
+(defspec test-linear-set-split iterations
+  (prop/for-all [s (set-gen #(LinearSet.))]
+    (-> s (.split 2) (set-union (LinearSet.)))))
+
+(defspec test-set-split iterations
+  (prop/for-all [s (set-gen #(Set.))]
+    (-> s (.split 2) (set-union (Set.)))))
+
+;; IList concat
 
 (defspec test-list-concat iterations
   (prop/for-all [a (list-gen #(List.))
@@ -220,17 +249,73 @@
     (= (concat (->vec a) (->vec b))
       (->vec (.concat ^IList a b)))))
 
+(defspec test-unreified-list-concat iterations
+  (prop/for-all [a (list-gen #(Lists/from []))
+                 b (list-gen #(Lists/from []))]
+    (= (concat (->vec a) (->vec b))
+      (->vec (.concat ^IList a b)))))
+
+;; LinearSet set operations
+
+(defspec test-linear-set-union iterations
+  (prop/for-all [a (set-gen #(LinearSet.))
+                 b (set-gen #(LinearSet.))]
+    (= (set/union (->set a) (->set b))
+      (->set (.union ^ISet (.clone a) b)))))
+
+(defspec test-linear-set-intersection iterations
+  (prop/for-all [a (set-gen #(LinearSet.))
+                 b (set-gen #(LinearSet.))]
+    (= (set/intersection (->set a) (->set b))
+      (->set (.intersection ^ISet (.clone a) ^ISet b)))))
+
+(defspec test-linear-set-difference iterations
+  (prop/for-all [a (set-gen #(LinearSet.))
+                 b (set-gen #(LinearSet.))]
+    (= (set/difference (->set a) (->set b))
+      (->set (.difference ^ISet (.clone a) ^ISet b)))))
+
+;; b set operations
+
 (defspec test-map-merge iterations
   (prop/for-all [a (map-gen #(Map.))
                  b (map-gen #(Map.))]
     (= (merge (->map a) (->map b))
       (->map (.union ^IMap a b)))))
 
+#_(defspec test-map-intersection iterations
+  (prop/for-all [a (map-gen #(Map.))
+                 b (map-gen #(Map.))]
+    (= (select-keys (->map a) (keys (->map b)))
+      (->map (.intersection ^IMap a ^IMap b)))))
+
+#_(defspec test-map-difference iterations
+  (prop/for-all [a (map-gen #(Map.))
+                 b (map-gen #(Map.))]
+    (= (apply dissoc (->map a) (keys (->map b)))
+      (->map (.difference ^IMap a ^IMap b)))))
+
+;; LinearMap set operations
+
 (defspec test-linear-map-merge iterations
   (prop/for-all [a (map-gen #(LinearMap.))
                  b (map-gen #(LinearMap.))]
     (= (merge (->map a) (->map b))
       (->map (.union ^IMap a b)))))
+
+(defspec test-linear-map-intersection iterations
+  (prop/for-all [a (map-gen #(LinearMap.))
+                 b (map-gen #(LinearMap.))]
+    (= (select-keys (->map a) (keys (->map b)))
+      (->map (.intersection ^IMap a ^IMap b)))))
+
+(defspec test-linear-map-difference iterations
+  (prop/for-all [a (map-gen #(LinearMap.))
+                 b (map-gen #(LinearMap.))]
+    (= (apply dissoc (->map a) (keys (->map b)))
+      (->map (.difference ^IMap a ^IMap b)))))
+
+;; IntMap set operations
 
 (defspec test-int-map-merge iterations
   (prop/for-all [a (map-gen #(IntMap.))

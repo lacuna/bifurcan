@@ -207,7 +207,7 @@ public class LinearMap<K, V> implements IMap<K, V> {
   }
 
   @Override
-  protected LinearMap<K, V> clone() {
+  public LinearMap<K, V> clone() {
     LinearMap<K, V> m = new LinearMap<K, V>(entries.length, hashFn, equalsFn);
     arraycopy(table, 0, m.table, 0, table.length);
     arraycopy(entries, 0, m.entries, 0, entries.length);
@@ -267,24 +267,52 @@ public class LinearMap<K, V> implements IMap<K, V> {
   }
 
   @Override
+  public LinearMap<K, V> union(IMap<K, V> m) {
+    return merge(m, Maps.MERGE_LAST_WRITE_WINS);
+  }
+
+  @Override
   public LinearMap<K, V> merge(IMap<K, V> o, BinaryOperator<V> mergeFn) {
     if (o.size() == 0) {
-      return this;
-    } else if (o instanceof LinearMap) {
+      return this.clone();
+    }
+
+    LinearMap<K, V> result = this.clone();
+    if (o instanceof LinearMap) {
       LinearMap<K, V> l = (LinearMap<K, V>) o;
-      resize(size + l.size);
+      result.resize(result.size + l.size);
       for (long row : l.table) {
         if (Row.populated(row)) {
           int keyIndex = Row.keyIndex(row);
-          put(Row.hash(row), (K) l.entries[keyIndex], (V) l.entries[keyIndex + 1], mergeFn);
+          result.put(Row.hash(row), (K) l.entries[keyIndex], (V) l.entries[keyIndex + 1], mergeFn);
         }
       }
+      return result;
     } else {
       for (IEntry<K, V> e : o.entries()) {
-        put(e.key(), e.value(), mergeFn);
+        result.put(e.key(), e.value(), mergeFn);
       }
     }
-    return this;
+
+    return result;
+  }
+
+  @Override
+  public LinearMap<K, V> difference(IMap<K, ?> m) {
+    if (m instanceof LinearMap) {
+      return difference((LinearMap<K, ?>) m);
+    } else {
+      return (LinearMap<K, V>) Maps.difference(this, m.keys());
+    }
+  }
+
+  @Override
+  public LinearMap<K, V> intersection(IMap<K, ?> m) {
+    if (m instanceof LinearMap) {
+      return intersection((LinearMap<K, ?>) m);
+    } else {
+      return (LinearMap<K, V>) Maps.intersection(new LinearMap<K, V>(), this, m.keys());
+    }
   }
 
   /// Bookkeeping functions

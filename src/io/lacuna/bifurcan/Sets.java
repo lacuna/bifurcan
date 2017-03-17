@@ -86,35 +86,29 @@ public class Sets {
   }
 
   public static <V> ISet<V> difference(ISet<V> a, ISet<V> b) {
-    LinearSet<V> s = LinearSet.from(a);
     for (V e : b) {
-      s = s.remove(e);
+      a = a.remove(e);
     }
-    return s;
+    return a;
   }
 
   public static <V> ISet<V> union(ISet<V> a, ISet<V> b) {
-    if (b.size() > a.size()) {
-      return union(b, a);
-    }
-    LinearSet<V> s = LinearSet.from(a);
     for (V e : b) {
-      s = s.add(e);
+      a = a.add(e);
     }
-    return s;
+    return a;
   }
 
-  public static <V> ISet<V> intersection(ISet<V> a, ISet<V> b) {
+  public static <V> ISet<V> intersection(ISet<V> accumulator, ISet<V> a, ISet<V> b) {
     if (b.size() < a.size()) {
-      return intersection(b, a);
+      return intersection(accumulator, b, a);
     }
-    LinearSet<V> s = new LinearSet<>((int) a.size());
     for (V e : a) {
       if (b.contains(e)) {
-        s = s.add(e);
+        accumulator = accumulator.add(e);
       }
     }
-    return s;
+    return accumulator;
   }
 
   public static <V> java.util.Set<V> toSet(IList<V> elements, Predicate<V> contains) {

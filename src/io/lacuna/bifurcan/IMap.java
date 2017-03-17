@@ -104,11 +104,7 @@ public interface IMap<K, V> extends
   }
 
   default IMap<K, V> difference(ISet<K> keys) {
-    IMap<K, V> m = this.linear();
-    for (K key : keys) {
-      m = m.remove(key);
-    }
-    return m.forked();
+    return Maps.difference(this, keys);
   }
 
   default IMap<K, V> intersection(ISet<K> keys) {

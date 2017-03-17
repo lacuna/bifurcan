@@ -254,7 +254,7 @@ public class List<V> implements IList<V> {
 
       // overwrite tree
     } else if (idx < (prefixLen + rootSize)) {
-      root = root.set(editor, idx - prefixLen, value);
+      root = (Node<V>) root.set(editor, idx - prefixLen, value);
 
       // overwrite suffix
     } else {

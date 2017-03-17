@@ -12,5 +12,7 @@
                                   [org.clojure/test.check "0.9.0"]
                                   [criterium "0.4.3"]
                                   [potemkin "0.4.3"]
-                                  [proteus "0.1.6"]]}}
+                                  [proteus "0.1.6"]
+                                  [eftest "0.1.4"]]}}
+  :aliases {"partest" ["run" "-m" "bifurcan.run-tests"]}
   :jvm-opts ^:replace ["-server" "-XX:+UseG1GC" "-Xmx10g" "-XX:-OmitStackTraceInFastThrow"])

@@ -13,6 +13,8 @@ public class ListNodes {
 
   interface INode<V> {
     INode<V> slice(Object editor, int start, int end);
+
+    INode<V> set(Object editor, int idx, V val);
   }
 
   public static class Leaf<V> implements INode<V> {
@@ -26,7 +28,7 @@ public class ListNodes {
       this.size = (byte) elements.length;
     }
 
-    public Leaf set(Object editor, int idx, Object value) {
+    public Leaf<V> set(Object editor, int idx, Object value) {
       if (editor == this.editor) {
         elements[idx] = value;
         return this;
@@ -37,13 +39,13 @@ public class ListNodes {
       }
     }
 
-    public Leaf slice(Object editor, int start, int end) {
+    public Leaf<V> slice(Object editor, int start, int end) {
       Object[] ary = new Object[end - start];
       arraycopy(elements, start, ary, 0, ary.length);
       return new Leaf(editor, ary);
     }
 
-    public Leaf clone() {
+    public Leaf<V> clone() {
       return new Leaf(editor, elements.clone());
     }
   }
@@ -57,7 +59,7 @@ public class ListNodes {
     public int shift;
     public int numNodes;
     public int[] offsets;
-    public Object[] nodes;
+    public INode[] nodes;
 
     // constructors
 
@@ -67,7 +69,7 @@ public class ListNodes {
       this.shift = shift;
       this.numNodes = 0;
       this.offsets = new int[2];
-      this.nodes = new Object[2];
+      this.nodes = new INode[2];
     }
 
     private Node() {
@@ -156,23 +158,23 @@ public class ListNodes {
 
     // update
 
-    public Node set(Object editor, int idx, Object value) {
+    public INode<V> set(Object editor, int idx, Object value) {
       return (editor == this.editor ? this : clone(editor)).overwrite(editor, idx, value);
     }
 
-    public Node removeFirst(Object editor) {
+    public Node<V> removeFirst(Object editor) {
       return (editor == this.editor ? this : clone(editor)).popFirst();
     }
 
-    public Node removeLast(Object editor) {
+    public Node<V> removeLast(Object editor) {
       return (editor == this.editor ? this : clone(editor)).popLast();
     }
 
-    public Node addLast(Object editor, Object node, int size) {
+    public Node<V> addLast(Object editor, INode<V> node, int size) {
       return (editor == this.editor ? this : clone(editor)).pushLast(node, size);
     }
 
-    public Node addFirst(Object editor, Object node, int size) {
+    public Node<V> addFirst(Object editor, INode<V> node, int size) {
       return (editor == this.editor ? this : clone(editor)).pushFirst(node, size);
     }
 
@@ -212,7 +214,7 @@ public class ListNodes {
       return numNodes == 0 ? 0 : offsets[numNodes - 1];
     }
 
-    public Node concat(Object editor, Node node) {
+    public Node<V> concat(Object editor, Node node) {
 
       // same level
       if (shift == node.shift) {
@@ -242,7 +244,7 @@ public class ListNodes {
       }
     }
 
-    public Node slice(Object editor, int start, int end) {
+    public Node<V> slice(Object editor, int start, int end) {
       int startIdx = indexOf(start);
       int endIdx = indexOf(end - 1);
 
@@ -277,23 +279,22 @@ public class ListNodes {
 
     ///
 
-    private Node overwrite(Object editor, int idx, Object value) {
-      int nodeIdx = indexOf(idx);
-      if (shift > 5) {
-        nodes[nodeIdx] = ((Node) nodes[nodeIdx]).set(editor, idx - offset(nodeIdx), value);
+    private Node<V> overwrite(Object editor, int idx, Object value) {
+      if (editor != this.editor) {
+        return clone(editor).overwrite(editor, idx, value);
       } else {
-        Leaf l = (Leaf) nodes[nodeIdx];
-        nodes[nodeIdx] = l.set(editor, idx, value);
+        int nodeIdx = indexOf(idx);
+        nodes[nodeIdx] = nodes[nodeIdx].set(editor, idx - offset(nodeIdx), value);
       }
 
       return this;
     }
 
-    private Node pushLast(Object node, int size) {
+    private Node<V> pushLast(INode<V> node, int size) {
 
       // we need to add a new level
       if (numNodes == 32 && isFull(31)) {
-        return new Node(editor, strict, shift + 5)
+        return new Node<V>(editor, strict, shift + 5)
             .pushLast(this, this.size())
             .pushLast(node, size);
       }
@@ -301,7 +302,7 @@ public class ListNodes {
       // we need to append
       if (numNodes == 0 || isFull(numNodes - 1)) {
         if (shift > 5 && node instanceof Leaf) {
-          node = new Node(editor, true, shift - 5).pushLast(node, size);
+          node = new Node<V>(editor, true, shift - 5).pushLast(node, size);
         }
 
         if (numNodes == nodes.length) {
@@ -315,18 +316,18 @@ public class ListNodes {
         // we need to go deeper
       } else {
         int idx = numNodes - 1;
-        nodes[idx] = ((Node) nodes[idx]).addLast(editor, node, size);
+        nodes[idx] = ((Node<V>) nodes[idx]).addLast(editor, node, size);
         offsets[idx] += size;
       }
 
       return this;
     }
 
-    private Node pushFirst(Object node, int size) {
+    private Node<V> pushFirst(INode<V> node, int size) {
 
       // we need to add a new level
       if (numNodes == 32 && isFull(0)) {
-        return new Node(editor, false, shift + 5)
+        return new Node<V>(editor, false, shift + 5)
             .pushFirst(this, this.size())
             .pushFirst(node, size);
       }
@@ -334,7 +335,7 @@ public class ListNodes {
       // we need to prepend
       if (numNodes == 0 || isFull(0)) {
         if (shift > 5 && node instanceof Leaf) {
-          node = new Node(editor, false, shift - 5).pushLast(node, size);
+          node = new Node<V>(editor, false, shift - 5).pushLast(node, size);
         }
 
         if (numNodes == nodes.length) {
@@ -363,7 +364,7 @@ public class ListNodes {
       return this;
     }
 
-    private Node popFirst() {
+    private Node<V> popFirst() {
       if (numNodes == 0) {
         return this;
 
@@ -378,9 +379,9 @@ public class ListNodes {
         offsets[numNodes] = 0;
 
       } else {
-        Node rn = (Node) nodes[0];
+        Node<V> rn = (Node<V>) nodes[0];
         int prevSize = rn.size();
-        Node rnPrime = rn.popFirst();
+        Node<V> rnPrime = rn.popFirst();
         int delta = rnPrime.size() - prevSize;
 
         nodes[0] = rnPrime;
@@ -393,7 +394,7 @@ public class ListNodes {
       return this;
     }
 
-    private Node popLast() {
+    private Node<V> popLast() {
       if (numNodes == 0) {
         return this;
 
@@ -419,7 +420,7 @@ public class ListNodes {
       arraycopy(offsets, 0, o, 0, offsets.length);
       this.offsets = o;
 
-      Object[] n = new Object[nodes.length << 1];
+      INode[] n = new INode[nodes.length << 1];
       arraycopy(nodes, 0, n, 0, nodes.length);
       this.nodes = n;
     }
