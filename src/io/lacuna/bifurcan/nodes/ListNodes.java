@@ -59,8 +59,7 @@ public class ListNodes {
     public int[] offsets;
     public Object[] nodes;
 
-    Node() {
-    }
+    // constructors
 
     public Node(Object editor, boolean strict, int shift) {
       this.strict = strict;
@@ -71,29 +70,36 @@ public class ListNodes {
       this.nodes = new Object[2];
     }
 
-    void grow() {
-      int[] o = new int[offsets.length << 1];
-      arraycopy(offsets, 0, o, 0, offsets.length);
-      this.offsets = o;
-
-      Object[] n = new Object[nodes.length << 1];
-      arraycopy(nodes, 0, n, 0, nodes.length);
-      this.nodes = n;
+    private Node() {
     }
 
-    Node clone(Object editor) {
-      Node n = new Node();
-      n.strict = strict;
-      n.editor = editor;
-      n.numNodes = numNodes;
-      n.offsets = offsets.clone();
-      n.nodes = nodes.clone();
-      n.shift = shift;
+    // lookup
 
-      return n;
+    public Object nth(int idx) {
+      return strict ? strictNth(idx) : relaxedNth(idx);
     }
 
-    public boolean isFull(int idx) {
+    public Leaf first() {
+      if (numNodes == 0) {
+        return null;
+      } else if (shift == 5) {
+        return (Leaf) nodes[0];
+      } else {
+        return ((Node) nodes[0]).first();
+      }
+    }
+
+    public Leaf last() {
+      if (numNodes == 0) {
+        return null;
+      } else if (shift == 5) {
+        return (Leaf) nodes[numNodes - 1];
+      } else {
+        return ((Node) nodes[numNodes - 1]).first();
+      }
+    }
+
+    private boolean isFull(int idx) {
       Object n = nodes[idx];
       if (n instanceof Leaf) {
         return true;
@@ -101,24 +107,6 @@ public class ListNodes {
         Node rn = (Node) n;
         return rn.numNodes == 32 && rn.isFull(31);
       }
-    }
-
-    int indexOf(int idx) {
-      int estimate = ((idx >> shift) & 31);
-      if (strict) {
-        return estimate;
-      }
-
-      for (int i = estimate; i < nodes.length; i++) {
-        if (idx < offsets[i]) {
-          return i;
-        }
-      }
-      return -1;
-    }
-
-    int offset(int idx) {
-      return idx == 0 ? 0 : offsets[idx - 1];
     }
 
     private Object relaxedNth(int idx) {
@@ -148,33 +136,47 @@ public class ListNodes {
       return leaf.elements[idx & 31];
     }
 
-    public Object nth(int idx) {
-      return strict ? strictNth(idx) : relaxedNth(idx);
-    }
-
-    public int size() {
-      return numNodes == 0 ? 0 : offsets[numNodes - 1];
-    }
-
-    public Leaf first() {
-      if (numNodes == 0) {
-        return null;
-      } else if (shift == 5) {
-        return (Leaf) nodes[0];
-      } else {
-        return ((Node) nodes[0]).first();
+    private int indexOf(int idx) {
+      int estimate = ((idx >> shift) & 31);
+      if (strict) {
+        return estimate;
       }
+
+      for (int i = estimate; i < nodes.length; i++) {
+        if (idx < offsets[i]) {
+          return i;
+        }
+      }
+      return -1;
     }
 
-    public Leaf last() {
-      if (numNodes == 0) {
-        return null;
-      } else if (shift == 5) {
-        return (Leaf) nodes[numNodes - 1];
-      } else {
-        return ((Node) nodes[numNodes - 1]).first();
-      }
+    int offset(int idx) {
+      return idx == 0 ? 0 : offsets[idx - 1];
     }
+
+    // update
+
+    public Node set(Object editor, int idx, Object value) {
+      return (editor == this.editor ? this : clone(editor)).overwrite(editor, idx, value);
+    }
+
+    public Node removeFirst(Object editor) {
+      return (editor == this.editor ? this : clone(editor)).popFirst();
+    }
+
+    public Node removeLast(Object editor) {
+      return (editor == this.editor ? this : clone(editor)).popLast();
+    }
+
+    public Node addLast(Object editor, Object node, int size) {
+      return (editor == this.editor ? this : clone(editor)).pushLast(node, size);
+    }
+
+    public Node addFirst(Object editor, Object node, int size) {
+      return (editor == this.editor ? this : clone(editor)).pushFirst(node, size);
+    }
+
+    // iteration
 
     public Iterator<Leaf> leafs() {
       LinearList list = new LinearList();
@@ -204,24 +206,10 @@ public class ListNodes {
       };
     }
 
-    public Node set(Object editor, int idx, Object value) {
-      return (editor == this.editor ? this : clone(editor)).overwrite(editor, idx, value);
-    }
+    // misc
 
-    public Node removeFirst(Object editor) {
-      return (editor == this.editor ? this : clone(editor)).popFirst();
-    }
-
-    public Node removeLast(Object editor) {
-      return (editor == this.editor ? this : clone(editor)).popLast();
-    }
-
-    public Node addLast(Object editor, Object node, int size) {
-      return (editor == this.editor ? this : clone(editor)).pushLast(node, size);
-    }
-
-    public Node addFirst(Object editor, Object node, int size) {
-      return (editor == this.editor ? this : clone(editor)).pushFirst(node, size);
+    public int size() {
+      return numNodes == 0 ? 0 : offsets[numNodes - 1];
     }
 
     public Node concat(Object editor, Node node) {
@@ -426,6 +414,26 @@ public class ListNodes {
       return this;
     }
 
+    private void grow() {
+      int[] o = new int[offsets.length << 1];
+      arraycopy(offsets, 0, o, 0, offsets.length);
+      this.offsets = o;
 
+      Object[] n = new Object[nodes.length << 1];
+      arraycopy(nodes, 0, n, 0, nodes.length);
+      this.nodes = n;
+    }
+
+    private Node clone(Object editor) {
+      Node n = new Node();
+      n.strict = strict;
+      n.editor = editor;
+      n.numNodes = numNodes;
+      n.offsets = offsets.clone();
+      n.nodes = nodes.clone();
+      n.shift = shift;
+
+      return n;
+    }
   }
 }

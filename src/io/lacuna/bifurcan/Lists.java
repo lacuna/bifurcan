@@ -72,6 +72,24 @@ public class Lists {
     public IList linear() {
       return new List().linear();
     }
+
+    @Override
+    public int hashCode() {
+      return 0;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (obj instanceof IList) {
+        return ((IList) obj).size() == 0;
+      }
+      return false;
+    }
+
+    @Override
+    public String toString() {
+      return Lists.toString(this);
+    }
   };
 
   /**
@@ -270,6 +288,11 @@ public class Lists {
       if (suffix.size() > 0) {
         IList<V> suffixPrime = suffix.removeLast();
         return linear ? this : new Proxy<V>(prefix, base, suffixPrime, false);
+      } else if (base.size() == 0 && prefix.size() == 0) {
+        return Lists.EMPTY;
+      } else if (base.size() == 0) {
+        IList<V> prefixPrime = prefix.removeLast();
+        return linear ? this : new Proxy<V>(prefixPrime, base, suffix, false);
       } else {
         IList<V> listPrime = base.slice(0, base.size() - 1);
         if (linear) {
@@ -286,21 +309,48 @@ public class Lists {
       if (prefix.size() > 0) {
         IList<V> prefixPrime = prefix.removeFirst();
         return linear ? this : new Proxy<V>(prefixPrime, base, suffix, false);
+      } else if (base.size() == 0 && suffix.size() == 0) {
+        return Lists.EMPTY;
+      } else if (base.size() == 0) {
+        IList<V> suffixPrime = suffix.removeFirst();
+        return linear ? this : new Proxy<V>(prefix, base, suffixPrime, false);
       } else {
-        IList<V> listPrime = base.slice(1, base.size());
+        IList<V> basePrime = base.slice(1, base.size());
         if (linear) {
-          base = listPrime;
+          base = basePrime;
           return this;
         } else {
-          return new Proxy<V>(prefix, listPrime, suffix, false);
+          return new Proxy<V>(prefix, basePrime, suffix, false);
         }
       }
     }
 
     @Override
     public IList<V> set(long idx, V value) {
-      // TODO
-      return null;
+      if (idx < 0 || idx > size()) {
+        throw new IndexOutOfBoundsException();
+      } else if (idx == size()) {
+        return addLast(value);
+      } else if (idx < prefix.size()) {
+        IList<V> prefixPrime = prefix.set(idx, value);
+        return linear ? this : new Proxy<V>(prefixPrime, base, suffix, false);
+      } else if (idx < (prefix.size() + base.size())) {
+        idx -= prefix.size();
+        IList<V> basePrime = Lists.concat(
+            slice(0, idx),
+            new LinearList(1).addLast(value),
+            slice(idx + 1, size()));
+        if (linear) {
+          base = basePrime;
+          return this;
+        } else {
+          return new Proxy<V>(prefix, base, suffix, false);
+        }
+      } else {
+        idx -= prefix.size() + base.size();
+        IList<V> suffixPrime = suffix.set(idx, value);
+        return linear ? this : new Proxy<V>(prefix, base, suffixPrime, false);
+      }
     }
 
     @Override
@@ -312,6 +362,25 @@ public class Lists {
     public IList<V> linear() {
       return linear ? this : new Proxy<V>(prefix.linear(), base, suffix.linear(), true);
     }
+
+    @Override
+    public int hashCode() {
+      return (int) Lists.hash(this);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (obj instanceof IList) {
+        return Lists.equals(this, (IList<V>) obj);
+      }
+      return false;
+    }
+
+    @Override
+    public String toString() {
+      return Lists.toString(this);
+    }
+
   }
 
   /**
@@ -600,6 +669,9 @@ public class Lists {
    */
   public static <V> IList<V> slice(IList<V> list, long start, long end) {
     long size = end - start;
+    if (size == 0) {
+      return Lists.EMPTY;
+    }
     if (size == list.size()) {
       return list;
     } else if (start < 0 || end > list.size()) {
@@ -620,13 +692,13 @@ public class Lists {
    * @return a view of the Java list as an IList
    */
   public static <V> IList<V> from(java.util.List<V> list) {
-    return Lists.from(list.size(), idx -> list.get((int) idx), () -> list.iterator());
+    return Lists.from(list.size(), idx -> list.get((int) idx), list::iterator);
   }
 
   /**
    * Creates a list which repeatedly uses the element function for each lookup.
    *
-   * @param size the size of the list
+   * @param size      the size of the list
    * @param elementFn a function which returns the list for the given element
    * @return a list
    */
@@ -668,8 +740,8 @@ public class Lists {
   /**
    * Creates a list which repeatedly uses the element function for each lookup.
    *
-   * @param size the size of the list
-   * @param elementFn a function which returns the list for the given element
+   * @param size       the size of the list
+   * @param elementFn  a function which returns the list for the given element
    * @param iteratorFn a function which generates an iterator for the list
    * @return a list
    */

@@ -40,6 +40,10 @@ public class List<V> implements IList<V> {
     this.suffix = suffix;
   }
 
+  public static <V> List<V> from(java.util.List<V> list) {
+    return list.stream().collect(Lists.collector());
+  }
+
   @Override
   public V nth(long idx) {
     int rootSize = root.size();
@@ -180,14 +184,14 @@ public class List<V> implements IList<V> {
       Node r = root;
 
       // append our own suffix
-      if (suffix != null) {
+      if (suffix != null && suffixLen > 0) {
         Object[] suf = new Object[suffixLen];
         arraycopy(suffix, 0, suf, 0, suf.length);
         r = r.addLast(editor, new Leaf(editor, suf), suf.length);
       }
 
       // append their prefix
-      if (b.prefix != null) {
+      if (b.prefix != null && b.prefixLen > 0) {
         Object[] pre = new Object[b.prefixLen];
         arraycopy(b.prefix, b.pIdx(0), pre, 0, pre.length);
         r = r.addLast(editor, new Leaf(editor, pre), pre.length);
@@ -217,8 +221,8 @@ public class List<V> implements IList<V> {
 
   @Override
   public boolean equals(Object obj) {
-    if (obj instanceof List) {
-      return Lists.equals(this, (List) obj);
+    if (obj instanceof IList) {
+      return Lists.equals(this, (IList<V>) obj);
     }
     return false;
   }

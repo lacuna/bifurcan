@@ -65,7 +65,7 @@ public interface IList<V> extends
    * @throws IndexOutOfBoundsException when {@code idx} is not within {@code [0, count]}
    */
   default IList<V> set(long idx, V value) {
-    return null;
+    return new Proxy<V>(this).set(idx, value);
   }
 
   /**

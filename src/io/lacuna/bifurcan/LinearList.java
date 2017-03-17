@@ -127,7 +127,7 @@ public class LinearList<V> implements IList<V> {
       throw new IndexOutOfBoundsException();
     }
 
-    elements[(int) idx] = value;
+    elements[(int) (offset + (int) idx) & mask] = value;
     return this;
   }
 

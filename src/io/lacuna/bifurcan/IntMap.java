@@ -47,7 +47,7 @@ public class IntMap<V> implements IMap<Long, V> {
     }
     return map.forked();
   }
-  
+
   public IntMap<V> slice(long min, long max) {
     Node<V> negPrime = neg.slice(editor, min, max);
     Node<V> posPrime = pos.slice(editor, min, max);
@@ -71,7 +71,9 @@ public class IntMap<V> implements IMap<Long, V> {
   public IntMap<V> difference(IMap<Long, ?> b) {
     if (b instanceof IntMap) {
       IntMap<V> m = (IntMap<V>) b;
-      return new IntMap<V>(neg.difference(new Object(), m.neg), pos.difference(new Object(), m.pos), linear);
+      Node<V> negPrime = neg.difference(new Object(), m.neg);
+      Node<V> posPrime = pos.difference(new Object(), m.pos);
+      return new IntMap<V>(negPrime == null ? Node.NEG_EMPTY : negPrime, posPrime == null ? Node.POS_EMPTY : posPrime, linear);
     } else {
       return (IntMap<V>) Maps.difference(this, b.keys());
     }
@@ -81,7 +83,9 @@ public class IntMap<V> implements IMap<Long, V> {
   public IntMap<V> intersection(IMap<Long, ?> b) {
     if (b instanceof IntMap) {
       IntMap<V> m = (IntMap<V>) b;
-      return new IntMap<V>(neg.intersection(new Object(), m.neg), pos.intersection(new Object(), m.pos), linear);
+      Node<V> negPrime = neg.intersection(new Object(), m.neg);
+      Node<V> posPrime = pos.intersection(new Object(), m.pos);
+      return new IntMap<V>(negPrime == null ? Node.NEG_EMPTY : negPrime, posPrime == null ? Node.POS_EMPTY : posPrime, linear);
     } else {
       return (IntMap<V>) Maps.intersection(new IntMap<V>().linear(), this, b.keys()).forked();
     }
