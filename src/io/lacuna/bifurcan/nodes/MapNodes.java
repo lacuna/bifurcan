@@ -173,7 +173,7 @@ public class MapNodes {
     // updates
 
     // this is factored out of `put` for greater inlining joy
-    private Node<K, V>  mergeEntry(int shift, int mask, PutCommand<K, V> c) {
+    private Node<K, V> mergeEntry(int shift, int mask, PutCommand<K, V> c) {
       int idx = entryIndex(mask);
 
       // there's a match
@@ -604,14 +604,14 @@ public class MapNodes {
 
     // Node / Node
     if (a instanceof Node && b instanceof Node) {
-      return merge(shift + 5, editor, (Node<K, V>) a, (Node<K, V>) b, equals, merge);
+      return merge(shift, editor, (Node<K, V>) a, (Node<K, V>) b, equals, merge);
 
       // Node / Collision
     } else if (a instanceof Node && b instanceof Collision) {
       na = (Node<K, V>) a;
       cb = (Collision<K, V>) b;
       for (IEntry<K, V> e : cb.entries()) {
-        na = (Node<K, V>) na.put(shift + 5, editor, cb.hash, e.key(), e.value(), equals, merge);
+        na = (Node<K, V>) na.put(shift, editor, cb.hash, e.key(), e.value(), equals, merge);
       }
       return na;
 
@@ -621,7 +621,7 @@ public class MapNodes {
       ca = (Collision<K, V>) a;
       nb = (Node<K, V>) b;
       for (IEntry<K, V> e : ca.entries()) {
-        nb = (Node<K, V>) nb.put(shift + 5, editor, ca.hash, e.key(), e.value(), equals, inverted);
+        nb = (Node<K, V>) nb.put(shift, editor, ca.hash, e.key(), e.value(), equals, inverted);
       }
       return nb;
 
@@ -629,7 +629,7 @@ public class MapNodes {
     } else {
       cb = (Collision<K, V>) b;
       for (IEntry<K, V> e : cb.entries()) {
-        a = a.put(shift + 5, editor, cb.hash, e.key(), e.value(), equals, merge);
+        a = a.put(shift, editor, cb.hash, e.key(), e.value(), equals, merge);
       }
       return a;
     }
@@ -658,7 +658,7 @@ public class MapNodes {
           result = (Node<K, V>) result.put(shift, editor, b.hash(idx), (K) b.content[idx << 1], (V) b.content[(idx << 1) + 1], equals, merge);
           break;
         case NODE_NODE:
-          result = result.putNode(mask, mergeNodes(shift, editor, a.node(mask), b.node(mask), equals, merge));
+          result = result.putNode(mask, mergeNodes(shift + 5, editor, a.node(mask), b.node(mask), equals, merge));
           break;
         case NODE_ENTRY:
           idx = b.entryIndex(mask);
@@ -680,14 +680,55 @@ public class MapNodes {
     return result;
   }
 
+  public static <K, V> INode<K, V> diffNodes(int shift, Object editor, INode<K, V> a, INode<K, V> b, BiPredicate<K, K> equals) {
+    Collision<K, V> ca, cb;
+    Node<K, V> na, nb;
+
+    // Node / Node
+    if (a instanceof Node && b instanceof Node) {
+      return difference(shift, editor, (Node<K, V>) a, (Node<K, V>) b, equals);
+
+      // Node / Collision
+    } else if (a instanceof Node && b instanceof Collision) {
+      cb = (Collision<K, V>) b;
+      for (IEntry<K, V> e : cb.entries()) {
+        a = a.remove(shift, editor, cb.hash, e.key(), equals);
+      }
+      return a.size() > 0 ? a : null;
+
+      // Collision / Node
+    } else if (a instanceof Collision && b instanceof Node) {
+      ca = (Collision<K, V>) a;
+      nb = (Node<K, V>) b;
+      for (IEntry<K, V> e : ca.entries()) {
+        if (nb.get(shift, ca.hash, e.key(), equals, DEFAULT_VALUE) != DEFAULT_VALUE) {
+          ca = (Collision<K, V>) ca.remove(shift, editor, ca.hash, e.key(), equals);
+        }
+      }
+      return ca.size() > 0 ? ca : null;
+
+      // Collision / Collision
+    } else {
+      ca = (Collision<K, V>) a;
+      cb = (Collision<K, V>) b;
+      if (ca.hash == cb.hash) {
+        for (IEntry<K, V> e : cb.entries()) {
+          ca = (Collision<K, V>) ca.remove(shift, editor, ca.hash, e.key(), equals);
+        }
+      }
+      return ca.size() > 0 ? ca : null;
+    }
+  }
+
   public static <K, V> Node<K, V> difference(int shift, Object editor, Node<K, V> a, Node<K, V> b, BiPredicate<K, K> equals) {
     Node<K, V> result = new Node<K, V>(editor);
 
+    INode<K, V> n;
+    int idx;
     PrimitiveIterator.OfInt masks = Util.masks(a.nodemap | a.datamap | b.nodemap | b.datamap);
     while (masks.hasNext()) {
       int mask = masks.nextInt();
       int state = mergeState(mask, a.nodemap, a.datamap, b.nodemap, b.datamap);
-      int idx;
       switch (state) {
         case NODE_NONE:
           result = transferNode(mask, a, result);
@@ -703,13 +744,17 @@ public class MapNodes {
           }
           break;
         case NODE_NODE:
-
-          // complicated
-          result = transferNode(mask, null, result);
+          n = diffNodes(shift + 5, editor, a.node(mask), b.node(mask), equals);
+          if (n != null) {
+            result = result.putNode(mask, n);
+          }
           break;
         case NODE_ENTRY:
           idx = b.entryIndex(mask);
-          result = (Node<K, V>) a.node(mask).remove(shift + 5, editor, b.hashes[idx], (K) b.content[idx << 1], equals);
+          n = a.node(mask).remove(shift + 5, editor, b.hashes[idx], (K) b.content[idx << 1], equals);
+          if (n.size() > 0) {
+            result = result.putNode(mask, n);
+          }
           break;
         case ENTRY_NODE:
           idx = a.entryIndex(mask);
@@ -724,7 +769,54 @@ public class MapNodes {
       }
     }
 
-    return result;
+    return result.size() > 0 ? result : null;
+  }
+
+  public static <K, V> INode<K, V> intersectNodes(int shift, Object editor, INode<K, V> a, INode<K, V> b, BiPredicate<K, K> equals) {
+    Collision<K, V> ca, cb;
+
+    // Node / Node
+    if (a instanceof Node && b instanceof Node) {
+      return intersection(shift, editor, (Node<K, V>) a, (Node<K, V>) b, equals);
+
+      // Node / Collision
+    } else if (a instanceof Node && b instanceof Collision) {
+      cb = (Collision<K, V>) b;
+      Collision<K, V> result = new Collision<K, V>(cb.hash, new Object[0]);
+      for (IEntry<K, V> e : b.entries()) {
+        Object val = a.get(shift, cb.hash, e.key(), equals, DEFAULT_VALUE);
+        if (val != DEFAULT_VALUE) {
+          result = (Collision<K, V>) result.put(shift, editor, cb.hash, e.key(), (V) val, equals, null);
+        }
+      }
+      return result.size() > 0 ? result : null;
+
+      // Collision / Node
+    } else if (a instanceof Collision && b instanceof Node) {
+
+      ca = (Collision<K, V>) a;
+      for (IEntry<K, V> e : ca.entries()) {
+        if (b.get(shift, ca.hash, e.key(), equals, DEFAULT_VALUE) == DEFAULT_VALUE) {
+          ca = (Collision<K, V>) ca.remove(shift, editor, ca.hash, e.key(), equals);
+        }
+      }
+      return ca.size() > 0 ? ca : null;
+
+      // Collision / Collision
+    } else {
+      ca = (Collision<K, V>) a;
+      cb = (Collision<K, V>) b;
+      if (ca.hash != cb.hash) {
+        return null;
+      }
+
+      for (IEntry<K, V> e : ca.entries()) {
+        if (cb.get(shift, ca.hash, e.key(), equals, DEFAULT_VALUE) == DEFAULT_VALUE) {
+          ca = (Collision<K, V>) ca.remove(shift, editor, ca.hash, e.key(), equals);
+        }
+      }
+      return ca.size() > 0 ? ca : null;
+    }
   }
 
   public static <K, V> Node<K, V> intersection(int shift, Object editor, Node<K, V> a, Node<K, V> b, BiPredicate<K, K> equals) {
@@ -744,8 +836,10 @@ public class MapNodes {
           }
           break;
         case NODE_NODE:
-          // complicated
-          result = transferNode(mask, null, result);
+          INode<K, V> n = intersectNodes(shift + 5, editor, a.node(mask), b.node(mask), equals);
+          if (n != null) {
+            result = result.putNode(mask, n);
+          }
           break;
         case NODE_ENTRY:
           idx = b.entryIndex(mask);
@@ -771,7 +865,7 @@ public class MapNodes {
       }
     }
 
-    return result;
+    return result.size() > 0 ? result : null;
   }
 
   public static <K, V> IList<Node<K, V>> split(Object editor, Node<K, V> node, int targetSize) {

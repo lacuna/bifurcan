@@ -2,7 +2,11 @@ package io.lacuna.bifurcan;
 
 import java.lang.reflect.Array;
 import java.util.Iterator;
+import java.util.Spliterator;
+import java.util.Spliterators;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 /**
  * @author ztellman
@@ -32,18 +36,27 @@ public interface ISet<V> extends
    * @return the set, containing {@code rowValue}
    */
   default ISet<V> add(V value) {
-    return null;
+    return new Sets.Proxy<V>(this).add(value);
   }
 
   /**
    * @return the set, without {@code rowValue}
    */
   default ISet<V> remove(V value) {
-    return null;
+    return new Sets.Proxy<V>(this).remove(value);
   }
 
   default Iterator<V> iterator() {
     return elements().iterator();
+  }
+
+  @Override
+  default Spliterator<V> spliterator() {
+    return Spliterators.spliterator(iterator(), size(), Spliterator.DISTINCT);
+  }
+
+  default Stream<V> stream() {
+    return StreamSupport.stream(spliterator(), false);
   }
 
   default ISet<V> union(ISet<V> s) {
@@ -97,7 +110,7 @@ public interface ISet<V> extends
   }
 
   @Override
-  default IList<ISet<V>> split(int parts) {
+  default IList<? extends ISet<V>> split(int parts) {
     parts = Math.max(1, Math.min((int) size(), parts));
     return elements().split(parts).stream().map(LinearSet::from).collect(Lists.collector());
   }

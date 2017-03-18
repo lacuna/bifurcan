@@ -26,6 +26,10 @@ public class Set<V> implements ISet<V> {
     this.map = map;
   }
 
+  public static <V> Set<V> from(ISet<V> s) {
+    return s.stream().collect(Sets.collector());
+  }
+
   @Override
   public boolean contains(V value) {
     return map.contains(value);
@@ -38,8 +42,8 @@ public class Set<V> implements ISet<V> {
 
   @Override
   public IList<V> elements() {
-    IList<IMap.IEntry> entries = ((IMap) map).entries();
-    return Lists.from(size(), i -> (V) entries.nth(i).key(), () -> iterator());
+    IList<IMap.IEntry<V, Void>> entries = map.entries();
+    return Lists.from(size(), i -> entries.nth(i).key(), this::iterator);
   }
 
   @Override
@@ -62,6 +66,11 @@ public class Set<V> implements ISet<V> {
     } else {
       return new Set<V>(mapPrime);
     }
+  }
+
+  @Override
+  public List<Set<V>> split(int parts) {
+    return map.split(parts).stream().map(m -> new Set<V>(m)).collect(Lists.collector());
   }
 
   @Override
@@ -125,5 +134,10 @@ public class Set<V> implements ISet<V> {
   @Override
   public String toString() {
     return Sets.toString(this);
+  }
+
+  @Override
+  public Set<V> clone() {
+    return map.isLinear() ? forked().linear() : this;
   }
 }

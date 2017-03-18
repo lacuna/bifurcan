@@ -9,6 +9,6 @@
   (->> "test"
     e/find-tests
     (remove #(-> % meta (contains? :benchmark)))
-    (e/run-tests #_{:report eftest.report.pretty/report})
+    (#(e/run-tests % {:report eftest.report.pretty/report}))
     (#(if (= (:test %) (:pass %)) 0 1))
     System/exit))

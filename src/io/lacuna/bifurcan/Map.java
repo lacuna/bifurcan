@@ -118,8 +118,8 @@ public class Map<K, V> implements IMap<K, V> {
   }
 
   @Override
-  public IList<IMap<K, V>> split(int parts) {
-    IList<IMap<K, V>> list = new List<IMap<K, V>>().linear();
+  public List<Map<K, V>> split(int parts) {
+    List<Map<K, V>> list = new List<Map<K, V>>().linear();
     MapNodes.split(new Object(), root, (int) Math.ceil(size() / (float) parts))
         .stream()
         .map(n -> new Map<K, V>(n, hashFn, equalsFn, false))
@@ -136,7 +136,7 @@ public class Map<K, V> implements IMap<K, V> {
   public Map<K, V> merge(IMap<K, V> b, BinaryOperator<V> mergeFn) {
     if (b instanceof Map) {
       Node<K, V> rootPrime = MapNodes.merge(0, editor, root, ((Map) b).root, equalsFn, mergeFn);
-      return linear ? this : new Map<>(rootPrime, hashFn, equalsFn, false);
+      return new Map<>(rootPrime, hashFn, equalsFn, linear);
     } else {
       return (Map<K, V>) Maps.merge(this, b, mergeFn);
     }
@@ -164,7 +164,7 @@ public class Map<K, V> implements IMap<K, V> {
   public Map<K, V> difference(IMap<K, ?> m) {
     if (m instanceof Map) {
       Node<K, V> rootPrime = MapNodes.difference(0, editor, root, ((Map) m).root, equalsFn);
-      return linear ? this : new Map<>(rootPrime, hashFn, equalsFn, false);
+      return new Map<>(rootPrime == null ? Node.EMPTY : rootPrime, hashFn, equalsFn, linear);
     } else {
       return difference(m.keys());
     }
@@ -174,7 +174,7 @@ public class Map<K, V> implements IMap<K, V> {
   public Map<K, V> intersection(IMap<K, ?> m) {
     if (m instanceof Map) {
       Node<K, V> rootPrime = MapNodes.intersection(0, editor, root, ((Map) m).root, equalsFn);
-      return linear ? this : new Map<>(rootPrime, hashFn, equalsFn, false);
+      return new Map<>(rootPrime == null ? Node.EMPTY : rootPrime, hashFn, equalsFn, linear);
     } else {
       return intersection(m.keys());
     }
@@ -220,6 +220,11 @@ public class Map<K, V> implements IMap<K, V> {
   @Override
   public String toString() {
     return Maps.toString(this);
+  }
+
+  @Override
+  public Map<K, V> clone() {
+    return linear ? forked().linear() : this;
   }
 
   private int keyHash(K key) {

@@ -191,4 +191,11 @@ public class LinearList<V> implements IList<V> {
   public String toString() {
     return Lists.toString(this);
   }
+
+  @Override
+  public LinearList<V> clone() {
+    LinearList<V> l = new LinearList<V>(size, elements.clone());
+    l.offset = offset;
+    return l;
+  }
 }

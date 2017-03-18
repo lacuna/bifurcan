@@ -233,11 +233,11 @@ public class LinearMap<K, V> implements IMap<K, V> {
   }
 
   @Override
-  public IList<IMap<K, V>> split(int parts) {
+  public List<LinearMap<K, V>> split(int parts) {
     parts = Math.min(parts, size);
-    IList<IMap<K, V>> list = new LinearList<>(parts);
+    List<LinearMap<K, V>> list = new List<LinearMap<K, V>>().linear();
     if (parts <= 1) {
-      return list.addLast(this);
+      return list.addLast(this).forked();
     }
 
     int partSize = table.length / parts;
@@ -263,7 +263,7 @@ public class LinearMap<K, V> implements IMap<K, V> {
       }
     }
 
-    return list;
+    return list.forked();
   }
 
   @Override

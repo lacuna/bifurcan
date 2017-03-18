@@ -132,8 +132,8 @@ public class LinearSet<V> implements ISet<V> {
   }
 
   @Override
-  public IList<ISet<V>> split(int parts) {
-    return map.split(parts).stream().map(m -> new LinearSet<>((LinearMap<V, Void>) m)).collect(Lists.collector());
+  public List<LinearSet<V>> split(int parts) {
+    return map.split(parts).stream().map(m -> new LinearSet<>(m)).collect(Lists.collector());
   }
 
   @Override

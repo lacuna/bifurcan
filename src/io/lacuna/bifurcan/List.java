@@ -232,17 +232,17 @@ public class List<V> implements IList<V> {
     return Lists.toString(this);
   }
 
+  @Override
+  public List<V> clone() {
+    return new List<V>(linear, root,
+        prefixLen, prefix == null ? null : prefix.clone(),
+        suffixLen, suffix == null ? null : suffix.clone());
+  }
+
   ///
 
   private int pIdx(int idx) {
     return prefix.length - prefixLen + idx;
-  }
-
-  @Override
-  protected List<V> clone() {
-    return new List<V>(linear, root,
-        prefixLen, prefix == null ? null : prefix.clone(),
-        suffixLen, suffix == null ? null : suffix.clone());
   }
 
   List<V> overwrite(int idx, V value) {

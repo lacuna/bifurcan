@@ -1,5 +1,7 @@
 package io.lacuna.bifurcan;
 
+import io.lacuna.bifurcan.utils.Iterators;
+
 import java.lang.reflect.Array;
 import java.util.*;
 import java.util.function.*;
@@ -36,37 +38,120 @@ public class Sets {
     public ISet remove(Object value) {
       return this;
     }
+
+    @Override
+    public ISet forked() {
+      return new Set().forked();
+    }
+
+    @Override
+    public ISet linear() {
+      return new Set().linear();
+    }
   };
 
   public static class Proxy<V> implements ISet<V> {
+
+    private Set<V> canonical;
+    private ISet<V> base, added, removed;
+    private boolean linear;
+
+    public Proxy(ISet<V> base) {
+      this(base, Sets.EMPTY, Sets.EMPTY, false);
+    }
+
+    private Proxy(ISet<V> base, ISet<V> added, ISet<V> removed, boolean linear) {
+      this.base = base;
+      this.added = added;
+      this.removed = removed;
+      this.linear = linear;
+    }
+
+    private void canonicalize() {
+      if (canonical != null) {
+        canonical = Set.from(base).union(added).difference(removed);
+        base = null;
+        added = null;
+        removed = null;
+      }
+    }
+
+    private boolean altered() {
+      return removed.size() > 0;
+    }
+
     @Override
-    public boolean contains(V value) {
-      return false;
+    public synchronized boolean contains(V value) {
+      return !removed.contains(value) && (base.contains(value) || added.contains(value));
     }
 
     @Override
     public long size() {
-      return 0;
+      return (base.size() + added.size()) - removed.size();
     }
 
     @Override
     public IList<V> elements() {
-      return null;
+      if (!altered()) {
+        return Lists.concat(added.elements(), base.elements());
+      } else {
+        canonicalize();
+        return canonical.elements();
+      }
     }
 
     @Override
-    public ISet<V> add(V value) {
-      return null;
+    public synchronized ISet<V> add(V value) {
+      if (canonical != null) {
+        return canonical.add(value);
+      } else {
+        ISet<V> removedPrime = removed.remove(value);
+        ISet<V> addedPrime = added;
+        if (!base.contains(value)) {
+          addedPrime = added.add(value);
+        }
+        return linear ? this : new Proxy<V>(base, addedPrime, removedPrime, false);
+      }
     }
 
     @Override
-    public ISet<V> remove(V value) {
-      return null;
+    public synchronized ISet<V> remove(V value) {
+      if (canonical != null) {
+        return canonical.remove(value);
+      } else {
+        ISet<V> removedPrime = removed.add(value);
+        ISet<V> addedPrime = added.remove(value);
+        return linear ? this : new Proxy<V>(base, addedPrime, removedPrime, false);
+      }
     }
 
     @Override
-    public Iterator<V> iterator() {
-      return null;
+    public synchronized Iterator<V> iterator() {
+      if (canonical != null) {
+        return canonical.iterator();
+      } else if (!altered()) {
+        return Iterators.concat(added.iterator(), base.iterator());
+      } else {
+        return Iterators.concat(added.iterator(), Iterators.filter(base.iterator(), v -> !removed.contains(v)));
+      }
+    }
+
+    @Override
+    public ISet<V> forked() {
+      if (canonical != null) {
+        return canonical.forked();
+      } else {
+        return new Proxy<V>(added.forked(), removed.forked(), base, false);
+      }
+    }
+
+    @Override
+    public ISet<V> linear() {
+      if (canonical != null) {
+        return canonical.linear();
+      } else {
+        return new Proxy<V>(added.linear(), removed.linear(), base, true);
+      }
     }
   }
 
@@ -183,6 +268,10 @@ public class Sets {
   }
 
   public static <V> ISet<V> from(IList<V> elements, Predicate<V> contains) {
+    return from(elements, contains, elements::iterator);
+  }
+
+  public static <V> ISet<V> from(IList<V> elements, Predicate<V> contains, Supplier<Iterator<V>> iterator) {
     return new ISet<V>() {
       @Override
       public boolean contains(V value) {
@@ -198,6 +287,11 @@ public class Sets {
       public IList<V> elements() {
         return elements;
       }
+
+      @Override
+      public Iterator<V> iterator() {
+        return iterator.get();
+      }
     };
   }
 
@@ -211,6 +305,11 @@ public class Sets {
       @Override
       public long size() {
         return s.size();
+      }
+
+      @Override
+      public Iterator<V> iterator() {
+        return s.iterator();
       }
 
       @Override

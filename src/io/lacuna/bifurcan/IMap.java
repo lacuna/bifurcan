@@ -159,7 +159,7 @@ public interface IMap<K, V> extends
   }
 
   @Override
-  default public IList<IMap<K, V>> split(int parts) {
+  default IList<? extends IMap<K, V>> split(int parts) {
     return keys()
         .split(parts)
         .stream()

@@ -354,7 +354,8 @@ public class IntMapNodes {
         return clone(editor).difference(editor, node);
       }
 
-      return IntMapNodes.difference(editor, this, node);
+      Node<V> nPrime = IntMapNodes.difference(editor, this, node);
+      return nPrime != null && nPrime.size() > 0 ? nPrime : null;
     }
 
     public Node<V> intersection(Object editor, Node<V> node) {
@@ -362,7 +363,8 @@ public class IntMapNodes {
         return clone(editor).intersection(editor, node);
       }
 
-      return IntMapNodes.intersection(editor, this, node);
+      Node<V> nPrime = IntMapNodes.intersection(editor, this, node);
+      return nPrime != null && nPrime.size() > 0 ? nPrime : null;
     }
 
     // misc

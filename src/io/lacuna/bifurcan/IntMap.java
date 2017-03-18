@@ -2,7 +2,7 @@ package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.nodes.IntMapNodes;
 import io.lacuna.bifurcan.nodes.IntMapNodes.Node;
-import io.lacuna.bifurcan.utils.IteratorStack;
+import io.lacuna.bifurcan.utils.Iterators;
 
 import java.util.*;
 import java.util.Map;
@@ -186,7 +186,7 @@ public class IntMap<V> implements IMap<Long, V> {
 
   @Override
   public Iterator<IEntry<Long, V>> iterator() {
-    return new IteratorStack<>(neg.iterator(), pos.iterator());
+    return Iterators.concat(neg.iterator(), pos.iterator());
   }
 
   public IEntry<Long, V> floor(long key) {
@@ -236,9 +236,8 @@ public class IntMap<V> implements IMap<Long, V> {
   }
 
   @Override
-  public IList<IMap<Long, V>> split(int parts) {
-    // Java's generics are such a trash fire
-    List<IMap<Long, V>> result = new List<IMap<Long, V>>().linear();
+  public List<IntMap<V>> split(int parts) {
+    List<IntMap<V>> result = new List<IntMap<V>>().linear();
 
     parts = Math.max(1, Math.min((int) size(), parts));
     if (parts == 1 || size() == 0) {
@@ -253,14 +252,14 @@ public class IntMap<V> implements IMap<Long, V> {
       IntMapNodes.split(new Object(), neg, neg.size() / negParts)
           .stream()
           .map(n -> new IntMap<V>(n, Node.POS_EMPTY, linear))
-          .forEach(m -> result.addLast((IMap<Long, V>) m));
+          .forEach(m -> result.addLast((IntMap<V>) m));
     }
 
     if (posParts > 0) {
       IntMapNodes.split(new Object(), pos, pos.size() / posParts)
           .stream()
           .map(n -> new IntMap<V>(Node.NEG_EMPTY, n, false))
-          .forEach(m -> result.addLast((IMap<Long, V>) m));
+          .forEach(m -> result.addLast((IntMap<V>) m));
     }
 
     return result.forked();

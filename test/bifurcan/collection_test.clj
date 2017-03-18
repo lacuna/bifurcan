@@ -15,7 +15,8 @@
     Collection]
    [io.lacuna.bifurcan.utils
     BitVector
-    Bits]
+    Bits
+    Iterators]
    [io.lacuna.bifurcan
     IntMap
     Map
@@ -119,7 +120,18 @@
 
 (def iterations 1e4)
 
-;;;
+;; Generators
+
+(defn map-gen [init]
+  (->> map-actions u/actions->generator (gen/fmap #(u/apply-actions %1 (init) bifurcan-map))))
+
+(defn set-gen [init]
+  (->> set-actions u/actions->generator (gen/fmap #(u/apply-actions %1 (init) bifurcan-set))))
+
+(defn list-gen [init]
+  (->> list-actions u/actions->generator (gen/fmap #(u/apply-actions %1 (init) bifurcan-list))))
+
+;; Maps
 
 (u/def-collection-check test-linear-map iterations map-actions
   [a (transient {}) clj-map
@@ -146,6 +158,14 @@
       (map= a b)
       (map= a c))))
 
+(u/def-collection-check test-unreified-map iterations map-actions
+  [a (transient {}) clj-map
+   b Maps/EMPTY bifurcan-map]
+  (let [a (persistent! a)]
+    (map= a b)))
+
+;; Sets
+
 (u/def-collection-check test-linear-set iterations set-actions
   [a (transient #{}) clj-set
    b (LinearSet.) bifurcan-set]
@@ -160,6 +180,14 @@
       (= b c)
       (set= a b)
       (set= a c))))
+
+(u/def-collection-check test-unreified-set iterations set-actions
+  [a (transient #{}) clj-set
+   b Sets/EMPTY bifurcan-set]
+  (let [a (persistent! a)]
+    (set= a b)))
+
+;; Lists
 
 (u/def-collection-check test-linear-list iterations list-actions
   [a [] clj-list
@@ -177,23 +205,12 @@
 
 (u/def-collection-check test-unreified-list iterations list-actions
   [a [] clj-list
-   b (Lists/from []) bifurcan-list
+   b Lists/EMPTY bifurcan-list
    c (.linear (Lists/from [])) bifurcan-list]
   (and
     (= b c)
     (list= a b)
     (list= a c)))
-
-;;;
-
-(defn map-gen [init]
-  (->> map-actions u/actions->generator (gen/fmap #(u/apply-actions %1 (init) bifurcan-map))))
-
-(defn set-gen [init]
-  (->> set-actions u/actions->generator (gen/fmap #(u/apply-actions %1 (init) bifurcan-set))))
-
-(defn list-gen [init]
-  (->> list-actions u/actions->generator (gen/fmap #(u/apply-actions %1 (init) bifurcan-list))))
 
 ;; Collection split/merge
 
@@ -275,7 +292,7 @@
     (= (set/difference (->set a) (->set b))
       (->set (.difference ^ISet (.clone a) ^ISet b)))))
 
-;; b set operations
+;; Map set operations
 
 (defspec test-map-merge iterations
   (prop/for-all [a (map-gen #(Map.))
@@ -283,13 +300,13 @@
     (= (merge (->map a) (->map b))
       (->map (.union ^IMap a b)))))
 
-#_(defspec test-map-intersection iterations
+(defspec test-map-intersection iterations
   (prop/for-all [a (map-gen #(Map.))
                  b (map-gen #(Map.))]
     (= (select-keys (->map a) (keys (->map b)))
       (->map (.intersection ^IMap a ^IMap b)))))
 
-#_(defspec test-map-difference iterations
+(defspec test-map-difference iterations
   (prop/for-all [a (map-gen #(Map.))
                  b (map-gen #(Map.))]
     (= (apply dissoc (->map a) (keys (->map b)))

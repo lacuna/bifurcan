@@ -135,6 +135,10 @@ public class Maps {
       removed = null;
     }
 
+    private boolean altered() {
+      return shadowed.size() > 0 || removed.size() > 0;
+    }
+
     @Override
     public synchronized V get(K key, V defaultValue) {
       if (canonical != null) {
@@ -210,20 +214,51 @@ public class Maps {
     }
 
     @Override
-    public Iterator<IEntry<K, V>> iterator() {
-      //TODO
-      return null;
+    public synchronized Iterator<IEntry<K, V>> iterator() {
+      if (canonical != null) {
+        return canonical.iterator();
+      } else if (!altered()) {
+        return Iterators.concat(added.iterator(), base.iterator());
+      } else {
+        return Iterators.concat(
+            added.iterator(),
+            Iterators.filter(base.iterator(), e -> !shadowed.contains(e.key()) && !removed.contains(e.key())));
+      }
     }
 
     @Override
     public synchronized IList<IEntry<K, V>> entries() {
-      canonicalize();
-      return canonical.entries();
+      if (!altered()) {
+        return Lists.concat(added.entries(), base.entries());
+      } else {
+        canonicalize();
+        return canonical.entries();
+      }
     }
 
     @Override
     public synchronized long size() {
-      return base.size() + (added.size() - shadowed.size()) - removed.size();
+      return canonical != null
+          ? canonical.size()
+          : base.size() + (added.size() - shadowed.size()) - removed.size();
+    }
+
+    @Override
+    public int hashCode() {
+      return (int) Maps.hash(this);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (obj instanceof IMap) {
+        return Maps.equals(this, (IMap<K, V>) obj);
+      }
+      return false;
+    }
+
+    @Override
+    public String toString() {
+      return Maps.toString(this);
     }
   }
 
@@ -274,66 +309,17 @@ public class Maps {
   }
 
   public static <K, V> IMap<K, V> from(java.util.Map<K, V> map) {
-    return new IMap<K, V>() {
-
-      @Override
-      public V get(K key, V defaultValue) {
-        return map.getOrDefault(key, defaultValue);
-      }
-
-      @Override
-      public Optional<V> get(K key) {
-        return Optional.ofNullable(map.get(key));
-      }
-
-      @Override
-      public boolean contains(K key) {
-        return map.containsKey(key);
-      }
-
-      @Override
-      public Iterator<IEntry<K, V>> iterator() {
-        return Iterators.map(map.entrySet().iterator(), e -> new Entry<K, V>(e.getKey(), e.getValue()));
-      }
-
-      @Override
-      public IList<IEntry<K, V>> entries() {
-        return map.entrySet().stream()
-            .map(e -> (IEntry<K, V>) new Entry(e.getKey(), e.getValue()))
-            .collect(Lists.collector());
-      }
-
-      @Override
-      public ISet<K> keys() {
-        return Sets.from(lazyMap(entries(), IEntry::key), map::containsKey);
-      }
-
-      @Override
-      public long size() {
-        return map.size();
-      }
-
-      @Override
-      public int hashCode() {
-        return (int) Maps.hash(this);
-      }
-
-      @Override
-      public boolean equals(Object obj) {
-        if (obj instanceof IMap) {
-          return Maps.equals(this, (Map<K, V>) obj);
-        }
-        return false;
-      }
-
-      @Override
-      public String toString() {
-        return Maps.toString(this);
-      }
-    };
+    return from(
+        Sets.from(map.keySet()),
+        k -> map.get(k),
+        () -> Iterators.map(map.entrySet().iterator(), e -> new Maps.Entry<>(e.getKey(), e.getValue())));
   }
 
   public static <K, V> IMap<K, V> from(ISet<K> keys, Function<K, V> lookup) {
+    return from(keys, lookup, () -> Iterators.map(keys.iterator(), k -> new Maps.Entry<>(k, lookup.apply(k))));
+  }
+
+  public static <K, V> IMap<K, V> from(ISet<K> keys, Function<K, V> lookup, Supplier<Iterator<IEntry<K, V>>> iterator) {
     return new IMap<K, V>() {
       @Override
       public V get(K key, V defaultValue) {
@@ -356,6 +342,11 @@ public class Maps {
       @Override
       public boolean contains(K key) {
         return keys.contains(key);
+      }
+
+      @Override
+      public Iterator<IEntry<K, V>> iterator() {
+        return iterator.get();
       }
 
       @Override
