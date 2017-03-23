@@ -606,7 +606,7 @@
                                 (println "benchmarking" coll)
                                 [coll (benchmark-collection n step idx)])))
                        (into {}))]
-      (spit "benchmarks/data/benchmarks.edn" (pr-str descriptor))
+      (spit "benchmarks/benchmarks.edn" (pr-str descriptor))
       (write-out-csvs descriptor)))
 
   (flush)

@@ -87,39 +87,38 @@ public class LinearSet<V> implements ISet<V>, Cloneable {
   @Override
   public LinearSet<V> union(ISet<V> s) {
     if (s instanceof LinearSet) {
-      map = map.union(((LinearSet<V>) s).map);
+      return new LinearSet<V>(map.union(((LinearSet<V>) s).map));
     } else {
-      for (V e : s) {
-        map.put(e, null);
-      }
+      LinearMap<V, Void> m = map.clone();
+      s.forEach(e -> map.put(e, null));
+      return new LinearSet<V>(m);
     }
-    return this;
   }
 
   @Override
   public LinearSet<V> difference(ISet<V> s) {
     if (s instanceof LinearSet) {
-      map = map.difference(((LinearSet<V>) s).map);
+      return new LinearSet<V>(map.difference(((LinearSet<V>) s).map));
     } else {
-      for (V e : s) {
-        map.remove(e);
-      }
+      LinearMap<V, Void> m = map.clone();
+      s.forEach(m::remove);
+      return new LinearSet<V>(m);
     }
-    return this;
   }
 
   @Override
   public LinearSet<V> intersection(ISet<V> s) {
     if (s instanceof LinearSet) {
-      map = map.intersection(((LinearSet<V>) s).map);
+      return new LinearSet<V>(map.intersection(((LinearSet<V>) s).map));
     } else {
-      for (V e : s) {
-        if (!map.contains(e)) {
-          map.remove(e);
+      LinearMap<V, Void> m = map.clone();
+      for (V e : this) {
+        if (s.contains(e)) {
+          m.remove(e);
         }
       }
+      return new LinearSet<V>(m);
     }
-    return this;
   }
 
   @Override

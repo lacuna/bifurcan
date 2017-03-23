@@ -10,4 +10,5 @@ pom.xml.asc
 .hgignore
 .hg/
 .idea
-benchmarks
+benchmarks/data/
+.DS_Store
