@@ -292,6 +292,10 @@ public class ListNodes {
 
     private Node<V> pushLast(INode<V> node, int size) {
 
+      if (node instanceof Node && ((Node<V>) node).shift > shift) {
+        return ((Node<V>) node).addFirst(editor, this, size());
+      }
+
       // we need to add a new level
       if (numNodes == 32 && isFull(31)) {
         return new Node<V>(editor, strict, shift + 5)
@@ -324,6 +328,10 @@ public class ListNodes {
     }
 
     private Node<V> pushFirst(INode<V> node, int size) {
+
+      if (node instanceof Node && ((Node<V>) node).shift > shift) {
+        return ((Node<V>) node).addLast(editor, this, size());
+      }
 
       // we need to add a new level
       if (numNodes == 32 && isFull(0)) {

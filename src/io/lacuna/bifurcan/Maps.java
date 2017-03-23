@@ -524,18 +524,23 @@ public class Maps {
     return a;
   }
 
+  public static <T, K, V> Collector<T, LinearMap<K, V>, LinearMap<K, V>> linearCollector(Function<T, K> keyFn, Function<T, V> valFn, int capacity) {
+    return linearCollector(keyFn, valFn, Maps.MERGE_LAST_WRITE_WINS, capacity);
+  }
+
   public static <T, K, V> Collector<T, LinearMap<K, V>, LinearMap<K, V>> linearCollector(Function<T, K> keyFn, Function<T, V> valFn) {
-    return linearCollector(keyFn, valFn, Maps.MERGE_LAST_WRITE_WINS);
+    return linearCollector(keyFn, valFn, Maps.MERGE_LAST_WRITE_WINS, 8);
   }
 
   public static <T, K, V> Collector<T, LinearMap<K, V>, LinearMap<K, V>> linearCollector(
       Function<T, K> keyFn,
       Function<T, V> valFn,
-      BinaryOperator<V> mergeFn) {
+      BinaryOperator<V> mergeFn,
+      int capacity) {
     return new Collector<T, LinearMap<K, V>, LinearMap<K, V>>() {
       @Override
       public Supplier<LinearMap<K, V>> supplier() {
-        return LinearMap::new;
+        return () -> new LinearMap<K, V>(capacity);
       }
 
       @Override

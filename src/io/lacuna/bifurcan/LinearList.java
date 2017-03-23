@@ -14,7 +14,7 @@ import static io.lacuna.bifurcan.utils.Bits.log2Ceil;
  * @author ztellman
  */
 @SuppressWarnings("unchecked")
-public class LinearList<V> implements IList<V> {
+public class LinearList<V> implements IList<V>, Cloneable {
 
   private static final int DEFAULT_CAPACITY = 8;
 
@@ -38,11 +38,7 @@ public class LinearList<V> implements IList<V> {
   }
 
   public static <V> LinearList<V> from(Collection<V> collection) {
-    LinearList<V> list = new LinearList<V>(collection.size());
-    for (V value : collection) {
-      list.elements[list.size++] = value;
-    }
-    return list;
+    return collection.stream().collect(Lists.linearCollector(collection.size()));
   }
 
   public static <V> LinearList<V> from(Iterable<V> iterable) {
@@ -61,7 +57,7 @@ public class LinearList<V> implements IList<V> {
     if (list.size() > Integer.MAX_VALUE) {
       throw new IllegalArgumentException("LinearList cannot hold more than 1 << 30 entries");
     }
-    return from(list.toList());
+    return list.stream().collect(Lists.linearCollector((int) list.size()));
   }
 
   private void resize(int newCapacity) {
@@ -133,9 +129,30 @@ public class LinearList<V> implements IList<V> {
 
   @Override
   public LinearList<V> concat(IList<V> l) {
-    for (V e : l) {
-      addLast(e);
+    long newSize = size() + l.size();
+    if (newSize > Integer.MAX_VALUE) {
+      throw new IllegalArgumentException("cannot hold more than 1 << 31 entries");
     }
+
+    if (l instanceof LinearList) {
+      if (offset != 0 || newSize > elements.length) {
+        resize(1 << log2Ceil(newSize));
+      }
+
+      LinearList<V> list = (LinearList<V>) l;
+      int truncatedListSize = Math.min(list.size, list.elements.length - list.offset);
+
+      System.arraycopy(list.elements, list.offset, elements, size, truncatedListSize);
+      if (list.size != truncatedListSize) {
+        System.arraycopy(list.elements, 0, elements, size + truncatedListSize, list.size - truncatedListSize);
+      }
+      size += list.size();
+    } else {
+      for (V e : l) {
+        addLast(e);
+      }
+    }
+
     return this;
   }
 

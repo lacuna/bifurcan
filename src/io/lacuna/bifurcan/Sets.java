@@ -339,10 +339,14 @@ public class Sets {
   }
 
   public static <V> Collector<V, LinearSet<V>, LinearSet<V>> linearCollector() {
+    return linearCollector(8);
+  }
+
+  public static <V> Collector<V, LinearSet<V>, LinearSet<V>> linearCollector(int capacity) {
     return new Collector<V, LinearSet<V>, LinearSet<V>>() {
       @Override
       public Supplier<LinearSet<V>> supplier() {
-        return LinearSet::new;
+        return () -> new LinearSet<V>(capacity);
       }
 
       @Override

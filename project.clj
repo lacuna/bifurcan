@@ -13,6 +13,7 @@
                                   [criterium "0.4.3"]
                                   [potemkin "0.4.3"]
                                   [proteus "0.1.6"]
+                                  [byte-streams "0.2.2"]
                                   [eftest "0.1.4"]]}}
   :aliases {"partest" ["run" "-m" "bifurcan.run-tests"]}
   :jvm-opts ^:replace ["-server" "-XX:+UseG1GC" "-Xmx10g" "-XX:-OmitStackTraceInFastThrow"])

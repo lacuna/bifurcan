@@ -10,7 +10,7 @@ import java.util.function.ToIntFunction;
 /**
  * @author ztellman
  */
-public class Set<V> implements ISet<V> {
+public class Set<V> implements ISet<V>, Cloneable {
 
   Map<V, Void> map;
 

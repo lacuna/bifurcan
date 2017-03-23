@@ -271,24 +271,39 @@ public class MapNodes {
       return new Iterator<IEntry<K, V>>() {
 
         final LinearList<INode<K, V>> nodes = LinearList.from(nodes());
-        Iterator<IEntry<K, V>> iterator = entries().iterator();
+
+        // we use this rather than entries() so that we're not using polymorphic dispatch for Iterator.next()
+        Object[] content = Node.this.content;
+        int idx = 0;
+        int limit = bitCount(Node.this.datamap) << 1;
 
         @Override
         public boolean hasNext() {
-          return iterator.hasNext() || nodes.size() > 0;
+          return idx < limit || nodes.size() > 0;
         }
 
         @Override
         public IEntry<K, V> next() {
-          while (!iterator.hasNext()) {
+          while (idx >= limit) {
             INode<K, V> node = nodes.popFirst();
-            iterator = node.entries().iterator();
+
             if (node instanceof Node) {
-              ((Node<K, V>) node).nodes().forEach(n -> nodes.addLast(n));
+              Node<K, V> n = (Node<K, V>) node;
+              n.nodes().forEach(nodes::addLast);
+              content = n.content;
+              idx = 0;
+              limit = bitCount(n.datamap) << 1;
+            } else {
+              Collision<K, V> c = (Collision<K, V>) node;
+              content = c.entries;
+              idx = 0;
+              limit = c.entries.length;
             }
           }
 
-          return iterator.next();
+          IEntry<K, V> e = new Maps.Entry<>((K) content[idx], (V) content[idx + 1]);
+          idx += 2;
+          return e;
         }
       };
     }

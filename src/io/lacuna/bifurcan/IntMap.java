@@ -12,7 +12,7 @@ import java.util.function.BinaryOperator;
 /**
  * @author ztellman
  */
-public class IntMap<V> implements IMap<Long, V> {
+public class IntMap<V> implements IMap<Long, V>, Cloneable {
 
   private static final Object DEFAULT_VALUE = new Object();
 
@@ -292,5 +292,10 @@ public class IntMap<V> implements IMap<Long, V> {
   @Override
   public String toString() {
     return Maps.toString(this);
+  }
+
+  @Override
+  public Object clone() {
+    return linear ? forked().linear() : this;
   }
 }

@@ -236,6 +236,206 @@ public class Lists {
     }
   }
 
+  private static class JavaList<V> implements java.util.List<V>, RandomAccess {
+
+    private final IList<V> list;
+
+    public JavaList(IList<V> list) {
+      this.list = list;
+    }
+
+    @Override
+    public int size() {
+      return (int) list.size();
+    }
+
+    @Override
+    public boolean isEmpty() {
+      return list.size() == 0;
+    }
+
+    @Override
+    public boolean contains(Object o) {
+      return list.stream().anyMatch(e -> Objects.equals(o, e));
+    }
+
+    @Override
+    public Iterator<V> iterator() {
+      return list.iterator();
+    }
+
+    @Override
+    public Object[] toArray() {
+      return list.toArray();
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T> T[] toArray(T[] a) {
+      T[] ary = (T[]) Array.newInstance(a.getClass().getComponentType(), size());
+      IntStream.range(0, size()).forEach(i -> ary[i] = (T) get(i));
+      return ary;
+    }
+
+    @Override
+    public boolean add(V v) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean remove(Object o) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean containsAll(Collection<?> c) {
+      return c.stream().allMatch(e -> contains(e));
+    }
+
+    @Override
+    public boolean addAll(Collection<? extends V> c) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean addAll(int index, Collection<? extends V> c) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean removeAll(Collection<?> c) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean retainAll(Collection<?> c) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void clear() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public V get(int index) {
+      return list.nth(index);
+    }
+
+    @Override
+    public V set(int index, V element) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void add(int index, V element) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public V remove(int index) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public int indexOf(Object o) {
+      return IntStream.range(0, size())
+          .filter(idx -> Objects.equals(get(idx), o))
+          .findFirst()
+          .orElse(-1);
+    }
+
+    @Override
+    public int lastIndexOf(Object o) {
+      return size() -
+          IntStream.range(0, size())
+              .filter(idx -> Objects.equals(get(size() - (idx + 1)), o))
+              .findFirst()
+              .orElse(size() + 1);
+    }
+
+    @Override
+    public ListIterator<V> listIterator() {
+      return listIterator(0);
+    }
+
+    @Override
+    public ListIterator<V> listIterator(int index) {
+      return new ListIterator<V>() {
+
+        int idx = index;
+
+        @Override
+        public boolean hasNext() {
+          return idx < size();
+        }
+
+        @Override
+        public V next() {
+          return get(idx++);
+        }
+
+        @Override
+        public boolean hasPrevious() {
+          return idx > index;
+        }
+
+        @Override
+        public V previous() {
+          return get(--idx);
+        }
+
+        @Override
+        public int nextIndex() {
+          return idx;
+        }
+
+        @Override
+        public int previousIndex() {
+          return idx - 1;
+        }
+
+        @Override
+        public void remove() {
+          throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void set(V v) {
+          throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void add(V v) {
+          throw new UnsupportedOperationException();
+        }
+      };
+    }
+
+    @Override
+    public java.util.List<V> subList(int fromIndex, int toIndex) {
+      return Lists.toList(list.slice(fromIndex, toIndex));
+    }
+
+    @Override
+    public int hashCode() {
+      return (int) Lists.hash(list, Objects::hashCode, (a, b) -> (a * 31) + b);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (obj instanceof java.util.List) {
+        return Lists.equals(list, Lists.from(this));
+      }
+      return false;
+    }
+
+    @Override
+    public String toString() {
+      return Lists.toString(list);
+    }
+  }
+
   static class Proxy<V> implements IList<V> {
 
     private IList<V> prefix, base, suffix;
@@ -467,199 +667,7 @@ public class Lists {
    * @return a shim around the input list, presenting it as a standard Java List object
    */
   public static <V> java.util.List<V> toList(IList<V> list) {
-    return new java.util.List<V>() {
-
-      @Override
-      public int size() {
-        return (int) list.size();
-      }
-
-      @Override
-      public boolean isEmpty() {
-        return list.size() == 0;
-      }
-
-      @Override
-      public boolean contains(Object o) {
-        return list.stream().anyMatch(e -> Objects.equals(o, e));
-      }
-
-      @Override
-      public Iterator<V> iterator() {
-        return list.iterator();
-      }
-
-      @Override
-      public Object[] toArray() {
-        return list.toArray();
-      }
-
-      @Override
-      @SuppressWarnings("unchecked")
-      public <T> T[] toArray(T[] a) {
-        T[] ary = (T[]) Array.newInstance(a.getClass().getComponentType(), size());
-        IntStream.range(0, size()).forEach(i -> ary[i] = (T) get(i));
-        return ary;
-      }
-
-      @Override
-      public boolean add(V v) {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public boolean remove(Object o) {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public boolean containsAll(Collection<?> c) {
-        return c.stream().allMatch(e -> contains(e));
-      }
-
-      @Override
-      public boolean addAll(Collection<? extends V> c) {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public boolean addAll(int index, Collection<? extends V> c) {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public boolean removeAll(Collection<?> c) {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public boolean retainAll(Collection<?> c) {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public void clear() {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public V get(int index) {
-        return list.nth(index);
-      }
-
-      @Override
-      public V set(int index, V element) {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public void add(int index, V element) {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public V remove(int index) {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public int indexOf(Object o) {
-        return IntStream.range(0, size())
-            .filter(idx -> Objects.equals(get(idx), o))
-            .findFirst()
-            .orElse(-1);
-      }
-
-      @Override
-      public int lastIndexOf(Object o) {
-        return size() -
-            IntStream.range(0, size())
-                .filter(idx -> Objects.equals(get(size() - (idx + 1)), o))
-                .findFirst()
-                .orElse(size() + 1);
-      }
-
-      @Override
-      public ListIterator<V> listIterator() {
-        return listIterator(0);
-      }
-
-      @Override
-      public ListIterator<V> listIterator(int index) {
-        return new ListIterator<V>() {
-
-          int idx = index;
-
-          @Override
-          public boolean hasNext() {
-            return idx < size();
-          }
-
-          @Override
-          public V next() {
-            return get(idx++);
-          }
-
-          @Override
-          public boolean hasPrevious() {
-            return idx > index;
-          }
-
-          @Override
-          public V previous() {
-            return get(--idx);
-          }
-
-          @Override
-          public int nextIndex() {
-            return idx;
-          }
-
-          @Override
-          public int previousIndex() {
-            return idx - 1;
-          }
-
-          @Override
-          public void remove() {
-            throw new UnsupportedOperationException();
-          }
-
-          @Override
-          public void set(V v) {
-            throw new UnsupportedOperationException();
-          }
-
-          @Override
-          public void add(V v) {
-            throw new UnsupportedOperationException();
-          }
-        };
-      }
-
-      @Override
-      public java.util.List<V> subList(int fromIndex, int toIndex) {
-        return Lists.toList(list.slice(fromIndex, toIndex));
-      }
-
-      @Override
-      public int hashCode() {
-        return (int) Lists.hash(list, Objects::hashCode, (a, b) -> (a * 31) + b);
-      }
-
-      @Override
-      public boolean equals(Object obj) {
-        if (obj instanceof java.util.List) {
-          return Lists.equals(list, Lists.from(this));
-        }
-        return false;
-      }
-
-      @Override
-      public String toString() {
-        return Lists.toString(list);
-      }
-    };
+    return new JavaList(list);
   }
 
   /**
@@ -785,14 +793,18 @@ public class Lists {
     };
   }
 
+  public static <V> Collector<V, LinearList<V>, LinearList<V>> linearCollector() {
+    return linearCollector(8);
+  }
+
   /**
    * @return a Java stream collection which can be used to construct a LinearList
    */
-  public static <V> Collector<V, LinearList<V>, LinearList<V>> linearCollector() {
+  public static <V> Collector<V, LinearList<V>, LinearList<V>> linearCollector(int capacity) {
     return new Collector<V, LinearList<V>, LinearList<V>>() {
       @Override
       public Supplier<LinearList<V>> supplier() {
-        return LinearList::new;
+        return () -> new LinearList(capacity);
       }
 
       @Override

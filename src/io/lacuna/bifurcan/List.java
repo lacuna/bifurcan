@@ -11,7 +11,7 @@ import static java.lang.System.arraycopy;
 /**
  * @author ztellman
  */
-public class List<V> implements IList<V> {
+public class List<V> implements IList<V>, Cloneable {
 
   boolean linear;
   public Node<V> root;
@@ -182,6 +182,7 @@ public class List<V> implements IList<V> {
     if (l instanceof List) {
       List<V> b = (List<V>) l;
       Node r = root;
+      Object editor = new Object();
 
       // append our own suffix
       if (suffix != null && suffixLen > 0) {

@@ -12,7 +12,7 @@ import java.util.function.ToIntFunction;
 /**
  * @author ztellman
  */
-public class Map<K, V> implements IMap<K, V> {
+public class Map<K, V> implements IMap<K, V>, Cloneable {
 
   private static final Object DEFAULT_VALUE = new Object();
 

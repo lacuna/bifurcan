@@ -10,7 +10,7 @@ import java.util.function.ToIntFunction;
 /**
  * @author ztellman
  */
-public class LinearSet<V> implements ISet<V> {
+public class LinearSet<V> implements ISet<V>, Cloneable {
 
   private LinearMap<V, Void> map;
 
@@ -80,7 +80,8 @@ public class LinearSet<V> implements ISet<V> {
 
   @Override
   public Iterator<V> iterator() {
-    return Iterators.map(map.iterator(), IMap.IEntry::key);
+    final Object[] entries = map.entries;
+    return Iterators.range(size(), i -> (V) entries[(int) i << 1]);
   }
 
   @Override

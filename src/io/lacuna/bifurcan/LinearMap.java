@@ -2,8 +2,8 @@ package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.utils.Iterators;
 
-import java.util.Iterator;
-import java.util.Objects;
+import java.util.*;
+import java.util.Map;
 import java.util.function.*;
 
 import static io.lacuna.bifurcan.Lists.lazyMap;
@@ -25,7 +25,7 @@ import static java.lang.System.arraycopy;
  * @author ztellman
  */
 @SuppressWarnings("unchecked")
-public class LinearMap<K, V> implements IMap<K, V> {
+public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
 
   /// Fields
 
@@ -54,25 +54,14 @@ public class LinearMap<K, V> implements IMap<K, V> {
   }
 
   public static <K, V> LinearMap<K, V> from(java.util.Map<K, V> map) {
-    LinearMap<K, V> l = new LinearMap<K, V>(map.size());
-    map.entrySet().forEach(e -> l.put(e.getKey(), e.getValue()));
-    return l;
+    return map.entrySet().stream().collect(Maps.linearCollector(Map.Entry::getKey, Map.Entry::getValue, map.size()));
   }
 
   public static <K, V> LinearMap<K, V> from(IMap<K, V> map) {
     if (map instanceof LinearMap) {
-      LinearMap<K, V> m = (LinearMap<K, V>) map;
-      LinearMap<K, V> l = new LinearMap<K, V>(m.entries.length >> 1, m.hashFn, m.equalsFn);
-
-      arraycopy(m.entries, 0, l.entries, 0, m.size << 1);
-      arraycopy(m.table, 0, l.table, 0, m.table.length);
-      l.size = m.size;
-
-      return l;
+      return ((LinearMap<K, V>) map).clone();
     } else {
-      LinearMap<K, V> l = new LinearMap<K, V>((int) map.size());
-      map.entries().stream().forEach(e -> l.put(e.key(), e.value()));
-      return l;
+      return map.stream().collect(Maps.linearCollector(IEntry::key, IEntry::value, (int) map.size()));
     }
   }
 
@@ -80,15 +69,10 @@ public class LinearMap<K, V> implements IMap<K, V> {
     if (entries.size() > MAX_CAPACITY) {
       throw new IllegalArgumentException("LinearMap cannot hold more than 1 << 29 entries");
     }
-    LinearMap<K, V> m = new LinearMap<>((int) entries.size());
-    for (IEntry<K, V> e : entries) {
-      m = m.put(e.key(), e.value());
-    }
-    return m;
+    return entries.stream().collect(Maps.linearCollector(IEntry::key, IEntry::value, (int) entries.size()));
   }
 
   public LinearMap(int initialCapacity, ToIntFunction<K> hashFn, BiPredicate<K, K> equalsFn) {
-
     if (initialCapacity > MAX_CAPACITY) {
       throw new IllegalArgumentException("initialCapacity cannot be larger than " + MAX_CAPACITY);
     }
@@ -210,7 +194,7 @@ public class LinearMap<K, V> implements IMap<K, V> {
   public LinearMap<K, V> clone() {
     LinearMap<K, V> m = new LinearMap<K, V>(entries.length, hashFn, equalsFn);
     arraycopy(table, 0, m.table, 0, table.length);
-    arraycopy(entries, 0, m.entries, 0, entries.length);
+    arraycopy(entries, 0, m.entries, 0, size << 1);
     m.size = size;
     return m;
   }
@@ -275,26 +259,15 @@ public class LinearMap<K, V> implements IMap<K, V> {
   public LinearMap<K, V> merge(IMap<K, V> o, BinaryOperator<V> mergeFn) {
     if (o.size() == 0) {
       return this.clone();
-    }
-
-    LinearMap<K, V> result = this.clone();
-    if (o instanceof LinearMap) {
-      LinearMap<K, V> l = (LinearMap<K, V>) o;
-      result.resize(result.size + l.size);
-      for (long row : l.table) {
-        if (Row.populated(row)) {
-          int keyIndex = Row.keyIndex(row);
-          result.put(Row.hash(row), (K) l.entries[keyIndex], (V) l.entries[keyIndex + 1], mergeFn);
-        }
-      }
-      return result;
+    } else if (o instanceof LinearMap) {
+      return merge((LinearMap<K, V>) o, mergeFn);
     } else {
+      LinearMap<K, V> result = this.clone();
       for (IEntry<K, V> e : o.entries()) {
         result.put(e.key(), e.value(), mergeFn);
       }
+      return result;
     }
-
-    return result;
   }
 
   @Override
@@ -302,7 +275,7 @@ public class LinearMap<K, V> implements IMap<K, V> {
     if (m instanceof LinearMap) {
       return difference((LinearMap<K, ?>) m);
     } else {
-      return (LinearMap<K, V>) Maps.difference(this, m.keys());
+      return (LinearMap<K, V>) Maps.difference(this.clone(), m.keys());
     }
   }
 
@@ -317,6 +290,22 @@ public class LinearMap<K, V> implements IMap<K, V> {
 
   /// Bookkeeping functions
 
+  LinearMap<K, V> merge(LinearMap<K, V> m, BinaryOperator<V> mergeFn) {
+    if (m.size > size) {
+      return m.merge(this, (x, y) -> mergeFn.apply(y, x));
+    }
+
+    LinearMap<K, V> result = this.clone();
+    result.resize(result.size + m.size);
+    for (long row : m.table) {
+      if (Row.populated(row)) {
+        int keyIndex = Row.keyIndex(row);
+        result.put(Row.hash(row), (K) m.entries[keyIndex], (V) m.entries[keyIndex + 1], mergeFn);
+      }
+    }
+    return result;
+  }
+
   LinearMap<K, V> difference(LinearMap<K, ?> m) {
     LinearMap<K, V> result = new LinearMap<>(size);
     combine(m, result, i -> i == -1);
@@ -324,7 +313,7 @@ public class LinearMap<K, V> implements IMap<K, V> {
   }
 
   LinearMap<K, V> intersection(LinearMap<K, ?> m) {
-    LinearMap<K, V> result = new LinearMap<K, V>(Math.min(size, (int) m.size()));
+    LinearMap<K, V> result = new LinearMap<>(Math.min(size, (int) m.size()));
     combine(m, result, i -> i != -1);
     return result;
   }
