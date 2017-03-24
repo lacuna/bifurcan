@@ -303,8 +303,9 @@ public class Maps {
     }
 
     return a.entries().stream().allMatch(e -> {
-      Optional<V> val = b.get(e.key());
-      return val.isPresent() && valEquals.test(val.get(), e.value());
+      IMap m = b;
+      Object val = m.get(e.key(), DEFAULT_VALUE);
+      return val != DEFAULT_VALUE && valEquals.test((V) val, e.value());
     });
   }
 

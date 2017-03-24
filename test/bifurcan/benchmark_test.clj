@@ -255,7 +255,9 @@
      :union map-union
      :difference map-difference
      :intersection map-intersection
-     :split split}))
+     :split split
+     :add #(.put ^IMap %1 %2 nil)
+     :remove #(.remove ^IMap %1 %2)}))
 
 (defn base-set [label class]
   (merge
@@ -268,7 +270,9 @@
      :union set-union
      :difference set-difference
      :intersection set-intersection
-     :split split}))
+     :split split
+     :add #(.add ^ISet %1 %2)
+     :remove #(.remove ^ISet %1 %2)}))
 
 (defn base-list [label class]
   (merge
@@ -310,7 +314,9 @@
        :consume consume-java-entry-iterator
        :union union-hash-maps
        :difference diff-hash-maps
-       :intersection intersect-hash-maps})))
+       :intersection intersect-hash-maps
+       :add #(doto ^HashMap %1 (.put %2 nil))
+       :remove #(doto ^HashMap %1 (.remove %2))})))
 
 (def clojure-map
   {:label "clojure.lang.PersistentHashMap"
@@ -322,7 +328,9 @@
    :consume consume-java-entry-iterator
    :union merge
    :difference #(apply dissoc %1 (keys %2))
-   :intersection #(select-keys %1 (keys %2))})
+   :intersection #(select-keys %1 (keys %2))
+   :add #(assoc %1 %2 nil)
+   :remove dissoc})
 
 (def linear-set
   (merge
@@ -344,7 +352,9 @@
      :clone #(.clone ^HashSet %)
      :union #(doto ^HashSet (.clone ^HashSet %1) (.addAll %2))
      :difference #(doto ^HashSet (.clone ^HashSet %1) (.removeAll %2))
-     :intersection intersect-hash-sets}))
+     :intersection intersect-hash-sets
+     :add #(doto ^HashSet %1 (.add %2))
+     :remove #(doto ^HashSet %1 (.remove %2))}))
 
 (def clojure-set
   {:label "clojure.lang.PersistentHashSet"
@@ -356,7 +366,9 @@
    :lookup lookup-clojure-set
    :union set/union
    :difference set/difference
-   :intersection set/intersection})
+   :intersection set/intersection
+   :add conj
+   :remove disj})
 
 (def linear-list (base-list "LinearList" LinearList))
 
@@ -424,37 +436,49 @@
   (let [c (construct (base) (entries (/ n 2)))]
     (benchmark n #(-> (base) (concat c) (concat c)))))
 
-(defn benchmark-union-disjoint [n {:keys [base entries construct union clone]}]
-  (let [a (construct (base) (entries n))
-        b (construct (base) (entries n))]
-    (benchmark n #(-> a (union b)))))
-
-(defn benchmark-union-overlap [n {:keys [base entries construct union clone]}]
-  (let [s (entries n)
+(defn benchmark-equals [n {:keys [label base entries construct add remove iterator]}]
+  (let [n (long n)
+        s (entries n)
         a (construct (base) s)
-        b (construct (base) s)]
+        b (construct (base) s)
+        int-map? (= "IntMap" label)]
+    (benchmark n
+      #(let [e (aget ^objects s (rand-int n))
+             e' (if int-map?
+                  (long (rand-int Integer/MAX_VALUE))
+                  (Obj. (rand-int Integer/MAX_VALUE)))
+             b (-> b (remove e) (add e'))]
+         (.equals ^Object a b)
+         (-> b (remove e') (add e))))))
+
+(defn benchmark-union [n {:keys [base entries construct union clone]}]
+  (let [s-a (entries n)
+        s-b (into-array
+              (concat
+                (->> s-a (take (/ n 2)) shuffle)
+                (entries (/ n 2))))
+        a (construct (base) s-a)
+        b (construct (base) s-b)]
     (benchmark n #(union a b))))
 
-(defn benchmark-difference-disjoint [n {:keys [base entries construct difference clone]}]
-  (let [a (construct (base) (entries n))
-        b (construct (base) (entries n))]
+(defn benchmark-difference [n {:keys [base entries construct difference clone]}]
+  (let [s-a (entries n)
+        s-b (into-array
+              (concat
+                (->> s-a (take (/ n 2)) shuffle)
+                (entries (/ n 2))))
+        a (construct (base) s-a)
+        b (construct (base) s-b)]
     (benchmark n #(difference a b))))
 
-(defn benchmark-difference-overlap [n {:keys [base entries construct difference clone]}]
-  (let [s (entries n)
-        a (construct (base) s)
-        b (construct (base) s)]
-    (benchmark n #(difference a b))))
-
-(defn benchmark-intersection-disjoint [n {:keys [base entries construct intersection clone]}]
-  (let [a (construct (base) (entries n))
-        b (construct (base) (entries n))]
-    (benchmark n #(intersection a b))))
-
-(defn benchmark-intersection-overlap [n {:keys [base entries construct intersection clone]}]
-  (let [s (entries n)
-        a (construct (base) s)
-        b (construct (base) s)]
+(defn benchmark-intersection [n {:keys [base entries construct intersection clone]}]
+  (let [s-a (entries n)
+        s-b (into-array
+              (concat
+                (->> s-a (take (/ n 2)) shuffle)
+                (entries (/ n 2))))
+        a (construct (base) s-a)
+        b (construct (base) s-b)]
     (benchmark n #(intersection a b))))
 
 ;;;
@@ -468,32 +492,28 @@
 (def all-colls (concat maps sets lists))
 
 (def bench->types
-  {:construct             [benchmark-construct
-                           all-colls]
-   :lookup                [benchmark-lookup
-                           all-colls]
-   :clone                 [benchmark-clone
-                           [linear-map java-hash-map linear-set java-hash-set]]
-   :iteration             [benchmark-iteration
-                           all-colls]
-   :concat                [benchmark-concat
-                           lists]
-   :union-disjoint        [benchmark-union-disjoint
-                           (concat maps sets)]
-   :union-overlap         [benchmark-union-overlap
-                           (concat maps sets)]
-   :difference-disjoint   [benchmark-difference-disjoint
-                           (concat maps sets)]
-   :difference-overlap    [benchmark-difference-overlap
-                           (concat maps sets)]
-   :intersection-disjoint [benchmark-intersection-disjoint
-                           (concat maps sets)]
-   :intersection-overlap  [benchmark-intersection-overlap
-                           (concat maps sets)]
+  {:construct    [benchmark-construct
+                  all-colls]
+   :lookup       [benchmark-lookup
+                  all-colls]
+   :clone        [benchmark-clone
+                  [linear-map java-hash-map linear-set java-hash-set]]
+   :iteration    [benchmark-iteration
+                  all-colls]
+   :concat       [benchmark-concat
+                  lists]
+   :union        [benchmark-union
+                  (concat maps sets)]
+   :difference   [benchmark-difference
+                  (concat maps sets)]
+   :intersection [benchmark-intersection
+                  (concat maps sets)]
+   :equals       [benchmark-equals
+                  (concat maps sets)]
    })
 
 (defn run-benchmarks [n coll]
-  (let [bench->types bench->types #_(select-keys bench->types [:iteration])]
+  (let [bench->types bench->types #_(select-keys bench->types [:iteration :equals])]
     (println "benchmarking:" n)
     (->> bench->types
       (map (fn [[k [f colls]]] [k (when (-> colls set (contains? coll)) (f n coll))]))
@@ -555,20 +575,17 @@
 
    "concat" [:concat lists]
 
-   "map_union_disjoint" [:union-disjoint maps]
-   "map_union_overlap" [:union-overlap maps]
-   "set_union_disjoint" [:union-disjoint sets]
-   "set_union_overlap" [:union-overlap sets]
+   "map_union" [:union maps]
+   "set_union" [:union sets]
 
-   "map_difference_disjoint" [:difference-disjoint maps]
-   "map_difference_overlap" [:difference-overlap maps]
-   "set_difference_disjoint" [:difference-disjoint sets]
-   "set_difference_overlap" [:difference-overlap sets]
+   "map_difference" [:difference maps]
+   "set_difference" [:difference sets]
 
-   "map_intersection_disjoint" [:intersection-disjoint maps]
-   "map_intersection_overlap" [:intersection-overlap maps]
-   "set_intersection_disjoint" [:intersection-disjoint sets]
-   "set_intersection_overlap" [:intersection-overlap sets]
+   "map_intersection" [:intersection maps]
+   "set_intersection" [:intersection sets]
+
+   "map_equals" [:equals maps]
+   "set_equals" [:equals sets]
 
    })
 

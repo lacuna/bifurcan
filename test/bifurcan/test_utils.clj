@@ -34,5 +34,5 @@
                               `(apply-actions ~actions ~coll ~action->fn)))))
                    (apply concat))]
            (if-not (do ~@predicate)
-             (do (prn ~actions) false)
+             (do #_(prn ~actions) false)
              true))))))

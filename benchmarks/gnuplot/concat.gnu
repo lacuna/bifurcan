@@ -1,6 +1,5 @@
 load "common.gnu"
 
-set format y "%.3fns"
 data = "../data/concat.csv"
 set output dir."concat".ext
 set title "concatenating lists"

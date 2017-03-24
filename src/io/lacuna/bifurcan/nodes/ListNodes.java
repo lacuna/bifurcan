@@ -18,14 +18,16 @@ public class ListNodes {
   }
 
   public static class Leaf<V> implements INode<V> {
-    public final byte size;
     public final Object[] elements;
     public final Object editor;
 
     public Leaf(Object editor, Object[] elements) {
       this.editor = editor;
       this.elements = elements;
-      this.size = (byte) elements.length;
+    }
+
+    public int size() {
+      return elements.length;
     }
 
     public Leaf<V> set(Object editor, int idx, Object value) {
@@ -77,7 +79,7 @@ public class ListNodes {
 
     // lookup
 
-    public Object nth(int idx) {
+    public Object nth(long idx) {
       return strict ? strictNth(idx) : relaxedNth(idx);
     }
 
@@ -111,7 +113,7 @@ public class ListNodes {
       }
     }
 
-    private Object relaxedNth(int idx) {
+    private Object relaxedNth(long idx) {
       Node node = this;
       int nodeIdx = node.indexOf(idx);
       while (node.shift > 5) {
@@ -124,22 +126,31 @@ public class ListNodes {
       }
 
       Leaf leaf = (Leaf) node.nodes[nodeIdx];
-      return leaf.elements[idx - node.offset(nodeIdx)];
+      return leaf.elements[(int)(idx - node.offset(nodeIdx))];
     }
 
-    private Object strictNth(int idx) {
+    public Object[] arrayFor(long idx) {
+      Node<V> node = this;
+      while (node.shift > 5) {
+        node = (Node<V>) node.nodes[(int)((idx >> node.shift) & 31)];
+        idx &= ~(31 << (node.shift + 5));
+      }
+      return ((Leaf<V>) node.nodes[(int)((idx >> 5) & 31)]).elements;
+    }
+
+    private Object strictNth(long idx) {
       Node node = this;
       while (node.shift > 5) {
-        node = (Node) node.nodes[(idx >> node.shift) & 31];
+        node = (Node) node.nodes[(int)((idx >> node.shift) & 31)];
         idx &= ~(31 << (node.shift + 5));
       }
 
-      Leaf leaf = (Leaf) node.nodes[(idx >> 5) & 31];
-      return leaf.elements[idx & 31];
+      Leaf leaf = (Leaf) node.nodes[(int)((idx >> 5) & 31)];
+      return leaf.elements[(int)(idx & 31)];
     }
 
-    private int indexOf(int idx) {
-      int estimate = ((idx >> shift) & 31);
+    private int indexOf(long idx) {
+      int estimate = (int) ((idx >> shift) & 31);
       if (strict) {
         return estimate;
       }
@@ -178,47 +189,17 @@ public class ListNodes {
       return (editor == this.editor ? this : clone(editor)).pushFirst(node, size);
     }
 
-    // iteration
-
-    public Iterator<Leaf> leafs() {
-      LinearList list = new LinearList();
-      if (size() > 0) {
-        list.addLast(this);
-      }
-
-      return new Iterator<Leaf>() {
-        @Override
-        public boolean hasNext() {
-          return list.size() > 0;
-        }
-
-        @Override
-        public Leaf next() {
-          while (!(list.first() instanceof Leaf)) {
-            Node rn = (Node) list.first();
-            list.removeFirst();
-            for (int i = rn.numNodes - 1; i >= 0; i--) {
-              list.addFirst(rn.nodes[i]);
-            }
-          }
-          Leaf n = (Leaf) list.first();
-          list.removeFirst();
-          return n;
-        }
-      };
-    }
-
     // misc
 
     public int size() {
       return numNodes == 0 ? 0 : offsets[numNodes - 1];
     }
 
-    public Node<V> concat(Object editor, Node node) {
+    public Node<V> concat(Object editor, Node<V> node) {
 
       // same level
       if (shift == node.shift) {
-        return new Node(editor, false, shift + 5)
+        return new Node<V>(editor, false, shift + 5)
             .addLast(editor, this, this.size())
             .addLast(editor, node, node.size());
 
@@ -232,14 +213,14 @@ public class ListNodes {
 
         // we're down multiple levels
       } else if (shift < node.shift) {
-        return new Node(editor, false, shift + 5)
+        return new Node<V>(editor, false, shift + 5)
             .addLast(editor, this, this.size())
             .concat(editor, node);
 
         // we're up multiple levels
       } else {
         return concat(editor,
-            new Node(editor, false, node.shift + 5)
+            new Node<V>(editor, false, node.shift + 5)
                 .addLast(editor, node, node.size()));
       }
     }
@@ -433,8 +414,8 @@ public class ListNodes {
       this.nodes = n;
     }
 
-    private Node clone(Object editor) {
-      Node n = new Node();
+    private Node<V> clone(Object editor) {
+      Node<V> n = new Node<>();
       n.strict = strict;
       n.editor = editor;
       n.numNodes = numNodes;
