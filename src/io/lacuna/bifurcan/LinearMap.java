@@ -39,8 +39,8 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
   private final BiPredicate<K, K> equalsFn;
 
   private int indexMask;
-  public long[] table;
-  public Object[] entries;
+  long[] table;
+  Object[] entries;
   private int size;
 
   /// Constructors
@@ -382,9 +382,11 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
   }
 
   private void putTable(long[] table, int hash, int keyIndex, int tableIndex) {
+    int tombstoneIdx = -1;
     for (int idx = tableIndex, dist = probeDistance(hash, tableIndex), abs = 0; ; idx = nextIndex(idx), dist++, abs++) {
       long row = table[idx];
       int currHash = Row.hash(row);
+      boolean isTombstone = Row.tombstone(row);
 
       if (abs > table.length) {
         throw new IllegalStateException();
@@ -393,16 +395,30 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
       if (currHash == NONE) {
         table[idx] = Row.construct(hash, keyIndex);
         break;
-      } else if (dist > probeDistance(currHash, idx)) {
-        int currKeyIndex = Row.keyIndex(row);
-        table[idx] = Row.construct(hash, keyIndex);
+      }
 
-        if (Row.tombstone(row)) {
+      int currDist = probeDistance(currHash, idx);
+      if (!isTombstone && currDist > dist) {
+        tombstoneIdx = -1;
+      } else if (isTombstone && tombstoneIdx == -1) {
+        tombstoneIdx = idx;
+      }
+
+      if (dist > currDist) {
+        long nRow = Row.construct(hash, keyIndex);
+
+        if (tombstoneIdx >= 0) {
+          table[tombstoneIdx] = nRow;
           break;
         }
 
-        dist = probeDistance(currHash, idx);
-        keyIndex = currKeyIndex;
+        table[idx] = nRow;
+        if (isTombstone) {
+          break;
+        }
+
+        dist = currDist;
+        keyIndex = Row.keyIndex(row);
         hash = currHash;
       }
     }
@@ -424,7 +440,6 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
     K currKey = (K) entries[keyIndex];
     if (equalsFn.test(key, currKey)) {
       entries[keyIndex + 1] = mergeFn.apply((V) entries[keyIndex + 1], value);
-      table[idx] = Row.removeTombstone(row);
       return true;
     } else {
       return false;
@@ -432,23 +447,36 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
   }
 
   private void put(int hash, K key, V value, BinaryOperator<V> mergeFn) {
+    int tombstoneIdx = -1;
     for (int idx = estimatedIndex(hash), dist = 0; ; idx = nextIndex(idx), dist++) {
       long row = table[idx];
       int currHash = Row.hash(row);
       boolean isNone = currHash == NONE;
-      boolean currTombstone = Row.tombstone(row);
+      boolean isTombstone = Row.tombstone(row);
 
-      if (currHash == hash && !currTombstone && putCheckEquality(idx, key, value, mergeFn)) {
+      if (currHash == hash && !isTombstone && putCheckEquality(idx, key, value, mergeFn)) {
         break;
-      } else if (isNone || dist > probeDistance(currHash, idx)) {
+      }
+
+      int currDist = probeDistance(currHash, idx);
+      if (!isTombstone && currDist > dist) {
+        tombstoneIdx = -1;
+      } else if (isTombstone && tombstoneIdx == -1) {
+        tombstoneIdx = idx;
+      }
+
+      if (isNone || dist > currDist) {
 
         // we know there isn't any collision, so add it to the end
         int keyIndex = size << 1;
         putEntry(keyIndex, key, value);
         size++;
 
-        if (isNone || currTombstone) {
-          table[idx] = Row.construct(hash, keyIndex);
+        long nRow = Row.construct(hash, keyIndex);
+        if (tombstoneIdx >= 0) {
+          table[tombstoneIdx] = nRow;
+        } else if (isNone || isTombstone) {
+          table[idx] = nRow;
         } else {
           putTable(table, hash, keyIndex, idx);
         }
@@ -456,6 +484,29 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
         break;
       }
     }
+  }
+
+  private boolean validateRow(long row) {
+    return !Row.populated(row) || Row.hash(row) == keyHash((K) entries[Row.keyIndex(row)]);
+  }
+
+  private void validate() {
+    if (Arrays.stream(table).filter(Row::populated).count() != size
+        || !Arrays.stream(table).allMatch(this::validateRow)) {
+      throw new IllegalStateException();
+    }
+  }
+
+  public void display() {
+    System.out.println("-----\n\n");
+      for (int i = 0; i < table.length; i++) {
+        long r = table[i];
+        if (Row.hash(r) != NONE) {
+          System.out.println(Row.tombstone(r) + " " + Row.hash(r) + " " + probeDistance(Row.hash(r), i) + " " + Row.keyIndex(r));;
+        } else {
+          System.out.println("---");
+        }
+      }
   }
 
   /// Utility functions

@@ -211,7 +211,10 @@ public class Lists {
 
     @Override
     public IList<V> slice(long start, long end) {
-      if (start < 0 || end <= start || end <= size) {
+      if (start == end) {
+        return EMPTY;
+      } else if (start < 0 || end <= start || end > size) {
+        System.out.println(start + " " + end + " " + size);
         throw new IllegalArgumentException();
       }
       return new Slice<V>(list, offset + start, end - start);
@@ -488,7 +491,7 @@ public class Lists {
       if (suffix.size() > 0) {
         IList<V> suffixPrime = suffix.removeLast();
         return linear ? this : new Proxy<V>(prefix, base, suffixPrime, false);
-      } else if (base.size() == 0 && prefix.size() == 0) {
+      } else if (base.size() <= 1 && prefix.size() == 0) {
         return Lists.EMPTY;
       } else if (base.size() == 0) {
         IList<V> prefixPrime = prefix.removeLast();
@@ -509,7 +512,7 @@ public class Lists {
       if (prefix.size() > 0) {
         IList<V> prefixPrime = prefix.removeFirst();
         return linear ? this : new Proxy<V>(prefixPrime, base, suffix, false);
-      } else if (base.size() == 0 && suffix.size() == 0) {
+      } else if (base.size() <= 1 && suffix.size() == 0) {
         return Lists.EMPTY;
       } else if (base.size() == 0) {
         IList<V> suffixPrime = suffix.removeFirst();
@@ -814,7 +817,7 @@ public class Lists {
 
       @Override
       public BinaryOperator<LinearList<V>> combiner() {
-        return LinearList::concat;
+        return LinearList::linearConcat;
       }
 
       @Override

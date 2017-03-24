@@ -267,8 +267,8 @@
       (->vec (.concat ^IList a b)))))
 
 (defspec test-unreified-list-concat iterations
-  (prop/for-all [a (list-gen #(Lists/from []))
-                 b (list-gen #(Lists/from []))]
+  (prop/for-all [a (list-gen #(Lists/from [1 2 3]))
+                 b (list-gen #(Lists/from [1 2 3]))]
     (= (concat (->vec a) (->vec b))
       (->vec (.concat ^IList a b)))))
 

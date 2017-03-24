@@ -127,21 +127,20 @@ public class LinearList<V> implements IList<V>, Cloneable {
     return this;
   }
 
-  @Override
-  public LinearList<V> concat(IList<V> l) {
+  LinearList<V> linearConcat(IList<V> l) {
     long newSize = size() + l.size();
     if (newSize > Integer.MAX_VALUE) {
       throw new IllegalArgumentException("cannot hold more than 1 << 31 entries");
     }
 
     if (l instanceof LinearList) {
+      LinearList<V> list = (LinearList<V>) l;
+
       if (offset != 0 || newSize > elements.length) {
         resize(1 << log2Ceil(newSize));
       }
 
-      LinearList<V> list = (LinearList<V>) l;
       int truncatedListSize = Math.min(list.size, list.elements.length - list.offset);
-
       System.arraycopy(list.elements, list.offset, elements, size, truncatedListSize);
       if (list.size != truncatedListSize) {
         System.arraycopy(list.elements, 0, elements, size + truncatedListSize, list.size - truncatedListSize);
