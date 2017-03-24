@@ -292,6 +292,24 @@ public class Sets {
       public Iterator<V> iterator() {
         return iterator.get();
       }
+
+      @Override
+      public int hashCode() {
+        return (int) Sets.hash(this);
+      }
+
+      @Override
+      public boolean equals(Object obj) {
+        if (obj instanceof Set) {
+          return Sets.equals(this, (Set<V>) obj);
+        }
+        return false;
+      }
+
+      @Override
+      public String toString() {
+        return Sets.toString(this);
+      }
     };
   }
 

@@ -61,14 +61,17 @@ public class IntMapNodes {
     // lookup
 
     public Object get(long k, Object defaultVal) {
-      int mask = mask(k);
-      if (isEntry(mask)) {
-        int idx = entryIndex(mask);
-        return keys[idx] == k ? content[idx] : defaultVal;
-      } else if (isNode(mask)) {
-        return node(mask).get(k, defaultVal);
-      } else {
-        return defaultVal;
+      Node<V> n = this;
+      for (;;) {
+        int mask = n.mask(k);
+        if (n.isEntry(mask)) {
+          int idx = n.entryIndex(mask);
+          return n.keys[idx] == k ? n.content[idx] : defaultVal;
+        } else if (n.isNode(mask)) {
+          n = node(mask);
+        } else {
+          return defaultVal;
+        }
       }
     }
 
@@ -449,15 +452,21 @@ public class IntMapNodes {
     }
 
     private void grow() {
-      Object[] c = new Object[content.length << 1];
-      int numNodes = bitCount(nodemap);
-      arraycopy(content, 0, c, 0, bitCount(datamap));
-      arraycopy(content, content.length - numNodes, c, c.length - numNodes, numNodes);
-      this.content = c;
+      if (content.length == 32) {
+        return;
+      }
 
+      Object[] c = new Object[content.length << 1];
       long[] k = new long[keys.length << 1];
-      arraycopy(keys, 0, k, 0, bitCount(datamap));
+      int numNodes = bitCount(nodemap);
+      int numEntries = bitCount(datamap);
+
+      arraycopy(content, 0, c, 0, numEntries);
+      arraycopy(content, content.length - numNodes, c, c.length - numNodes, numNodes);
+      arraycopy(keys, 0, k, 0, numEntries);
+
       this.keys = k;
+      this.content = c;
     }
 
     Node<V> putEntry(int mask, long key, V value) {

@@ -47,13 +47,8 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
 
   @Override
   public V get(K key, V defaultValue) {
-    Object val = root.get(0, keyHash(key), key, equalsFn, DEFAULT_VALUE);
-
-    if (val == DEFAULT_VALUE) {
-      return defaultValue;
-    } else {
-      return (V) val;
-    }
+    Object val = MapNodes.get(root, 0, keyHash(key), key, equalsFn, DEFAULT_VALUE);
+    return val == DEFAULT_VALUE ? defaultValue : (V) val;
   }
 
   @Override
@@ -91,7 +86,7 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
 
   @Override
   public boolean contains(K key) {
-    return root.get(0, keyHash(key), key, equalsFn, DEFAULT_VALUE) != DEFAULT_VALUE;
+    return MapNodes.contains(root, 0, keyHash(key), key, equalsFn);
   }
 
   @Override
