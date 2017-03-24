@@ -402,7 +402,7 @@
 (defn benchmark [n f]
   (-> (c/quick-benchmark* f
         (merge
-          {:samples (long (/ 42 (Math/log10 n)))
+          {:samples (long (/ 80 (Math/log10 n)))
            :target-execution-time 5e7}
           (if *warmup*
             {:samples 6
@@ -483,7 +483,7 @@
 
 ;;;
 
-(def maps [linear-map bifurcan-map int-map java-hash-map clojure-map])
+(def maps [linear-map bifurcan-map java-hash-map clojure-map int-map])
 
 (def sets [linear-set bifurcan-set java-hash-set clojure-set])
 

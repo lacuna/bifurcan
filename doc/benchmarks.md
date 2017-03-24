@@ -2,7 +2,7 @@ These benchmarks are generated using [Criterium](https://github.com/hugoduncan/c
 
 The numbers given here are scaled by the size of the collection, because otherwise the most noticeable feature of these benchmarks would be "larger collections take longer to create/iterate/etc".  This means, however, that the numbers provided here are the mean duration of the median sample, and do not reflect the variation that might be seen in real-world usage.
 
-With that said, this is still as useful as pretty much any other data structure benchmark.  The single largest factor in the performance of any in-memory data structure is whether it's in the cache, and the repeated operations of a benchmark guarantee a warm cache.  This may reflect some real-world workloads, but not others.  The performance for 1M+ element collections, which are too big to fit in cache, give some hint as to the effects of a cold cache, but also reflect the other costs of a larger collection.
+With that said, this is still as useful as pretty much any other data structure benchmark.  The single largest factor in the performance of any in-memory data structure is whether it's in the cache, and the repeated operations of a benchmark guarantee a warm cache.  This may reflect some real-world workloads, but not others.  The performance for 1OOk+ element collections, which are too big to fit in cache, give some hint as to the effects of a cold cache, but also reflect the other costs of a larger collection.
 
 ---
 
@@ -12,13 +12,19 @@ Unlike Java's `HashMap` and `HashSet`, Bifurcan's `LinearMap` and `LinearSet` st
 
 ## Lists
 
-Unlike Clojure and Java's lists, Bifurcan allows for efficient prepending of elements, and provide near-constant time concatenation.  Due to this additional complexity, the immutable `List` is marginally slower to iterate over, but both lists are very competitive with their equivalents.
+Unlike Clojure and Java's lists, Bifurcan's lists can efficiently remove and add from both ends of the collection.
 
 ![](../benchmarks/images/list_construct.png)
 
+`List` is marginally slower to iterate over, but both lists are very competitive with their equivalents.
+
 ![](../benchmarks/images/list_iterate.png)
 
+`List` is marginally slower to lookup, because it uses [relaxed radix nodes](https://infoscience.epfl.ch/record/169879/files/RMTrees.pdf), but in return gets near constant-time slices and concats.
+
 ![](../benchmarks/images/list_lookup.png)
+
+Both `List` and `LinearList` provide effectively constant-time concatenation, the former via the relaxed radix structure, the latter via a wrapper object provided by `Lists.concat()`.
 
 ![](../benchmarks/images/concat.png)
 
@@ -26,7 +32,7 @@ Unlike Clojure and Java's lists, Bifurcan allows for efficient prepending of ele
 
 ![](../benchmarks/images/map_construct.png)
 
-Due to its contiguous layout, `LinearMap` is significantly faster at iteration.  Both `Map` and `IntMap` are around 2x faster than Clojure's map, due to a contiguous layout of entries and children within each node.
+Due to its contiguous layout, `LinearMap` is significantly faster at iteration.  `Map` is about 2x faster than Clojure's `PersistentHashMap` because of a contiguous layout within each node, and `IntMap` is somewhat slower due to the fact that it does an in-order traversal of entries.
 
 ![](../benchmarks/images/map_iterate.png)
 
@@ -49,6 +55,8 @@ However, both `Map` and `IntMap` also use their structure to perform equality ch
 ![](../benchmarks/images/map_equals.png)
 
 ## Sets
+
+The behavior for sets broadly mirrors that of the maps.
 
 ![](../benchmarks/images/set_construct.png)
 
