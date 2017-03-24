@@ -129,15 +129,6 @@ public class ListNodes {
       return leaf.elements[(int)(idx - node.offset(nodeIdx))];
     }
 
-    public Object[] arrayFor(long idx) {
-      Node<V> node = this;
-      while (node.shift > 5) {
-        node = (Node<V>) node.nodes[(int)((idx >> node.shift) & 31)];
-        idx &= ~(31 << (node.shift + 5));
-      }
-      return ((Leaf<V>) node.nodes[(int)((idx >> 5) & 31)]).elements;
-    }
-
     private Object strictNth(long idx) {
       Node node = this;
       while (node.shift > 5) {
@@ -187,6 +178,35 @@ public class ListNodes {
 
     public Node<V> addFirst(Object editor, INode<V> node, int size) {
       return (editor == this.editor ? this : clone(editor)).pushFirst(node, size);
+    }
+
+    // iteration
+
+    public Iterator<Leaf<V>> leafs() {
+      LinearList<INode<V>> list = new LinearList<>();
+      if (size() > 0) {
+        list.addLast(this);
+      }
+
+      return new Iterator<Leaf<V>>() {
+        @Override
+        public boolean hasNext() {
+          return list.size() > 0;
+        }
+
+        @Override
+        public Leaf<V> next() {
+          INode<V> n = list.popLast();
+          while (!(n instanceof Leaf)) {
+            Node<V> node = (Node<V>) n;
+            for (int i = node.numNodes - 1; i >= 0; i--) {
+              list.addLast(node.nodes[i]);
+            }
+            n = list.popLast();
+          }
+          return (Leaf<V>) n;
+        }
+      };
     }
 
     // misc

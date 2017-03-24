@@ -456,7 +456,7 @@
         s-b (into-array
               (concat
                 (->> s-a (take (/ n 2)) shuffle)
-                (entries (/ n 2))))
+                (->> (entries (* n 1.5)) (drop n))))
         a (construct (base) s-a)
         b (construct (base) s-b)]
     (benchmark n #(union a b))))
@@ -466,7 +466,7 @@
         s-b (into-array
               (concat
                 (->> s-a (take (/ n 2)) shuffle)
-                (entries (/ n 2))))
+                (->> (entries (* n 1.5)) (drop n))))
         a (construct (base) s-a)
         b (construct (base) s-b)]
     (benchmark n #(difference a b))))
@@ -476,7 +476,7 @@
         s-b (into-array
               (concat
                 (->> s-a (take (/ n 2)) shuffle)
-                (entries (/ n 2))))
+                (->> (entries (* n 1.5)) (drop n))))
         a (construct (base) s-a)
         b (construct (base) s-b)]
     (benchmark n #(intersection a b))))

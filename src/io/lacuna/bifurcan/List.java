@@ -109,11 +109,8 @@ public class List<V> implements IList<V>, Cloneable {
   @Override
   public Iterator<V> iterator() {
 
-    long size = size();
-
-    if (size == 0) {
-      return Iterators.EMPTY;
-    }
+    final long size = size();
+    final Iterator<Leaf<V>> leafs = root.leafs();
 
     final Object[] initChunk;
     final int initOffset, initLimit;
@@ -122,7 +119,7 @@ public class List<V> implements IList<V>, Cloneable {
       initOffset = pIdx(0);
       initLimit = prefix.length;
     } else if (root.size() > 0) {
-      initChunk = root.arrayFor(0);
+      initChunk = leafs.next().elements;
       initOffset = 0;
       initLimit = initChunk.length;
     } else {
@@ -156,7 +153,7 @@ public class List<V> implements IList<V>, Cloneable {
               chunk = suffix;
               limit = suffixLen;
             } else {
-              chunk = root.arrayFor(idx - prefixLen);
+              chunk = leafs.next().elements;
               limit = chunk.length;
             }
             offset = 0;
@@ -217,8 +214,8 @@ public class List<V> implements IList<V>, Cloneable {
       }
 
       return new List<V>(linear, r,
-          prefixLen, prefix == null ? null : prefix.clone(),
-          b.suffixLen, b.suffix == null ? null : b.suffix.clone());
+          prefixLen, prefixLen > 0 ? prefix.clone() : null,
+          b.suffixLen, b.suffixLen > 0 ? b.suffix.clone() : null);
 
     } else {
       return Lists.concat(this, l);
