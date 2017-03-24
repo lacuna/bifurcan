@@ -1,5 +1,7 @@
 load "common.gnu"
 
+set format y "%.1fns"
+
 data = "../data/list_iterate.csv"
 set output dir."list_iterate".ext
 set title "iterating over lists"
