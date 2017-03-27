@@ -12,8 +12,9 @@ import static java.lang.System.arraycopy;
 
 /**
  * A hash-map implementation which uses Robin Hood hashing for placement, and allows for customized hashing and equality
- * semantics.  Performance is equivalent to {@code java.util.HashMap} for reads, moderately faster for writes, and more
- * robust to cases of poor hash distribution.
+ * semantics.  Performance is equivalent to {@code java.util.HashMap} for lookups and construction, and superior in the
+ * case of poor hash distribution.  Because entries are stored contiguously, performance of {@code clone()} and
+ * iteration is significantly better than {@code java.util.HashMap}.
  * <p>
  * The {@code entries()} method is O(1) and allows random access, returning an IList that proxies through to an
  * underlying array.  Partitioning this list is the most efficient way to process the collection in parallel.
@@ -39,8 +40,8 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
   private final BiPredicate<K, K> equalsFn;
 
   private int indexMask;
-  long[] table;
-  Object[] entries;
+  private long[] table;
+  private Object[] entries;
   private int size;
 
   /// Constructors
@@ -49,22 +50,39 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
     this(16);
   }
 
+  /**
+   * @param initialCapacity the initial capacity of the map
+   */
   public LinearMap(int initialCapacity) {
     this(initialCapacity, Objects::hashCode, Objects::equals);
   }
 
+  /**
+   * @param map a {@code java.util.Map}
+   * @return a copy of the map
+   */
   public static <K, V> LinearMap<K, V> from(java.util.Map<K, V> map) {
-    return map.entrySet().stream().collect(Maps.linearCollector(Map.Entry::getKey, Map.Entry::getValue, map.size()));
+    return from(map.entrySet());
   }
 
+  /**
+   * @param map another map
+   * @return a copy of the map, with the same equality semantics
+   */
   public static <K, V> LinearMap<K, V> from(IMap<K, V> map) {
     if (map instanceof LinearMap) {
       return ((LinearMap<K, V>) map).clone();
     } else {
-      return map.stream().collect(Maps.linearCollector(IEntry::key, IEntry::value, (int) map.size()));
+      LinearMap<K, V> result = new LinearMap<K, V>((int) map.size(), map.keyHash(), map.keyEquality());
+      map.forEach(e -> result.put(e.key(), e.value()));
+      return result;
     }
   }
 
+  /**
+   * @param entries a list of {@code IEntry} objects
+   * @return a {@code LinearMap} representing the entries in the list
+   */
   public static <K, V> LinearMap<K, V> from(IList<IEntry<K, V>> entries) {
     if (entries.size() > MAX_CAPACITY) {
       throw new IllegalArgumentException("LinearMap cannot hold more than 1 << 29 entries");
@@ -72,6 +90,19 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
     return entries.stream().collect(Maps.linearCollector(IEntry::key, IEntry::value, (int) entries.size()));
   }
 
+  /**
+   * @param entries a collection of {@code java.util.Map.Entry} objects
+   * @return a {@code LinearMap} representing the entries in the collection
+   */
+  public static <K, V> LinearMap<K, V> from(Collection<Map.Entry<K, V>> entries) {
+    return entries.stream().collect(Maps.linearCollector(Map.Entry::getKey, Map.Entry::getValue, entries.size()));
+  }
+
+  /**
+   * @param initialCapacity the initial capacity of the map
+   * @param hashFn a function which yields the hash value of keys
+   * @param equalsFn a function which checks equality of keys
+   */
   public LinearMap(int initialCapacity, ToIntFunction<K> hashFn, BiPredicate<K, K> equalsFn) {
     if (initialCapacity > MAX_CAPACITY) {
       throw new IllegalArgumentException("initialCapacity cannot be larger than " + MAX_CAPACITY);
@@ -85,6 +116,16 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
   }
 
   /// Accessors
+
+  @Override
+  public ToIntFunction<K> keyHash() {
+    return hashFn;
+  }
+
+  @Override
+  public BiPredicate<K, K> keyEquality() {
+    return equalsFn;
+  }
 
   @Override
   public LinearMap<K, V> put(K key, V value) {
@@ -291,9 +332,9 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
   /// Bookkeeping functions
 
   LinearMap<K, V> merge(LinearMap<K, V> m, BinaryOperator<V> mergeFn) {
-    if (m.size > size) {
+    /*if (m.size > size) {
       return m.merge(this, (x, y) -> mergeFn.apply(y, x));
-    }
+    }*/
 
     LinearMap<K, V> result = this.clone();
     result.resize(result.size + m.size);
@@ -484,29 +525,6 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
         break;
       }
     }
-  }
-
-  private boolean validateRow(long row) {
-    return !Row.populated(row) || Row.hash(row) == keyHash((K) entries[Row.keyIndex(row)]);
-  }
-
-  private void validate() {
-    if (Arrays.stream(table).filter(Row::populated).count() != size
-        || !Arrays.stream(table).allMatch(this::validateRow)) {
-      throw new IllegalStateException();
-    }
-  }
-
-  public void display() {
-    System.out.println("-----\n\n");
-      for (int i = 0; i < table.length; i++) {
-        long r = table[i];
-        if (Row.hash(r) != NONE) {
-          System.out.println(Row.tombstone(r) + " " + Row.hash(r) + " " + probeDistance(Row.hash(r), i) + " " + Row.keyIndex(r));;
-        } else {
-          System.out.println("---");
-        }
-      }
   }
 
   /// Utility functions

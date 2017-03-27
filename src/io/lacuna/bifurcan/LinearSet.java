@@ -8,20 +8,32 @@ import java.util.function.BiPredicate;
 import java.util.function.ToIntFunction;
 
 /**
+ * A set which builds atop {@code LinearMap}, and shares the same performance characteristics.
+ *
  * @author ztellman
  */
 public class LinearSet<V> implements ISet<V>, Cloneable {
 
   private LinearMap<V, Void> map;
 
+  ///
+
   public LinearSet() {
     this(8);
   }
 
+  /**
+   * @param initialCapacity the initial capacity of the set
+   */
   public LinearSet(int initialCapacity) {
     this(initialCapacity, Objects::hashCode, Objects::equals);
   }
 
+  /**
+   * @param initialCapacity the initial capacity of the set
+   * @param hashFn the hash function used by the set
+   * @param equalsFn the equality semantics used by the set
+   */
   public LinearSet(int initialCapacity, ToIntFunction<V> hashFn, BiPredicate<V, V> equalsFn) {
     map = new LinearMap<>(initialCapacity, hashFn, equalsFn);
   }
@@ -30,24 +42,69 @@ public class LinearSet<V> implements ISet<V>, Cloneable {
     this.map = map;
   }
 
+  /**
+   * @param elements a list of elements
+   * @return a {@code LinearSet} containing the elements in the list
+   */
   public static <V> LinearSet<V> from(IList<V> elements) {
     return from(elements.toList());
   }
 
+  /**
+   * @param elements a collection of elements
+   * @return a {@code LinearSet} containing the elements in the collection
+   */
   public static <V> LinearSet<V> from(java.util.Collection<V> elements) {
-    LinearSet<V> set = new LinearSet<>((int) elements.size());
-    for (V e : elements) {
-      set = set.add(e);
-    }
+    return elements.stream().collect(Sets.linearCollector(elements.size()));
+  }
+
+  /**
+   * @param iterator an iterator
+   * @return a {@code LinearSet} containing the remaining elements in the iterator
+   */
+  public static <V> LinearSet<V> from(Iterator<V> iterator) {
+    LinearSet<V> set = new LinearSet<V>();
+    iterator.forEachRemaining(set::add);
     return set;
   }
 
+  /**
+   * @param iterable an {@code Iterable} object
+   * @return a {@code LinearSet} containing the elements in the iterator
+   */
+  public static <V> LinearSet<V> from(Iterable<V> iterable) {
+    return from(iterable.iterator());
+  }
+
+  /**
+   * @param set another set
+   * @return a {@code LinearSet} containing the same elements, with the same equality semantics
+   */
   public static <V> LinearSet<V> from(ISet<V> set) {
     if (set instanceof LinearSet) {
       return ((LinearSet<V>) set).clone();
     } else {
-      return from(set.toSet());
+      LinearSet<V> result = new LinearSet<V>((int) set.size(), set.valueHash(), set.valueEquality());
+      set.forEach(result::add);
+      return result;
     }
+  }
+
+  ///
+
+  @Override
+  public boolean isLinear() {
+    return true;
+  }
+
+  @Override
+  public ToIntFunction<V> valueHash() {
+    return map.keyHash();
+  }
+
+  @Override
+  public BiPredicate<V, V> valueEquality() {
+    return map.keyEquality();
   }
 
   @Override

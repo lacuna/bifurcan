@@ -402,7 +402,7 @@
 (defn benchmark [n f]
   (-> (c/quick-benchmark* f
         (merge
-          {:samples (long (/ 80 (Math/log10 n)))
+          {:samples (long (max 30 (/ 80 (Math/log10 n))))
            :target-execution-time 5e7}
           (if *warmup*
             {:samples 6
@@ -416,7 +416,7 @@
 
 (defn benchmark-construct [n {:keys [base entries construct]}]
   (let [s (entries n)]
-    (benchmark n #(construct (base) s))))
+    (benchmark n #(do (construct (base) s) nil))))
 
 (defn benchmark-lookup [n {:keys [base entries construct lookup]}]
   (let [s (entries n)
@@ -426,7 +426,7 @@
 
 (defn benchmark-clone [n {:keys [base entries construct clone]}]
   (let [c (construct (base) (entries n))]
-    (benchmark n #(clone c))))
+    (benchmark n #(do (clone c) nil))))
 
 (defn benchmark-iteration [n {:keys [base entries construct iterator consume] :as m}]
   (let [c (construct (base) (entries n))]
@@ -434,7 +434,7 @@
 
 (defn benchmark-concat [n {:keys [base entries construct concat]}]
   (let [c (construct (base) (entries (/ n 2)))]
-    (benchmark n #(-> (base) (concat c) (concat c)))))
+    (benchmark n #(do (-> (base) (concat c) (concat c)) nil))))
 
 (defn benchmark-equals [n {:keys [label base entries construct add remove iterator]}]
   (let [n (long n)
@@ -449,7 +449,8 @@
                   (Obj. (rand-int Integer/MAX_VALUE)))
              b (-> b (remove e) (add e'))]
          (.equals ^Object a b)
-         (-> b (remove e') (add e))))))
+         (-> b (remove e') (add e))
+         nil))))
 
 (defn benchmark-union [n {:keys [base entries construct union clone]}]
   (let [s-a (entries n)
@@ -459,7 +460,7 @@
                 (->> (entries (* n 1.5)) (drop n))))
         a (construct (base) s-a)
         b (construct (base) s-b)]
-    (benchmark n #(union a b))))
+    (benchmark n #(do (union a b) nil))))
 
 (defn benchmark-difference [n {:keys [base entries construct difference clone]}]
   (let [s-a (entries n)
@@ -469,7 +470,7 @@
                 (->> (entries (* n 1.5)) (drop n))))
         a (construct (base) s-a)
         b (construct (base) s-b)]
-    (benchmark n #(difference a b))))
+    (benchmark n #(do (difference a b) nil))))
 
 (defn benchmark-intersection [n {:keys [base entries construct intersection clone]}]
   (let [s-a (entries n)
@@ -479,7 +480,7 @@
                 (->> (entries (* n 1.5)) (drop n))))
         a (construct (base) s-a)
         b (construct (base) s-b)]
-    (benchmark n #(intersection a b))))
+    (benchmark n #(do (intersection a b) nil))))
 
 ;;;
 
@@ -513,7 +514,7 @@
    })
 
 (defn run-benchmarks [n coll]
-  (let [bench->types bench->types #_(select-keys bench->types [:iteration :equals])]
+  (let [bench->types bench->types #_(select-keys bench->types [:iteration])]
     (println "benchmarking:" n)
     (->> bench->types
       (map (fn [[k [f colls]]] [k (when (-> colls set (contains? coll)) (f n coll))]))

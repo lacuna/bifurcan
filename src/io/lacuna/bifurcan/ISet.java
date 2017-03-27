@@ -2,8 +2,11 @@ package io.lacuna.bifurcan;
 
 import java.lang.reflect.Array;
 import java.util.Iterator;
+import java.util.Objects;
 import java.util.Spliterator;
 import java.util.Spliterators;
+import java.util.function.BiPredicate;
+import java.util.function.ToIntFunction;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -18,7 +21,21 @@ public interface ISet<V> extends
     IForkable<ISet<V>> {
 
   /**
-   * @return true, if the set contains {@code rowValue}
+   * @return the hash function used by the set
+   */
+  default ToIntFunction<V> valueHash() {
+    return Objects::hashCode;
+  }
+
+  /**
+   * @return the equality semantics used by the set
+   */
+  default BiPredicate<V, V> valueEquality() {
+    return Objects::equals;
+  }
+
+  /**
+   * @return true, if the set contains {@code value}
    */
   boolean contains(V value);
 
@@ -26,6 +43,13 @@ public interface ISet<V> extends
    * @return the number of elements in the set
    */
   long size();
+
+  /**
+   * @return true, if the set is linear
+   */
+  default boolean isLinear() {
+    return false;
+  }
 
   /**
    * @return an {@code IList} containing all the elements in the set
@@ -36,16 +60,19 @@ public interface ISet<V> extends
    * @return the set, containing {@code rowValue}
    */
   default ISet<V> add(V value) {
-    return new Sets.Proxy<V>(this).add(value);
+    return new Sets.VirtualSet<V>(this).add(value);
   }
 
   /**
    * @return the set, without {@code rowValue}
    */
   default ISet<V> remove(V value) {
-    return new Sets.Proxy<V>(this).remove(value);
+    return new Sets.VirtualSet<V>(this).remove(value);
   }
 
+  /**
+   * @return an iterator representing the elements of the set
+   */
   default Iterator<V> iterator() {
     return elements().iterator();
   }
@@ -55,24 +82,41 @@ public interface ISet<V> extends
     return Spliterators.spliterator(iterator(), size(), Spliterator.DISTINCT);
   }
 
+  /**
+   * @return a {@code java.util.stream.Stream}, representing the elements in the set
+   */
   default Stream<V> stream() {
     return StreamSupport.stream(spliterator(), false);
   }
 
+  /**
+   * @param s another set
+   * @return a new set, representing the union of the two sets
+   */
   default ISet<V> union(ISet<V> s) {
     return Sets.union(this, s);
   }
 
+  /**
+   * @param s another set
+   * @return a new set, representing the difference of the two sets
+   */
   default ISet<V> difference(ISet<V> s) {
     return Sets.difference(this, s);
   }
 
+  /**
+   * @param s another set
+   * @return a new set, representing the intersection of the two sets
+   */
   default ISet<V> intersection(ISet<V> s) {
-    return Sets.intersection(new Set().linear(), this, s).forked();
+    ISet<V> result = Sets.intersection(new Set(valueHash(), valueEquality()).linear(), this, s);
+    return isLinear() ? result : result.forked();
   }
 
   /**
-   * @return the collection, represented as a normal Java {@code Set}, without support for writes
+   * @return the collection, represented as a normal Java {@code Set}, which will throw
+   * {@code UnsupportedOperationException} on writes
    */
   default java.util.Set<V> toSet() {
     return Sets.toSet(elements(), this::contains);

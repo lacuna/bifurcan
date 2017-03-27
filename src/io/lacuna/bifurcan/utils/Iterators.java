@@ -5,12 +5,12 @@ import io.lacuna.bifurcan.IList;
 import io.lacuna.bifurcan.IMap;
 import io.lacuna.bifurcan.LinearList;
 
-import java.util.Iterator;
-import java.util.NoSuchElementException;
-import java.util.PrimitiveIterator;
+import java.util.*;
 import java.util.function.Function;
 import java.util.function.LongFunction;
 import java.util.function.Predicate;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 /**
  * @author ztellman
@@ -31,6 +31,10 @@ public class Iterators {
     }
   };
 
+  /**
+   * A utility class for dynamically appending and prepending iterators to a collection, which itself can be iterated
+   * over.
+   */
   public static class IteratorStack<V> implements Iterator<V> {
 
     LinearList<Iterator<V>> iterators = new LinearList<>();
@@ -74,6 +78,11 @@ public class Iterators {
     }
   }
 
+  /**
+   * @param it an iterator
+   * @param f a predicate
+   * @return an iterator which only yields values that satisfy the predicate
+   */
   public static <V> Iterator<V> filter(Iterator<V> it, Predicate<V> f) {
     return new Iterator<V>() {
 
@@ -108,6 +117,11 @@ public class Iterators {
     };
   }
 
+  /**
+   * @param it an iterator
+   * @param f a function which transforms values
+   * @return an iterator which yields the transformed values
+   */
   public static <U, V> Iterator<V> map(Iterator<U> it, Function<U, V> f) {
     return new Iterator<V>() {
       @Override
@@ -122,6 +136,11 @@ public class Iterators {
     };
   }
 
+  /**
+   * @param it an iterator
+   * @param f a function which transforms values into iterators
+   * @return an iterator which yields the concatenation of the iterators
+   */
   public static <U, V> Iterator<V> flatMap(Iterator<U> it, Function<U, Iterator<V>> f) {
     return new Iterator<V>() {
 
@@ -147,6 +166,12 @@ public class Iterators {
     };
   }
 
+  /**
+   * @param min an inclusive start of the range
+   * @param max an exclusive end of the range
+   * @param f a function which transforms a number in the range into a value
+   * @return an iterator which yields the values returned by {@code f}
+   */
   public static <V> Iterator<V> range(long min, long max, LongFunction<V> f) {
     return new Iterator<V>() {
 
@@ -168,10 +193,21 @@ public class Iterators {
     };
   }
 
+  /**
+   * Represents a range implicitly starting at 0.
+   *
+   * @param max an exclusive end of the range.
+   * @param f a function which transforms a number in the range into a value.
+   * @return an iterator which yields the values returned by {@code f}
+   */
   public static <V> Iterator<V> range(long max, LongFunction<V> f) {
     return range(0, max, f);
   }
 
+  /**
+   * @param iterators a list of iterators
+   * @return a concatenation of all iterators, in the order provided
+   */
   public static <V> Iterator<V> concat(Iterator<V>... iterators) {
     if (iterators.length == 1) {
       return iterators[0];

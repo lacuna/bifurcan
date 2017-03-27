@@ -18,6 +18,8 @@ import java.util.stream.Collector;
 import java.util.stream.IntStream;
 
 /**
+ * Utility functions for classes implementing {@code IList}.
+ *
  * @author ztellman
  */
 @SuppressWarnings("unchecked")
@@ -439,16 +441,16 @@ public class Lists {
     }
   }
 
-  static class Proxy<V> implements IList<V> {
+  static class VirtualList<V> implements IList<V> {
 
     private IList<V> prefix, base, suffix;
     private final boolean linear;
 
-    public Proxy(IList<V> base) {
+    public VirtualList(IList<V> base) {
       this(Lists.EMPTY, base, Lists.EMPTY, false);
     }
 
-    private Proxy(IList<V> prefix, IList<V> base, IList<V> suffix, boolean linear) {
+    private VirtualList(IList<V> prefix, IList<V> base, IList<V> suffix, boolean linear) {
       this.prefix = prefix;
       this.base = base;
       this.suffix = suffix;
@@ -477,32 +479,32 @@ public class Lists {
     @Override
     public IList<V> addLast(V value) {
       IList<V> suffixPrime = suffix.addLast(value);
-      return linear ? this : new Proxy<V>(prefix, base, suffixPrime, false);
+      return linear ? this : new VirtualList<V>(prefix, base, suffixPrime, false);
     }
 
     @Override
     public IList<V> addFirst(V value) {
       IList<V> prefixPrime = prefix.addFirst(value);
-      return linear ? this : new Proxy<V>(prefixPrime, base, suffix, false);
+      return linear ? this : new VirtualList<V>(prefixPrime, base, suffix, false);
     }
 
     @Override
     public IList<V> removeLast() {
       if (suffix.size() > 0) {
         IList<V> suffixPrime = suffix.removeLast();
-        return linear ? this : new Proxy<V>(prefix, base, suffixPrime, false);
+        return linear ? this : new VirtualList<V>(prefix, base, suffixPrime, false);
       } else if (base.size() <= 1 && prefix.size() == 0) {
         return Lists.EMPTY;
       } else if (base.size() == 0) {
         IList<V> prefixPrime = prefix.removeLast();
-        return linear ? this : new Proxy<V>(prefixPrime, base, suffix, false);
+        return linear ? this : new VirtualList<V>(prefixPrime, base, suffix, false);
       } else {
         IList<V> listPrime = base.slice(0, base.size() - 1);
         if (linear) {
           base = listPrime;
           return this;
         } else {
-          return new Proxy<V>(prefix, listPrime, suffix, false);
+          return new VirtualList<V>(prefix, listPrime, suffix, false);
         }
       }
     }
@@ -511,19 +513,19 @@ public class Lists {
     public IList<V> removeFirst() {
       if (prefix.size() > 0) {
         IList<V> prefixPrime = prefix.removeFirst();
-        return linear ? this : new Proxy<V>(prefixPrime, base, suffix, false);
+        return linear ? this : new VirtualList<V>(prefixPrime, base, suffix, false);
       } else if (base.size() <= 1 && suffix.size() == 0) {
         return Lists.EMPTY;
       } else if (base.size() == 0) {
         IList<V> suffixPrime = suffix.removeFirst();
-        return linear ? this : new Proxy<V>(prefix, base, suffixPrime, false);
+        return linear ? this : new VirtualList<V>(prefix, base, suffixPrime, false);
       } else {
         IList<V> basePrime = base.slice(1, base.size());
         if (linear) {
           base = basePrime;
           return this;
         } else {
-          return new Proxy<V>(prefix, basePrime, suffix, false);
+          return new VirtualList<V>(prefix, basePrime, suffix, false);
         }
       }
     }
@@ -536,7 +538,7 @@ public class Lists {
         return addLast(value);
       } else if (idx < prefix.size()) {
         IList<V> prefixPrime = prefix.set(idx, value);
-        return linear ? this : new Proxy<V>(prefixPrime, base, suffix, false);
+        return linear ? this : new VirtualList<V>(prefixPrime, base, suffix, false);
       } else if (idx < (prefix.size() + base.size())) {
         idx -= prefix.size();
         IList<V> basePrime = Lists.concat(
@@ -547,23 +549,23 @@ public class Lists {
           base = basePrime;
           return this;
         } else {
-          return new Proxy<V>(prefix, base, suffix, false);
+          return new VirtualList<V>(prefix, base, suffix, false);
         }
       } else {
         idx -= prefix.size() + base.size();
         IList<V> suffixPrime = suffix.set(idx, value);
-        return linear ? this : new Proxy<V>(prefix, base, suffixPrime, false);
+        return linear ? this : new VirtualList<V>(prefix, base, suffixPrime, false);
       }
     }
 
     @Override
     public IList<V> forked() {
-      return linear ? new Proxy<V>(prefix.forked(), base, suffix.forked(), false) : this;
+      return linear ? new VirtualList<V>(prefix.forked(), base, suffix.forked(), false) : this;
     }
 
     @Override
     public IList<V> linear() {
-      return linear ? this : new Proxy<V>(prefix.linear(), base, suffix.linear(), true);
+      return linear ? this : new VirtualList<V>(prefix.linear(), base, suffix.linear(), true);
     }
 
     @Override
@@ -613,7 +615,10 @@ public class Lists {
   public static <V> boolean equals(IList<V> a, IList<V> b, BiPredicate<V, V> equals) {
     if (a.size() != b.size()) {
       return false;
+    } else if (a == b) {
+      return true;
     }
+
     Iterator<V> ia = a.iterator();
     Iterator<V> ib = b.iterator();
     while (ia.hasNext()) {
@@ -679,17 +684,18 @@ public class Lists {
    * @return a subset view of the list, which holds onto a reference to the original
    */
   public static <V> IList<V> slice(IList<V> list, long start, long end) {
+    IList<V> result;
+
     long size = end - start;
     if (size == 0) {
-      return Lists.EMPTY;
-    }
-    if (size == list.size()) {
-      return list;
+      result = Lists.EMPTY;
     } else if (start < 0 || end > list.size()) {
       throw new IllegalArgumentException();
+    } else {
+      result = new Slice<V>(list, start, size);
     }
 
-    return new Slice<V>(list, start, size);
+    return list.isLinear() ? result.linear() : result;
   }
 
   /**
@@ -796,12 +802,16 @@ public class Lists {
     };
   }
 
+  /**
+   * @return a Java stream collector which can be used to construct a LinearList
+   */
   public static <V> Collector<V, LinearList<V>, LinearList<V>> linearCollector() {
     return linearCollector(8);
   }
 
   /**
-   * @return a Java stream collection which can be used to construct a LinearList
+   * @param capacity the initial capacity of the list which collects values.
+   * @return a Java stream collector which can be used to construct a LinearList
    */
   public static <V> Collector<V, LinearList<V>, LinearList<V>> linearCollector(int capacity) {
     return new Collector<V, LinearList<V>, LinearList<V>>() {
@@ -872,22 +882,24 @@ public class Lists {
   }
 
   /**
-   * @return a concatenation of the two lists
+   * @return a concatenation of the two lists, which is linear if {@code a} is linear
    */
   public static <V> IList<V> concat(IList<V> a, IList<V> b) {
+    IList<V> result;
     if (a.size() == 0) {
-      return b;
+      result = b;
     } else if (b.size() == 0) {
-      return a;
+      result = a;
     } else if (a instanceof Concat && b instanceof Concat) {
-      return ((Concat<V>) a).concat((Concat<V>) b);
+      result = ((Concat<V>) a).concat((Concat<V>) b);
     } else if (a instanceof Concat) {
-      return ((Concat<V>) a).concat(new Concat<>(b));
+      result = ((Concat<V>) a).concat(new Concat<>(b));
     } else if (b instanceof Concat) {
-      return new Concat<>(a).concat((Concat<V>) b);
+      result = new Concat<>(a).concat((Concat<V>) b);
     } else {
-      return new Concat<V>(a, b);
+      result = new Concat<V>(a, b);
     }
+    return a.isLinear() ? result.linear() : result;
   }
 
   /**

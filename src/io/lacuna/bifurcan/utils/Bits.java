@@ -19,39 +19,74 @@ public class Bits {
     return deBruijnIndex[0xFF & (int) ((n * 0x022fdd63cc95386dL) >>> 58)];
   }
 
+  /**
+   * @param n a number
+   * @return the same number, with all but the lowest bit zeroed out
+   */
   public static long lowestBit(long n) {
     return n & -n;
   }
 
+  /**
+   * @param n a number
+   * @return the same number, with all but the lowest bit zeroed out
+   */
   public static int lowestBit(int n) {
     return n & -n;
   }
 
+  /**
+   * @param n a number
+   * @return the same number, with all but the highest bit zeroed out
+   */
   public static long highestBit(long n) {
     return Long.highestOneBit(n);
   }
 
+  /**
+   * @param n a number
+   * @return the same number, with all but the highest bit zeroed out
+   */
   public static int highestBit(int n) {
     return Integer.highestOneBit(n);
   }
 
+  /**
+   * @param n a number
+   * @return the log2 of that value, rounded down
+   */
   public static int log2Floor(long n) {
     return bitOffset(highestBit(n));
   }
 
+  /**
+   * @param n a number
+   * @return the log2 of the value, rounded up
+   */
   public static int log2Ceil(long n) {
     int log2 = log2Floor(n);
     return isPowerOfTwo(n) ? log2 : log2 + 1;
   }
 
+  /**
+   * @param bits a bit offset
+   * @return a mask, with all bits below that offset set to one
+   */
   public static long maskBelow(int bits) {
     return (1L << bits) - 1;
   }
 
+  /**
+   * @param bits a bit offset
+   * @return a mask, with all bits above that offset set to one
+   */
   public static long maskAbove(int bits) {
     return -1L & ~maskBelow(bits);
   }
 
+  /**
+   * @return the offset of the highest bit which differs between {@code a} and {@code b}
+   */
   public static int branchingBit(long a, long b) {
     if (a == b) {
       return -1;
@@ -60,6 +95,10 @@ public class Bits {
     }
   }
 
+  /**
+   * @param n a number
+   * @return true, if the number is a power of two
+   */
   public static boolean isPowerOfTwo(long n) {
     return (n & (n - 1)) == 0;
   }

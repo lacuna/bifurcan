@@ -158,7 +158,7 @@
       (map= a b)
       (map= a c))))
 
-(u/def-collection-check test-unreified-map iterations map-actions
+(u/def-collection-check test-virtual-map iterations map-actions
   [a (transient {}) clj-map
    b Maps/EMPTY bifurcan-map]
   (let [a (persistent! a)]
@@ -181,7 +181,7 @@
       (set= a b)
       (set= a c))))
 
-(u/def-collection-check test-unreified-set iterations set-actions
+(u/def-collection-check test-virtual-set iterations set-actions
   [a (transient #{}) clj-set
    b Sets/EMPTY bifurcan-set]
   (let [a (persistent! a)]
@@ -203,7 +203,7 @@
     (list= a b)
     (list= a c)))
 
-(u/def-collection-check test-unreified-list iterations list-actions
+(u/def-collection-check test-virtual-list iterations list-actions
   [a [] clj-list
    b Lists/EMPTY bifurcan-list
    c (.linear (Lists/from [])) bifurcan-list]
@@ -211,6 +211,69 @@
     (= b c)
     (list= a b)
     (list= a c)))
+
+(defspec test-list-range iterations
+  (prop/for-all [n (gen/choose 1 1e4)]
+    (list= (range n)
+      (List/from (range n)))))
+
+(defspec test-list-range-concat iterations
+  (prop/for-all [a (gen/choose 1 2e3)
+                 b (gen/choose 1 2e3)]
+    (list= (concat (range a) (range b))
+      (List/from (concat (range a) (range b))))))
+
+(defspec test-list-slice iterations
+  (prop/for-all [start (gen/choose 1 1e4)
+                 end (gen/choose 1 1e4)]
+    (let [start (min start end)
+          end (max start end)
+          s (range (* 2 end))]
+      (and
+        (list=
+          (->> s (drop start) (take (- end start)))
+          (.slice (List/from s) start end))
+        (list=
+          (->> s (drop start) (take (- end start)))
+          (Lists/slice (List/from s) start end))))))
+
+(defspec test-list-slice iterations
+  (prop/for-all [start (gen/choose 1 1e4)
+                 end (gen/choose 1 1e4)]
+    (let [start (min start end)
+          end (max start end)
+          s (range (* 2 end))]
+      (and
+        (list=
+          (->> s (drop start) (take (- end start)))
+          (.slice (List/from s) start end))
+        (list=
+          (->> s (drop start) (take (- end start)))
+          (Lists/slice (List/from s) start end))))))
+
+;;; IntMap
+
+(defspec test-int-map-slice iterations
+  (prop/for-all [start (gen/choose 1 1e4)
+                 end (gen/choose 1 1e4)]
+    (let [start (min start end)
+          end (max start end)
+          s (range (* 2 end))]
+      (map=
+        (->> s (drop start) (take (inc (- end start))) (map #(vector % %)) (into {}))
+        (-> (->> s (map #(vector % %)) (into {})) IntMap/from (.slice start end))))))
+
+(defspec test-int-map-floor iterations
+  (prop/for-all [m (map-gen #(IntMap.))
+                 k gen/pos-int]
+    (= (->> m .keys .toSet (take-while #(<= % k)) last)
+      (some-> m (.floor k) .key))))
+
+(defspec test-int-map-ceil iterations
+  (prop/for-all [m (map-gen #(IntMap.))
+                 k gen/pos-int]
+    (= (->> m .keys .toSet (drop-while #(< % k)) first)
+      (some-> m (.ceil k) .key))))
 
 ;; Collection split/merge
 
@@ -240,7 +303,7 @@
   (prop/for-all [l (list-gen #(List.))]
     (-> l (.split 2) into-array Lists/concat)))
 
-(defspec test-unreified-list-split iterations
+(defspec test-virtual-list-split iterations
   (prop/for-all [l (list-gen #(Lists/from []))]
     (-> l (.split 2) into-array Lists/concat)))
 
@@ -266,9 +329,9 @@
     (= (concat (->vec a) (->vec b))
       (->vec (.concat ^IList a b)))))
 
-(defspec test-unreified-list-concat iterations
-  (prop/for-all [a (list-gen #(Lists/from [1 2 3]))
-                 b (list-gen #(Lists/from [1 2 3]))]
+(defspec test-virtual-list-concat iterations
+  (prop/for-all [a (list-gen #(Lists/from []))
+                 b (list-gen #(Lists/from []))]
     (= (concat (->vec a) (->vec b))
       (->vec (.concat ^IList a b)))))
 

@@ -141,7 +141,7 @@ public class MapNodes {
       Node<K, V> n = this;
       int currShift = shift;
       boolean increment;
-      for (;;) {
+      for (; ; ) {
 
         int mask = hashMask(hash, currShift);
 
@@ -237,9 +237,8 @@ public class MapNodes {
 
       return new Iterator<IEntry<K, V>>() {
 
-        final LinearList<INode<K, V>> nodes = LinearList.from(nodes());
+        final LinearList nodes = LinearList.from(nodes());
 
-        // we use this rather than entries() so that we're not using polymorphic dispatch for Iterator.next()
         Object[] content = Node.this.content;
         int idx = 0;
         int limit = bitCount(Node.this.datamap) << 1;
@@ -252,14 +251,20 @@ public class MapNodes {
         @Override
         public IEntry<K, V> next() {
           while (idx >= limit) {
-            INode<K, V> node = nodes.popFirst();
+            Object node = nodes.popFirst();
 
             if (node instanceof Node) {
               Node<K, V> n = (Node<K, V>) node;
-              n.nodes().forEach(nodes::addLast);
               content = n.content;
               idx = 0;
               limit = bitCount(n.datamap) << 1;
+
+              if (n.nodemap != 0) {
+                int len = n.content.length;
+                for (int i = len - bitCount(n.nodemap); i < len; i++) {
+                  nodes.addLast(n.content[i]);
+                }
+              }
             } else {
               Collision<K, V> c = (Collision<K, V>) node;
               content = c.entries;
@@ -293,6 +298,11 @@ public class MapNodes {
     }
 
     public boolean equals(INode<K, V> o, BiPredicate<K, K> keyEquals, BiPredicate<V, V> valEquals) {
+
+      if (this == o) {
+        return true;
+      }
+
       if (o instanceof Node) {
         Node<K, V> n = (Node<K, V>) o;
         if (n.size == size && n.datamap == datamap && n.nodemap == nodemap) {
@@ -558,18 +568,23 @@ public class MapNodes {
 
     @Override
     public boolean equals(INode<K, V> o, BiPredicate<K, K> keyEquals, BiPredicate<V, V> valEquals) {
+
+      if (this == o) {
+        return true;
+      }
+
       if (o instanceof Collision) {
-        Collision<K, V> n = (Collision<K, V>) o;
-        if (n.size() == size()) {
+        Collision<K, V> c = (Collision<K, V>) o;
+        if (c.size() == size()) {
+
           Iterator<IEntry<K, V>> it = entries().iterator();
           while (it.hasNext()) {
             IEntry<K, V> e = it.next();
-            int idx = n.indexOf(e.key(), keyEquals);
+            int idx = c.indexOf(e.key(), keyEquals);
             if (idx < 0 || !valEquals.test(e.value(), (V) entries[idx + 1])) {
               return false;
             }
           }
-
           return true;
         }
       }

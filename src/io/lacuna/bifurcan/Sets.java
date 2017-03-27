@@ -9,6 +9,8 @@ import java.util.stream.Collector;
 import java.util.stream.IntStream;
 
 /**
+ * Utility functions for classes implementing {@code ISet}.
+ *
  * @author ztellman
  */
 public class Sets {
@@ -50,17 +52,17 @@ public class Sets {
     }
   };
 
-  public static class Proxy<V> implements ISet<V> {
+  static class VirtualSet<V> implements ISet<V> {
 
     private Set<V> canonical;
     private ISet<V> base, added, removed;
     private boolean linear;
 
-    public Proxy(ISet<V> base) {
+    public VirtualSet(ISet<V> base) {
       this(base, Sets.EMPTY, Sets.EMPTY, false);
     }
 
-    private Proxy(ISet<V> base, ISet<V> added, ISet<V> removed, boolean linear) {
+    private VirtualSet(ISet<V> base, ISet<V> added, ISet<V> removed, boolean linear) {
       this.base = base;
       this.added = added;
       this.removed = removed;
@@ -110,7 +112,7 @@ public class Sets {
         if (!base.contains(value)) {
           addedPrime = added.add(value);
         }
-        return linear ? this : new Proxy<V>(base, addedPrime, removedPrime, false);
+        return linear ? this : new VirtualSet<V>(base, addedPrime, removedPrime, false);
       }
     }
 
@@ -121,7 +123,7 @@ public class Sets {
       } else {
         ISet<V> removedPrime = removed.add(value);
         ISet<V> addedPrime = added.remove(value);
-        return linear ? this : new Proxy<V>(base, addedPrime, removedPrime, false);
+        return linear ? this : new VirtualSet<V>(base, addedPrime, removedPrime, false);
       }
     }
 
@@ -141,7 +143,7 @@ public class Sets {
       if (canonical != null) {
         return canonical.forked();
       } else {
-        return new Proxy<V>(added.forked(), removed.forked(), base, false);
+        return new VirtualSet<V>(added.forked(), removed.forked(), base, false);
       }
     }
 
@@ -150,7 +152,7 @@ public class Sets {
       if (canonical != null) {
         return canonical.linear();
       } else {
-        return new Proxy<V>(added.linear(), removed.linear(), base, true);
+        return new VirtualSet<V>(added.linear(), removed.linear(), base, true);
       }
     }
   }
@@ -166,25 +168,27 @@ public class Sets {
   public static <V> boolean equals(ISet<V> a, ISet<V> b) {
     if (a.size() != b.size()) {
       return false;
+    } else if (a == b) {
+      return true;
     }
     return a.elements().stream().allMatch(b::contains);
   }
 
-  public static <V> ISet<V> difference(ISet<V> a, ISet<V> b) {
+  static <V> ISet<V> difference(ISet<V> a, ISet<V> b) {
     for (V e : b) {
       a = a.remove(e);
     }
     return a;
   }
 
-  public static <V> ISet<V> union(ISet<V> a, ISet<V> b) {
+  static <V> ISet<V> union(ISet<V> a, ISet<V> b) {
     for (V e : b) {
       a = a.add(e);
     }
     return a;
   }
 
-  public static <V> ISet<V> intersection(ISet<V> accumulator, ISet<V> a, ISet<V> b) {
+  static <V> ISet<V> intersection(ISet<V> accumulator, ISet<V> a, ISet<V> b) {
     if (b.size() < a.size()) {
       return intersection(accumulator, b, a);
     }

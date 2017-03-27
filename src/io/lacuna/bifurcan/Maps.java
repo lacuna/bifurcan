@@ -10,6 +10,8 @@ import java.util.stream.Collector;
 import static io.lacuna.bifurcan.Lists.lazyMap;
 
 /**
+ * * Utility functions for classes implementing {@code IMap}.
+ *
  * @author ztellman
  */
 @SuppressWarnings("unchecked")
@@ -98,7 +100,7 @@ public class Maps {
     }
   }
 
-  static class Proxy<K, V> implements IMap<K, V> {
+  static class VirtualMap<K, V> implements IMap<K, V> {
 
     private IMap<K, V> canonical = null;
 
@@ -106,11 +108,11 @@ public class Maps {
     private ISet<K> removed, shadowed;
     private final boolean linear;
 
-    public Proxy(IMap<K, V> base) {
+    public VirtualMap(IMap<K, V> base) {
       this(base, Maps.EMPTY, Sets.EMPTY, Sets.EMPTY, false);
     }
 
-    private Proxy(IMap<K, V> base, IMap<K, V> added, ISet<K> removed, ISet<K> shadowed, boolean linear) {
+    private VirtualMap(IMap<K, V> base, IMap<K, V> added, ISet<K> removed, ISet<K> shadowed, boolean linear) {
       this.base = base;
       this.added = added;
       this.removed = removed;
@@ -157,13 +159,13 @@ public class Maps {
         return canonical.put(key, value, merge);
       } else if (added.contains(key) || !base.contains(key)) {
         IMap<K, V> addedPrime = added.put(key, value, merge);
-        return linear ? this : new Proxy<K, V>(base, addedPrime, removed, shadowed, false);
+        return linear ? this : new VirtualMap<K, V>(base, addedPrime, removed, shadowed, false);
       } else {
         IMap<K, V> addedPrime = added.put(key, merge.apply(added.get(key).orElse(null), value));
         ISet<K> shadowedPrime = shadowed.add(key);
         ISet<K> removedPrime = removed.remove(key);
 
-        return linear ? this : new Proxy<K, V>(base, addedPrime, removedPrime, shadowedPrime, false);
+        return linear ? this : new VirtualMap<K, V>(base, addedPrime, removedPrime, shadowedPrime, false);
       }
     }
 
@@ -179,9 +181,9 @@ public class Maps {
         if (shadowed.contains(key)) {
           ISet<K> shadowedPrime = shadowed.remove(key);
           ISet<K> removedPrime = removed.add(key);
-          return linear ? this : new Proxy<K, V>(base, addedPrime, removedPrime, shadowedPrime, false);
+          return linear ? this : new VirtualMap<K, V>(base, addedPrime, removedPrime, shadowedPrime, false);
         } else {
-          return linear ? this : new Proxy<K, V>(base, addedPrime, removed, shadowed, false);
+          return linear ? this : new VirtualMap<K, V>(base, addedPrime, removed, shadowed, false);
         }
       }
     }
@@ -191,7 +193,7 @@ public class Maps {
       if (canonical != null) {
         return canonical.forked();
       } else {
-        return linear ? new Proxy<K, V>(base, added.forked(), removed.forked(), shadowed.forked(), false) : this;
+        return linear ? new VirtualMap<K, V>(base, added.forked(), removed.forked(), shadowed.forked(), false) : this;
       }
     }
 
@@ -200,7 +202,7 @@ public class Maps {
       if (canonical != null) {
         return canonical.linear();
       } else {
-        return linear ? this : new Proxy<K, V>(base, added.linear(), removed.linear(), shadowed.linear(), true);
+        return linear ? this : new VirtualMap<K, V>(base, added.linear(), removed.linear(), shadowed.linear(), true);
       }
     }
 
@@ -300,6 +302,8 @@ public class Maps {
   public static <K, V> boolean equals(IMap<K, V> a, IMap<K, V> b, BiPredicate<V, V> valEquals) {
     if (a.size() != b.size()) {
       return false;
+    } else if (a == b) {
+      return true;
     }
 
     return a.entries().stream().allMatch(e -> {

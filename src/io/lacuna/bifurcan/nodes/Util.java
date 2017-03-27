@@ -34,7 +34,7 @@ public class Util {
   static final int NONE_ENTRY = 0x8;
   static final int ENTRY_NODE = ENTRY_NONE | NONE_NODE;
   static final int NODE_ENTRY = NODE_NONE | NONE_ENTRY;
-  static final int ENTRY_ENTRY = ENTRY_NONE | NONE_ENTRY;
+  static final int  ENTRY_ENTRY = ENTRY_NONE | NONE_ENTRY;
   static final int NODE_NODE = NODE_NONE | NONE_NODE;
 
   static int mergeState(int mask, int nodeA, int dataA, int nodeB, int dataB) {

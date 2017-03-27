@@ -16,17 +16,11 @@ Unlike Clojure and Java's lists, Bifurcan's lists can efficiently remove and add
 
 ![](../benchmarks/images/list_construct.png)
 
-`List` is marginally slower to iterate over, but both lists are very competitive with their equivalents.
+Bifurcan's `List` provides equivalent performance in iteration and random lookups to Clojure's vector, but unlike Clojure it also   allows for near constant-time slices and concats.
 
 ![](../benchmarks/images/list_iterate.png)
 
-`List` is marginally slower to lookup, because it uses [relaxed radix nodes](https://infoscience.epfl.ch/record/169879/files/RMTrees.pdf), but in return gets near constant-time slices and concats.
-
 ![](../benchmarks/images/list_lookup.png)
-
-Both `List` and `LinearList` provide effectively constant-time concatenation, the former via the relaxed radix structure, the latter via a wrapper object provided by `Lists.concat()`.
-
-![](../benchmarks/images/concat.png)
 
 ## Maps
 

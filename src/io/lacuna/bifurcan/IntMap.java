@@ -8,17 +8,28 @@ import java.util.*;
 import java.util.Map;
 import java.util.function.BiPredicate;
 import java.util.function.BinaryOperator;
+import java.util.function.ToIntFunction;
 
 /**
+ * A map which has integer keys, which is an combination of Okasaki and Gill's
+ * <a href="http://ittc.ku.edu/~andygill/papers/IntMap98.pdf">Fast Mergeable Integer Maps</a> with the memory layout
+ * suggested by Steindorfer and Vinju used in {@class Map}, with which it shares the same broad performance
+ * characteristics.
+ * <p>
+ * This collection keeps the keys in sorted order, and can thought of as either a map of integers or a sparse vector.
+ * It provides {@code slice()}, {@code floor()}, and {@code ceil()} methods which allow for lookups and filtering on
+ * its keys.
+ *
  * @author ztellman
  */
 public class IntMap<V> implements IMap<Long, V>, Cloneable {
 
+  private static final ToIntFunction<Long> HASH = n -> (int) (n ^ (n >>> 32));
   private static final Object DEFAULT_VALUE = new Object();
 
   private final Object editor = new Object();
   private final boolean linear;
-  public Node<V> neg, pos;
+  private Node<V> neg, pos;
 
   public IntMap() {
     this.neg = Node.NEG_EMPTY;
@@ -32,22 +43,67 @@ public class IntMap<V> implements IMap<Long, V>, Cloneable {
     this.linear = linear;
   }
 
+  /**
+   * @param m another map
+   * @return a forked copy of the map
+   */
   public static <V> IntMap<V> from(IMap<Number, V> m) {
-    IntMap<V> map = new IntMap<V>().linear();
-    for (IEntry<Number, V> e : m) {
-      map = map.put((long) e.key(), e.value());
+    if (m instanceof IntMap) {
+      return (IntMap) m.forked();
+    } else {
+      return from(m.entries());
     }
-    return map.forked();
   }
 
+  /**
+   * @param m a {@code java.util.Map}
+   * @return a forked copy of the map
+   */
   public static <V> IntMap<V> from(java.util.Map<Number, V> m) {
+    return from(m.entrySet());
+  }
+
+  /**
+   * @param collection a collection of {@code java.util.map.Entry} objects
+   * @return an {@code IntMap} representing the entries in the collection
+   */
+  public static <V> IntMap<V> from(Collection<Map.Entry<Number, V>> collection) {
     IntMap<V> map = new IntMap<V>().linear();
-    for (Map.Entry<Number, V> e : m.entrySet()) {
-      map = map.put((long) e.getKey(), e.getValue());
+    for (Map.Entry<Number, V> entry : collection) {
+      map = map.put((long) entry.getKey(), entry.getValue());
     }
     return map.forked();
   }
 
+  /**
+   * @param list a list of {@code IEntry} objects
+   * @return an {@code IntMap} representing the entries in the list
+   */
+  public static <V> IntMap<V> from(IList<IEntry<Number, V>> list) {
+    IntMap<V> map = new IntMap<V>().linear();
+    for (IEntry<Number, V> entry : list) {
+      map = map.put((long) entry.key(), entry.value());
+    }
+    return map.forked();
+  }
+
+  ///
+
+  @Override
+  public ToIntFunction<Long> keyHash() {
+    return HASH;
+  }
+
+  @Override
+  public BiPredicate<Long, Long> keyEquality() {
+    return Objects::equals;
+  }
+
+  /**
+   * @param min the inclusive minimum key value
+   * @param max the inclusive maximum key value
+   * @return a map representing all entries within [{@code} min, {@code} max]
+   */
   public IntMap<V> slice(long min, long max) {
     Node<V> negPrime = neg.slice(editor, min, max);
     Node<V> posPrime = pos.slice(editor, min, max);
@@ -63,7 +119,7 @@ public class IntMap<V> implements IMap<Long, V>, Cloneable {
       IntMap<V> m = (IntMap<V>) b;
       return new IntMap<V>(neg.merge(new Object(), m.neg, mergeFn), pos.merge(new Object(), m.pos, mergeFn), linear);
     } else {
-      return (IntMap<V>) Maps.merge(this, b, mergeFn);
+      return (IntMap<V>) Maps.merge(this.clone(), b, mergeFn);
     }
   }
 
@@ -75,7 +131,7 @@ public class IntMap<V> implements IMap<Long, V>, Cloneable {
       Node<V> posPrime = pos.difference(new Object(), m.pos);
       return new IntMap<V>(negPrime == null ? Node.NEG_EMPTY : negPrime, posPrime == null ? Node.POS_EMPTY : posPrime, linear);
     } else {
-      return (IntMap<V>) Maps.difference(this, b.keys());
+      return (IntMap<V>) Maps.difference(this.clone(), b.keys());
     }
   }
 
@@ -87,14 +143,27 @@ public class IntMap<V> implements IMap<Long, V>, Cloneable {
       Node<V> posPrime = pos.intersection(new Object(), m.pos);
       return new IntMap<V>(negPrime == null ? Node.NEG_EMPTY : negPrime, posPrime == null ? Node.POS_EMPTY : posPrime, linear);
     } else {
-      return (IntMap<V>) Maps.intersection(new IntMap<V>().linear(), this, b.keys()).forked();
+      IntMap<V> result = (IntMap<V>) Maps.intersection(new IntMap<V>().linear(), this, b.keys());
+      return linear ? result : result.forked();
     }
   }
 
+  /**
+   * @param key   a primitive {@code long} key
+   * @param value a value
+   * @return an updated {@code IntMap} with {@code value} under {@code key}
+   */
   public IntMap<V> put(long key, V value) {
     return put(key, value, (BinaryOperator<V>) Maps.MERGE_LAST_WRITE_WINS);
   }
 
+  /**
+   * @param key   a primitive {@code long} key
+   * @param value a value
+   * @param merge a function which will be invoked if there is a pre-existing value under {@code key}, with the current
+   *              value as the first argument and new value as the second, to determine the combined result
+   * @return an updated map
+   */
   public IntMap<V> put(long key, V value, BinaryOperator<V> merge) {
     if (key < 0) {
       Node<V> negPrime = neg.put(editor, key, value, merge);
@@ -129,6 +198,9 @@ public class IntMap<V> implements IMap<Long, V>, Cloneable {
     return put((long) key, value, merge);
   }
 
+  /**
+   * @return an updated map that does not contain {@code key}
+   */
   public IntMap<V> remove(long key) {
     if (key < 0) {
       Node<V> negPrime = neg.remove(editor, key);
@@ -189,6 +261,10 @@ public class IntMap<V> implements IMap<Long, V>, Cloneable {
     return Iterators.concat(neg.iterator(), pos.iterator());
   }
 
+  /**
+   * @return the entry whose key is either equal to {@code key}, or just below it. If {@code key} is less than the
+   * minimum value in the map, returns {@code null}.
+   */
   public IEntry<Long, V> floor(long key) {
     if (key < 0) {
       return neg.floor(key);
@@ -197,11 +273,15 @@ public class IntMap<V> implements IMap<Long, V>, Cloneable {
       if (entry != null) {
         return entry;
       } else {
-        return neg.size() > 0 ? neg.nth(pos.size() - 1) : null;
+        return neg.size() > 0 ? neg.nth(neg.size() - 1) : null;
       }
     }
   }
 
+  /**
+   * @return the entry whose key is either equal to {@code key}, or just above it. If {@code key} is greater than the
+   * maximum value in the map, returns {@code null}.
+   */
   public IEntry<Long, V> ceil(long key) {
     if (key >= 0) {
       return pos.ceil(key);
@@ -295,7 +375,7 @@ public class IntMap<V> implements IMap<Long, V>, Cloneable {
   }
 
   @Override
-  public Object clone() {
+  public IntMap<V> clone() {
     return linear ? forked().linear() : this;
   }
 }

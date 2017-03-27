@@ -9,23 +9,36 @@ import java.util.Optional;
 import static io.lacuna.bifurcan.utils.Bits.log2Ceil;
 
 /**
- * A simple implementation of a list, mimicking most behaviors of Java's ArrayDeque.
+ * A simple implementation of a mutable list combining the best characteristics of {@code java.util.ArrayList} and
+ * {@code java.util.ArrayDeque}, allowing elements to be added and removed from both ends of the collection <i>and</i>
+ * allowing random-access reads and updates.
+ * <p>
+ * Calls to {@code concat()}, {@code slice()}, and {@code split()} create virtual collections which retain a reference
+ * to the whole underlying collection, and are somewhat less efficient than {@code LinearList}.
  *
  * @author ztellman
  */
 @SuppressWarnings("unchecked")
 public class LinearList<V> implements IList<V>, Cloneable {
 
-  private static final int DEFAULT_CAPACITY = 8;
+  private static final int DEFAULT_CAPACITY = 4;
 
-  public Object[] elements;
-  public int mask;
-  public int size, offset;
+  private Object[] elements;
+  private int mask;
+  private int size, offset;
 
+  /**
+   * Creates a new {@code LinearList}.
+   */
   public LinearList() {
     this(DEFAULT_CAPACITY);
   }
 
+  /**
+   * Creates a new {@code LinearList}.
+   *
+   * @param capacity the initial capacity of the list
+   */
   public LinearList(int capacity) {
     this(0, new Object[Math.max(1, 1 << log2Ceil(capacity))]);
   }
@@ -37,27 +50,44 @@ public class LinearList<V> implements IList<V>, Cloneable {
     this.elements = elements;
   }
 
+  /**
+   * @param collection a {@code java.util.Collection}
+   * @return a list containing the entries of the collection
+   */
   public static <V> LinearList<V> from(Collection<V> collection) {
     return collection.stream().collect(Lists.linearCollector(collection.size()));
   }
 
+  /**
+   * @param iterable an {@code Iterable} object
+   * @return a list containing the elements of the iterator
+   */
   public static <V> LinearList<V> from(Iterable<V> iterable) {
     return from(iterable.iterator());
   }
 
+  /**
+   * @param iterator an {@code java.util.Iterator}
+   * @return a list containing all remaining elements of the iterator
+   */
   public static <V> LinearList<V> from(Iterator<V> iterator) {
     LinearList<V> list = new LinearList<V>();
-    while (iterator.hasNext()) {
-      list.addLast(iterator.next());
-    }
+    iterator.forEachRemaining(list::addLast);
     return list;
   }
 
+  /**
+   * @param list another list
+   * @return a {@code LinearList} containing all the elements of the list
+   */
   public static <V> LinearList<V> from(IList<V> list) {
     if (list.size() > Integer.MAX_VALUE) {
       throw new IllegalArgumentException("LinearList cannot hold more than 1 << 30 entries");
+    } else if (list instanceof LinearList) {
+      return ((LinearList<V>) list).clone();
+    } else {
+      return list.stream().collect(Lists.linearCollector((int) list.size()));
     }
-    return list.stream().collect(Lists.linearCollector((int) list.size()));
   }
 
   private void resize(int newCapacity) {
@@ -73,6 +103,11 @@ public class LinearList<V> implements IList<V>, Cloneable {
     mask = nElements.length - 1;
     elements = nElements;
     offset = 0;
+  }
+
+  @Override
+  public boolean isLinear() {
+    return true;
   }
 
   @Override
@@ -163,12 +198,24 @@ public class LinearList<V> implements IList<V>, Cloneable {
     return (V) elements[(offset + (int) idx) & mask];
   }
 
+  /**
+   * Removes, and returns, the first element of the list.
+   *
+   * @return the first element of the list
+   * @throws IndexOutOfBoundsException if the list is empty
+   */
   public V popFirst() {
     V val = first();
     removeFirst();
     return val;
   }
 
+  /**
+   * Removes, and returns, the last element of the list.
+   *
+   * @return the last element of the list
+   * @throws IndexOutOfBoundsException if the list is empty
+   */
   public V popLast() {
     V val = last();
     removeLast();

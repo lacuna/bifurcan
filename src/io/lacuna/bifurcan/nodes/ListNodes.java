@@ -11,48 +11,23 @@ import static java.lang.System.arraycopy;
  */
 public class ListNodes {
 
-  interface INode<V> {
-    INode<V> slice(Object editor, int start, int end);
-
-    INode<V> set(Object editor, int idx, V val);
-  }
-
-  public static class Leaf<V> implements INode<V> {
-    public final Object[] elements;
-    public final Object editor;
-
-    public Leaf(Object editor, Object[] elements) {
-      this.editor = editor;
-      this.elements = elements;
-    }
-
-    public int size() {
-      return elements.length;
-    }
-
-    public Leaf<V> set(Object editor, int idx, Object value) {
-      if (editor == this.editor) {
-        elements[idx] = value;
-        return this;
-      } else {
-        Leaf leaf = new Leaf(editor, elements.clone());
-        leaf.elements[idx] = value;
-        return leaf;
-      }
-    }
-
-    public Leaf<V> slice(Object editor, int start, int end) {
+  public static Object slice(Object chunk, Object editor, int start, int end) {
+    if (chunk instanceof Object[]) {
       Object[] ary = new Object[end - start];
-      arraycopy(elements, start, ary, 0, ary.length);
-      return new Leaf(editor, ary);
-    }
-
-    public Leaf<V> clone() {
-      return new Leaf(editor, elements.clone());
+      arraycopy(chunk, start, ary, 0, ary.length);
+      return ary;
+    } else {
+      return ((Node) chunk).slice(editor, start, end);
     }
   }
 
-  public static class Node<V> implements INode<V> {
+  public static Object[] set(Object[] elements, int idx, Object value) {
+    Object[] ary = elements.clone();
+    ary[idx] = value;
+    return ary;
+  }
+
+  public static class Node {
 
     public final static Node EMPTY = new Node(new Object(), true, 5);
 
@@ -61,7 +36,7 @@ public class ListNodes {
     public int shift;
     public int numNodes;
     public int[] offsets;
-    public INode[] nodes;
+    public Object[] nodes;
 
     // constructors
 
@@ -71,7 +46,7 @@ public class ListNodes {
       this.shift = shift;
       this.numNodes = 0;
       this.offsets = new int[2];
-      this.nodes = new INode[2];
+      this.nodes = new Object[2];
     }
 
     private Node() {
@@ -79,25 +54,29 @@ public class ListNodes {
 
     // lookup
 
-    public Object nth(long idx) {
+    public Object nth(int idx) {
       return strict ? strictNth(idx) : relaxedNth(idx);
     }
 
-    public Leaf first() {
+    public Object[] arrayFor(int idx) {
+      return strict ? strictArrayFor(idx) : relaxedArrayFor(idx);
+    }
+
+    public Object[] first() {
       if (numNodes == 0) {
         return null;
       } else if (shift == 5) {
-        return (Leaf) nodes[0];
+        return (Object[]) nodes[0];
       } else {
         return ((Node) nodes[0]).first();
       }
     }
 
-    public Leaf last() {
+    public Object[] last() {
       if (numNodes == 0) {
         return null;
       } else if (shift == 5) {
-        return (Leaf) nodes[numNodes - 1];
+        return (Object[]) nodes[numNodes - 1];
       } else {
         return ((Node) nodes[numNodes - 1]).first();
       }
@@ -105,108 +84,106 @@ public class ListNodes {
 
     private boolean isFull(int idx) {
       Object n = nodes[idx];
-      if (n instanceof Leaf) {
-        return true;
-      } else {
+      if (n instanceof Node) {
         Node rn = (Node) n;
         return rn.numNodes == 32 && rn.isFull(31);
+      } else {
+        return true;
       }
     }
 
-    private Object relaxedNth(long idx) {
-      Node node = this;
-      int nodeIdx = node.indexOf(idx);
-      while (node.shift > 5) {
-        if (node.strict) {
-          return strictNth(idx);
+    private Object[] strictArrayFor(int idx) {
+      Node n = this;
+      while (n.shift > 5) {
+        n = (Node) n.nodes[(idx >>> n.shift) & 31];
+      }
+      return (Object[]) n.nodes[(idx >>> 5) & 31];
+    }
+
+    private Object[] relaxedArrayFor(int idx) {
+      Node n = this;
+      while (n.shift > 5) {
+        if (n.strict) {
+          return n.strictArrayFor(idx);
         }
-        idx -= node.offset(nodeIdx);
-        node = (Node) node.nodes[nodeIdx];
-        nodeIdx = node.indexOf(idx);
+        int nodeIdx = n.indexOf(idx);
+        idx -= n.offset(nodeIdx);
+        n = (Node) n.nodes[nodeIdx];
       }
-
-      Leaf leaf = (Leaf) node.nodes[nodeIdx];
-      return leaf.elements[(int)(idx - node.offset(nodeIdx))];
+      return (Object[]) n.nodes[n.indexOf(idx)];
     }
 
-    private Object strictNth(long idx) {
-      Node node = this;
-      while (node.shift > 5) {
-        node = (Node) node.nodes[(int)((idx >> node.shift) & 31)];
-        idx &= ~(31 << (node.shift + 5));
+    private Object relaxedNth(int idx) {
+      Node n = this;
+      while (n.shift > 5) {
+        if (n.strict) {
+          return n.strictNth(idx);
+        }
+        int nodeIdx = n.indexOf(idx);
+        idx -= n.offset(nodeIdx);
+        n = (Node) n.nodes[nodeIdx];
       }
 
-      Leaf leaf = (Leaf) node.nodes[(int)((idx >> 5) & 31)];
-      return leaf.elements[(int)(idx & 31)];
+      int nodeIdx = n.indexOf(idx);
+      return ((Object[]) n.nodes[nodeIdx])[idx - n.offset(nodeIdx)];
     }
 
-    private int indexOf(long idx) {
-      int estimate = (int) ((idx >> shift) & 31);
+    private Object strictNth(int idx) {
+      return strictArrayFor(idx)[idx & 31];
+    }
+
+    private int indexOf(int idx) {
+      int estimate = (idx >> shift) & 31;
       if (strict) {
         return estimate;
-      }
-
-      for (int i = estimate; i < nodes.length; i++) {
-        if (idx < offsets[i]) {
-          return i;
+      } else {
+        for (int i = estimate; i < nodes.length; i++) {
+          if (idx < offsets[i]) {
+            return i;
+          }
         }
+        return -1;
       }
-      return -1;
     }
 
     int offset(int idx) {
-      return idx == 0 ? 0 : offsets[idx - 1];
+      if (strict) {
+        return (32 << (shift - 5)) * idx;
+      } else {
+        return idx == 0 ? 0 : offsets[idx - 1];
+      }
     }
 
     // update
 
-    public INode<V> set(Object editor, int idx, Object value) {
-      return (editor == this.editor ? this : clone(editor)).overwrite(editor, idx, value);
+    public Node set(Object editor, int idx, Object value) {
+      if (editor != this.editor) {
+        return clone(editor).set(editor, idx, value);
+      }
+
+      int nodeIdx = indexOf(idx);
+      if (shift == 5) {
+        nodes[nodeIdx] = ListNodes.set((Object[]) nodes[nodeIdx], idx - offset(nodeIdx), value);
+      } else {
+        nodes[nodeIdx] = ((Node) nodes[nodeIdx]).set(editor, idx - offset(nodeIdx), value);
+      }
+      return this;
     }
 
-    public Node<V> removeFirst(Object editor) {
+    public Node removeFirst(Object editor) {
       return (editor == this.editor ? this : clone(editor)).popFirst();
     }
 
-    public Node<V> removeLast(Object editor) {
+    public Node removeLast(Object editor) {
       return (editor == this.editor ? this : clone(editor)).popLast();
     }
 
-    public Node<V> addLast(Object editor, INode<V> node, int size) {
-      return (editor == this.editor ? this : clone(editor)).pushLast(node, size);
+    public Node addLast(Object editor, Object chunk, int size) {
+      return (editor == this.editor ? this : clone(editor)).pushLast(chunk, size);
     }
 
-    public Node<V> addFirst(Object editor, INode<V> node, int size) {
-      return (editor == this.editor ? this : clone(editor)).pushFirst(node, size);
-    }
-
-    // iteration
-
-    public Iterator<Leaf<V>> leafs() {
-      LinearList<INode<V>> list = new LinearList<>();
-      if (size() > 0) {
-        list.addLast(this);
-      }
-
-      return new Iterator<Leaf<V>>() {
-        @Override
-        public boolean hasNext() {
-          return list.size() > 0;
-        }
-
-        @Override
-        public Leaf<V> next() {
-          INode<V> n = list.popLast();
-          while (!(n instanceof Leaf)) {
-            Node<V> node = (Node<V>) n;
-            for (int i = node.numNodes - 1; i >= 0; i--) {
-              list.addLast(node.nodes[i]);
-            }
-            n = list.popLast();
-          }
-          return (Leaf<V>) n;
-        }
-      };
+    public Node addFirst(Object editor, Object chunk, int size) {
+      return (editor == this.editor ? this : clone(editor)).pushFirst(chunk, size);
     }
 
     // misc
@@ -215,11 +192,11 @@ public class ListNodes {
       return numNodes == 0 ? 0 : offsets[numNodes - 1];
     }
 
-    public Node<V> concat(Object editor, Node<V> node) {
+    public Node concat(Object editor, Node node) {
 
       // same level
       if (shift == node.shift) {
-        return new Node<V>(editor, false, shift + 5)
+        return new Node(editor, false, shift + 5)
             .addLast(editor, this, this.size())
             .addLast(editor, node, node.size());
 
@@ -233,19 +210,24 @@ public class ListNodes {
 
         // we're down multiple levels
       } else if (shift < node.shift) {
-        return new Node<V>(editor, false, shift + 5)
+        return new Node(editor, false, shift + 5)
             .addLast(editor, this, this.size())
             .concat(editor, node);
 
         // we're up multiple levels
       } else {
         return concat(editor,
-            new Node<V>(editor, false, node.shift + 5)
+            new Node(editor, false, node.shift + 5)
                 .addLast(editor, node, node.size()));
       }
     }
 
-    public Node<V> slice(Object editor, int start, int end) {
+    public Node slice(Object editor, int start, int end) {
+
+      if (start == end) {
+        return EMPTY;
+      }
+
       int startIdx = indexOf(start);
       int endIdx = indexOf(end - 1);
 
@@ -254,7 +236,7 @@ public class ListNodes {
       // we're slicing within a single node
       if (startIdx == endIdx) {
         int offset = offset(startIdx);
-        INode n = ((INode) nodes[startIdx]).slice(editor, start - offset, end - offset);
+        Object n = ListNodes.slice(nodes[startIdx], editor, start - offset, end - offset);
         rn.addLast(editor, n, end - start);
 
         // we're slicing across multiple nodes
@@ -263,7 +245,7 @@ public class ListNodes {
         // first partial node
         int sLower = offset(startIdx);
         int sUpper = offset(startIdx + 1);
-        rn.addLast(editor, ((INode) nodes[startIdx]).slice(editor, start - sLower, sUpper - sLower), sUpper - start);
+        rn.addLast(editor, ListNodes.slice(nodes[startIdx], editor, start - sLower, sUpper - sLower), sUpper - start);
 
         // intermediate full nodes
         for (int i = startIdx + 1; i < endIdx; i++) {
@@ -272,7 +254,7 @@ public class ListNodes {
 
         // last partial node
         int eLower = offset(endIdx);
-        rn.addLast(editor, ((INode) nodes[endIdx]).slice(editor, 0, end - eLower), end - eLower);
+        rn.addLast(editor, ListNodes.slice(nodes[endIdx], editor, 0, end - eLower), end - eLower);
       }
 
       return rn;
@@ -280,71 +262,74 @@ public class ListNodes {
 
     ///
 
-    private Node<V> overwrite(Object editor, int idx, Object value) {
-      if (editor != this.editor) {
-        return clone(editor).overwrite(editor, idx, value);
-      } else {
-        int nodeIdx = indexOf(idx);
-        nodes[nodeIdx] = nodes[nodeIdx].set(editor, idx - offset(nodeIdx), value);
-      }
+    private Node pushLast(Object chunk, int size) {
 
-      return this;
-    }
+      boolean isNode = chunk instanceof Node;
 
-    private Node<V> pushLast(INode<V> node, int size) {
-
-      if (node instanceof Node && ((Node<V>) node).shift > shift) {
-        return ((Node<V>) node).addFirst(editor, this, size());
+      if (isNode && ((Node) chunk).shift > shift) {
+        return ((Node) chunk).addFirst(editor, this, size());
       }
 
       // we need to add a new level
       if (numNodes == 32 && isFull(31)) {
-        return new Node<V>(editor, strict, shift + 5)
+        return new Node(editor, strict, shift + 5)
             .pushLast(this, this.size())
-            .pushLast(node, size);
+            .pushLast(chunk, size);
       }
 
+      boolean isFull = numNodes == 0 || isFull(numNodes - 1);
+
       // we need to append
-      if (numNodes == 0 || isFull(numNodes - 1)) {
-        if (shift > 5 && node instanceof Leaf) {
-          node = new Node<V>(editor, true, shift - 5).pushLast(node, size);
+      if (isFull || (isNode && ((Node) chunk).shift == (shift - 5))) {
+
+        strict = strict && ((!isNode && size == 32) || (isFull && isNode && ((Node) chunk).strict));
+
+        if (shift > 5 && !isNode) {
+          chunk = new Node(editor, true, shift - 5).pushLast(chunk, size);
         }
 
         if (numNodes == nodes.length) {
           grow();
         }
 
-        nodes[numNodes] = node;
+        nodes[numNodes] = chunk;
         offsets[numNodes] = offset(numNodes) + size;
         numNodes++;
 
         // we need to go deeper
       } else {
         int idx = numNodes - 1;
-        nodes[idx] = ((Node<V>) nodes[idx]).addLast(editor, node, size);
+        nodes[idx] = ((Node) nodes[idx]).addLast(editor, chunk, size);
         offsets[idx] += size;
       }
 
       return this;
     }
 
-    private Node<V> pushFirst(INode<V> node, int size) {
+    private Node pushFirst(Object chunk, int size) {
 
-      if (node instanceof Node && ((Node<V>) node).shift > shift) {
-        return ((Node<V>) node).addLast(editor, this, size());
+      boolean isNode = chunk instanceof Node;
+
+      if (isNode && ((Node) chunk).shift > shift) {
+        return ((Node) chunk).addLast(editor, this, size());
       }
 
       // we need to add a new level
       if (numNodes == 32 && isFull(0)) {
-        return new Node<V>(editor, false, shift + 5)
+        return new Node(editor, false, shift + 5)
             .pushFirst(this, this.size())
-            .pushFirst(node, size);
+            .pushFirst(chunk, size);
       }
 
+      boolean isFull = numNodes == 0 || isFull(0);
+
       // we need to prepend
-      if (numNodes == 0 || isFull(0)) {
-        if (shift > 5 && node instanceof Leaf) {
-          node = new Node<V>(editor, false, shift - 5).pushLast(node, size);
+      if (isFull || (isNode && ((Node) chunk).shift == (shift - 5))) {
+
+        strict = strict && ((!isNode && size == 32) || (isFull && isNode && ((Node) chunk).strict));
+
+        if (shift > 5 && !isNode) {
+          chunk = new Node(editor, false, shift - 5).pushLast(chunk, size);
         }
 
         if (numNodes == nodes.length) {
@@ -352,7 +337,7 @@ public class ListNodes {
         }
 
         arraycopy(nodes, 0, nodes, 1, numNodes);
-        nodes[0] = node;
+        nodes[0] = chunk;
         for (int i = numNodes; i > 0; i--) {
           offsets[i] = offsets[i - 1] + size;
         }
@@ -362,7 +347,7 @@ public class ListNodes {
         // we need to go deeper
       } else {
         Node rn = (Node) nodes[0];
-        nodes[0] = rn.addFirst(editor, node, size);
+        nodes[0] = rn.addFirst(editor, chunk, size);
 
         for (int i = 0; i < numNodes; i++) {
           offsets[i] += size;
@@ -373,7 +358,7 @@ public class ListNodes {
       return this;
     }
 
-    private Node<V> popFirst() {
+    private Node popFirst() {
       if (numNodes == 0) {
         return this;
 
@@ -388,9 +373,9 @@ public class ListNodes {
         offsets[numNodes] = 0;
 
       } else {
-        Node<V> rn = (Node<V>) nodes[0];
+        Node rn = (Node) nodes[0];
         int prevSize = rn.size();
-        Node<V> rnPrime = rn.popFirst();
+        Node rnPrime = rn.popFirst();
         int delta = rnPrime.size() - prevSize;
 
         nodes[0] = rnPrime;
@@ -403,7 +388,7 @@ public class ListNodes {
       return this;
     }
 
-    private Node<V> popLast() {
+    private Node popLast() {
       if (numNodes == 0) {
         return this;
 
@@ -429,13 +414,13 @@ public class ListNodes {
       arraycopy(offsets, 0, o, 0, offsets.length);
       this.offsets = o;
 
-      INode[] n = new INode[nodes.length << 1];
+      Object[] n = new Object[nodes.length << 1];
       arraycopy(nodes, 0, n, 0, nodes.length);
       this.nodes = n;
     }
 
-    private Node<V> clone(Object editor) {
-      Node<V> n = new Node<>();
+    private Node clone(Object editor) {
+      Node n = new Node();
       n.strict = strict;
       n.editor = editor;
       n.numNodes = numNodes;

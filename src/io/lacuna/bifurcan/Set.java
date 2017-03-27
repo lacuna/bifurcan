@@ -1,13 +1,17 @@
 package io.lacuna.bifurcan;
 
+import io.lacuna.bifurcan.IMap.IEntry;
 import io.lacuna.bifurcan.utils.Iterators;
 
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.Objects;
 import java.util.function.BiPredicate;
 import java.util.function.ToIntFunction;
 
 /**
+ * A set which builds atop {@code Map}, and shares the same performance characteristics.
+ *
  * @author ztellman
  */
 public class Set<V> implements ISet<V>, Cloneable {
@@ -18,16 +22,65 @@ public class Set<V> implements ISet<V>, Cloneable {
     this(Objects::hashCode, Objects::equals);
   }
 
+  /**
+   * @param hashFn the hash function used by the set
+   * @param equalsFn the equality semantics used by the set
+   */
   public Set(ToIntFunction<V> hashFn, BiPredicate<V, V> equalsFn) {
-    map = new Map<V, Void>(hashFn, equalsFn);
+    map = new Map<>(hashFn, equalsFn);
   }
 
   private Set(Map<V, Void> map) {
     this.map = map;
   }
 
+  /**
+   * @param s a set
+   * @return an equivalent set, with the same equality semantics
+   */
   public static <V> Set<V> from(ISet<V> s) {
-    return s.stream().collect(Sets.collector());
+    if (s instanceof Set) {
+      return ((Set<V>) s).forked();
+    } else {
+      Set<V> result = new Set<V>(s.valueHash(), s.valueEquality()).linear();
+      s.forEach(result::add);
+      return result.forked();
+    }
+  }
+
+  /**
+   * @param iterator an iterator
+   * @return a set containing the remaining values in the iterator
+   */
+  public static <V> Set<V> from(Iterator<V> iterator) {
+    Set<V> set = new Set<V>().linear();
+    iterator.forEachRemaining(set::add);
+    return set.forked();
+  }
+
+  /**
+   * @param iterable an {@code Iterable} object
+   * @return a set containing the values in the iterator
+   */
+  public static <V> Set<V> from(Iterable<V> iterable) {
+    return from(iterable.iterator());
+  }
+
+  ///
+
+  @Override
+  public boolean isLinear() {
+    return map.isLinear();
+  }
+
+  @Override
+  public ToIntFunction<V> valueHash() {
+    return map.keyHash();
+  }
+
+  @Override
+  public BiPredicate<V, V> valueEquality() {
+    return map.keyEquality();
   }
 
   @Override
@@ -42,7 +95,7 @@ public class Set<V> implements ISet<V>, Cloneable {
 
   @Override
   public IList<V> elements() {
-    IList<IMap.IEntry<V, Void>> entries = map.entries();
+    IList<IEntry<V, Void>> entries = map.entries();
     return Lists.from(size(), i -> entries.nth(i).key(), this::iterator);
   }
 
@@ -75,7 +128,7 @@ public class Set<V> implements ISet<V>, Cloneable {
 
   @Override
   public Iterator<V> iterator() {
-    return Iterators.map(map.iterator(), e -> e.key());
+    return Iterators.map(map.iterator(), IEntry::key);
   }
 
   @Override

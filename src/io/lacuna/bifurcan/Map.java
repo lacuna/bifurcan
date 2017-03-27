@@ -3,6 +3,7 @@ package io.lacuna.bifurcan;
 import io.lacuna.bifurcan.nodes.MapNodes;
 import io.lacuna.bifurcan.nodes.MapNodes.Node;
 
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.Objects;
 import java.util.function.BiPredicate;
@@ -10,6 +11,16 @@ import java.util.function.BinaryOperator;
 import java.util.function.ToIntFunction;
 
 /**
+ * An implementation of an immutable hash-map based on the general approach described by Steindorfer and Vinju in
+ * <a href=https://michael.steindorfer.name/publications/oopsla15.pdf>this paper</a>.  It allows for customized hashing
+ * and equality semantics, and due to its default reliance on Java's semantics, it is significantly faster than
+ * Clojure's {@code PersistentHashMap} for lookups and construction for collections smaller than 100k entries, and has
+ * equivalent performance for larger collections.
+ * <p>
+ * By ensuring that equivalent maps always have equivalent layout in memory, it can perform equality checks and set
+ * operations (union, difference, intersection) significantly faster than a more naive implementation..  By keeping the
+ * memory layout of each node more compact, iteration is at least 2x faster than Clojure's map.
+ *
  * @author ztellman
  */
 public class Map<K, V> implements IMap<K, V>, Cloneable {
@@ -18,10 +29,18 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
 
   private final BiPredicate<K, K> equalsFn;
   private final ToIntFunction<K> hashFn;
-  public Node<K, V> root;
-  public final boolean linear;
+  private Node<K, V> root;
+  private final boolean linear;
   private final Object editor = new Object();
 
+  ///
+
+  /**
+   * Creates a map.
+   *
+   * @param hashFn   a function which yields the hash value of keys
+   * @param equalsFn a function which checks equality of keys
+   */
   public Map(ToIntFunction<K> hashFn, BiPredicate<K, K> equalsFn) {
     this(Node.EMPTY, hashFn, equalsFn, false);
   }
@@ -30,12 +49,42 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
     this(Node.EMPTY, Objects::hashCode, Objects::equals, false);
   }
 
-  public static <K, V>  Map<K, V> from(IMap<K, V> map) {
+  /**
+   * @param map another map
+   * @return an equivalent forked map, with the same equality semantics
+   */
+  public static <K, V> Map<K, V> from(IMap<K, V> map) {
     if (map instanceof Map) {
-      return (Map<K, V>) map;
+      return (Map<K, V>) map.forked();
+    } else {
+      Map<K, V> result = new Map<K, V>(map.keyHash(), map.keyEquality()).linear();
+      map.forEach(e -> result.put(e.key(), e.value()));
+      return result.forked();
     }
+  }
 
-    return map.stream().collect(Maps.collector(IEntry::key, IEntry::value));
+  /**
+   * @param map a {@code java.util.Map}
+   * @return a forked map with the same entries
+   */
+  public static <K, V> Map<K, V> from(java.util.Map<K, V> map) {
+    return from(map.entrySet());
+  }
+
+  /**
+   * @param entries a list of {@code IEntry} objects
+   * @return a forked map containing these entries
+   */
+  public static <K, V> Map<K, V> from(IList<IEntry<K, V>> entries) {
+    return entries.stream().collect(Maps.collector(IEntry::key, IEntry::value));
+  }
+
+  /**
+   * @param entries a collection of {@code java.util.Map.Entry} objects
+   * @return a forked map containing these entries
+   */
+  public static <K, V> Map<K, V> from(Collection<java.util.Map.Entry<K, V>> entries) {
+    return entries.stream().collect(Maps.collector(java.util.Map.Entry::getKey, java.util.Map.Entry::getValue));
   }
 
   private Map(Node<K, V> root, ToIntFunction<K> hashFn, BiPredicate<K, K> equalsFn, boolean linear) {
@@ -43,6 +92,18 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
     this.hashFn = hashFn;
     this.equalsFn = equalsFn;
     this.linear = linear;
+  }
+
+  ///
+
+  @Override
+  public ToIntFunction<K> keyHash() {
+    return hashFn;
+  }
+
+  @Override
+  public BiPredicate<K, K> keyEquality() {
+    return equalsFn;
   }
 
   @Override
@@ -133,7 +194,7 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
       Node<K, V> rootPrime = MapNodes.merge(0, editor, root, ((Map) b).root, equalsFn, mergeFn);
       return new Map<>(rootPrime, hashFn, equalsFn, linear);
     } else {
-      return (Map<K, V>) Maps.merge(this, b, mergeFn);
+      return (Map<K, V>) Maps.merge(this.clone(), b, mergeFn);
     }
   }
 
@@ -142,7 +203,7 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
     if (keys instanceof Set) {
       return difference(((Set<K>) keys).map);
     } else {
-      return (Map<K, V>) Maps.difference(this, keys);
+      return (Map<K, V>) Maps.difference(this.clone(), keys);
     }
   }
 
@@ -151,7 +212,8 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
     if (keys instanceof Set) {
       return intersection(((Set<K>) keys).map);
     } else {
-      return (Map<K, V>) Maps.intersection(new Map<K, V>().linear(), this, keys).forked();
+      Map<K, V> map = (Map<K, V>) Maps.intersection(new Map<K, V>().linear(), this, keys);
+      return isLinear() ? map : map.forked();
     }
   }
 
@@ -207,7 +269,7 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
   @Override
   public boolean equals(Object obj) {
     if (obj instanceof IMap) {
-      return equals((IMap<K, V>) obj);
+      return equals((IMap<K, V>) obj, Objects::equals);
     }
     return false;
   }

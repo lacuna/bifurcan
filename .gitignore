@@ -12,3 +12,4 @@ pom.xml.asc
 .idea
 benchmarks/data/
 .DS_Store
+gen-javadoc.sh

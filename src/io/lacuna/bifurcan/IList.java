@@ -1,10 +1,9 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.Lists.Proxy;
+import io.lacuna.bifurcan.Lists.VirtualList;
 
 import java.lang.reflect.Array;
 import java.util.Iterator;
-import java.util.NoSuchElementException;
 import java.util.Spliterator;
 import java.util.Spliterators;
 import java.util.stream.IntStream;
@@ -23,9 +22,19 @@ public interface IList<V> extends
 
   /**
    * @return the element at {@code idx}
-   * @throws IndexOutOfBoundsException when {@code idx} is not within {@code [0, count-1]}
+   * @throws IndexOutOfBoundsException when {@code idx} is not within {@code [0, size-1]}
    */
   V nth(long idx);
+
+  /**
+   * @return the element at {@code idx}, or {@code defaultValue} if it is not within {@code [0, size-1]}
+   */
+  default V nth(long idx, V defaultValue) {
+    if (idx < 0 || idx >= size()) {
+      return defaultValue;
+    }
+    return nth(idx);
+  }
 
   /**
    * @return the length of the list
@@ -33,31 +42,38 @@ public interface IList<V> extends
   long size();
 
   /**
+   * @return true, if the list is linear
+   */
+  default boolean isLinear() {
+    return false;
+  }
+
+  /**
    * @return a new list, with {@code value} appended
    */
   default IList<V> addLast(V value) {
-    return new Proxy<>(this).addLast(value);
+    return new VirtualList<>(this).addLast(value);
   }
 
   /**
    * @return a new list, with {@code value} prepended
    */
   default IList<V> addFirst(V value) {
-    return new Proxy<>(this).addFirst(value);
+    return new VirtualList<>(this).addFirst(value);
   }
 
   /**
    * @return a new list with the last value removed, or the same list if already empty
    */
   default IList<V> removeLast() {
-    return new Proxy<V>(this).removeLast();
+    return new VirtualList<V>(this).removeLast();
   }
 
   /**
    * @return a new list with the first value removed, or the same value if already empty
    */
   default IList<V> removeFirst() {
-    return new Proxy<V>(this).removeFirst();
+    return new VirtualList<V>(this).removeFirst();
   }
 
   /**
@@ -65,11 +81,11 @@ public interface IList<V> extends
    * @throws IndexOutOfBoundsException when {@code idx} is not within {@code [0, count]}
    */
   default IList<V> set(long idx, V value) {
-    return new Proxy<V>(this).set(idx, value);
+    return new VirtualList<V>(this).set(idx, value);
   }
 
   /**
-   * @return a {@code java.util.stream.Stream}, representing the elements in the list.
+   * @return a {@code java.util.stream.Stream}, representing the elements in the list
    */
   default Stream<V> stream() {
     return StreamSupport.stream(spliterator(), false);
@@ -136,7 +152,7 @@ public interface IList<V> extends
 
   /**
    * @param l another list
-   * @return the read-only concatenation of the two lists
+   * @return a new collection representing the concatenation of the two lists
    */
   default IList<V> concat(IList<V> l) {
     return Lists.concat(this, l);
@@ -144,7 +160,7 @@ public interface IList<V> extends
 
   /**
    * @return the first element
-   * @throws NoSuchElementException if the collection is empty
+   * @throws IndexOutOfBoundsException if the collection is empty
    */
   default V first() {
     if (size() == 0) {
@@ -155,7 +171,7 @@ public interface IList<V> extends
 
   /**
    * @return the last element
-   * @throws NoSuchElementException if the collection is empty
+   * @throws IndexOutOfBoundsException if the collection is empty
    */
   default V last() {
     if (size() == 0) {
@@ -171,6 +187,6 @@ public interface IList<V> extends
 
   @Override
   default IList<V> linear() {
-    return new Proxy<V>(this).linear();
+    return new VirtualList<V>(this).linear();
   }
 }

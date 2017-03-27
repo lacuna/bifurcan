@@ -1,25 +1,27 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.nodes.ListNodes.Leaf;
 import io.lacuna.bifurcan.nodes.ListNodes.Node;
-import io.lacuna.bifurcan.utils.Iterators;
 
+import java.util.Collection;
 import java.util.Iterator;
 
 import static java.lang.System.arraycopy;
 
 /**
+ * An implementation of an immutable list which allows for elements to be added and removed from both ends of the
+ * collection, as well as random-access reads and writes.  Due to its
+ * <a href=https://infoscience.epfl.ch/record/169879/files/RMTrees.pdf>relaxed radix structure</a>, {@code slice()},
+ * {@code concat()}, and {@code split()} are near-constant time.
+ *
  * @author ztellman
  */
 public class List<V> implements IList<V>, Cloneable {
 
-  boolean linear;
-  public Node<V> root;
-  public byte prefixLen;
-  public Object[] prefix;
-  public byte suffixLen;
-  public Object[] suffix;
+  private Node root;
+  private byte prefixLen, suffixLen;
+  private Object[] prefix, suffix;
 
+  private final boolean linear;
   private final Object editor = new Object();
 
   public List() {
@@ -40,8 +42,22 @@ public class List<V> implements IList<V>, Cloneable {
     this.suffix = suffix;
   }
 
-  public static <V> List<V> from(java.util.List<V> list) {
-    return list.stream().collect(Lists.collector());
+  public static <V> List<V> from(IList<V> list) {
+    if (list instanceof List) {
+      return ((List<V>) list).forked();
+    } else {
+      return from(list.iterator());
+    }
+  }
+
+  public static <V> List<V> from(Iterable<V> iterable) {
+    return from(iterable.iterator());
+  }
+
+  public static <V> List<V> from(Iterator<V> iterator) {
+    List<V> list = new List<V>().linear();
+    iterator.forEachRemaining(list::addLast);
+    return list.forked();
   }
 
   @Override
@@ -70,6 +86,11 @@ public class List<V> implements IList<V>, Cloneable {
   @Override
   public long size() {
     return root.size() + prefixLen + suffixLen;
+  }
+
+  @Override
+  public boolean isLinear() {
+    return linear;
   }
 
   @Override
@@ -109,17 +130,17 @@ public class List<V> implements IList<V>, Cloneable {
   @Override
   public Iterator<V> iterator() {
 
-    final long size = size();
-    final Iterator<Leaf<V>> leafs = root.leafs();
-
     final Object[] initChunk;
     final int initOffset, initLimit;
+    final int size = (int) size();
+    final int rootSize = root.size();
+
     if (prefixLen > 0) {
       initChunk = prefix;
       initOffset = pIdx(0);
       initLimit = prefix.length;
-    } else if (root.size() > 0) {
-      initChunk = leafs.next().elements;
+    } else if (rootSize > 0) {
+      initChunk = root.arrayFor(0);
       initOffset = 0;
       initLimit = initChunk.length;
     } else {
@@ -130,7 +151,7 @@ public class List<V> implements IList<V>, Cloneable {
 
     return new Iterator<V>() {
 
-      long idx = 0;
+      int idx = 0;
 
       Object[] chunk = initChunk;
       int offset = initOffset;
@@ -149,11 +170,11 @@ public class List<V> implements IList<V>, Cloneable {
         if (offset == limit) {
           idx += chunkSize;
           if (idx < size) {
-            if (idx == prefixLen + root.size()) {
+            if (idx == prefixLen + rootSize) {
               chunk = suffix;
               limit = suffixLen;
             } else {
-              chunk = leafs.next().elements;
+              chunk = root.arrayFor(idx - prefixLen);
               limit = chunk.length;
             }
             offset = 0;
@@ -175,19 +196,25 @@ public class List<V> implements IList<V>, Cloneable {
     int s = (int) start;
     int e = (int) end;
 
-    byte pLen = (byte) Math.max(0, prefixLen - s);
+    int pStart = Math.max(0, prefixLen - s);
+    int pEnd = Math.min(prefixLen, e);
+    int pLen = pEnd - pStart;
     Object[] pre = pLen == 0 ? null : new Object[32];
     if (pre != null) {
-      arraycopy(prefix, pIdx(s), pre, 32 - pLen, pLen);
+      arraycopy(prefix, pIdx(pStart), pre, 32 - pLen, pLen);
     }
 
-    byte sLen = (byte) Math.max(0, suffixLen - ((int) size() - e));
+    int sStart = Math.max(0, s - (prefixLen + root.size()));
+    int sEnd = Math.max(0, e - (prefixLen + root.size()));
+    int sLen = sEnd - sStart;
     Object[] suf = sLen == 0 ? null : new Object[32];
     if (suf != null) {
-      arraycopy(suffix, 0, suf, 0, sLen);
+      arraycopy(suffix, sStart, suf, 0, sLen);
     }
 
-    return new List<V>(linear, root.slice(editor, s - prefixLen, Math.min(root.size(), e - prefixLen)), pLen, pre, sLen, suf);
+    return new List<V>(linear,
+        root.slice(editor, Math.max(0, Math.min(root.size(), s - prefixLen)), Math.max(0, Math.min(root.size(), e - prefixLen))),
+        (byte) pLen, pre, (byte) sLen, suf);
   }
 
   @Override
@@ -199,17 +226,15 @@ public class List<V> implements IList<V>, Cloneable {
 
       // append our own suffix
       if (suffix != null && suffixLen > 0) {
-        r = r.addLast(editor, suffixLeaf(), suffixLen);
+        r = r.addLast(editor, suffixArray(), suffixLen);
       }
 
       // append their prefix
       if (b.prefix != null && b.prefixLen > 0) {
-        r = r.addLast(editor, b.prefixLeaf(), b.prefixLen);
+        r = r.addLast(editor, b.prefixArray(), b.prefixLen);
       }
 
-      if (r.size() == 0) {
-        r = b.root;
-      } else if (b.root.size() > 0) {
+      if (b.root.size() > 0) {
         r = r.concat(editor, b.root);
       }
 
@@ -254,16 +279,16 @@ public class List<V> implements IList<V>, Cloneable {
 
   ///
 
-  private Leaf<V> suffixLeaf() {
+  private Object[] suffixArray() {
     Object[] suf = new Object[suffixLen];
     arraycopy(suffix, 0, suf, 0, suf.length);
-    return new Leaf<V>(editor, suf);
+    return suf;
   }
 
-  private Leaf<V> prefixLeaf() {
+  private Object prefixArray() {
     Object[] pre = new Object[prefixLen];
     arraycopy(prefix, pIdx(0), pre, 0, pre.length);
-    return new Leaf<V>(editor, pre);
+    return pre;
   }
 
   private int pIdx(int idx) {
@@ -279,7 +304,7 @@ public class List<V> implements IList<V>, Cloneable {
 
       // overwrite tree
     } else if (idx < (prefixLen + rootSize)) {
-      root = (Node<V>) root.set(editor, idx - prefixLen, value);
+      root = root.set(editor, idx - prefixLen, value);
 
       // overwrite suffix
     } else {
@@ -300,7 +325,7 @@ public class List<V> implements IList<V>, Cloneable {
       // prefix overflow
     } else if (prefixLen == prefix.length - 1) {
       prefix[0] = value;
-      root = root.addFirst(editor, new Leaf(editor, prefix), prefix.length);
+      root = root.addFirst(editor, prefix, prefix.length);
       prefix = null;
       prefixLen = 0;
 
@@ -324,7 +349,7 @@ public class List<V> implements IList<V>, Cloneable {
       // suffix overflow
     } else if (suffixLen == suffix.length - 1) {
       suffix[suffixLen] = value;
-      root = root.addLast(editor, new Leaf(editor, suffix), suffix.length);
+      root = root.addLast(editor, suffix, suffix.length);
       suffix = null;
       suffixLen = 0;
 
@@ -347,11 +372,11 @@ public class List<V> implements IList<V>, Cloneable {
 
       // prefix underflow
     } else if (prefixLen == 0) {
-      Leaf leaf = root.first();
-      if (leaf != null) {
-        prefix = leaf.elements.clone();
-        prefixLen = (byte) (leaf.size() - 1);
-        root = root.removeFirst(this);
+      Object[] chunk = root.first();
+      if (chunk != null) {
+        prefix = chunk.clone();
+        prefixLen = (byte) (chunk.length - 1);
+        root = root.removeFirst(editor);
         prefix[pIdx(-1)] = null;
       }
 
@@ -376,11 +401,11 @@ public class List<V> implements IList<V>, Cloneable {
 
       // suffix underflow
     } else if (suffixLen == 0) {
-      Leaf leaf = root.last();
-      if (leaf != null) {
-        suffix = leaf.elements.clone();
-        suffixLen = (byte) (leaf.size() - 1);
-        root = root.removeLast(this);
+      Object[] chunk = root.last();
+      if (chunk != null) {
+        suffix = chunk.clone();
+        suffixLen = (byte) (chunk.length - 1);
+        root = root.removeLast(editor);
         suffix[suffixLen] = null;
       }
 

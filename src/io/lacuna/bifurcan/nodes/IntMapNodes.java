@@ -18,6 +18,7 @@ import java.util.function.BinaryOperator;
 import static io.lacuna.bifurcan.nodes.Util.*;
 import static io.lacuna.bifurcan.utils.Bits.bitOffset;
 import static io.lacuna.bifurcan.utils.Bits.highestBit;
+import static java.lang.Integer.MAX_VALUE;
 import static java.lang.Integer.bitCount;
 import static java.lang.System.arraycopy;
 
@@ -68,7 +69,7 @@ public class IntMapNodes {
           int idx = n.entryIndex(mask);
           return n.keys[idx] == k ? n.content[idx] : defaultVal;
         } else if (n.isNode(mask)) {
-          n = node(mask);
+          n = n.node(mask);
         } else {
           return defaultVal;
         }
@@ -110,8 +111,10 @@ public class IntMapNodes {
         if (isEntry(mask)) {
           int idx = entryIndex(mask);
           return new Maps.Entry<>(keys[idx], (V) content[idx]);
-        } else {
+        } else if (isNode(mask)) {
           return node(mask).floor(key);
+        } else {
+          return null;
         }
 
         // somewhere in between
@@ -376,7 +379,12 @@ public class IntMapNodes {
       return size;
     }
 
-    public boolean equals(Node<V> n, BiPredicate<V, V> equalsFn) {
+    public boolean equals(Node<V> n, BiPredicate<V, V> equalsFn)  {
+
+      if (n == this) {
+        return true;
+      }
+
       if (size == n.size && datamap == n.datamap && nodemap == n.nodemap) {
         int numEntries = bitCount(datamap);
         for (int i = 0; i < numEntries; i++) {
@@ -429,7 +437,7 @@ public class IntMapNodes {
     }
 
     private long max() {
-      return prefix | (offset == 60 ? -1 : ((1L << (offset + 4)) - 1));
+      return prefix | (offset == 60 ? (prefix < 0 ? -1 : Long.MAX_VALUE) : ((1L << (offset + 4)) - 1));
     }
 
     private boolean overlap(long min, long max) {

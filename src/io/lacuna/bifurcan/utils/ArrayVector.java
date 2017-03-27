@@ -7,8 +7,6 @@ import static java.lang.System.arraycopy;
  */
 public class ArrayVector {
 
-  // Object
-
   public static Object[] insert(Object[] vec, int idx, Object v) {
     Object[] nVec = new Object[vec.length + 1];
     arraycopy(vec, 0, nVec, 0, idx);
