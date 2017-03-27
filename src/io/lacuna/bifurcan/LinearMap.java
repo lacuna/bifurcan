@@ -40,8 +40,8 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
   private final BiPredicate<K, K> equalsFn;
 
   private int indexMask;
-  private long[] table;
-  private Object[] entries;
+  long[] table;
+  Object[] entries;
   private int size;
 
   /// Constructors
