@@ -2,7 +2,7 @@
 
 __This library is still alpha quality, use with caution__
 
-This library provides high-quality Java implementations of mutable and immutable data structures exposing a common API, and sharing these design principles:
+This library provides high-quality Java implementations of mutable and immutable data structures, each sharing a common API and these design principles:
 
 * efficient random access
 * efficient splitting and merging of collections
@@ -10,9 +10,9 @@ This library provides high-quality Java implementations of mutable and immutable
 * contiguous memory used wherever possible
 * performance equivalent to, or better than, existing alternatives
 
-Some of these properties, such as uniformly efficient random access and split/merge, are simply not available elsewhere.  Even if these are not required, other JVM libraries in this space tend to bring a large amount of tangential code along for the ride.  For instance, the collections in the [Functional Java](https://github.com/functionaljava/functionaljava) library assume and encourage the use of all the surrounding abstractions.  Clojure's data structures, while implemented in Java, are hard-coded to use Clojure's equality semantics.
+Some of these properties, such as uniformly efficient random access and splits, are simply not available elsewhere.  Even if these are not required, other JVM libraries in this space tend to bring a large amount of tangential code along for the ride.  For instance, the collections in the [Functional Java](https://github.com/functionaljava/functionaljava) library assume and encourage the use of all the surrounding abstractions.  Clojure's data structures, while implemented in Java, are hard-coded to use Clojure's equality semantics.
 
-These libraries are all-or-nothing propositions: they work great as long as you also adopt the surrounding ecosystem.  Historically, given the lack of functional primitives in Java's standard library, this made a lot of sense.  With the introduction of lambdas, streams, et al in Java 8, however, this is no longer required.
+These libraries are all-or-nothing propositions: they work great as long as you also adopt the surrounding ecosystem.  Historically, given the lack of functional primitives in Java's standard library, this made a lot of sense.  With the introduction of lambdas, streams, et al in Java 8, however, this is no longer true.
 
 This library builds only on the primitives provided by the Java 8 standard library.  Rather than using the existing collection interfaces in `java.util` such as `List` or `Map`, it provides its own interfaces (`IList`, `IMap`, `ISet`) that provide functional semantics - each update to a collection returns a reference to a new collection.  Each interface provides a method (`toList`, `toMap`, `toSet`) for coercing the collection to a read-only version of the standard Java interfaces.
 
@@ -22,7 +22,7 @@ This library builds only on the primitives provided by the Java 8 standard libra
 * [Map](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/Map.html) is an immutable hash-map, which also allows for custom hash and equality semantics.  It ensures that all equivalent collections have an equivalent layout in memory, which makes checking for equality and performing set operations (`merge`, `union`, `difference`, `intersection`) significantly faster.  
 * [LinearSet](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/LinearSet.html) and [Set](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/Set.html) are built atop their respective map implementations, and have similar properties.
 * [LinearList](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/LinearList.html) is a mutable list, which allows for elements to be added or removed from both ends of the collection, and allows random reads and writes within the list.
-* [List](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/List.html) is an immutable list, which also allows for modification at both ends, and random reads and writes.  Due to its [relaxed radix structure](https://infoscience.epfl.ch/record/169879/files/RMTrees.pdf), it also allows for near constant-time slices and concatenation.
+* [List](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/List.html) is an immutable list, which also allows for modification at both ends, as well as random reads and writes.  Due to its [relaxed radix structure](https://infoscience.epfl.ch/record/169879/files/RMTrees.pdf), it also allows for near constant-time slices and concatenation.
 * [IntMap](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/IntMap.html) is an immutable sorted map of integers onto arbitrary values, and can be used as an efficient sparse vector.
 
 Full benchmarks for these collections [can be found here](https://github.com/lacuna/bifurcan/blob/master/doc/benchmarks.md).  Full documentation [can be found here](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/package-summary.html).
@@ -36,11 +36,11 @@ IList<Long> list = Lists.from(1_000_000, i -> i);
 // creates a set representing that same range
 ISet<Long> set = Sets.from(list, i -> 0 <= i && i < 1_000_000);
   
-// creates a map of that range onto its corresponding square number
-IMap<Long, Long> = Maps.from(set, i -> i * i);
+// creates a map of the numbers onto their corresponding square
+IMap<Long, Long> map = Maps.from(set, i -> i * i);
 ```
 
-Each of these collections is identical to its concrete, immutable equivalent.  They can be updated, in which case only the changes to the underlying collection will be stored in memory.
+Each of these collections are identical to their concrete, immutable equivalent.  They can be updated, in which case only the changes to the underlying collection will be stored in memory.
 
 ### "linear" and "forked" collections
 

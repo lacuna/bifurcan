@@ -1,6 +1,6 @@
 These benchmarks are generated using [Criterium](https://github.com/hugoduncan/criterium), which provides a median value based on repeated trials.  These measurements are isolated from the effects of JIT or GC.
 
-The numbers given here are scaled by the size of the collection, because otherwise the most noticeable feature of these benchmarks would be "larger collections take longer to create/iterate/etc".  This means, however, that the numbers provided here are the mean duration of the median sample, and do not reflect the variation that might be seen in real-world usage.
+The numbers given here are scaled by the size of the collection, because otherwise the most noticeable feature of these benchmarks would be "larger collections take longer to create/iterate/etc".  This means, however, that the numbers provided here are the mean duration of the median sample, and do not reflect any variation that might be seen in real-world usage.
 
 With that said, this is still as useful as pretty much any other data structure benchmark.  The single largest factor in the performance of any in-memory data structure is whether it's in the cache, and the repeated operations of a benchmark guarantee a warm cache.  This may reflect some real-world workloads, but not others.  The performance for 1OOk+ element collections, which are too big to fit in cache, give some hint as to the effects of a cold cache, but also reflect the other costs of a larger collection.
 
@@ -12,11 +12,9 @@ Unlike Java's `HashMap` and `HashSet`, Bifurcan's `LinearMap` and `LinearSet` st
 
 ## Lists
 
-Unlike Clojure and Java's lists, Bifurcan's lists can efficiently remove and add from both ends of the collection.
+`List` and `LinearList` are more or less equivalent to Clojure's `PersistentVector` and Java's `ArrayList`, respectively.  Unlike their counterparts, however, both allow for near constant-time slicing and concatenation.
 
 ![](../benchmarks/images/list_construct.png)
-
-Bifurcan's `List` provides equivalent performance in iteration and random lookups to Clojure's vector, but unlike Clojure it also   allows for near constant-time slices and concats.
 
 ![](../benchmarks/images/list_iterate.png)
 
@@ -50,7 +48,7 @@ However, both `Map` and `IntMap` also use their structure to perform equality ch
 
 ## Sets
 
-The behavior for sets broadly mirrors that of the maps.
+Since the sets are implemented in terms of their corresponding map, the behavior is much the same as above.
 
 ![](../benchmarks/images/set_construct.png)
 
