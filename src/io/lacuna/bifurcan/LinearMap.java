@@ -233,10 +233,11 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
 
   @Override
   public LinearMap<K, V> clone() {
-    LinearMap<K, V> m = new LinearMap<K, V>(entries.length, hashFn, equalsFn);
+    LinearMap<K, V> m = new LinearMap<K, V>((int)(entries.length * LOAD_FACTOR), hashFn, equalsFn);
+    m.size = size;
+    m.indexMask = indexMask;
     arraycopy(table, 0, m.table, 0, table.length);
     arraycopy(entries, 0, m.entries, 0, size << 1);
-    m.size = size;
     return m;
   }
 
@@ -332,9 +333,9 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
   /// Bookkeeping functions
 
   LinearMap<K, V> merge(LinearMap<K, V> m, BinaryOperator<V> mergeFn) {
-    /*if (m.size > size) {
+    if (m.size > size) {
       return m.merge(this, (x, y) -> mergeFn.apply(y, x));
-    }*/
+    }
 
     LinearMap<K, V> result = this.clone();
     result.resize(result.size + m.size);

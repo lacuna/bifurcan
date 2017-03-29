@@ -13,7 +13,7 @@ import java.util.function.ToIntFunction;
 /**
  * A map which has integer keys, which is an combination of Okasaki and Gill's
  * <a href="http://ittc.ku.edu/~andygill/papers/IntMap98.pdf">Fast Mergeable Integer Maps</a> with the memory layout
- * suggested by Steindorfer and Vinju used in {@class Map}, with which it shares the same broad performance
+ * suggested by Steindorfer and Vinju used in {@code Map}, with which it shares the same broad performance
  * characteristics.
  * <p>
  * This collection keeps the keys in sorted order, and can thought of as either a map of integers or a sparse vector.
