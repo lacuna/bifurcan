@@ -4,6 +4,7 @@ import io.lacuna.bifurcan.utils.Bits;
 
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 
 import static io.lacuna.bifurcan.utils.Bits.log2Ceil;
@@ -220,6 +221,31 @@ public class LinearList<V> implements IList<V>, Cloneable {
     V val = last();
     removeLast();
     return val;
+  }
+
+  @Override
+  public Iterator<V> iterator() {
+
+    return new Iterator<V>() {
+
+      final int limit = offset + size;
+      int idx = offset;
+
+      @Override
+      public boolean hasNext() {
+        return idx != limit;
+      }
+
+      @Override
+      public V next() {
+        if (idx == limit) {
+          throw new NoSuchElementException();
+        }
+
+        V val = (V) elements[idx++ & mask];
+        return val;
+      }
+    };
   }
 
   @Override

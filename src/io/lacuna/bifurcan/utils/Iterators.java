@@ -1,16 +1,12 @@
 package io.lacuna.bifurcan.utils;
 
-import clojure.lang.Obj;
-import io.lacuna.bifurcan.IList;
-import io.lacuna.bifurcan.IMap;
 import io.lacuna.bifurcan.LinearList;
 
 import java.util.*;
+import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.LongFunction;
 import java.util.function.Predicate;
-import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 /**
  * @author ztellman
@@ -76,6 +72,15 @@ public class Iterators {
     public void addLast(Iterator<V> it) {
       iterators.addLast(it);
     }
+  }
+
+  public static <V> boolean equals(Iterator<V> a, Iterator<V> b, BiPredicate<V, V> equals) {
+    while (a.hasNext()) {
+      if (!equals.test(a.next(), b.next())) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /**

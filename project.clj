@@ -1,4 +1,4 @@
-(defproject bifurcan "0.1.0-SNAPSHOT"
+(defproject io.lacuna/bifurcan "0.1.0-alpha1"
   :java-source-paths ["src"]
   :dependencies []
   :test-selectors {:default #(not

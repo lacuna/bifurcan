@@ -619,14 +619,7 @@ public class Lists {
       return true;
     }
 
-    Iterator<V> ia = a.iterator();
-    Iterator<V> ib = b.iterator();
-    while (ia.hasNext()) {
-      if (!equals.test(ia.next(), ib.next())) {
-        return false;
-      }
-    }
-    return true;
+    return Iterators.equals(a.iterator(), b.iterator(), equals);
   }
 
   /**

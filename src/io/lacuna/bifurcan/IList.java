@@ -6,6 +6,7 @@ import java.lang.reflect.Array;
 import java.util.Iterator;
 import java.util.Spliterator;
 import java.util.Spliterators;
+import java.util.function.BiPredicate;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -188,5 +189,12 @@ public interface IList<V> extends
   @Override
   default IList<V> linear() {
     return new VirtualList<V>(this).linear();
+  }
+
+  default boolean equals(Object o, BiPredicate<V, V> equals) {
+    if (o instanceof IList) {
+      return Lists.equals(this, (IList<V>) o, equals);
+    }
+    return false;
   }
 }

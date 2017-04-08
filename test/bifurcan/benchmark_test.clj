@@ -599,8 +599,9 @@
 ;;;
 
 (defn benchmark-collection [n step idx]
-  (-> (sh/sh "sh" "-c"
-        (str "lein run -m bifurcan.benchmark-test benchmark-collection " n " " step " " idx))
+  (->
+    (sh/sh "sh" "-c"
+      (str "lein run -m bifurcan.benchmark-test benchmark-collection " n " " step " " idx))
     :out
     bs/to-line-seq
     last
@@ -622,7 +623,7 @@
                        (map (fn [idx]
                               (let [coll (-> all-colls (nth idx) :label)]
                                 (println "benchmarking" coll)
-                                [coll (benchmark-collection n step idx)])))
+                                [coll (benchmark-collection (or n "1e6") step idx)])))
                        (into {}))]
       (spit "benchmarks/benchmarks.edn" (pr-str descriptor))
       (write-out-csvs descriptor)))
