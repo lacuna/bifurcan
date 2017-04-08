@@ -623,7 +623,7 @@
                        (map (fn [idx]
                               (let [coll (-> all-colls (nth idx) :label)]
                                 (println "benchmarking" coll)
-                                [coll (benchmark-collection (or n "1e6") step idx)])))
+                                [coll (benchmark-collection (or n "1e6") (or step "1") idx)])))
                        (into {}))]
       (spit "benchmarks/benchmarks.edn" (pr-str descriptor))
       (write-out-csvs descriptor)))
