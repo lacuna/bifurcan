@@ -376,7 +376,7 @@ public class ListNodes {
       } else {
         Node rn = (Node) nodes[0];
         int prevSize = rn.size();
-        Node rnPrime = rn.popFirst();
+        Node rnPrime = rn.removeFirst(editor);
         int delta = rnPrime.size() - prevSize;
 
         nodes[0] = rnPrime;
@@ -401,7 +401,7 @@ public class ListNodes {
       } else {
         Node rn = (Node) nodes[numNodes - 1];
         int prevSize = rn.size();
-        Node rnPrime = rn.popLast();
+        Node rnPrime = rn.removeLast(editor);
 
         nodes[numNodes - 1] = rnPrime;
         offsets[numNodes - 1] += rnPrime.size() - prevSize;

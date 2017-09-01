@@ -2,7 +2,11 @@
   (:require
    [clojure.test.check.generators :as gen]
    [clojure.test.check.properties :as prop]
-   [clojure.test.check.clojure-test :as ct :refer (defspec)]))
+   [clojure.test.check.clojure-test :as ct :refer (defspec)])
+  (:import
+   [org.apache.commons.lang3.builder
+    ReflectionToStringBuilder
+    RecursiveToStringStyle]))
 
 (defn actions->generator [actions]
   (->> actions
@@ -36,3 +40,9 @@
            (if-not (do ~@predicate)
              (do #_(prn ~actions) false)
              true))))))
+
+(defn reflect-to-str
+  "Recursively reflect over the object to create a string.
+  Use to snapshot object internals to assert immutability."
+  [obj]
+  (ReflectionToStringBuilder/toString obj (RecursiveToStringStyle.)))

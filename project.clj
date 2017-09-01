@@ -16,7 +16,8 @@
                                      [proteus "0.1.6"]
                                      [byte-streams "0.2.2"]
                                      [eftest "0.1.4"]
-                                     [virgil "0.1.7-alpha1"]]}}
+                                     [virgil "0.1.7-alpha1"]
+                                     [org.apache.commons/commons-lang3 "3.6"]]}}
   :aliases {"partest"   ["run" "-m" "bifurcan.run-tests"]
             "benchmark" ["with-profile" "bench,dev" "run" "-m" "bifurcan.benchmark-test" "benchmark"]}
   :jvm-opts ^:replace ["-server" "-XX:+UseG1GC" "-Xmx10g" "-XX:-OmitStackTraceInFastThrow"]

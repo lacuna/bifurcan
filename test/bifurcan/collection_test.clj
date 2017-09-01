@@ -251,6 +251,43 @@
           (->> s (drop start) (take (- end start)))
           (Lists/slice (List/from s) start end))))))
 
+(defspec test-list-immutable-add-first iterations
+  (prop/for-all [n (gen/choose 1 1e4)]
+  (let [x (List/from (range n))
+        xs (u/reflect-to-str x)]
+    (.addFirst x 42)
+    (= xs (u/reflect-to-str x)))))
+
+(defspec test-list-immutable-add-last iterations
+  (prop/for-all [n (gen/choose 1 1e4)]
+    (let [x (List/from (range n))
+          xs (u/reflect-to-str x)]
+      (.addLast x 42)
+      (= xs (u/reflect-to-str x)))))
+
+(defspec test-list-immutable-set iterations
+  (prop/for-all [[n i] (gen/bind
+                         (gen/choose 1 1e4)
+                         #(gen/tuple (gen/return %) (gen/choose 1 %))) ]
+    (let [x (List/from (range n))
+          xs (u/reflect-to-str x)]
+      (.set x i 42)
+      (= xs (u/reflect-to-str x)))))
+
+(defspec test-list-immutable-remove-first iterations
+  (prop/for-all [n (gen/choose 1 1e4)]
+    (let [x (List/from (range n))
+          xs (u/reflect-to-str x)]
+      (.removeFirst x)
+      (= xs (u/reflect-to-str x)))))
+
+(defspec test-list-immutable-remove-last iterations
+  (prop/for-all [n (gen/choose 1 1e4)]
+    (let [x (List/from (range n))
+          xs (u/reflect-to-str x)]
+      (.removeLast x)
+      (= xs (u/reflect-to-str x)))))
+
 ;;; IntMap
 
 (defspec test-int-map-slice iterations
