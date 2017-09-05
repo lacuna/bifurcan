@@ -154,7 +154,7 @@ public class MapNodes {
         } else if (n.isNode(mask)) {
           INode<K, V> child = n.node(mask);
 
-          // since we're not changing anything at this left, just head down
+          // since we're not changing anything at this level, just head down
           if (child instanceof Node && ((Node<K, V>) child).editor == editor) {
             n = (Node<K, V>) child;
             currShift += SHIFT_INCREMENT;

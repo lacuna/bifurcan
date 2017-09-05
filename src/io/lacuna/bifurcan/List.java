@@ -42,6 +42,14 @@ public class List<V> implements IList<V>, Cloneable {
     this.suffix = suffix;
   }
 
+  public static <V> List<V> from(V... elements) {
+    List<V> list = new List<V>().linear();
+    for (V e : elements) {
+      list.addLast(e);
+    }
+    return list.forked();
+  }
+
   public static <V> List<V> from(IList<V> list) {
     if (list instanceof List) {
       return ((List<V>) list).forked();

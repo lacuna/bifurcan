@@ -5,6 +5,7 @@ import io.lacuna.bifurcan.Maps.VirtualMap;
 import java.util.*;
 import java.util.function.BiPredicate;
 import java.util.function.BinaryOperator;
+import java.util.function.Function;
 import java.util.function.ToIntFunction;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -179,6 +180,15 @@ public interface IMap<K, V> extends
   }
 
   /**
+   * @param update a function which takes the existing value, or {@code null} if none exists, and returns an updated
+   *               value.
+   * @return an updated map with {@code update(value)} under {@code key}.
+   */
+  default IMap<K, V> update(K key, Function<V, V> update) {
+    return this.put(key, update.apply(this.get(key, null)));
+  }
+
+  /**
    * @return an updated map with {@code value} stored under {@code key}
    */
   default IMap<K, V> put(K key, V value) {
@@ -194,12 +204,12 @@ public interface IMap<K, V> extends
 
   @Override
   default IMap<K, V> forked() {
-    return null;
+    return this;
   }
 
   @Override
   default IMap<K, V> linear() {
-    return null;
+    return new VirtualMap<>(this).linear();
   }
 
   @Override

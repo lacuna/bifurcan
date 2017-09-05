@@ -1,6 +1,7 @@
 package io.lacuna.bifurcan.nodes;
 
 import io.lacuna.bifurcan.LinearList;
+import io.lacuna.bifurcan.utils.Bits;
 
 import java.util.Iterator;
 

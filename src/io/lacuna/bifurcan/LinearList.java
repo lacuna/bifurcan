@@ -51,6 +51,14 @@ public class LinearList<V> implements IList<V>, Cloneable {
     this.elements = elements;
   }
 
+  public static <V> LinearList<V> from(V... elements) {
+    LinearList<V> list = new LinearList<V>(elements.length);
+    for (V e : elements) {
+      list.addLast(e);
+    }
+    return list;
+  }
+
   /**
    * @param collection a {@code java.util.Collection}
    * @return a list containing the entries of the collection
@@ -136,7 +144,6 @@ public class LinearList<V> implements IList<V>, Cloneable {
     if (size == 0) {
       return this;
     }
-    elements[offset] = null;
     offset = (offset + 1) & mask;
     size--;
     return this;

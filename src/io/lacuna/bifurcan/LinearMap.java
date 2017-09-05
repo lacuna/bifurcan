@@ -184,6 +184,20 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
   }
 
   @Override
+  public IMap<K, V> update(K key, Function<V, V> update) {
+    int idx = tableIndex(keyHash(key), key);
+    if (idx >= 0) {
+      long row = table[idx];
+      int valIdx = Row.keyIndex(row) + 1;
+      entries[valIdx] = update.apply((V) entries[valIdx]);
+    } else {
+      put(key, update.apply(null));
+    }
+
+    return this;
+  }
+
+  @Override
   public IList<IEntry<K, V>> entries() {
     return Lists.from(
         size,
