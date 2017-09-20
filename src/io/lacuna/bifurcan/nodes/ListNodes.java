@@ -1,10 +1,5 @@
 package io.lacuna.bifurcan.nodes;
 
-import io.lacuna.bifurcan.LinearList;
-import io.lacuna.bifurcan.utils.Bits;
-
-import java.util.Iterator;
-
 import static java.lang.System.arraycopy;
 
 /**
@@ -12,13 +7,16 @@ import static java.lang.System.arraycopy;
  */
 public class ListNodes {
 
-  public static Object slice(Object chunk, Object editor, int start, int end) {
-    if (chunk instanceof Object[]) {
+  private static final int SHIFT_INCREMENT = 5;
+  private static final int MAX_BRANCHES = 1 << SHIFT_INCREMENT;
+
+  public static Object slice(Object node, Object editor, int start, int end) {
+    if (node instanceof Object[]) {
       Object[] ary = new Object[end - start];
-      arraycopy(chunk, start, ary, 0, ary.length);
+      arraycopy(node, start, ary, 0, ary.length);
       return ary;
     } else {
-      return ((Node) chunk).slice(editor, start, end);
+      return ((Node) node).slice(editor, start, end);
     }
   }
 
@@ -28,13 +26,17 @@ public class ListNodes {
     return ary;
   }
 
+  public static int nodeSize(Object node) {
+    return node instanceof Node ? ((Node) node).size() : ((Object[]) node).length;
+  }
+
   public static class Node {
 
     public final static Node EMPTY = new Node(new Object(), true, 5);
 
     Object editor;
     public boolean strict;
-    public int shift;
+    public byte shift;
     public int numNodes;
     public int[] offsets;
     public Object[] nodes;
@@ -44,7 +46,7 @@ public class ListNodes {
     public Node(Object editor, boolean strict, int shift) {
       this.strict = strict;
       this.editor = editor;
-      this.shift = shift;
+      this.shift = (byte) shift;
       this.numNodes = 0;
       this.offsets = new int[2];
       this.nodes = new Object[2];
@@ -66,7 +68,7 @@ public class ListNodes {
     public Object[] first() {
       if (numNodes == 0) {
         return null;
-      } else if (shift == 5) {
+      } else if (shift == SHIFT_INCREMENT) {
         return (Object[]) nodes[0];
       } else {
         return ((Node) nodes[0]).first();
@@ -76,18 +78,18 @@ public class ListNodes {
     public Object[] last() {
       if (numNodes == 0) {
         return null;
-      } else if (shift == 5) {
+      } else if (shift == SHIFT_INCREMENT) {
         return (Object[]) nodes[numNodes - 1];
       } else {
-        return ((Node) nodes[numNodes - 1]).first();
+        return ((Node) nodes[numNodes - 1]).last();
       }
     }
 
-    private boolean isFull(int idx) {
+    private boolean isFull(int idx, int shift) {
       Object n = nodes[idx];
       if (n instanceof Node) {
         Node rn = (Node) n;
-        return rn.numNodes == 32 && rn.isFull(31);
+        return shift >= rn.shift || (rn.numNodes == MAX_BRANCHES && rn.isFull(MAX_BRANCHES - 1, shift));
       } else {
         return true;
       }
@@ -95,15 +97,15 @@ public class ListNodes {
 
     private Object[] strictArrayFor(int idx) {
       Node n = this;
-      while (n.shift > 5) {
-        n = (Node) n.nodes[(idx >>> n.shift) & 31];
+      while (n.shift > SHIFT_INCREMENT) {
+        n = (Node) n.nodes[(idx >>> n.shift) & (MAX_BRANCHES - 1)];
       }
-      return (Object[]) n.nodes[(idx >>> 5) & 31];
+      return (Object[]) n.nodes[(idx >>> SHIFT_INCREMENT) & (MAX_BRANCHES - 1)];
     }
 
     private Object[] relaxedArrayFor(int idx) {
       Node n = this;
-      while (n.shift > 5) {
+      while (n.shift > SHIFT_INCREMENT) {
         if (n.strict) {
           return n.strictArrayFor(idx);
         }
@@ -116,7 +118,7 @@ public class ListNodes {
 
     private Object relaxedNth(int idx) {
       Node n = this;
-      while (n.shift > 5) {
+      while (n.shift > SHIFT_INCREMENT) {
         if (n.strict) {
           return n.strictNth(idx);
         }
@@ -130,11 +132,11 @@ public class ListNodes {
     }
 
     private Object strictNth(int idx) {
-      return strictArrayFor(idx)[idx & 31];
+      return strictArrayFor(idx)[idx & (MAX_BRANCHES - 1)];
     }
 
     private int indexOf(int idx) {
-      int estimate = (idx >> shift) & 31;
+      int estimate = (idx >> shift) & (MAX_BRANCHES - 1);
       if (strict) {
         return estimate;
       } else {
@@ -149,7 +151,7 @@ public class ListNodes {
 
     int offset(int idx) {
       if (strict) {
-        return (32 << (shift - 5)) * idx;
+        return (32 << (shift - SHIFT_INCREMENT)) * idx;
       } else {
         return idx == 0 ? 0 : offsets[idx - 1];
       }
@@ -163,7 +165,7 @@ public class ListNodes {
       }
 
       int nodeIdx = indexOf(idx);
-      if (shift == 5) {
+      if (shift == SHIFT_INCREMENT) {
         nodes[nodeIdx] = ListNodes.set((Object[]) nodes[nodeIdx], idx - offset(nodeIdx), value);
       } else {
         nodes[nodeIdx] = ((Node) nodes[nodeIdx]).set(editor, idx - offset(nodeIdx), value);
@@ -179,12 +181,12 @@ public class ListNodes {
       return (editor == this.editor ? this : clone(editor)).popLast();
     }
 
-    public Node addLast(Object editor, Object chunk, int size) {
-      return (editor == this.editor ? this : clone(editor)).pushLast(chunk, size);
+    public Node addLast(Object editor, Object chunk) {
+      return (editor == this.editor ? this : clone(editor)).pushLast(chunk);
     }
 
-    public Node addFirst(Object editor, Object chunk, int size) {
-      return (editor == this.editor ? this : clone(editor)).pushFirst(chunk, size);
+    public Node addFirst(Object editor, Object chunk) {
+      return (editor == this.editor ? this : clone(editor)).pushFirst(chunk);
     }
 
     // misc
@@ -195,31 +197,39 @@ public class ListNodes {
 
     public Node concat(Object editor, Node node) {
 
+      if (size() == 0) {
+        return node;
+      } else if (node.size() == 0) {
+        return this;
+      }
+
       // same level
       if (shift == node.shift) {
-        return new Node(editor, false, shift + 5)
-            .addLast(editor, this, this.size())
-            .addLast(editor, node, node.size());
+        Node newNode = clone(editor);
+        for (int i = 0; i < node.numNodes; i++) {
+          newNode = newNode.pushLast(node.nodes[i]);
+        }
+        return newNode;
 
         // we're down one level
-      } else if (shift == node.shift - 5) {
-        return node.addFirst(editor, this, this.size());
+      } else if (shift == node.shift - SHIFT_INCREMENT) {
+        return node.addFirst(editor, this);
 
         // we're up one level
-      } else if (shift == node.shift + 5) {
-        return addFirst(editor, node, node.size());
+      } else if (shift == node.shift + SHIFT_INCREMENT) {
+        return addLast(editor, node);
 
         // we're down multiple levels
       } else if (shift < node.shift) {
-        return new Node(editor, false, shift + 5)
-            .addLast(editor, this, this.size())
+        return new Node(editor, false, shift + SHIFT_INCREMENT)
+            .addLast(editor, this)
             .concat(editor, node);
 
         // we're up multiple levels
       } else {
         return concat(editor,
-            new Node(editor, false, node.shift + 5)
-                .addLast(editor, node, node.size()));
+                new Node(editor, false, node.shift + SHIFT_INCREMENT)
+                        .addLast(editor, node));
       }
     }
 
@@ -237,8 +247,12 @@ public class ListNodes {
       // we're slicing within a single node
       if (startIdx == endIdx) {
         int offset = offset(startIdx);
-        Object n = ListNodes.slice(nodes[startIdx], editor, start - offset, end - offset);
-        rn.addLast(editor, n, end - start);
+        Object child = ListNodes.slice(nodes[startIdx], editor, start - offset, end - offset);
+        if (shift > SHIFT_INCREMENT) {
+          return (Node) child;
+        } else {
+          rn.pushLast(child);
+        }
 
         // we're slicing across multiple nodes
       } else {
@@ -246,16 +260,16 @@ public class ListNodes {
         // first partial node
         int sLower = offset(startIdx);
         int sUpper = offset(startIdx + 1);
-        rn.addLast(editor, ListNodes.slice(nodes[startIdx], editor, start - sLower, sUpper - sLower), sUpper - start);
+        rn.pushLast(ListNodes.slice(nodes[startIdx], editor, start - sLower, sUpper - sLower));
 
         // intermediate full nodes
         for (int i = startIdx + 1; i < endIdx; i++) {
-          rn.addLast(editor, nodes[i], offset(i + 1) - offset(i));
+          rn.pushLast(nodes[i]);
         }
 
         // last partial node
         int eLower = offset(endIdx);
-        rn.addLast(editor, ListNodes.slice(nodes[endIdx], editor, 0, end - eLower), end - eLower);
+        rn.pushLast(ListNodes.slice(nodes[endIdx], editor, 0, end - eLower));
       }
 
       return rn;
@@ -263,74 +277,76 @@ public class ListNodes {
 
     ///
 
-    private Node pushLast(Object chunk, int size) {
+    private Node pushLast(Object child) {
 
-      boolean isNode = chunk instanceof Node;
+      boolean isNode = child instanceof Node;
 
-      if (isNode && ((Node) chunk).shift > shift) {
-        return ((Node) chunk).addFirst(editor, this, size());
+      if (isNode && ((Node) child).shift > shift) {
+        return ((Node) child).addFirst(editor, this);
       }
+
+      int childShift = !isNode ? 0 : ((Node) child).shift;
+      boolean isFull = numNodes == 0 || isFull(numNodes - 1, childShift);
 
       // we need to add a new level
-      if (numNodes == 32 && isFull(31)) {
-        return new Node(editor, strict, shift + 5)
-            .pushLast(this, this.size())
-            .pushLast(chunk, size);
+      if (numNodes == MAX_BRANCHES && isFull) {
+        return new Node(editor, strict, shift + SHIFT_INCREMENT).pushLast(this).pushLast(child);
       }
 
-      boolean isFull = numNodes == 0 || isFull(numNodes - 1);
+      int size = nodeSize(child);
 
       // we need to append
-      if (isFull || (isNode && ((Node) chunk).shift == (shift - 5))) {
+      if (isFull) {
 
-        strict = strict && ((!isNode && size == 32) || (isFull && isNode && ((Node) chunk).strict));
+        strict = strict && ((!isNode && nodeSize(child) == MAX_BRANCHES) || (isNode && ((Node) child).strict));
 
-        if (shift > 5 && !isNode) {
-          chunk = new Node(editor, true, shift - 5).pushLast(chunk, size);
+        if (childShift < shift - SHIFT_INCREMENT) {
+          child = new Node(editor, true, shift - SHIFT_INCREMENT).pushLast(child);
         }
 
         if (numNodes == nodes.length) {
           grow();
         }
 
-        nodes[numNodes] = chunk;
+        nodes[numNodes] = child;
         offsets[numNodes] = offset(numNodes) + size;
         numNodes++;
 
         // we need to go deeper
       } else {
         int idx = numNodes - 1;
-        nodes[idx] = ((Node) nodes[idx]).addLast(editor, chunk, size);
+        nodes[idx] = ((Node) nodes[idx]).addLast(editor, child);
         offsets[idx] += size;
       }
 
       return this;
     }
 
-    private Node pushFirst(Object chunk, int size) {
+    private Node pushFirst(Object child) {
 
-      boolean isNode = chunk instanceof Node;
+      boolean isNode = child instanceof Node;
 
-      if (isNode && ((Node) chunk).shift > shift) {
-        return ((Node) chunk).addLast(editor, this, size());
+      if (isNode && ((Node) child).shift > shift) {
+        return ((Node) child).addLast(editor, this);
       }
+
+      int childShift = !isNode ? 0 : ((Node) child).shift;
+      boolean isFull = numNodes == 0 || isFull(0, childShift);
 
       // we need to add a new level
-      if (numNodes == 32 && isFull(0)) {
-        return new Node(editor, false, shift + 5)
-            .pushFirst(this, this.size())
-            .pushFirst(chunk, size);
+      if (numNodes == MAX_BRANCHES && isFull) {
+        return new Node(editor, false, shift + SHIFT_INCREMENT).pushLast(child).pushLast(this);
       }
 
-      boolean isFull = numNodes == 0 || isFull(0);
+      int size = nodeSize(child);
 
       // we need to prepend
-      if (isFull || (isNode && ((Node) chunk).shift == (shift - 5))) {
+      if (isFull) {
 
-        strict = strict && ((!isNode && size == 32) || (isFull && isNode && ((Node) chunk).strict));
+        strict = strict && ((!isNode && nodeSize(child) == MAX_BRANCHES) || (isFull && isNode && ((Node) child).strict));
 
-        if (shift > 5 && !isNode) {
-          chunk = new Node(editor, false, shift - 5).pushLast(chunk, size);
+        if (childShift < shift - SHIFT_INCREMENT) {
+          child = new Node(editor, false, shift - SHIFT_INCREMENT).pushLast(child);
         }
 
         if (numNodes == nodes.length) {
@@ -338,7 +354,7 @@ public class ListNodes {
         }
 
         arraycopy(nodes, 0, nodes, 1, numNodes);
-        nodes[0] = chunk;
+        nodes[0] = child;
         for (int i = numNodes; i > 0; i--) {
           offsets[i] = offsets[i - 1] + size;
         }
@@ -348,7 +364,7 @@ public class ListNodes {
         // we need to go deeper
       } else {
         Node rn = (Node) nodes[0];
-        nodes[0] = rn.addFirst(editor, chunk, size);
+        nodes[0] = rn.addFirst(editor, child);
 
         for (int i = 0; i < numNodes; i++) {
           offsets[i] += size;
@@ -360,26 +376,34 @@ public class ListNodes {
     }
 
     private Node popFirst() {
+      int delta = 0;
+      boolean shiftLeft = false;
       if (numNodes == 0) {
         return this;
 
-      } else if (shift == 5) {
-        numNodes--;
-        int size = offsets[0];
-        arraycopy(nodes, 1, nodes, 0, numNodes);
-        nodes[numNodes] = null;
-        for (int i = 0; i < numNodes; i++) {
-          offsets[i] = offsets[i + 1] - size;
-        }
-        offsets[numNodes] = 0;
+      } else if (shift == SHIFT_INCREMENT) {
+        delta = -offsets[0];
+        shiftLeft = true;
 
       } else {
         Node rn = (Node) nodes[0];
         int prevSize = rn.size();
         Node rnPrime = rn.popFirst();
-        int delta = rnPrime.size() - prevSize;
+        delta = rnPrime.size() - prevSize;
+        shiftLeft = rnPrime.size() == 0;
 
         nodes[0] = rnPrime;
+      }
+
+      if (shiftLeft) {
+        numNodes--;
+        arraycopy(nodes, 1, nodes, 0, numNodes);
+        nodes[numNodes] = null;
+        for (int i = 0; i < numNodes; i++) {
+          offsets[i] = offsets[i + 1] + delta;
+        }
+        offsets[numNodes] = 0;
+      } else {
         for (int i = 0; i < numNodes; i++) {
           offsets[i] += delta;
         }
@@ -393,7 +417,7 @@ public class ListNodes {
       if (numNodes == 0) {
         return this;
 
-      } else if (shift == 5) {
+      } else if (shift == SHIFT_INCREMENT) {
         numNodes--;
         nodes[numNodes] = null;
         offsets[numNodes] = 0;
@@ -403,8 +427,14 @@ public class ListNodes {
         int prevSize = rn.size();
         Node rnPrime = rn.popLast();
 
-        nodes[numNodes - 1] = rnPrime;
-        offsets[numNodes - 1] += rnPrime.size() - prevSize;
+        if (rnPrime.size() == 0) {
+          numNodes--;
+          nodes[numNodes] = null;
+          offsets[numNodes] = 0;
+        } else {
+          nodes[numNodes - 1] = rnPrime;
+          offsets[numNodes - 1] += rnPrime.size() - prevSize;
+        }
       }
 
       return this;

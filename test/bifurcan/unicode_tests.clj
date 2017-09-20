@@ -5,6 +5,8 @@
    [clojure.test.check.properties :as prop]
    [clojure.test.check.clojure-test :as ct :refer (defspec)])
   (:import
+   [io.lacuna.bifurcan
+    Rope]
    [io.lacuna.bifurcan.utils
     UnicodeChunk]))
 
@@ -12,15 +14,10 @@
   (UnicodeChunk/from s))
 
 (defn chunk->str [chunk]
-  (->> (UnicodeChunk/numChars chunk)
-    range
-    (map #(UnicodeChunk/nthChar chunk %))
-    (apply str)))
+  (str (UnicodeChunk/toCharSequence chunk)))
 
 (defn codepoints->str [cs]
-  (->> cs
-    (mapcat #(seq (Character/toChars %)))
-    (apply str)))
+  (String. (int-array cs) 0 (count cs)))
 
 (def gen-code-point
   (gen/such-that

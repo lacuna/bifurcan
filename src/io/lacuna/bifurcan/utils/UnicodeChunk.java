@@ -1,5 +1,8 @@
 package io.lacuna.bifurcan.utils;
 
+import java.nio.charset.Charset;
+import java.util.PrimitiveIterator;
+
 import static java.lang.Character.*;
 import static java.lang.System.arraycopy;
 
@@ -9,15 +12,23 @@ import static java.lang.System.arraycopy;
  */
 public class UnicodeChunk {
 
+  private static final Charset UTF8 = Charset.forName("utf-8");
+
+  public static final byte[] EMPTY = new byte[]{0, 0};
+
   public static byte[] from(CharSequence cs) {
-    if (cs.length() > 255) {
+    return from(cs, 0, cs.length());
+  }
+
+  public static byte[] from(CharSequence cs, int start, int end) {
+    if (end - start > 255) {
       throw new IllegalArgumentException("cannot encode a block of more than 255 UTF-16 code units");
     }
 
     int numBytes = 0;
     int[] codePoints = new int[cs.length()];
     int codePointIdx = 0;
-    for (int charIdx = 0; charIdx < cs.length(); codePointIdx++) {
+    for (int charIdx = start; charIdx < end; codePointIdx++) {
       char c = cs.charAt(charIdx);
       int codePoint;
       if (isHighSurrogate(c)) {
@@ -33,7 +44,7 @@ public class UnicodeChunk {
 
     byte[] chunk = new byte[numBytes + 2];
     chunk[0] = (byte) codePointIdx;
-    chunk[1] = (byte) cs.length();
+    chunk[1] = (byte) (end - start);
 
     int offset = 2;
     for (int i = 0; i < codePointIdx; i++) {
@@ -44,50 +55,73 @@ public class UnicodeChunk {
     return chunk;
   }
 
-  public static byte[] remove(byte[] chunk, int idx) {
-    int offset = offset(chunk, idx);
-    int len = encodedLength(chunk[offset]);
+  public static CharSequence toCharSequence(byte[] chunk) {
+    return new CharSequence() {
+      @Override
+      public int length() {
+        return numCodeUnits(chunk);
+      }
 
-    byte[] newChunk = new byte[chunk.length - len];
-    arraycopy(chunk, 0, newChunk, 0, offset);
-    arraycopy(chunk, offset + len, newChunk, offset, newChunk.length - offset);
-    newChunk[0] = (byte) (numCodePoints(chunk) - 1);
-    newChunk[1] = (byte) (numChars(chunk) - (len == 4 ? 2 : 1));
+      @Override
+      public char charAt(int index) {
+        return nthUnit(chunk, index);
+      }
 
-    return newChunk;
+      @Override
+      public CharSequence subSequence(int start, int end) {
+        return CharSequences.subSequence(this, start, end);
+      }
+
+      @Override
+      public String toString() {
+        return UnicodeChunk.toString(chunk);
+      }
+    };
   }
 
-  public static byte[] insert(byte[] chunk, int idx, int codePoint) {
-    int offset = offset(chunk, idx);
-    int len = encodedLength(codePoint);
+  public static String toString(byte[] chunk) {
+    char[] cs = new char[numCodeUnits(chunk)];
+    for (int bi = 2, ci = 0; ci < cs.length; ) {
+      int codePoint = decode(chunk, bi);
+      bi += codePoint < 0x80 ? 1 : encodedLength(chunk[bi]);
 
-    byte[] newChunk = new byte[chunk.length + len];
-    arraycopy(chunk, 0, newChunk, 0, offset);
-    overwrite(chunk, offset, codePoint);
-    arraycopy(chunk, offset, newChunk, offset + len, chunk.length - offset);
-    newChunk[0] = (byte) (numCodePoints(chunk) + 1);
-    newChunk[1] = (byte) (numChars(chunk) + (len == 4 ? 2 : 1));
-
-    return newChunk;
+      if (isBmpCodePoint(codePoint)) {
+        cs[ci++] = (char) codePoint;
+      } else {
+        cs[ci++] = highSurrogate(codePoint);
+        cs[ci++] = lowSurrogate(codePoint);
+      }
+    }
+    return new String(cs);
   }
 
   public static byte[] concat(byte[] a, byte[] b) {
-    if (numChars(a) + numChars(b) > 255) {
+    if (numCodeUnits(a) + numCodeUnits(b) > 255) {
       throw new IllegalArgumentException("cannot create a chunk larger than 255 UTF-16 code units");
     }
 
     byte[] newChunk = new byte[a.length + b.length - 2];
-    arraycopy(a, 2, newChunk, 0, a.length - 2);
+    arraycopy(a, 2, newChunk, 2, a.length - 2);
     arraycopy(b, 2, newChunk, a.length, b.length - 2);
     newChunk[0] = (byte) (numCodePoints(a) + numCodePoints(b));
-    newChunk[1] = (byte) (numChars(a) + numChars(b));
+    newChunk[1] = (byte) (numCodeUnits(a) + numCodeUnits(b));
 
     return newChunk;
+  }
+
+  public static byte[] concat(byte[]... chunks) {
+    byte[] chunk = chunks[0];
+    for (int i = 1; i < chunks.length; i++) {
+      chunk = concat(chunk, chunks[i]);
+    }
+    return chunk;
   }
 
   public static byte[] slice(byte[] chunk, int start, int end) {
     if (end > numCodePoints(chunk) || start < 0) {
       throw new IllegalArgumentException("slice range out of bounds");
+    } else if (start == 0 && end == numCodePoints(chunk)) {
+      return chunk;
     }
 
     int startOffset = offset(chunk, start);
@@ -99,7 +133,8 @@ public class UnicodeChunk {
     } else {
       endOffset = startOffset;
       for (int i = start; i < end; i++) {
-        int len = encodedLength(chunk[endOffset]);
+        byte b = chunk[endOffset];
+        int len = b >= 0 ? 1 : encodedLength(b);
         codeUnits += len == 4 ? 2 : 1;
         endOffset += len;
       }
@@ -113,15 +148,15 @@ public class UnicodeChunk {
     return newChunk;
   }
 
-  public static char nthChar(byte[] chunk, int idx) {
+  public static char nthUnit(byte[] chunk, int idx) {
     if (isAscii(chunk)) {
       return (char) chunk[idx + 2];
     } else {
-      return findNthChar(chunk, idx);
+      return findNthUnit(chunk, idx);
     }
   }
 
-  public static int nth(byte[] chunk, int idx) {
+  public static int nthPoint(byte[] chunk, int idx) {
     return decode(chunk, offset(chunk, idx));
   }
 
@@ -129,13 +164,13 @@ public class UnicodeChunk {
     return chunk[0] & 0xFF;
   }
 
-  public static int numChars(byte[] chunk) {
+  public static int numCodeUnits(byte[] chunk) {
     return chunk[1] & 0xFF;
   }
 
   ///
 
-  private static char findNthChar(byte[] chunk, int idx) {
+  private static char findNthUnit(byte[] chunk, int idx) {
     int offset = 2;
 
     for (; ; ) {
@@ -164,11 +199,11 @@ public class UnicodeChunk {
     if (isAscii(chunk)) {
       return idx + 2;
     } else {
-      return findOffset(chunk, idx);
+      return findNthPoint(chunk, idx);
     }
   }
 
-  private static int findOffset(byte[] chunk, int idx) {
+  private static int findNthPoint(byte[] chunk, int idx) {
     int offset = 2;
     while (idx-- > 0) {
       byte b = chunk[offset];
@@ -242,7 +277,7 @@ public class UnicodeChunk {
 
   private static int decode(byte[] array, int offset) {
     byte b = array[offset];
-    if (b > 0) {
+    if (b >= 0) {
       return b;
     }
 

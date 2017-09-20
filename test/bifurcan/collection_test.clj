@@ -17,6 +17,8 @@
     BitVector
     Bits
     Iterators]
+   [io.lacuna.bifurcan.nodes
+    ListNodes$Node]
    [io.lacuna.bifurcan
     IntMap
     Map
@@ -74,7 +76,16 @@
 (def list-actions
   {:add-first    [gen/pos-int]
    :add-last     [gen/pos-int]
-   :set          [(gen/choose 0 999) gen/pos-int]
+   :set          [gen/pos-int gen/pos-int]
+   :slice        [gen/pos-int gen/pos-int]
+   :concat       [(gen/vector gen/pos-int 0 33)]
+   :remove-first []
+   :remove-last  []})
+
+(def linear-list-actions
+  {:add-first    [gen/pos-int]
+   :add-last     [gen/pos-int]
+   :set          [gen/pos-int gen/pos-int]
    :remove-first []
    :remove-last  []})
 
@@ -90,6 +101,9 @@
   {:add-first    #(cons %2 %1)
    :add-last     #(conj (vec %1) %2)
    :set          #(assoc (vec %1) (min (count %1) %2) %3)
+   :slice        #(let [[s e] (sort [%2 %3])]
+                    (->> %1 (drop s) (take (- e s)) vec))
+   :concat       #(vec (concat %1 %2))
    :remove-first #(or (rest %) [])
    :remove-last  #(or (butlast %) [])})
 
@@ -97,6 +111,12 @@
   {:add-first    #(.addFirst ^IList %1 %2)
    :add-last     #(.addLast ^IList %1 %2)
    :set          #(.set ^IList %1 (min (.size ^IList %1) %2) %3)
+   :slice        #(let [^IList l %1
+                        [s e] (sort [%2 %3])]
+                    (.slice l
+                      (max 0 (min (.size l) s))
+                      (min (.size l) e)))
+   :concat       #(.concat ^IList %1 (List/from %2))
    :remove-first #(.removeFirst ^IList %)
    :remove-last  #(.removeLast ^IList %)})
 
@@ -128,8 +148,20 @@
 (defn set-gen [init]
   (->> set-actions u/actions->generator (gen/fmap #(u/apply-actions %1 (init) bifurcan-set))))
 
+;; TODO: should this not be `linear-list-actions`?
 (defn list-gen [init]
-  (->> list-actions u/actions->generator (gen/fmap #(u/apply-actions %1 (init) bifurcan-list))))
+  (->> linear-list-actions u/actions->generator (gen/fmap #(u/apply-actions %1 (init) bifurcan-list))))
+
+(defn ->tree [^ListNodes$Node n]
+  (let [nodes (.numNodes n)]
+    {:shift (.shift n)
+     :offsets (take nodes (.offsets n))
+     :nodes (->> n
+              .nodes
+              (take nodes)
+              (map #(if (instance? ListNodes$Node %)
+                      (->tree %)
+                      (seq %))))}))
 
 ;; Maps
 
@@ -189,7 +221,7 @@
 
 ;; Lists
 
-(u/def-collection-check test-linear-list iterations list-actions
+(u/def-collection-check test-linear-list iterations linear-list-actions
   [a [] clj-list
    b (LinearList.) bifurcan-list]
   (list= a b))
@@ -203,7 +235,7 @@
     (list= a b)
     (list= a c)))
 
-(u/def-collection-check test-virtual-list iterations list-actions
+(u/def-collection-check test-virtual-list iterations linear-list-actions
   [a [] clj-list
    b Lists/EMPTY bifurcan-list
    c (.linear (Lists/from [])) bifurcan-list]
@@ -227,22 +259,8 @@
   (prop/for-all [start (gen/choose 1 1e4)
                  end (gen/choose 1 1e4)]
     (let [start (min start end)
-          end (max start end)
-          s (range (* 2 end))]
-      (and
-        (list=
-          (->> s (drop start) (take (- end start)))
-          (.slice (List/from s) start end))
-        (list=
-          (->> s (drop start) (take (- end start)))
-          (Lists/slice (List/from s) start end))))))
-
-(defspec test-list-slice iterations
-  (prop/for-all [start (gen/choose 1 1e4)
-                 end (gen/choose 1 1e4)]
-    (let [start (min start end)
-          end (max start end)
-          s (range (* 2 end))]
+          end   (max start end)
+          s     (range (* 2 end))]
       (and
         (list=
           (->> s (drop start) (take (- end start)))
