@@ -44,11 +44,6 @@ public class RopeNodes {
     // constructors
 
     public Node(Object editor, int shift) {
-
-      if (shift > 64) {
-        throw new IllegalArgumentException("excessive shift");
-      }
-
       this.editor = editor;
       this.shift = (byte) shift;
       this.unitOffsets = new int[2];

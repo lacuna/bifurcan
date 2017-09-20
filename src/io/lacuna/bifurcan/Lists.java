@@ -17,6 +17,8 @@ import java.util.function.ToLongFunction;
 import java.util.stream.Collector;
 import java.util.stream.IntStream;
 
+import static java.lang.Math.min;
+
 /**
  * Utility functions for classes implementing {@code IList}.
  *
@@ -169,9 +171,9 @@ public class Lists {
       long pos = start;
       while (pos < end) {
         IEntry<Long, IList<V>> e = lists.floor(pos);
-        IList<V> l = e.value().slice(start - e.key(), Math.min(end - pos, e.value().size()));
-        m = m.put(pos, l);
-        pos += l.size();
+        IList<V> l = e.value().slice(pos - e.key(), min(end - e.key(), e.value().size()));
+        m = m.put(pos - start, l);
+        pos = e.key() + e.value().size();
       }
       return new Concat<V>(m.forked(), end - start);
     }
@@ -180,8 +182,10 @@ public class Lists {
       IntMap<IList<V>> m = lists.linear();
       long nSize = size;
       for (IList<V> l : o.lists.values()) {
-        m = m.put(nSize, l);
-        nSize += l.size();
+        if (l.size() > 0) {
+          m = m.put(nSize, l);
+          nSize += l.size();
+        }
       }
       return new Concat<V>(m.forked(), nSize);
     }
@@ -192,7 +196,7 @@ public class Lists {
     private final long offset;
     private final long size;
 
-    public Slice(IList<V> list, long offset, long size) {
+    Slice(IList<V> list, long offset, long size) {
       this.list = list;
       this.offset = offset;
       this.size = size;
@@ -216,7 +220,6 @@ public class Lists {
       if (start == end) {
         return EMPTY;
       } else if (start < 0 || end <= start || end > size) {
-        System.out.println(start + " " + end + " " + size);
         throw new IllegalArgumentException();
       }
       return new Slice<V>(list, offset + start, end - start);
@@ -345,18 +348,18 @@ public class Lists {
     @Override
     public int indexOf(Object o) {
       return IntStream.range(0, size())
-          .filter(idx -> Objects.equals(get(idx), o))
-          .findFirst()
-          .orElse(-1);
+              .filter(idx -> Objects.equals(get(idx), o))
+              .findFirst()
+              .orElse(-1);
     }
 
     @Override
     public int lastIndexOf(Object o) {
       return size() -
-          IntStream.range(0, size())
-              .filter(idx -> Objects.equals(get(size() - (idx + 1)), o))
-              .findFirst()
-              .orElse(size() + 1);
+              IntStream.range(0, size())
+                      .filter(idx -> Objects.equals(get(size() - (idx + 1)), o))
+                      .findFirst()
+                      .orElse(size() + 1);
     }
 
     @Override
@@ -493,20 +496,20 @@ public class Lists {
       if (suffix.size() > 0) {
         IList<V> suffixPrime = suffix.removeLast();
         return linear ? this : new VirtualList<V>(prefix, base, suffixPrime, false);
-      } else if (base.size() <= 1 && prefix.size() == 0) {
-        return Lists.EMPTY;
-      } else if (base.size() == 0) {
-        IList<V> prefixPrime = prefix.removeLast();
-        return linear ? this : new VirtualList<V>(prefixPrime, base, suffix, false);
-      } else {
-        IList<V> listPrime = base.slice(0, base.size() - 1);
+      }
+
+      if (base.size() > 0) {
+        IList<V> basePrime = base.slice(0, base.size() - 1);
         if (linear) {
-          base = listPrime;
+          base = basePrime;
           return this;
         } else {
-          return new VirtualList<V>(prefix, listPrime, suffix, false);
+          return new VirtualList<V>(prefix, basePrime, suffix, false);
         }
       }
+
+      IList<V> prefixPrime = prefix.removeLast();
+      return linear ? this : new VirtualList<V>(prefixPrime, base, suffix, false);
     }
 
     @Override
@@ -514,12 +517,9 @@ public class Lists {
       if (prefix.size() > 0) {
         IList<V> prefixPrime = prefix.removeFirst();
         return linear ? this : new VirtualList<V>(prefixPrime, base, suffix, false);
-      } else if (base.size() <= 1 && suffix.size() == 0) {
-        return Lists.EMPTY;
-      } else if (base.size() == 0) {
-        IList<V> suffixPrime = suffix.removeFirst();
-        return linear ? this : new VirtualList<V>(prefix, base, suffixPrime, false);
-      } else {
+      }
+
+      if (base.size() > 0) {
         IList<V> basePrime = base.slice(1, base.size());
         if (linear) {
           base = basePrime;
@@ -528,31 +528,32 @@ public class Lists {
           return new VirtualList<V>(prefix, basePrime, suffix, false);
         }
       }
+
+      IList<V> suffixPrime = suffix.removeFirst();
+      return linear ? this : new VirtualList<V>(prefix, base, suffixPrime, false);
     }
 
     @Override
     public IList<V> set(long idx, V value) {
+      long prefixSize = prefix.size();
+      long baseSize = base.size();
+
       if (idx < 0 || idx > size()) {
         throw new IndexOutOfBoundsException();
       } else if (idx == size()) {
         return addLast(value);
-      } else if (idx < prefix.size()) {
+      } else if (idx < prefixSize) {
         IList<V> prefixPrime = prefix.set(idx, value);
         return linear ? this : new VirtualList<V>(prefixPrime, base, suffix, false);
-      } else if (idx < (prefix.size() + base.size())) {
-        idx -= prefix.size();
+      } else if (idx < (prefixSize + baseSize)) {
+        idx -= prefixSize;
         IList<V> basePrime = Lists.concat(
-            slice(0, idx),
-            new LinearList(1).addLast(value),
-            slice(idx + 1, size()));
-        if (linear) {
-          base = basePrime;
-          return this;
-        } else {
-          return new VirtualList<V>(prefix, base, suffix, false);
-        }
+                base.slice(0, idx),
+                new LinearList(1).addLast(value),
+                base.slice(idx + 1, base.size()));
+        return new VirtualList<V>(prefix, basePrime, suffix, linear);
       } else {
-        idx -= prefix.size() + base.size();
+        idx -= prefixSize + baseSize;
         IList<V> suffixPrime = suffix.set(idx, value);
         return linear ? this : new VirtualList<V>(prefix, base, suffixPrime, false);
       }

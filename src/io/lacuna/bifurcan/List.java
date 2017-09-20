@@ -1,10 +1,13 @@
 package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.nodes.ListNodes.Node;
+import io.lacuna.bifurcan.utils.Bits;
 
 import java.util.Collection;
 import java.util.Iterator;
 
+import static io.lacuna.bifurcan.utils.Bits.log2Ceil;
+import static java.lang.Math.min;
 import static java.lang.System.arraycopy;
 
 /**
@@ -204,24 +207,26 @@ public class List<V> implements IList<V>, Cloneable {
     int s = (int) start;
     int e = (int) end;
 
-    int pStart = Math.min(prefixLen, s);
-    int pEnd = Math.min(prefixLen, e);
+    int pStart = min(prefixLen, s);
+    int pEnd = min(prefixLen, e);
     int pLen = pEnd - pStart;
-    Object[] pre = pLen == 0 ? null : new Object[32];
-    if (pre != null) {
-      arraycopy(prefix, pIdx(pStart), pre, 32 - pLen, pLen);
+    Object[] pre = null;
+    if (pLen > 0) {
+      pre = new Object[1 << log2Ceil(pLen)];
+      arraycopy(prefix, pIdx(pStart), pre, pre.length - pLen, pLen);
     }
 
     int sStart = Math.max(0, s - (prefixLen + root.size()));
     int sEnd = Math.max(0, e - (prefixLen + root.size()));
     int sLen = sEnd - sStart;
-    Object[] suf = sLen == 0 ? null : new Object[32];
-    if (suf != null) {
+    Object[] suf = null;
+    if (sLen > 0) {
+      suf = new Object[1 << log2Ceil(sLen)];
       arraycopy(suffix, sStart, suf, 0, sLen);
     }
 
     return new List<V>(linear,
-        root.slice(editor, Math.max(0, Math.min(root.size(), s - prefixLen)), Math.max(0, Math.min(root.size(), e - prefixLen))),
+        root.slice(editor, Math.max(0, min(root.size(), s - prefixLen)), Math.max(0, min(root.size(), e - prefixLen))),
         pLen, pre, sLen, suf);
   }
 
@@ -293,7 +298,7 @@ public class List<V> implements IList<V>, Cloneable {
     return suf;
   }
 
-  private Object prefixArray() {
+  private Object[] prefixArray() {
     Object[] pre = new Object[prefixLen];
     arraycopy(prefix, pIdx(0), pre, 0, pre.length);
     return pre;
@@ -324,23 +329,21 @@ public class List<V> implements IList<V>, Cloneable {
 
   List<V> pushFirst(V value) {
 
-    // create a prefix
     if (prefix == null) {
-      prefix = new Object[32];
-      prefix[31] = value;
-      prefixLen = 1;
+      prefix = new Object[2];
+    } else if (prefixLen == prefix.length) {
+      Object[] newPrefix = new Object[min(32, prefix.length << 1)];
+      arraycopy(prefix, 0, newPrefix, newPrefix.length - prefixLen, prefixLen);
+      prefix = newPrefix;
+    }
 
-      // prefix overflow
-    } else if (prefixLen == prefix.length - 1) {
-      prefix[0] = value;
+    prefix[pIdx(-1)] = value;
+    prefixLen++;
+
+    if (prefixLen == 32) {
       root = root.addFirst(editor, prefix);
       prefix = null;
       prefixLen = 0;
-
-      // prepend to prefix
-    } else {
-      prefix[pIdx(-1)] = value;
-      prefixLen++;
     }
 
     return this;
@@ -348,22 +351,20 @@ public class List<V> implements IList<V>, Cloneable {
 
   List<V> pushLast(V value) {
 
-    // create a suffix
     if (suffix == null) {
-      suffix = new Object[32];
-      suffix[0] = value;
-      suffixLen = 1;
+      suffix = new Object[2];
+    } else if (suffixLen == suffix.length) {
+      Object[] newSuffix = new Object[min(32, suffix.length << 1)];
+      arraycopy(suffix, 0, newSuffix, 0, suffix.length);
+      suffix = newSuffix;
+    }
 
-      // suffix overflow
-    } else if (suffixLen == suffix.length - 1) {
-      suffix[suffixLen] = value;
+    suffix[suffixLen++] = value;
+
+    if (suffixLen == 32) {
       root = root.addLast(editor, suffix);
       suffix = null;
       suffixLen = 0;
-
-      // append to suffix
-    } else {
-      suffix[suffixLen++] = value;
     }
 
     return this;
@@ -371,25 +372,21 @@ public class List<V> implements IList<V>, Cloneable {
 
   List<V> popFirst() {
 
-    // pull from the front of the suffix
-    if (root.size() == 0 && prefixLen == 0) {
-      if (suffixLen > 0) {
+    if (prefixLen == 0) {
+      if (root.size() > 0) {
+        Object[] chunk = root.first();
+        if (chunk != null) {
+          prefix = chunk.clone();
+          prefixLen = (byte) prefix.length;
+          root = root.removeFirst(editor);
+        }
+      } else if (suffixLen > 0) {
         arraycopy(suffix, 1, suffix, 0, --suffixLen);
         suffix[suffixLen] = null;
       }
+    }
 
-      // prefix underflow
-    } else if (prefixLen == 0) {
-      Object[] chunk = root.first();
-      if (chunk != null) {
-        prefix = chunk.clone();
-        prefixLen = (byte) (chunk.length - 1);
-        root = root.removeFirst(editor);
-        prefix[pIdx(-1)] = null;
-      }
-
-      // truncate prefix
-    } else {
+    if (prefixLen > 0) {
       prefixLen--;
       prefix[pIdx(-1)] = null;
     }
@@ -399,27 +396,23 @@ public class List<V> implements IList<V>, Cloneable {
 
   List<V> popLast() {
 
-    // pull from the back of the prefix
-    if (root.size() == 0 && suffixLen == 0) {
-      if (prefixLen > 0) {
+    if (suffixLen == 0) {
+      if (root.size() > 0) {
+        Object[] chunk = root.last();
+        if (chunk != null) {
+          suffix = chunk.clone();
+          suffixLen = (byte) suffix.length;
+          root = root.removeLast(editor);
+        }
+      } else if (prefixLen > 0) {
         prefixLen--;
         arraycopy(prefix, pIdx(-1), prefix, pIdx(0), prefixLen);
         prefix[pIdx(-1)] = null;
       }
+    }
 
-      // suffix underflow
-    } else if (suffixLen == 0) {
-      Object[] chunk = root.last();
-      if (chunk != null) {
-        suffix = chunk.clone();
-        suffixLen = (byte) (chunk.length - 1);
-        root = root.removeLast(editor);
-        suffix[suffixLen] = null;
-      }
-
-      // truncate suffix
-    } else {
-      suffix[suffixLen--] = null;
+    if (suffixLen > 0) {
+      suffix[--suffixLen] = null;
     }
 
     return this;

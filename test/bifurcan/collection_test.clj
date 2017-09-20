@@ -73,24 +73,19 @@
 
 ;;;
 
-(def list-actions
-  {:add-first    [gen/pos-int]
-   :add-last     [gen/pos-int]
-   :set          [gen/pos-int gen/pos-int]
-   :slice        [gen/pos-int gen/pos-int]
-   :concat       [(gen/vector gen/pos-int 0 33)]
-   :remove-first []
-   :remove-last  []})
+(def gen-element (gen/elements [0 1]))
 
-(def linear-list-actions
-  {:add-first    [gen/pos-int]
-   :add-last     [gen/pos-int]
-   :set          [gen/pos-int gen/pos-int]
+(def list-actions
+  {:add-first    [gen-element]
+   :add-last     [gen-element]
+   :set          [gen/pos-int gen-element]
+   :slice        [gen/pos-int gen/pos-int]
+   :concat       [(gen/vector gen-element 0 33)]
    :remove-first []
    :remove-last  []})
 
 (def map-actions
-  {:put    [gen/large-integer gen/pos-int]
+  {:put    [gen/large-integer gen-element]
    :remove [gen/large-integer]})
 
 (def set-actions
@@ -148,9 +143,8 @@
 (defn set-gen [init]
   (->> set-actions u/actions->generator (gen/fmap #(u/apply-actions %1 (init) bifurcan-set))))
 
-;; TODO: should this not be `linear-list-actions`?
 (defn list-gen [init]
-  (->> linear-list-actions u/actions->generator (gen/fmap #(u/apply-actions %1 (init) bifurcan-list))))
+  (->> list-actions u/actions->generator (gen/fmap #(u/apply-actions %1 (init) bifurcan-list))))
 
 (defn ->tree [^ListNodes$Node n]
   (let [nodes (.numNodes n)]
@@ -221,10 +215,14 @@
 
 ;; Lists
 
-(u/def-collection-check test-linear-list iterations linear-list-actions
+(u/def-collection-check test-linear-list iterations list-actions
   [a [] clj-list
    b (LinearList.) bifurcan-list]
-  (list= a b))
+  (if (list= a b)
+    true
+    (do
+      (prn (count a) (.size b))
+      false)))
 
 (u/def-collection-check test-list iterations list-actions
   [a [] clj-list
@@ -235,7 +233,7 @@
     (list= a b)
     (list= a c)))
 
-(u/def-collection-check test-virtual-list iterations linear-list-actions
+(u/def-collection-check test-virtual-list iterations list-actions
   [a [] clj-list
    b Lists/EMPTY bifurcan-list
    c (.linear (Lists/from [])) bifurcan-list]
