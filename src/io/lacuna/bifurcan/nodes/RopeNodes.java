@@ -11,16 +11,17 @@ public class RopeNodes {
 
   public static final int SHIFT_INCREMENT = 5;
   public static final int MAX_BRANCHES = 1 << SHIFT_INCREMENT;
+  public static final int MAX_CHUNK_CODE_UNITS = MAX_BRANCHES;
 
   public interface ChunkUpdater {
     byte[] update(int offset, byte[] chunk);
   }
 
-  public static Object slice(Object chunk, Object editor, int start, int end) {
+  public static Object slice(Object chunk, int start, int end) {
     if (chunk instanceof byte[]) {
       return UnicodeChunk.slice((byte[]) chunk, start, end);
     } else {
-      return ((Node) chunk).slice(editor, start, end);
+      return ((Node) chunk).slice(start, end);
     }
   }
 
@@ -64,18 +65,21 @@ public class RopeNodes {
           return i;
         }
       }
-
-      throw new IndexOutOfBoundsException("could not find node for index " + idx);
+      throw new IndexOutOfBoundsException(idx + " is not within [0," + offsetFor(numNodes, offsets) + ")");
     }
 
-    private static int offsetFor(int offsetIdx, int[] offsets) {
-      return offsetIdx == 0 ? 0 : offsets[offsetIdx - 1];
+    private static int offsetFor(int nodeIdx, int[] offsets) {
+      return nodeIdx == 0 ? 0 : offsets[nodeIdx - 1];
     }
 
     public byte[] chunkFor(int idx) {
       Node n = this;
       for (; ; ) {
         int nodeIdx = n.indexFor(idx, n.pointOffsets);
+        if (nodeIdx < 0) {
+          return null;
+        }
+
         idx -= offsetFor(nodeIdx, n.pointOffsets);
         Object o = n.nodes[nodeIdx];
         if (o instanceof Node) {
@@ -115,11 +119,11 @@ public class RopeNodes {
     }
 
     public int numCodeUnits() {
-      return numNodes == 0 ? 0 : unitOffsets[numNodes - 1];
+      return unitOffsets[numNodes - 1];
     }
 
     public int numCodePoints() {
-      return numNodes == 0 ? 0 : pointOffsets[numNodes - 1];
+      return pointOffsets[numNodes - 1];
     }
 
     // update
@@ -144,15 +148,11 @@ public class RopeNodes {
 
     public Node update(Object editor, int offset, int idx, ChunkUpdater updater) {
 
-      int estimate = (idx >> shift) & (MAX_BRANCHES - 1);
       int nodeIdx = numNodes - 1;
-      int nodeOffset = pointOffsets[numNodes - 1];
-      for (int i = estimate; i < pointOffsets.length; i++) {
-        if (idx <= pointOffsets[i]) {
-          nodeIdx = i;
-          nodeOffset = offsetFor(i, pointOffsets);
-          break;
-        }
+      int nodeOffset = offsetFor(nodeIdx, pointOffsets);
+      if (idx != numCodePoints()) {
+        nodeIdx = indexFor(idx, pointOffsets);
+        nodeOffset = offsetFor(nodeIdx, pointOffsets);
       }
 
       Object child = nodes[nodeIdx];
@@ -163,7 +163,7 @@ public class RopeNodes {
           ? updater.update(offset + nodeOffset, (byte[]) child)
           : ((Node) child).update(editor, offset + nodeOffset, idx - nodeOffset, updater);
 
-      if (newChild == null) {
+      if (newChild == null  ) {
         return null;
       }
 
@@ -221,7 +221,7 @@ public class RopeNodes {
       }
     }
 
-     public Node slice(Object editor, int start, int end) {
+     public Node slice(int start, int end) {
 
       if (start == end) {
         return new Node(new Object(), SHIFT_INCREMENT).pushLast(UnicodeChunk.EMPTY);
@@ -235,7 +235,7 @@ public class RopeNodes {
       // we're slicing within a single node
       if (startIdx == endIdx) {
         int offset = offsetFor(startIdx, pointOffsets);
-        Object child = RopeNodes.slice(nodes[startIdx], editor, start - offset, end - offset);
+        Object child = RopeNodes.slice(nodes[startIdx], start - offset, end - offset);
         if (shift > SHIFT_INCREMENT) {
           return (Node) child;
         } else {
@@ -248,7 +248,7 @@ public class RopeNodes {
         // first partial node
         int sLower = offsetFor(startIdx, pointOffsets);
         int sUpper = offsetFor(startIdx + 1, pointOffsets);
-        rn.pushLast(RopeNodes.slice(nodes[startIdx], editor, start - sLower, sUpper - sLower));
+        rn.pushLast(RopeNodes.slice(nodes[startIdx], start - sLower, sUpper - sLower));
 
         // intermediate full nodes
         for (int i = startIdx + 1; i < endIdx; i++) {
@@ -257,7 +257,7 @@ public class RopeNodes {
 
         // last partial node
         int eLower = offsetFor(endIdx, pointOffsets);
-        rn.pushLast(RopeNodes.slice(nodes[endIdx], editor, 0, end - eLower));
+        rn.pushLast(RopeNodes.slice(nodes[endIdx], 0, end - eLower));
       }
 
       return rn;

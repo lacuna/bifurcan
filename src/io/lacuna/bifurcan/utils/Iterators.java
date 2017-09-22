@@ -7,6 +7,8 @@ import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.LongFunction;
 import java.util.function.Predicate;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 /**
  * @author ztellman
@@ -24,6 +26,18 @@ public class Iterators {
     @Override
     public Object next() {
       throw new NoSuchElementException();
+    }
+  };
+
+  public static final PrimitiveIterator.OfInt EMPTY_INT = new PrimitiveIterator.OfInt() {
+    @Override
+    public int nextInt() {
+      throw new NoSuchElementException();
+    }
+
+    @Override
+    public boolean hasNext() {
+      return false;
     }
   };
 
@@ -115,6 +129,10 @@ public class Iterators {
       @Override
       public V next() {
         prime();
+        if (next == NONE) {
+          throw new NoSuchElementException();
+        }
+
         V val = (V) next;
         next = NONE;
         return val;
@@ -224,4 +242,5 @@ public class Iterators {
       return stack;
     }
   }
+
 }

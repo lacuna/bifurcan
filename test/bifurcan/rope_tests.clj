@@ -88,15 +88,17 @@
                (str (.substring a 0 s) (.substring a e (count a)))))
    :concat str})
 
-(defn compare-outcomes [actions]
-  (let [a (u/apply-actions actions (Rope/from "") rope-actions)
-        b (u/apply-actions actions "" string-actions)]
-   [a b (= (str a) b)]))
-
 (u/def-collection-check test-rope iterations actions
   [a (Rope/from "") rope-actions
    b "" string-actions]
   (= (str a) b))
+
+;;;
+
+(defn compare-outcomes [actions]
+  (let [a (u/apply-actions actions (Rope/from "") rope-actions)
+        b (u/apply-actions actions "" string-actions)]
+   [a b (= (str a) b)]))
 
 (defn ->tree [^RopeNodes$Node n]
   (let [nodes (.numNodes n)]

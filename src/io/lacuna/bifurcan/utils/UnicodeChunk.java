@@ -109,16 +109,9 @@ public class UnicodeChunk {
     return newChunk;
   }
 
-  public static byte[] concat(byte[]... chunks) {
-    byte[] chunk = chunks[0];
-    for (int i = 1; i < chunks.length; i++) {
-      chunk = concat(chunk, chunks[i]);
-    }
-    return chunk;
-  }
-
   public static byte[] slice(byte[] chunk, int start, int end) {
     if (end > numCodePoints(chunk) || start < 0) {
+      System.out.println(start + " " + end + " " + numCodePoints(chunk));
       throw new IllegalArgumentException("slice range out of bounds");
     } else if (start == 0 && end == numCodePoints(chunk)) {
       return chunk;
@@ -166,6 +159,37 @@ public class UnicodeChunk {
 
   public static int numCodeUnits(byte[] chunk) {
     return chunk[1] & 0xFF;
+  }
+
+  public static int writeCodeUnits(char[] array, int offset, byte[] chunk) {
+    for (int aryIdx = offset, chunkIdx = 2; chunkIdx < chunk.length; ) {
+      byte b = chunk[chunkIdx];
+      if (b >= 0) {
+        array[aryIdx++] = (char) b;
+        chunkIdx++;
+      } else {
+        int codePoint = decode(chunk, chunkIdx);
+        chunkIdx += encodedLength(codePoint);
+        if (isBmpCodePoint(codePoint)) {
+          array[aryIdx++] = (char) codePoint;
+        } else {
+          array[aryIdx++] = highSurrogate(codePoint);
+          array[aryIdx++] = lowSurrogate(codePoint);
+        }
+      }
+    }
+
+    return numCodeUnits(chunk);
+  }
+
+  public static int writeCodePoints(int[] array, int offset, byte[] chunk) {
+    for (int aryIdx = offset, chunkIdx = 2; chunkIdx < chunk.length; ) {
+      int codePoint = decode(chunk, chunkIdx);
+      array[aryIdx++] = codePoint;
+      chunkIdx += encodedLength(codePoint);
+    }
+
+    return numCodePoints(chunk);
   }
 
   ///

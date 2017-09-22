@@ -1,6 +1,7 @@
 package io.lacuna.bifurcan.hash;
 
 import java.nio.ByteBuffer;
+import java.util.Iterator;
 
 /**
  * @author ztellman
@@ -23,6 +24,24 @@ public class PerlHash {
       key += buf.get(i) & 0xFF;
       key += key << 10;
       key ^= key >>> 6;
+    }
+    key += key << 3;
+    key ^= key >>> 11;
+    key += key << 15;
+
+    return key;
+  }
+
+  public static int hash(int seed, Iterator<ByteBuffer> buffers) {
+    int key = seed;
+
+    while (buffers.hasNext()) {
+      ByteBuffer buf = buffers.next();
+      for (int i = 0; i < buf.remaining(); i++) {
+        key += buf.get(i) & 0xFF;
+        key += key << 10;
+        key ^= key >>> 6;
+      }
     }
     key += key << 3;
     key ^= key >>> 11;
