@@ -93,6 +93,21 @@
    b "" string-actions]
   (= (str a) b))
 
+(defn sign [x]
+  (cond
+    (< x 0) -1
+    (= x 0) 0
+    (< 0 x) 1))
+
+(defspec test-compare iterations
+  (prop/for-all [a (gen/vector gen-code-point 0 256)
+                 b (gen/vector gen-code-point 0 256)]
+    (let [a' (codepoints->str a)
+          b' (codepoints->str b)]
+      (=
+        (sign (compare a b))
+        (sign (compare (Rope/from a') (Rope/from b')))))))
+
 ;;;
 
 (defn compare-outcomes [actions]

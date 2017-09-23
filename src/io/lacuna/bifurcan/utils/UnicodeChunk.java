@@ -289,7 +289,7 @@ public class UnicodeChunk {
     return length;
   }
 
-  private static int encodedLength(byte leadingByte) {
+  public static int encodedLength(byte leadingByte) {
     int mask = 0b001000000;
     for (int i = 1; ; i++) {
       if ((leadingByte & mask) == 0) {

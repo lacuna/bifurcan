@@ -21,12 +21,13 @@ import static java.lang.Character.isLowSurrogate;
 
 /**
  * A tree-based immutable string representation, indexed on full Unicode code points rather than Java's UTF-16 code
- * units.  It allows for near constant-time {@code insert()} and {@code remove()} calls, and can be converted in
- * constant time to a Java {@code CharSequence} via {@code toCharSequence()}.
+ * units.  Storage at the leaves uses UTF-8 encoding.  It allows for near constant-time {@code insert()} and
+ * {@code remove()} calls, and can be converted in constant time to a Java {@code CharSequence}
+ * via {@code toCharSequence()}.
  *
  * @author ztellman
  */
-public class Rope implements ILinearizable<Rope>, IForkable<Rope> {
+public class Rope implements ILinearizable<Rope>, IForkable<Rope>, Comparable<Rope> {
 
   final Object editor = new Object();
   public Node root;
@@ -260,22 +261,128 @@ public class Rope implements ILinearizable<Rope>, IForkable<Rope> {
 
   @Override
   public boolean equals(Object obj) {
-
-    if (obj == this) {
+    if (this == obj) {
       return true;
     }
 
     if (obj instanceof Rope) {
-      Rope r = (Rope) obj;
-      return root.numCodeUnits() == r.root.numCodeUnits()
-              && root.numCodePoints() == r.root.numCodePoints()
-              && IntIterators.equals(codePoints(), r.codePoints());
+      Rope o = (Rope) obj;
+      if (size() == o.size() || root.numCodeUnits() == o.root.numCodeUnits()) {
+        return size() == 0 || equals(chunks(), o.chunks());
+      }
     }
-
     return false;
   }
 
+  @Override
+  public int compareTo(Rope o) {
+    if (this == o) {
+      return 0;
+    }
+
+    if (size() != o.size()) {
+      return size() - o.size();
+    }
+
+    if (size() == 0) {
+      return 0;
+    }
+
+    return compare(chunks(), o.chunks());
+  }
+
   ////
+
+  private boolean equals(Iterator<byte[]> a, Iterator<byte[]> b) {
+    byte[] x = a.next();
+    byte[] y = b.next();
+
+    int i = 2;
+    int j = 2;
+    for (;;) {
+
+      int len = Math.min(x.length - i, y.length - j);
+      for (int k = 0; k < len; i++, j++, k++) {
+        if (x[i] != y[j]) {
+          return false;
+        }
+      }
+
+      if (i == x.length) {
+        if (!a.hasNext()) {
+          break;
+        }
+        x = a.next();
+        i = 2;
+      }
+
+      if (j == y.length) {
+        if (!b.hasNext()) {
+          break;
+        }
+        y = b.next();
+        j = 2;
+      }
+    }
+
+    return true;
+  }
+
+  private int compare(Iterator<byte[]> a, Iterator<byte[]> b) {
+
+    byte[] x = a.next();
+    byte[] y = b.next();
+
+    int i = 2;
+    int j = 2;
+    for (;;) {
+
+      while (i < x.length && j < y.length) {
+        byte bi = x[i];
+        byte bj = y[j];
+        if (bi >= 0) {
+          if (bi != bj) {
+            return (bi & 0xFF) - (bj & 0xFF);
+          }
+          i++;
+          j++;
+        } else {
+          int li = UnicodeChunk.encodedLength(bi);
+          int lj = UnicodeChunk.encodedLength(bj);
+          if (li != lj) {
+            return li - lj;
+          }
+
+          for (int k = 0; k < li; k++, i++, j++) {
+            bi = x[i];
+            bj = y[j];
+            if (bi != bj) {
+              return (bi & 0xFF) - (bj & 0xFF);
+            }
+          }
+        }
+      }
+
+      if (i == x.length) {
+        if (!a.hasNext()) {
+          break;
+        }
+        x = a.next();
+        i = 2;
+      }
+
+      if (j == y.length) {
+        if (!b.hasNext()) {
+          break;
+        }
+        y = b.next();
+        j = 2;
+      }
+
+    }
+
+    return 0;
+  }
 
   private Iterator<byte[]> chunks() {
     return new Iterator<byte[]>() {
@@ -317,5 +424,4 @@ public class Rope implements ILinearizable<Rope>, IForkable<Rope> {
       }
     };
   }
-
 }
