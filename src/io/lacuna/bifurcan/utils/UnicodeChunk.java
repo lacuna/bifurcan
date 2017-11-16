@@ -2,6 +2,7 @@ package io.lacuna.bifurcan.utils;
 
 import java.nio.charset.Charset;
 import java.util.PrimitiveIterator;
+import java.util.PrimitiveIterator.OfInt;
 
 import static java.lang.Character.*;
 import static java.lang.System.arraycopy;
@@ -16,6 +17,10 @@ public class UnicodeChunk {
 
   public static final byte[] EMPTY = new byte[]{0, 0};
 
+  public static final byte[] LENGTHS = new byte[]{
+          1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+          0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 3, 3, 4, 0};
+
   public static byte[] from(CharSequence cs) {
     return from(cs, 0, cs.length());
   }
@@ -26,9 +31,23 @@ public class UnicodeChunk {
     }
 
     int numBytes = 0;
-    int[] codePoints = new int[cs.length()];
-    int codePointIdx = 0;
-    for (int charIdx = start; charIdx < end; codePointIdx++) {
+    int numCodePoints = 0;
+    for (int charIdx = start; charIdx < end; numCodePoints++) {
+      char c = cs.charAt(charIdx);
+      if (isHighSurrogate(c)) {
+        numBytes += 4;
+        charIdx += 2;
+      } else {
+        numBytes += encodedLength(c & 0xFFFF);
+        charIdx += 1;
+      }
+    }
+
+    byte[] chunk = new byte[numBytes + 2];
+    chunk[0] = (byte) numCodePoints;
+    chunk[1] = (byte) (end - start);
+
+    for (int charIdx = start, offset = 2; charIdx < end; ) {
       char c = cs.charAt(charIdx);
       int codePoint;
       if (isHighSurrogate(c)) {
@@ -39,16 +58,6 @@ public class UnicodeChunk {
         charIdx += 1;
       }
       numBytes += encodedLength(codePoint);
-      codePoints[codePointIdx] = codePoint;
-    }
-
-    byte[] chunk = new byte[numBytes + 2];
-    chunk[0] = (byte) codePointIdx;
-    chunk[1] = (byte) (end - start);
-
-    int offset = 2;
-    for (int i = 0; i < codePointIdx; i++) {
-      int codePoint = codePoints[i];
       offset += overwrite(chunk, offset, codePoint);
     }
 
@@ -83,7 +92,7 @@ public class UnicodeChunk {
     char[] cs = new char[numCodeUnits(chunk)];
     for (int bi = 2, ci = 0; ci < cs.length; ) {
       int codePoint = decode(chunk, bi);
-      bi += codePoint < 0x80 ? 1 : encodedLength(chunk[bi]);
+      bi += codePoint < 0x80 ? 1 : prefixLength(chunk[bi]);
 
       if (isBmpCodePoint(codePoint)) {
         cs[ci++] = (char) codePoint;
@@ -109,25 +118,43 @@ public class UnicodeChunk {
     return newChunk;
   }
 
+  public static byte[] insert(byte[] a, byte[] b, int idx) {
+    if (numCodeUnits(a) + numCodeUnits(b) > 255) {
+      throw new IllegalArgumentException("cannot create a chunk larger than 255 UTF-16 code units");
+    }
+
+    int offset = offset(a, idx);
+    byte[] newChunk = new byte[a.length + b.length - 2];
+    arraycopy(a, 2, newChunk, 2, offset - 2);
+    arraycopy(b, 2, newChunk, offset, b.length - 2);
+    arraycopy(a, offset, newChunk, offset + b.length - 2, a.length - offset);
+    newChunk[0] = (byte) (numCodePoints(a) + numCodePoints(b));
+    newChunk[1] = (byte) (numCodeUnits(a) + numCodeUnits(b));
+
+    return newChunk;
+  }
+
   public static byte[] slice(byte[] chunk, int start, int end) {
-    if (end > numCodePoints(chunk) || start < 0) {
-      System.out.println(start + " " + end + " " + numCodePoints(chunk));
-      throw new IllegalArgumentException("slice range out of bounds");
+
+    if (start == end) {
+      return EMPTY;
     } else if (start == 0 && end == numCodePoints(chunk)) {
       return chunk;
     }
 
-    int startOffset = offset(chunk, start);
+    int startOffset;
     int codeUnits = 0;
     int endOffset;
     if (isAscii(chunk)) {
+      startOffset = start + 2;
       endOffset = end + 2;
       codeUnits = end - start;
     } else {
+      startOffset = offset(chunk, start);
       endOffset = startOffset;
       for (int i = start; i < end; i++) {
         byte b = chunk[endOffset];
-        int len = b >= 0 ? 1 : encodedLength(b);
+        int len = b >= 0 ? 1 : prefixLength(b);
         codeUnits += len == 4 ? 2 : 1;
         endOffset += len;
       }
@@ -159,6 +186,103 @@ public class UnicodeChunk {
 
   public static int numCodeUnits(byte[] chunk) {
     return chunk[1] & 0xFF;
+  }
+
+  public static OfInt codePointIterator(byte[] chunk) {
+    return new OfInt() {
+      private int idx = 2;
+
+      @Override
+      public int nextInt() {
+        int codePoint = decode(chunk, idx);
+        idx += prefixLength(chunk[idx]);
+        return codePoint;
+      }
+
+      @Override
+      public boolean hasNext() {
+        return idx < chunk.length;
+      }
+    };
+  }
+
+  public static OfInt reverseCodePointIterator(byte[] chunk) {
+    return new OfInt() {
+      int idx = chunk.length;
+
+      @Override
+      public int nextInt() {
+        while ((chunk[idx] & 0b11000000) == 0b10000000) {
+          idx--;
+        }
+        int codePoint = decode(chunk, idx);
+        idx--;
+        return codePoint;
+      }
+
+      @Override
+      public boolean hasNext() {
+        return idx > 2;
+      }
+    };
+  }
+
+  public static OfInt codeUnitIterator(byte[] chunk) {
+    return new OfInt() {
+      OfInt it = codePointIterator(chunk);
+      short low = -1;
+
+      @Override
+      public int nextInt() {
+        if (low == -1) {
+          int codePoint = it.nextInt();
+          if (codePoint < 0x10000) {
+            return codePoint;
+          } else {
+            low = (short) Character.lowSurrogate(codePoint);
+            return Character.highSurrogate(codePoint);
+          }
+        } else {
+          int val = low;
+          low = -1;
+          return val;
+        }
+      }
+
+      @Override
+      public boolean hasNext() {
+        return low != -1 || it.hasNext();
+      }
+    };
+  }
+
+  public static OfInt reverseCodeUnitIterator(byte[] chunk) {
+    return new OfInt() {
+      OfInt it = codePointIterator(chunk);
+      short high = -1;
+
+      @Override
+      public int nextInt() {
+        if (high == -1) {
+          int codePoint = it.nextInt();
+          if (codePoint < 0x10000) {
+            return codePoint;
+          } else {
+            high = (short) Character.highSurrogate(codePoint);
+            return Character.lowSurrogate(codePoint);
+          }
+        } else {
+          int val = high;
+          high = -1;
+          return val;
+        }
+      }
+
+      @Override
+      public boolean hasNext() {
+        return high != -1 || it.hasNext();
+      }
+    };
   }
 
   public static int writeCodeUnits(char[] array, int offset, byte[] chunk) {
@@ -208,7 +332,7 @@ public class UnicodeChunk {
         idx--;
         offset++;
       } else {
-        int len = encodedLength(b);
+        int len = prefixLength(b);
         int codeUnits = 1 << (len >> 2);
         idx -= codeUnits;
         if (idx < 0) {
@@ -234,7 +358,7 @@ public class UnicodeChunk {
       if (b >= 0) {
         offset++;
       } else {
-        offset += encodedLength(b);
+        offset += prefixLength(b);
       }
     }
     return offset;
@@ -289,14 +413,8 @@ public class UnicodeChunk {
     return length;
   }
 
-  public static int encodedLength(byte leadingByte) {
-    int mask = 0b001000000;
-    for (int i = 1; ; i++) {
-      if ((leadingByte & mask) == 0) {
-        return i;
-      }
-      mask >>= 1;
-    }
+  public static int prefixLength(byte prefix) {
+    return LENGTHS[(prefix & 0xFF) >> 3];
   }
 
   private static int decode(byte[] array, int offset) {
@@ -305,7 +423,7 @@ public class UnicodeChunk {
       return b;
     }
 
-    int len = encodedLength(b);
+    int len = prefixLength(b);
     int codePoint = b & ((1 << (7 - len)) - 1);
 
     for (int i = offset + 1; i < offset + len; i++) {
@@ -314,6 +432,4 @@ public class UnicodeChunk {
 
     return codePoint;
   }
-
-
 }

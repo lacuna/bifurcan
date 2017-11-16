@@ -13,7 +13,7 @@ public class PerlHash {
   }
 
   public static int hash(int seed, ByteBuffer buf) {
-    return hash(seed, buf, 0, buf.remaining());
+    return hash(seed, buf, buf.position(), buf.remaining());
   }
 
   public static int hash(int seed, ByteBuffer buf, int offset, int len) {
@@ -37,7 +37,7 @@ public class PerlHash {
 
     while (buffers.hasNext()) {
       ByteBuffer buf = buffers.next();
-      for (int i = 0; i < buf.remaining(); i++) {
+      for (int i = buf.position(); i < buf.limit(); i++) {
         key += buf.get(i) & 0xFF;
         key += key << 10;
         key ^= key >>> 6;

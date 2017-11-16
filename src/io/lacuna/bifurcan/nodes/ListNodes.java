@@ -211,25 +211,13 @@ public class ListNodes {
         }
         return newNode;
 
-        // we're down one level
-      } else if (shift == node.shift - SHIFT_INCREMENT) {
+        // we're below
+      } else if (shift < node.shift) {
         return node.addFirst(editor, this);
 
-        // we're up one level
-      } else if (shift == node.shift + SHIFT_INCREMENT) {
-        return addLast(editor, node);
-
-        // we're down multiple levels
-      } else if (shift < node.shift) {
-        return new Node(editor, false, shift + SHIFT_INCREMENT)
-            .addLast(editor, this)
-            .concat(editor, node);
-
-        // we're up multiple levels
+        // we're above
       } else {
-        return concat(editor,
-                new Node(editor, false, node.shift + SHIFT_INCREMENT)
-                        .addLast(editor, node));
+        return addLast(editor, node);
       }
     }
 

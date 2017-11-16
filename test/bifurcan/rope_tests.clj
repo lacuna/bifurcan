@@ -63,7 +63,7 @@
    :concat [gen-string-unicode]})
 
 (def rope-actions
-  {:insert (fn [^Rope r idx s]
+  {:insert (fn [^Rope r idx ^String s]
              (.insert r (min (.size r) idx) s))
    :remove (fn [^Rope r s e]
              (let [[s e] (sort [s e])
@@ -79,25 +79,33 @@
                    idx (.offsetByCodePoints a 0 (min cnt idx))]
                (str (.substring a 0 idx) b (.substring a idx (count a)))))
    :remove (fn [^String a s e]
-             (let [cnt (.codePointCount a 0 (count a))
+             (let [cnt   (.codePointCount a 0 (count a))
                    [s e] (sort [s e])
-                   s (max 0 (min (dec cnt) s))
-                   e (min cnt e)
-                   s (.offsetByCodePoints a 0 s)
-                   e (.offsetByCodePoints a 0 e)]
+                   s     (max 0 (min (dec cnt) s))
+                   e     (min cnt e)
+                   s     (.offsetByCodePoints a 0 s)
+                   e     (.offsetByCodePoints a 0 e)]
                (str (.substring a 0 s) (.substring a e (count a)))))
    :concat str})
 
 (u/def-collection-check test-rope iterations actions
   [a (Rope/from "") rope-actions
    b "" string-actions]
-  (= (str a) b))
+  (if (= (str a) b)
+    true
+    (do
+      (prn (count b))
+      false)))
 
 (defn sign [x]
   (cond
     (< x 0) -1
     (= x 0) 0
     (< 0 x) 1))
+
+(defspec test-roundtrip iterations
+  (prop/for-all [points (gen/vector gen-code-point 0 256)]
+    (= points (-> points codepoints->str Rope/from .codePoints iterator-seq vec))))
 
 (defspec test-compare iterations
   (prop/for-all [a (gen/vector gen-code-point 0 256)
@@ -117,12 +125,12 @@
 
 (defn ->tree [^RopeNodes$Node n]
   (let [nodes (.numNodes n)]
-    {:shift (.shift n)
-     :units (take nodes (.unitOffsets n))
+    {:shift  (.shift n)
+     :units  (take nodes (.unitOffsets n))
      :points (take nodes (.pointOffsets n))
-     :nodes (->> n
-              .nodes
-              (take nodes)
-              (map #(if (instance? RopeNodes$Node %)
-                      (->tree %)
-                      (UnicodeChunk/toString %))))}))
+     :nodes  (->> n
+               .nodes
+               (take nodes)
+               (map #(if (instance? RopeNodes$Node %)
+                       (->tree %)
+                       (when % (UnicodeChunk/toString %)))))}))

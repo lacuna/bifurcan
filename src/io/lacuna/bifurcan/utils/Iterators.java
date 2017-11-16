@@ -29,18 +29,6 @@ public class Iterators {
     }
   };
 
-  public static final PrimitiveIterator.OfInt EMPTY_INT = new PrimitiveIterator.OfInt() {
-    @Override
-    public int nextInt() {
-      throw new NoSuchElementException();
-    }
-
-    @Override
-    public boolean hasNext() {
-      return false;
-    }
-  };
-
   /**
    * A utility class for dynamically appending and prepending iterators to a collection, which itself can be iterated
    * over.
@@ -95,6 +83,27 @@ public class Iterators {
       }
     }
     return true;
+  }
+
+  public static <V> Iterator<V> singleton(V val) {
+    return new Iterator<V>() {
+      boolean consumed = false;
+
+      @Override
+      public boolean hasNext() {
+        return !consumed;
+      }
+
+      @Override
+      public V next() {
+        if (!consumed) {
+          consumed = true;
+          return val;
+        } else {
+          throw new NoSuchElementException();
+        }
+      }
+    };
   }
 
   /**
@@ -241,6 +250,10 @@ public class Iterators {
       }
       return stack;
     }
+  }
+
+  public static <V> Stream<V> toStream(Iterator<V> it, long estimatedSize) {
+    return StreamSupport.stream(Spliterators.spliterator(it, estimatedSize, Spliterator.ORDERED), false);
   }
 
 }

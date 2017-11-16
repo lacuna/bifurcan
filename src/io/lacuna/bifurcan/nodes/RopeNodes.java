@@ -17,43 +17,72 @@ public class RopeNodes {
     byte[] update(int offset, byte[] chunk);
   }
 
-  public static Object slice(Object chunk, int start, int end) {
+  public static Object slice(Object chunk, int start, int end, Object editor) {
     if (chunk instanceof byte[]) {
       return UnicodeChunk.slice((byte[]) chunk, start, end);
     } else {
-      return ((Node) chunk).slice(start, end);
+      return ((Node) chunk).slice(start, end, editor);
     }
   }
 
   public static int numCodeUnits(Object node) {
-    return node instanceof Node ? ((Node) node).numCodeUnits() : UnicodeChunk.numCodeUnits((byte[]) node);
+    if (node instanceof byte[]) {
+      return UnicodeChunk.numCodeUnits((byte[]) node);
+    } else {
+      return ((Node) node).numCodeUnits();
+    }
   }
 
   public static int numCodePoints(Object node) {
-    return node instanceof Node ? ((Node) node).numCodePoints() : UnicodeChunk.numCodePoints((byte[]) node);
+    if (node instanceof byte[]) {
+      return UnicodeChunk.numCodePoints((byte[]) node);
+    } else {
+      return ((Node) node).numCodePoints();
+    }
+  }
+
+  public static Node concat(Node a, Object b, Object editor) {
+    if (b instanceof byte[]) {
+      return a.pushLast((byte[]) b, editor);
+    } else {
+      return a.concat((Node) b, editor);
+    }
   }
 
   public static class Node {
 
-    Object editor;
     public byte shift;
     public int[] unitOffsets;
     public int[] pointOffsets;
     public Object[] nodes;
     public int numNodes;
+    public final Object editor;
 
     // constructors
 
     public Node(Object editor, int shift) {
-      this.editor = editor;
       this.shift = (byte) shift;
       this.unitOffsets = new int[2];
       this.pointOffsets = new int[2];
       this.nodes = new Object[2];
       this.numNodes = 0;
+      this.editor = editor;
     }
 
-    private Node() {
+    private Node(Object editor) {
+      this.editor = editor;
+    }
+
+    private static Node from(Object editor, int shift, Node child) {
+      return new Node(editor, shift).pushLast(child, editor);
+    }
+
+    private static Node from(Object editor, int shift, Node a, Node b) {
+      return new Node(editor, shift).pushLast(a, editor).pushLast(b, editor);
+    }
+
+    private static Node from(Object editor, byte[] child) {
+      return new Node(editor, SHIFT_INCREMENT).pushLast(child, editor);
     }
 
     // lookup
@@ -119,34 +148,20 @@ public class RopeNodes {
     }
 
     public int numCodeUnits() {
-      return unitOffsets[numNodes - 1];
+      return numNodes == 0 ? 0 : unitOffsets[numNodes - 1];
     }
 
     public int numCodePoints() {
-      return pointOffsets[numNodes - 1];
+      return numNodes == 0 ? 0 : pointOffsets[numNodes - 1];
     }
 
     // update
 
-    private boolean isFull(int idx, int shift) {
-      Object n = nodes[idx];
-      if (n instanceof Node) {
-        Node rn = (Node) n;
-        return rn.shift <= shift || (rn.numNodes == MAX_BRANCHES && rn.isFull(MAX_BRANCHES - 1, shift));
-      } else {
-        return true;
+    public Node update(int offset, int idx, Object editor, ChunkUpdater updater) {
+
+      if (numNodes == 0) {
+        return null;
       }
-    }
-
-    public Node addLast(Object editor, Object node) {;
-      return (editor == this.editor ? this : clone(editor)).pushLast(node);
-    }
-
-    public Node addFirst(Object editor, Object node) {
-      return (editor == this.editor ? this : clone(editor)).pushFirst(node);
-    }
-
-    public Node update(Object editor, int offset, int idx, ChunkUpdater updater) {
 
       int nodeIdx = numNodes - 1;
       int nodeOffset = offsetFor(nodeIdx, pointOffsets);
@@ -160,10 +175,10 @@ public class RopeNodes {
       int numPoints = RopeNodes.numCodePoints(child);
 
       Object newChild = shift == SHIFT_INCREMENT
-          ? updater.update(offset + nodeOffset, (byte[]) child)
-          : ((Node) child).update(editor, offset + nodeOffset, idx - nodeOffset, updater);
+              ? updater.update(offset + nodeOffset, (byte[]) child)
+              : ((Node) child).update(offset + nodeOffset, idx - nodeOffset, editor, updater);
 
-      if (newChild == null  ) {
+      if (newChild == null) {
         return null;
       }
 
@@ -181,191 +196,240 @@ public class RopeNodes {
       return node;
     }
 
-    // misc
+    public Node concat(Node node, Object editor) {
 
-    public Node concat(Object editor, Node node) {
-
-      if (numCodeUnits() == 0) {
-        return node;
-      } else if (node.numCodeUnits() == 0) {
+      if (node.numCodeUnits() == 0) {
         return this;
+      } else if (numCodeUnits() == 0) {
+        return node;
       }
 
-      // same level
       if (shift == node.shift) {
-        Node newNode = clone(editor);
-        for (int i = 0; i < node.numNodes; i++) {
-          newNode = newNode.pushLast(node.nodes[i]);
+
+        Node newNode = this.editor == editor ? this : clone(editor);
+
+        if (node.shift == SHIFT_INCREMENT) {
+          for (int i = 0; i < node.numNodes; i++) {
+            newNode = newNode.pushLast((byte[]) node.nodes[i], editor);
+          }
+        } else {
+          for (int i = 0; i < node.numNodes; i++) {
+            newNode = newNode.pushLast((Node) node.nodes[i], editor);
+          }
         }
+
         return newNode;
+      }
 
-        // we're down one level
-      } else if (shift == node.shift - SHIFT_INCREMENT) {
-        return node.addFirst(editor, this);
-
-        // we're up one level
-      } else if (shift == node.shift + SHIFT_INCREMENT) {
-        return addLast(editor, node);
-
-        // we're down multiple levels
-      } else if (shift < node.shift) {
-        return new Node(editor, shift + SHIFT_INCREMENT)
-                .addLast(editor, this)
-                .concat(editor, node);
-
-        // we're up multiple levels
+      if (shift < node.shift) {
+        return node.pushFirst(this, editor);
       } else {
-        return concat(editor,
-                new Node(editor, node.shift + SHIFT_INCREMENT)
-                        .addLast(editor, node));
+        return pushLast(node, editor);
       }
     }
 
-     public Node slice(int start, int end) {
+    public Node slice(int start, int end, Object editor) {
 
       if (start == end) {
-        return new Node(new Object(), SHIFT_INCREMENT).pushLast(UnicodeChunk.EMPTY);
+        return new Node(editor, SHIFT_INCREMENT);
       }
 
       int startIdx = indexFor(start, pointOffsets);
       int endIdx = indexFor(end - 1, pointOffsets);
 
-      Node rn = new Node(editor, shift);
-
       // we're slicing within a single node
       if (startIdx == endIdx) {
         int offset = offsetFor(startIdx, pointOffsets);
-        Object child = RopeNodes.slice(nodes[startIdx], start - offset, end - offset);
+        Object child = RopeNodes.slice(nodes[startIdx], start - offset, end - offset, editor);
         if (shift > SHIFT_INCREMENT) {
           return (Node) child;
         } else {
-          rn.pushLast(child);
+          return from(editor, (byte[]) child);
         }
 
         // we're slicing across multiple nodes
       } else {
 
+        Node newNode = new Node(editor, SHIFT_INCREMENT);
+
         // first partial node
         int sLower = offsetFor(startIdx, pointOffsets);
         int sUpper = offsetFor(startIdx + 1, pointOffsets);
-        rn.pushLast(RopeNodes.slice(nodes[startIdx], start - sLower, sUpper - sLower));
+        newNode = RopeNodes.concat(newNode, RopeNodes.slice(nodes[startIdx], start - sLower, sUpper - sLower, editor), editor);
 
         // intermediate full nodes
         for (int i = startIdx + 1; i < endIdx; i++) {
-          rn.pushLast(nodes[i]);
+          newNode = RopeNodes.concat(newNode, nodes[i], editor);
         }
 
         // last partial node
         int eLower = offsetFor(endIdx, pointOffsets);
-        rn.pushLast(RopeNodes.slice(nodes[endIdx], 0, end - eLower));
+        return RopeNodes.concat(newNode, RopeNodes.slice(nodes[endIdx], 0, end - eLower, editor), editor);
       }
-
-      return rn;
     }
 
     ///
 
-    public Node pushLast(Object child) {
+    public Node pushLast(byte[] chunk, Object editor) {
 
-      boolean isNode = child instanceof Node;
-
-      if (isNode && ((Node) child).shift > shift) {
-        return ((Node) child).addFirst(editor, this);
+      if (numCodeUnits() == 0 && shift > SHIFT_INCREMENT) {
+        return pushLast(from(editor, chunk), editor);
       }
 
-      int childShift = !isNode ? 0 : ((Node) child).shift;
-      boolean isFull = numNodes == 0 || isFull(numNodes - 1, shift);
-
-      // we need to add a new level
-      if (numNodes == MAX_BRANCHES && isFull) {
-        return new Node(editor, shift + SHIFT_INCREMENT)
-                .pushLast(this)
-                .pushLast(child);
+      Node[] stack = new Node[shift / SHIFT_INCREMENT];
+      stack[0] = this;
+      for (int i = 1; i < stack.length; i++) {
+        Node n = stack[i - 1];
+        stack[i] = (Node) n.nodes[n.numNodes - 1];
       }
 
-      int numUnits = RopeNodes.numCodeUnits(child);
-      int numPoints = RopeNodes.numCodePoints(child);
+      boolean isFull = stack[stack.length - 1].numNodes == MAX_BRANCHES;
 
-      // we need to append
+      // we need to grow a parent
       if (isFull) {
-
-        if (childShift < shift - SHIFT_INCREMENT) {
-          child = new Node(editor, shift - SHIFT_INCREMENT).pushLast(child);
-        }
-
-        int lastIdx = numNodes;
-        if (numNodes == nodes.length) {
-          grow(nodes.length << 1);
-        }
-
-        nodes[lastIdx] = child;
-        unitOffsets[lastIdx] = offsetFor(lastIdx, unitOffsets) + numUnits;
-        pointOffsets[lastIdx] = offsetFor(lastIdx, pointOffsets) + numPoints;
-        numNodes++;
-
-        // we need to go deeper
-      } else {
-        int lastIdx = numNodes - 1;
-        nodes[lastIdx] = ((Node) nodes[lastIdx]).addLast(editor, child);
-        unitOffsets[lastIdx] += numUnits;
-        pointOffsets[lastIdx] += numPoints;
+        return numNodes == MAX_BRANCHES
+                ? new Node(editor, shift + SHIFT_INCREMENT).pushLast(this, editor).pushLast(chunk, editor)
+                : pushLast(new Node(editor, SHIFT_INCREMENT).pushLast(chunk, editor), editor);
       }
 
-      return this;
+      int numCodePoints = UnicodeChunk.numCodePoints(chunk);
+      int numCodeUnits = UnicodeChunk.numCodeUnits(chunk);
+
+      for (int i = 0; i < stack.length; i++) {
+        if (stack[i].editor != editor) {
+          stack[i] = stack[i].clone(editor);
+        }
+      }
+
+      Node parent = stack[stack.length - 1];
+      if (parent.nodes.length == parent.numNodes) {
+        parent.grow(parent.numNodes << 1);
+      }
+      parent.unitOffsets[parent.numNodes] = parent.numCodeUnits();
+      parent.pointOffsets[parent.numNodes] = parent.numCodePoints();
+      parent.numNodes++;
+
+      for (int i = 0; i < stack.length; i++) {
+        Node n = stack[i];
+        int lastIdx = n.numNodes - 1;
+        n.nodes[lastIdx] = i == stack.length - 1 ? chunk : stack[i + 1];
+        n.unitOffsets[lastIdx] += numCodeUnits;
+        n.pointOffsets[lastIdx] += numCodePoints;
+      }
+
+      return stack[0];
     }
 
-    public Node pushFirst(Object child) {
+    public Node pushLast(Node node, Object editor) {
 
-      boolean isNode = child instanceof Node;
-
-      if (isNode && ((Node) child).shift > shift) {
-        return ((Node) child).addLast(editor, this);
+      if (node.numCodeUnits() == 0) {
+        return this;
       }
 
-      int childShift = !isNode ? 0 : ((Node) child).shift;
-      boolean isFull = numNodes == 0 || isFull(0, shift);
-
-      // we need to add a new level
-      if (numNodes == MAX_BRANCHES && isFull) {
-        return new Node(editor, shift + SHIFT_INCREMENT).pushLast(child).pushLast(this);
+      if (shift < node.shift) {
+        return node.pushFirst(this, editor);
+      } else if (shift == node.shift) {
+        return from(editor, shift + SHIFT_INCREMENT, this, node);
       }
 
-      int numUnits = RopeNodes.numCodeUnits(child);
-      int numPoints = RopeNodes.numCodePoints(child);
+      Node[] stack = new Node[(shift - node.shift) / SHIFT_INCREMENT];
+      stack[0] = this;
+      for (int i = 1; i < stack.length; i++) {
+        Node n = stack[i - 1];
+        stack[i] = (Node) n.nodes[n.numNodes - 1];
+      }
 
-      // we need to prepend
-      if (isFull) {
+      // we need to grow a parent
+      if (stack[stack.length - 1].numNodes == MAX_BRANCHES) {
+        return pushLast(from(editor, node.shift + SHIFT_INCREMENT, node), editor);
+      }
 
-        if (childShift < shift - SHIFT_INCREMENT) {
-          child = new Node(editor, shift - SHIFT_INCREMENT).pushLast(child);
-        }
+      int numCodePoints = node.numCodePoints();
+      int numCodeUnits = node.numCodeUnits();
 
-        if (numNodes == nodes.length) {
-          grow(nodes.length << 1);
-        }
-
-        arraycopy(nodes, 0, nodes, 1, nodes.length - 1);
-        nodes[0] = child;
-        for (int i = numNodes; i > 0; i--) {
-          unitOffsets[i] = unitOffsets[i - 1] + numUnits;
-          pointOffsets[i] = pointOffsets[i - 1] + numPoints;
-        }
-        unitOffsets[0] = numUnits;
-        pointOffsets[0] = numPoints;
-        numNodes++;
-
-        // we need to go deeper
-      } else {
-        Node rn = (Node) nodes[0];
-        nodes[0] = rn.addFirst(editor, child);
-
-        for (int i = 0; i < numNodes; i++) {
-          unitOffsets[i] += numUnits;
-          pointOffsets[i] += numPoints;
+      for (int i = 0; i < stack.length; i++) {
+        if (stack[i].editor != editor) {
+          stack[i] = stack[i].clone(editor);
         }
       }
 
-      return this;
+      Node parent = stack[stack.length - 1];
+      if (parent.shift - node.shift != SHIFT_INCREMENT) {
+        throw new IllegalStateException();
+      }
+
+      if (parent.nodes.length == parent.numNodes) {
+        parent.grow(parent.numNodes << 1);
+      }
+      parent.unitOffsets[parent.numNodes] = parent.numCodeUnits();
+      parent.pointOffsets[parent.numNodes] = parent.numCodePoints();
+      parent.numNodes++;
+
+      for (int i = 0; i < stack.length; i++) {
+        Node n = stack[i];
+        int lastIdx = n.numNodes - 1;
+        n.nodes[lastIdx] = i == stack.length - 1 ? node : stack[i + 1];
+        n.unitOffsets[lastIdx] += numCodeUnits;
+        n.pointOffsets[lastIdx] += numCodePoints;
+      }
+
+      return stack[0];
+    }
+
+    public Node pushFirst(Node node, Object editor) {
+
+      if (node.numCodeUnits() == 0) {
+        return this;
+      }
+
+      if (shift < node.shift) {
+        return node.pushLast(this, editor);
+      } else if (shift == node.shift) {
+        return from(editor, shift + SHIFT_INCREMENT, node, this);
+      }
+
+      Node[] stack = new Node[(shift - node.shift) / SHIFT_INCREMENT];
+      stack[0] = this;
+      for (int i = 1; i < stack.length; i++) {
+        Node n = stack[i - 1];
+        stack[i] = (Node) n.nodes[0];
+      }
+
+      // we need to grow a parent
+      if (stack[stack.length - 1].numNodes == MAX_BRANCHES) {
+        return pushFirst(from(editor, node.shift + SHIFT_INCREMENT, node), editor);
+      }
+
+      int numCodePoints = node.numCodePoints();
+      int numCodeUnits = node.numCodeUnits();
+
+      for (int i = 0; i < stack.length; i++) {
+        if (stack[i].editor != editor) {
+          stack[i] = stack[i].clone(editor);
+        }
+      }
+
+      Node parent = stack[stack.length - 1];
+      if (parent.nodes.length == parent.numNodes) {
+        parent.grow(parent.numNodes << 1);
+      }
+      arraycopy(parent.nodes, 0, parent.nodes, 1, parent.numNodes);
+      arraycopy(parent.unitOffsets, 0, parent.unitOffsets, 1, parent.numNodes);
+      arraycopy(parent.pointOffsets, 0, parent.pointOffsets, 1, parent.numNodes);
+      parent.numNodes++;
+      parent.unitOffsets[0] = 0;
+      parent.pointOffsets[0] = 0;
+
+      for (int i = 0; i < stack.length; i++) {
+        Node n = stack[i];
+        n.nodes[0] = i == stack.length - 1 ? node : stack[i + 1];
+        for (int j = 0; j < n.numNodes; j++) {
+          n.unitOffsets[j] += numCodeUnits;
+          n.pointOffsets[j] += numCodePoints;
+        }
+      }
+
+      return stack[0];
     }
 
     private void grow(int len) {
@@ -384,8 +448,8 @@ public class RopeNodes {
     }
 
     public Node clone(Object editor) {
-      Node n = new Node();
-      n.editor = editor;
+
+      Node n = new Node(editor);
       n.shift = shift;
       n.unitOffsets = unitOffsets.clone();
       n.pointOffsets = pointOffsets.clone();

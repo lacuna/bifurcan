@@ -11,31 +11,28 @@ import io.lacuna.bifurcan.utils.UnicodeChunk;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.PrimitiveIterator;
-import java.util.Spliterator;
-import java.util.Spliterators;
 import java.util.stream.IntStream;
-import java.util.stream.StreamSupport;
 
 import static io.lacuna.bifurcan.nodes.RopeNodes.MAX_CHUNK_CODE_UNITS;
+import static java.lang.Character.isHighSurrogate;
 import static java.lang.Character.isLowSurrogate;
 
 /**
- * A tree-based immutable string representation, indexed on full Unicode code points rather than Java's UTF-16 code
- * units.  Storage at the leaves uses UTF-8 encoding.  It allows for near constant-time {@code insert()} and
- * {@code remove()} calls, and can be converted in constant time to a Java {@code CharSequence}
+ * A tree-based immutable string representation, indexed on both full Unicode code points and Java's UTF-16 code
+ * units.  Storage at the leaves uses UTF-8 encoding.  It allows for efficient {@code insert}, {@code remove},
+ * {@code slice}, and {@code concat} calls, and can be converted in constant time to a Java {@code CharSequence}
  * via {@code toCharSequence()}.
  *
  * @author ztellman
  */
-public class Rope implements ILinearizable<Rope>, IForkable<Rope>, Comparable<Rope> {
+public class Rope implements Comparable<Rope> {
 
-  final Object editor = new Object();
+  private final Object editor;
   public Node root;
-  final boolean linear;
 
-  private Rope(Node node, boolean linear) {
+  Rope(Object editor, Node node) {
+    this.editor = editor;
     this.root = node;
-    this.linear = linear;
   }
 
   /**
@@ -43,42 +40,37 @@ public class Rope implements ILinearizable<Rope>, IForkable<Rope>, Comparable<Ro
    * @return a corresponding {@code Rope} representation
    */
   public static Rope from(CharSequence cs) {
-    Node root = new Node(new Object(), RopeNodes.SHIFT_INCREMENT);
 
-    if (cs.length() == 0) {
-      root.pushLast(UnicodeChunk.EMPTY);
-    } else {
-      chunks(cs).forEachRemaining(root::pushLast);
+    Object editor = new Object();
+    Node root = new Node(editor, RopeNodes.SHIFT_INCREMENT);
+
+    if (cs.length() > 0) {
+      Iterator<byte[]> it = chunks(cs);
+      while (it.hasNext()) {
+        root = root.pushLast(it.next(), editor);
+      }
     }
 
-    return new Rope(root, false);
+    return new Rope(editor, root);
+
   }
 
-  /**
-   * @return the concatenation of this rope and {@code rope}
-   */
   public Rope concat(Rope rope) {
-    return new Rope(root.concat(new Object(), rope.root), linear);
+    Object editor = new Object();
+    return new Rope(editor, root.concat(rope.root, editor));
   }
 
-  /**
-   * @return the code point at {@code idx}
-   */
   public int nth(int idx) {
     return root.nthPoint(idx);
   }
 
-  /**
-   * @return the number of code points in the rope
-   */
   public int size() {
     return root.numCodePoints();
   }
 
-  /**
-   * @return a Rope without the code points within {@code [start, end)}
-   */
   public Rope remove(int start, int end) {
+
+    Object editor = new Object();
 
     if (end < start || start < 0 || end > size()) {
       throw new IllegalArgumentException("[" + start + ", " + end + ") is not a valid range");
@@ -87,7 +79,7 @@ public class Rope implements ILinearizable<Rope>, IForkable<Rope>, Comparable<Ro
     }
 
     // try to update a single leaf
-    Node newRoot = root.update(editor, 0, start, (offset, chunk) -> {
+    Node newRoot = root.update(0, start, editor, (offset, chunk) -> {
       int len = UnicodeChunk.numCodePoints(chunk);
       if (end < offset + len) {
         return UnicodeChunk.concat(
@@ -99,20 +91,22 @@ public class Rope implements ILinearizable<Rope>, IForkable<Rope>, Comparable<Ro
     });
 
     if (newRoot == null) {
-      return slice(0, start).concat(slice(end, size()));
-    } else if (linear) {
-      root = newRoot;
-      return this;
-    } else {
-      return new Rope(newRoot, false);
+      newRoot = root.slice(0, start, editor).concat(root.slice(end, size(), editor), editor);
     }
+    return new Rope(editor, newRoot);
   }
 
   private Rope insert(final int index, Iterator<byte[]> chunks, int numCodeUnits) {
 
+    if (index < 0 || index > size()) {
+      throw new IndexOutOfBoundsException();
+    }
+
+    Object editor = new Object();
+
     // can we just update a single leaf node?
     if (numCodeUnits < MAX_CHUNK_CODE_UNITS) {
-      Node newRoot = root.update(editor, 0, index, (offset, chunk) -> {
+      Node newRoot = root.update(0, index, editor, (offset, chunk) -> {
         if (numCodeUnits + UnicodeChunk.numCodeUnits(chunk) <= MAX_CHUNK_CODE_UNITS) {
           byte[] newChunk = UnicodeChunk.slice(chunk, 0, index - offset);
           while (chunks.hasNext()) {
@@ -126,35 +120,28 @@ public class Rope implements ILinearizable<Rope>, IForkable<Rope>, Comparable<Ro
 
       // success!
       if (newRoot != null) {
-        if (linear) {
-          root = newRoot;
-          return this;
-        } else {
-          return new Rope(newRoot, false);
-        }
+        return new Rope(editor, newRoot);
       }
     }
 
-    Node newRoot = root.slice(0, index);
-    chunks.forEachRemaining(newRoot::pushLast);
-    newRoot = newRoot.concat(editor, root.slice(index, root.numCodePoints()));
+    Node newRoot = root.slice(0, index, editor);
+    while (chunks.hasNext()) {
+      newRoot = newRoot.pushLast(chunks.next(), editor);
+    }
+    newRoot = newRoot.concat(root.slice(index, size(), editor), editor);
 
-    return new Rope(newRoot, linear);
+    return new Rope(editor, newRoot);
   }
 
-  /**
-   * @return inserts the code points in {@code rope} starting at {@code index}
-   */
   public Rope insert(int index, Rope rope) {
     if (rope.size() == 0) {
       return this;
     }
+
     return insert(index, rope.chunks(), rope.root.numCodeUnits());
+
   }
 
-  /**
-   * @return inserts the code points in {@code cs} starting at {@code index}
-   */
   public Rope insert(int index, CharSequence cs) {
     if (cs.length() == 0) {
       return this;
@@ -162,42 +149,34 @@ public class Rope implements ILinearizable<Rope>, IForkable<Rope>, Comparable<Ro
     return insert(index, chunks(cs), cs.length());
   }
 
-  /**
-   * @return returns the code points within {@code [start, end)}
-   */
   public Rope slice(int start, int end) {
     if (end < start || start < 0 || end > size()) {
       throw new IllegalArgumentException("[" + start + ", " + end + ") is not a valid range");
     }
 
-    return new Rope(root.slice(start, end), linear);
+    Object editor = new Object();
+
+    return new Rope(editor, root.slice(start, end, editor));
   }
 
-  /**
-   * @return an iterator of {@code ByteBuffer} objects corresponding to a UTF-8 encoding of the rope
-   */
   public Iterator<ByteBuffer> bytes() {
     return Iterators.map(chunks(), ary -> ByteBuffer.wrap(ary, 2, ary.length - 2).slice());
   }
 
-  public PrimitiveIterator.OfInt chars() {
-    Iterator<char[]> codeUnits = Iterators.map(chunks(), chunk -> {
-      char[] array = new char[UnicodeChunk.numCodeUnits(chunk)];
-      UnicodeChunk.writeCodeUnits(array, 0, chunk);
-      return array;
-    });
+  public PrimitiveIterator.OfInt reverseChars() {
+    return IntIterators.flatMap(reverseChunks(), UnicodeChunk::reverseCodeUnitIterator);
+  }
 
-    return IntIterators.flatMap(codeUnits, ary -> IntIterators.range(ary.length, i -> ary[(int) i]));
+  public PrimitiveIterator.OfInt chars() {
+    return IntIterators.flatMap(chunks(), UnicodeChunk::codeUnitIterator);
+  }
+
+  public PrimitiveIterator.OfInt reverseCodePoints() {
+    return IntIterators.flatMap(reverseChunks(), UnicodeChunk::reverseCodePointIterator);
   }
 
   public PrimitiveIterator.OfInt codePoints() {
-    Iterator<int[]> codePoints = Iterators.map(chunks(), chunk -> {
-      int[] array = new int[UnicodeChunk.numCodePoints(chunk)];
-      UnicodeChunk.writeCodePoints(array, 0, chunk);
-      return array;
-    });
-
-    return IntIterators.flatMap(codePoints, ary -> IntIterators.range(ary.length, i -> ary[(int) i]));
+    return IntIterators.flatMap(chunks(), UnicodeChunk::codePointIterator);
   }
 
   @Override
@@ -234,24 +213,14 @@ public class Rope implements ILinearizable<Rope>, IForkable<Rope>, Comparable<Ro
 
       @Override
       public IntStream chars() {
-        return StreamSupport.intStream(Spliterators.spliterator(Rope.this.chars(), root.numCodeUnits(), Spliterator.ORDERED), false);
+        return IntIterators.toStream(Rope.this.chars(), root.numCodeUnits());
       }
 
       @Override
       public IntStream codePoints() {
-        return StreamSupport.intStream(Spliterators.spliterator(Rope.this.codePoints(), root.numCodePoints(), Spliterator.ORDERED), false);
+        return IntIterators.toStream(Rope.this.codePoints(), root.numCodePoints());
       }
     };
-  }
-
-  @Override
-  public Rope forked() {
-    return linear ? new Rope(root, false) : this;
-  }
-
-  @Override
-  public Rope linear() {
-    return linear ? this : new Rope(root, true);
   }
 
   @Override
@@ -263,125 +232,45 @@ public class Rope implements ILinearizable<Rope>, IForkable<Rope>, Comparable<Ro
   public boolean equals(Object obj) {
     if (this == obj) {
       return true;
+    } else if (obj instanceof Rope) {
+      return Ropes.equals(this, (Rope) obj);
+    } else {
+      return false;
     }
-
-    if (obj instanceof Rope) {
-      Rope o = (Rope) obj;
-      if (size() == o.size() || root.numCodeUnits() == o.root.numCodeUnits()) {
-        return size() == 0 || equals(chunks(), o.chunks());
-      }
-    }
-    return false;
   }
 
   @Override
   public int compareTo(Rope o) {
     if (this == o) {
       return 0;
-    }
-
-    if (size() != o.size()) {
+    } else if (size() != o.size()) {
       return size() - o.size();
-    }
-
-    if (size() == 0) {
+    } else if (size() == 0) {
       return 0;
+    } else {
+      return Ropes.compare(bytes(), o.bytes());
     }
-
-    return compare(chunks(), o.chunks());
   }
 
   ////
 
-  private boolean equals(Iterator<byte[]> a, Iterator<byte[]> b) {
-    byte[] x = a.next();
-    byte[] y = b.next();
+  private Iterator<byte[]> reverseChunks() {
+    return new Iterator<byte[]>() {
 
-    int i = 2;
-    int j = 2;
-    for (;;) {
+      int idx = size() - 1;
 
-      int len = Math.min(x.length - i, y.length - j);
-      for (int k = 0; k < len; i++, j++, k++) {
-        if (x[i] != y[j]) {
-          return false;
-        }
+      @Override
+      public boolean hasNext() {
+        return idx > 0;
       }
 
-      if (i == x.length) {
-        if (!a.hasNext()) {
-          break;
-        }
-        x = a.next();
-        i = 2;
+      @Override
+      public byte[] next() {
+        byte[] chunk = root.chunkFor(idx);
+        idx -= UnicodeChunk.numCodePoints(chunk);
+        return chunk;
       }
-
-      if (j == y.length) {
-        if (!b.hasNext()) {
-          break;
-        }
-        y = b.next();
-        j = 2;
-      }
-    }
-
-    return true;
-  }
-
-  private int compare(Iterator<byte[]> a, Iterator<byte[]> b) {
-
-    byte[] x = a.next();
-    byte[] y = b.next();
-
-    int i = 2;
-    int j = 2;
-    for (;;) {
-
-      while (i < x.length && j < y.length) {
-        byte bi = x[i];
-        byte bj = y[j];
-        if (bi >= 0) {
-          if (bi != bj) {
-            return (bi & 0xFF) - (bj & 0xFF);
-          }
-          i++;
-          j++;
-        } else {
-          int li = UnicodeChunk.encodedLength(bi);
-          int lj = UnicodeChunk.encodedLength(bj);
-          if (li != lj) {
-            return li - lj;
-          }
-
-          for (int k = 0; k < li; k++, i++, j++) {
-            bi = x[i];
-            bj = y[j];
-            if (bi != bj) {
-              return (bi & 0xFF) - (bj & 0xFF);
-            }
-          }
-        }
-      }
-
-      if (i == x.length) {
-        if (!a.hasNext()) {
-          break;
-        }
-        x = a.next();
-        i = 2;
-      }
-
-      if (j == y.length) {
-        if (!b.hasNext()) {
-          break;
-        }
-        y = b.next();
-        j = 2;
-      }
-
-    }
-
-    return 0;
+    };
   }
 
   private Iterator<byte[]> chunks() {
@@ -403,7 +292,7 @@ public class Rope implements ILinearizable<Rope>, IForkable<Rope>, Comparable<Ro
     };
   }
 
-  private static Iterator<byte[]> chunks(CharSequence cs) {
+  public static Iterator<byte[]> chunks(CharSequence cs) {
     return new Iterator<byte[]>() {
       int offset = 0;
 
@@ -414,11 +303,11 @@ public class Rope implements ILinearizable<Rope>, IForkable<Rope>, Comparable<Ro
 
       @Override
       public byte[] next() {
-        int end = Math.min(cs.length(), offset + MAX_CHUNK_CODE_UNITS);
-        if (end < cs.length() && isLowSurrogate(cs.charAt(end))) {
+        int start = offset;
+        int end = Math.min(cs.length(), start + MAX_CHUNK_CODE_UNITS);
+        if (end < cs.length() && isHighSurrogate(cs.charAt(end - 1))) {
           end--;
         }
-        int start = offset;
         offset = end;
         return UnicodeChunk.from(cs, start, end);
       }

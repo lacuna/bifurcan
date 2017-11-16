@@ -5,6 +5,7 @@ import io.lacuna.bifurcan.LinearList;
 import java.util.*;
 import java.util.PrimitiveIterator.OfInt;
 import java.util.function.*;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -163,5 +164,9 @@ public class IntIterators {
    */
   public static OfInt range(long max, LongToIntFunction f) {
     return range(0, max, f);
+  }
+
+  public static IntStream toStream(OfInt it, long estimatedSize) {
+    return StreamSupport.intStream(Spliterators.spliterator(it, estimatedSize, Spliterator.ORDERED), false);
   }
 }

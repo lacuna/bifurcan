@@ -24,7 +24,8 @@
     ArrayList
     ArrayDeque
     Collection
-    Iterator]
+    Iterator
+    PrimitiveIterator$OfInt]
    [io.lacuna.bifurcan
     IntMap
     Map
@@ -37,7 +38,8 @@
     LinearList
     LinearMap
     LinearSet
-    IMap$IEntry]))
+    IMap$IEntry
+    Rope]))
 
 (set! *warn-on-reflection* true)
 
@@ -50,6 +52,15 @@
   (reify BiPredicate
     (test [_ a b]
       (clojure.lang.Util/equiv a b))))
+
+(defmacro doary-int
+  "An array-specific version of doseq."
+  [[x ary] & body]
+  (let [ary-sym (gensym "ary")]
+    `(let [~(with-meta ary-sym {:tag "ints"}) ~ary]
+       (dotimes [idx# (alength ~ary-sym)]
+         (let [~x (aget ~ary-sym idx#)]
+           ~@body)))))
 
 ;;;
 
@@ -121,6 +132,12 @@
   (loop [x nil]
     (if (.hasNext it)
       (recur (or (.next it) x))
+      x)))
+
+(defn consume-int-iterator [^PrimitiveIterator$OfInt it]
+  (loop [x nil]
+    (if (.hasNext it)
+      (recur (or (.nextInt it) x))
       x)))
 
 (defn consume-entry-iterator [^Iterator it]
@@ -224,6 +241,33 @@
         (.remove m x)))
     m))
 
+(defn insert-string [^String a ^String b ^long idx]
+  (let [idx (.offsetByCodePoints a 0 idx)]
+    (.concat
+      (.concat
+        (.substring a 0 idx)
+        b)
+      (.substring a idx (.length a)))))
+
+(defn remove-string [^String a ^long start ^long end]
+  (let [start' (.offsetByCodePoints a 0 start)
+        end'   (.offsetByCodePoints a start' (- end start))]
+    (.concat
+      (.substring a 0 start')
+      (.substring a end' (.length a)))))
+
+(defn concat-string [^String a ^String b]
+  (.concat a b))
+
+(defn insert-rope [^Rope a ^Rope b ^long idx]
+  (.insert a idx b))
+
+(defn remove-rope [^Rope a ^long start ^long end]
+  (.remove a start end))
+
+(defn concat-rope [^Rope a ^Rope b]
+  (.concat a b))
+
 ;;;
 
 ;; a simple object that exists to provide minimal overhead within a hashmap
@@ -237,6 +281,14 @@
 
 (defn generate-numbers [n]
   (->> n range shuffle into-array))
+
+(defn generate-string [n]
+  (let [is (->> [0 0x80 0x800 0x10000]
+             cycle
+             (take n)
+             shuffle
+             int-array)]
+    (String. ^ints is 0 (int n))))
 
 ;;;
 
@@ -395,33 +447,64 @@
    :lookup lookup-clojure-vector
    :concat concat-clojure-vectors})
 
+(def java-string
+  {:label "String"
+   :base (constantly "")
+   :lookup #(doary-int [i %2]
+              (.codePointAt ^String %1 (.offsetByCodePoints ^String %1 0 i)))
+   :indices range
+   :entries generate-string
+   :construct concat-string
+   :consume consume-int-iterator
+   :iterator #(.iterator (.codePoints ^String %))
+   :concat concat-string
+   :remove remove-string
+   :insert insert-string})
+
+(def rope
+  {:label "Rope"
+   :base (constantly (Rope/from ""))
+   :lookup #(doary-int [i %2]
+              (.nth ^Rope %1 i))
+   :indices range
+   :entries generate-string
+   :construct #(.concat ^Rope %1 (Rope/from %2))
+   :consume consume-int-iterator
+   :iterator #(.codePoints ^Rope %)
+   :concat concat-rope
+   :remove remove-rope
+   :insert insert-rope})
+
 ;;;
 
 (def ^:dynamic *warmup* false)
 
 (defn benchmark [n f]
-  (-> (c/quick-benchmark* f
-        (merge
-          {:samples (long (max 30 (/ 80 (Math/log10 n))))
-           :target-execution-time 5e7}
-          (if *warmup*
-            {:samples 6
-             :warmup-jit-period 1e10
-             :target-execution-time 1e9}
-            {:warmup-jit-period 1e8})))
-    :mean
-    first
-    (* 1e9)
-    long))
+  (binding [c/*final-gc-problem-threshold* 0.1]
+    (-> (c/quick-benchmark* f
+          (merge
+            {:samples (long (max 30 (/ 80 (Math/log10 n))))
+             :target-execution-time 5e7}
+            (if *warmup*
+              {:samples 6
+               :warmup-jit-period 1e10
+               :target-execution-time 1e9}
+              {:warmup-jit-period 1e8})))
+      :mean
+      first
+      (* 1e9)
+      long)))
 
 (defn benchmark-construct [n {:keys [base entries construct]}]
   (let [s (entries n)]
     (benchmark n #(do (construct (base) s) nil))))
 
-(defn benchmark-lookup [n {:keys [base entries construct lookup]}]
+(defn benchmark-lookup [n {:keys [base indices entries construct lookup]}]
   (let [s (entries n)
         c (construct (base) s)
-        s (-> s seq shuffle into-array)]
+        s (if indices
+            (-> n indices shuffle int-array)
+            s)]
     (benchmark n #(lookup c s))))
 
 (defn benchmark-clone [n {:keys [base entries construct clone]}]
@@ -432,9 +515,31 @@
   (let [c (construct (base) (entries n))]
     (benchmark n #(consume (iterator c)))))
 
+(defn benchmark-iteration [n {:keys [base entries construct iterator consume] :as m}]
+  (let [c (construct (base) (entries n))]
+    (benchmark n #(consume (iterator c)))))
+
 (defn benchmark-concat [n {:keys [base entries construct concat]}]
-  (let [c (construct (base) (entries (/ n 2)))]
-    (benchmark n #(do (-> (base) (concat c) (concat c)) nil))))
+  (let [a (construct (base) (entries (/ n 2)))
+        b (construct (base) (entries (/ n 2)))]
+    (benchmark n #(do (-> (base) (concat a) (concat b)) nil))))
+
+(defn benchmark-insert [n {:keys [base entries construct insert]}]
+  (let [s       (construct (base) (entries n))
+        s'      (construct (base) (entries 1))
+        indices (->> n range shuffle int-array)]
+    (benchmark n
+      #(let-mutable [s s]
+         (doary-int [i indices]
+           (set! s (insert s s' (long i))))
+         s))))
+
+(defn benchmark-remove [n {:keys [base entries construct remove]}]
+  (let [s       (construct (base) (entries n))
+        indices (->> n range shuffle int-array)]
+    (benchmark n
+      #(doary-int [i indices]
+         (remove s (long i) (unchecked-inc (long i)))))))
 
 (defn benchmark-equals [n {:keys [label base entries construct add remove iterator]}]
   (let [n (long n)
@@ -490,11 +595,13 @@
 
 (def lists [linear-list bifurcan-list java-array-list clojure-vector])
 
-(def all-colls (concat maps sets lists))
+(def strings [java-string rope])
+
+(def all-colls (concat maps sets lists strings))
 
 (def bench->types
   {:construct    [benchmark-construct
-                  all-colls]
+                  (-> all-colls set (disj java-string rope))]
    :lookup       [benchmark-lookup
                   all-colls]
    :clone        [benchmark-clone
@@ -502,7 +609,7 @@
    :iteration    [benchmark-iteration
                   all-colls]
    :concat       [benchmark-concat
-                  lists]
+                  (concat lists strings)]
    :union        [benchmark-union
                   (concat maps sets)]
    :difference   [benchmark-difference
@@ -511,17 +618,24 @@
                   (concat maps sets)]
    :equals       [benchmark-equals
                   (concat maps sets)]
+   :insert       [benchmark-insert
+                  strings]
+   :remove       [benchmark-remove
+                  strings]
    })
 
 (defn run-benchmarks [n coll]
-  (let [bench->types bench->types #_(select-keys bench->types [:iteration])]
+  (let [bench->types bench->types #_(select-keys bench->types [:insert :remove])]
     (println "benchmarking:" n)
     (->> bench->types
       (map (fn [[k [f colls]]] [k (when (-> colls set (contains? coll)) (f n coll))]))
       (into {}))))
 
 (defn run-benchmark-suite [n log-step coll]
-  (let [log10 (Math/log10 n)
+  (let [n     (if (= coll java-string)
+                (min 1e4 n)
+                n)
+        log10 (Math/log10 n)
         sizes (->> log10 (* log-step) inc (range log-step) (map #(Math/pow 10 (/ % log-step))) (map long))]
     (prn (:label coll) sizes)
     (println "warming up...")
@@ -533,7 +647,7 @@
 ;;;
 
 (defn extract-csv [coll->n->benchmark->nanos benchmark colls scale]
-  (let [sizes          (-> coll->n->benchmark->nanos first val keys sort)
+  (let [sizes          (->> coll->n->benchmark->nanos vals (map keys) (sort-by count) last sort)
         coll->n->nanos (->> colls
                          (map :label)
                          (select-keys coll->n->benchmark->nanos)
@@ -573,6 +687,12 @@
    "map_iterate" [:iteration maps]
    "list_iterate" [:iteration lists]
    "set_iterate" [:iteration sets]
+
+   "string_lookup" [:lookup strings]
+   "string_insert" [:insert strings]
+   "string_remove" [:remove strings]
+   "string_concat" [:concat strings]
+   "string_iterate" [:iteration strings]
 
    "concat" [:concat lists]
 
@@ -621,9 +741,10 @@
     (let [[n step] args
           descriptor (->> (range (count all-colls))
                        (map (fn [idx]
-                              (let [coll (-> all-colls (nth idx) :label)]
-                                (println "benchmarking" coll)
-                                [coll (benchmark-collection (or n "1e6") (or step "1") idx)])))
+                              (when (#{java-string rope} (nth all-colls idx))
+                                (let [coll (-> all-colls (nth idx) :label)]
+                                  (println "benchmarking" coll)
+                                  [coll (benchmark-collection (or n "1e6") (or step "1") idx)]))))
                        (into {}))]
       (spit "benchmarks/benchmarks.edn" (pr-str descriptor))
       (write-out-csvs descriptor)))
