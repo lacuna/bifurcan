@@ -18,7 +18,7 @@ import static java.lang.System.arraycopy;
  */
 public class List<V> implements IList<V>, Cloneable {
 
-  public Node root;
+  private Node root;
   private byte prefixLen, suffixLen;
   public Object[] prefix, suffix;
 

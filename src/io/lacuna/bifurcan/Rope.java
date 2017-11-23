@@ -29,7 +29,7 @@ public class Rope implements Comparable<Rope>, ILinearizable<Rope>, IForkable<Ro
 
   private final boolean linear;
   private final Object editor;
-  public Node root;
+  private Node root;
 
   Rope(Object editor, Node node, boolean linear) {
     this.linear = linear;
