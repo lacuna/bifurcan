@@ -66,7 +66,7 @@ Since the sets are implemented in terms of their corresponding map, the behavior
 
 ## Strings
 
-Comparing `Rope` and Java's `String` isn't entirely fair, as `String` can only index on Unicode code points by performing a linear scan.  As expected, on larger collections this cost becomes intolerably large, and so all `String` benchmarks are truncated at 10k elements.  However, these benchmarks are still useful to demonstrate that the cost of `insert` and `remove` for `Rope` are `O(log N)` (shown as a linear trend on the horizontal log scale), and concatenation is near-constant.
+Comparing `Rope` and Java's `String` isn't entirely fair, as `String` can only index on Unicode code points by performing a linear scan.  As expected, on larger collections this cost becomes intolerably large, and so all `String` benchmarks are truncated at 10k elements.  However, these benchmarks are still useful to demonstrate that the cost of `insert` and `remove` for `Rope` are logarithmic (shown as a linear trend on the horizontal log scale), and concatenation is near-constant.
 
 ![](../benchmarks/images/string_insert.png)
 
