@@ -27,6 +27,8 @@ import static java.lang.Character.isLowSurrogate;
  */
 public class Rope implements Comparable<Rope>, ILinearizable<Rope>, IForkable<Rope> {
 
+  public static final Rope EMPTY = Rope.from("");
+
   private final boolean linear;
   private final Object editor;
   private Node root;
