@@ -1,5 +1,7 @@
 package io.lacuna.bifurcan.nodes;
 
+import io.lacuna.bifurcan.utils.Bits;
+
 import static java.lang.System.arraycopy;
 
 /**
@@ -9,6 +11,7 @@ public class ListNodes {
 
   private static final int SHIFT_INCREMENT = 5;
   private static final int MAX_BRANCHES = 1 << SHIFT_INCREMENT;
+  private static final int BRANCH_MASK = MAX_BRANCHES - 1;
 
   public static Object slice(Object node, Object editor, int start, int end) {
     if (node instanceof Object[]) {
@@ -16,7 +19,7 @@ public class ListNodes {
       arraycopy(node, start, ary, 0, ary.length);
       return ary;
     } else {
-      return ((Node) node).slice(editor, start, end);
+      return ((Node) node).slice(start, end, editor);
     }
   }
 
@@ -26,25 +29,28 @@ public class ListNodes {
     return ary;
   }
 
-  public static int nodeSize(Object node) {
-    return node instanceof Node ? ((Node) node).size() : ((Object[]) node).length;
+  public static Node pushLast(Node a, Object b, Object editor) {
+    if (b instanceof Node) {
+      return a.pushLast((Node) b, editor);
+    } else {
+      return a.pushLast((Object[]) b, editor);
+    }
   }
 
   public static class Node {
 
-    public final static Node EMPTY = new Node(new Object(), true, 5);
+    public final static Node EMPTY = new Node(new Object(), 5);
 
-    Object editor;
-    public boolean strict;
-    public byte shift;
+    public final byte shift;
+    public boolean isStrict;
     public int numNodes;
+    Object editor;
     public int[] offsets;
     public Object[] nodes;
 
     // constructors
 
-    public Node(Object editor, boolean strict, int shift) {
-      this.strict = strict;
+    public Node(Object editor, int shift) {
       this.editor = editor;
       this.shift = (byte) shift;
       this.numNodes = 0;
@@ -52,92 +58,91 @@ public class ListNodes {
       this.nodes = new Object[2];
     }
 
-    private Node() {
+    private Node(int shift) {
+      this.shift = (byte) shift;
     }
+
+    private static Node from(Object editor, int shift, Node child) {
+      return new Node(editor, shift).pushLast(child, editor);
+    }
+
+    private static Node from(Object editor, int shift, Node a, Node b) {
+      return new Node(editor, shift).pushLast(a, editor).pushLast(b, editor);
+    }
+
+    private static Node from(Object editor, Object[] child) {
+      return new Node(editor, SHIFT_INCREMENT).pushLast(child, editor);
+    }
+
 
     // lookup
 
-    public Object nth(int idx) {
-      return strict ? strictNth(idx) : relaxedNth(idx);
-    }
-
-    public Object[] arrayFor(int idx) {
-      return strict ? strictArrayFor(idx) : relaxedArrayFor(idx);
-    }
-
     public Object[] first() {
+
       if (numNodes == 0) {
         return null;
-      } else if (shift == SHIFT_INCREMENT) {
-        return (Object[]) nodes[0];
-      } else {
-        return ((Node) nodes[0]).first();
       }
+
+      Node n = this;
+      while (n.shift > SHIFT_INCREMENT) {
+        n = (Node) n.nodes[0];
+      }
+      return (Object[]) n.nodes[0];
     }
 
     public Object[] last() {
+
       if (numNodes == 0) {
         return null;
-      } else if (shift == SHIFT_INCREMENT) {
-        return (Object[]) nodes[numNodes - 1];
-      } else {
-        return ((Node) nodes[numNodes - 1]).last();
       }
-    }
 
-    private boolean isFull(int idx, int shift) {
-      Object n = nodes[idx];
-      if (n instanceof Node) {
-        Node rn = (Node) n;
-        return shift >= rn.shift || (rn.numNodes == MAX_BRANCHES && rn.isFull(MAX_BRANCHES - 1, shift));
-      } else {
-        return true;
-      }
-    }
-
-    private Object[] strictArrayFor(int idx) {
       Node n = this;
       while (n.shift > SHIFT_INCREMENT) {
-        n = (Node) n.nodes[(idx >>> n.shift) & (MAX_BRANCHES - 1)];
+        n = (Node) n.nodes[n.numNodes - 1];
       }
-      return (Object[]) n.nodes[(idx >>> SHIFT_INCREMENT) & (MAX_BRANCHES - 1)];
+      return (Object[]) n.nodes[n.numNodes - 1];
     }
 
-    private Object[] relaxedArrayFor(int idx) {
+    public Object nth(int idx, boolean returnChunk) {
+      if (!isStrict) {
+        return relaxedNth(idx, returnChunk);
+      }
+
       Node n = this;
       while (n.shift > SHIFT_INCREMENT) {
-        if (n.strict) {
-          return n.strictArrayFor(idx);
-        }
-        int nodeIdx = n.indexOf(idx);
-        idx -= n.offset(nodeIdx);
+        int nodeIdx = (idx >>> n.shift) & BRANCH_MASK;
         n = (Node) n.nodes[nodeIdx];
+
+        if (!n.isStrict) {
+          return n.relaxedNth(idx, returnChunk);
+        }
       }
-      return (Object[]) n.nodes[n.indexOf(idx)];
+
+      Object[] chunk = (Object[]) n.nodes[(idx >>> SHIFT_INCREMENT) & BRANCH_MASK];
+      return returnChunk ? chunk : chunk[idx & BRANCH_MASK];
     }
 
-    private Object relaxedNth(int idx) {
+    private Object relaxedNth(int idx, boolean returnChunk) {
+
+      // moved inside here to make nth() more inline-able
+      idx = idx & (int) Bits.maskBelow(shift + SHIFT_INCREMENT);
+
       Node n = this;
+
       while (n.shift > SHIFT_INCREMENT) {
-        if (n.strict) {
-          return n.strictNth(idx);
-        }
         int nodeIdx = n.indexOf(idx);
         idx -= n.offset(nodeIdx);
         n = (Node) n.nodes[nodeIdx];
       }
 
       int nodeIdx = n.indexOf(idx);
-      return ((Object[]) n.nodes[nodeIdx])[idx - n.offset(nodeIdx)];
-    }
-
-    private Object strictNth(int idx) {
-      return strictArrayFor(idx)[idx & (MAX_BRANCHES - 1)];
+      Object[] chunk = (Object[]) n.nodes[nodeIdx];
+      return returnChunk ? chunk : chunk[idx - n.offset(nodeIdx)];
     }
 
     private int indexOf(int idx) {
-      int estimate = (idx >> shift) & (MAX_BRANCHES - 1);
-      if (strict) {
+      int estimate = (idx >>> shift) & BRANCH_MASK;
+      if (isStrict) {
         return estimate;
       } else {
         for (int i = estimate; i < nodes.length; i++) {
@@ -150,11 +155,7 @@ public class ListNodes {
     }
 
     int offset(int idx) {
-      if (strict) {
-        return (32 << (shift - SHIFT_INCREMENT)) * idx;
-      } else {
-        return idx == 0 ? 0 : offsets[idx - 1];
-      }
+      return idx == 0 ? 0 : offsets[idx - 1];
     }
 
     // update
@@ -173,29 +174,13 @@ public class ListNodes {
       return this;
     }
 
-    public Node removeFirst(Object editor) {
-      return (editor == this.editor ? this : clone(editor)).popFirst();
-    }
-
-    public Node removeLast(Object editor) {
-      return (editor == this.editor ? this : clone(editor)).popLast();
-    }
-
-    public Node addLast(Object editor, Object chunk) {
-      return (editor == this.editor ? this : clone(editor)).pushLast(chunk);
-    }
-
-    public Node addFirst(Object editor, Object chunk) {
-      return (editor == this.editor ? this : clone(editor)).pushFirst(chunk);
-    }
-
     // misc
 
     public int size() {
       return numNodes == 0 ? 0 : offsets[numNodes - 1];
     }
 
-    public Node concat(Object editor, Node node) {
+    public Node concat(Node node, Object editor) {
 
       if (size() == 0) {
         return node;
@@ -205,32 +190,36 @@ public class ListNodes {
 
       // same level
       if (shift == node.shift) {
-        Node newNode = clone(editor);
+        Node newNode = editor == this.editor ? this : clone(editor);
+
         for (int i = 0; i < node.numNodes; i++) {
-          newNode = newNode.pushLast(node.nodes[i]);
+          newNode = ListNodes.pushLast(newNode, node.nodes[i], editor);
         }
+
         return newNode;
 
         // we're below
       } else if (shift < node.shift) {
-        return node.addFirst(editor, this);
+        return node.pushFirst(this, editor);
 
         // we're above
       } else {
-        return addLast(editor, node);
+        return pushLast(node, editor);
       }
     }
 
-    public Node slice(Object editor, int start, int end) {
+    public Node slice(int start, int end, Object editor) {
 
       if (start == end) {
         return EMPTY;
+      } else if (start == 0 && end == size()) {
+        return this;
       }
 
       int startIdx = indexOf(start);
       int endIdx = indexOf(end - 1);
 
-      Node rn = new Node(editor, false, shift);
+      Node rn = new Node(editor, shift);
 
       // we're slicing within a single node
       if (startIdx == endIdx) {
@@ -239,7 +228,7 @@ public class ListNodes {
         if (shift > SHIFT_INCREMENT) {
           return (Node) child;
         } else {
-          rn.pushLast(child);
+          rn = ListNodes.pushLast(rn, child, editor);
         }
 
         // we're slicing across multiple nodes
@@ -248,16 +237,16 @@ public class ListNodes {
         // first partial node
         int sLower = offset(startIdx);
         int sUpper = offset(startIdx + 1);
-        rn.pushLast(ListNodes.slice(nodes[startIdx], editor, start - sLower, sUpper - sLower));
+        rn = ListNodes.pushLast(rn, ListNodes.slice(nodes[startIdx], editor, start - sLower, sUpper - sLower), editor);
 
         // intermediate full nodes
         for (int i = startIdx + 1; i < endIdx; i++) {
-          rn.pushLast(nodes[i]);
+          rn = ListNodes.pushLast(rn, nodes[i], editor);
         }
 
         // last partial node
         int eLower = offset(endIdx);
-        rn.pushLast(ListNodes.slice(nodes[endIdx], editor, 0, end - eLower));
+        rn = ListNodes.pushLast(rn, ListNodes.slice(nodes[endIdx], editor, 0, end - eLower), editor);
       }
 
       return rn;
@@ -265,167 +254,286 @@ public class ListNodes {
 
     ///
 
-    private Node pushLast(Object child) {
+    public Node pushLast(Object[] chunk, Object editor) {
 
-      boolean isNode = child instanceof Node;
-
-      if (isNode && ((Node) child).shift > shift) {
-        return ((Node) child).addFirst(editor, this);
+      if (size() == 0 && shift > SHIFT_INCREMENT) {
+        return pushLast(from(editor, chunk), editor);
       }
 
-      int childShift = !isNode ? 0 : ((Node) child).shift;
-      boolean isFull = numNodes == 0 || isFull(numNodes - 1, childShift);
-
-      // we need to add a new level
-      if (numNodes == MAX_BRANCHES && isFull) {
-        return new Node(editor, strict, shift + SHIFT_INCREMENT).pushLast(this).pushLast(child);
+      Node[] stack = new Node[shift / SHIFT_INCREMENT];
+      stack[0] = this;
+      for (int i = 1; i < stack.length; i++) {
+        Node n = stack[i - 1];
+        stack[i] = (Node) n.nodes[n.numNodes - 1];
       }
 
-      int size = nodeSize(child);
+      // we need to grow a parent
+      if (stack[stack.length - 1].numNodes == MAX_BRANCHES) {
+        return numNodes == MAX_BRANCHES
+                ? new Node(editor, shift + SHIFT_INCREMENT).pushLast(this, editor).pushLast(chunk, editor)
+                : pushLast(new Node(editor, SHIFT_INCREMENT).pushLast(chunk, editor), editor);
+      }
 
-      // we need to append
-      if (isFull) {
-
-        strict = strict && ((!isNode && nodeSize(child) == MAX_BRANCHES) || (isNode && ((Node) child).strict));
-
-        if (childShift < shift - SHIFT_INCREMENT) {
-          child = new Node(editor, true, shift - SHIFT_INCREMENT).pushLast(child);
+      for (int i = 0; i < stack.length; i++) {
+        if (stack[i].editor != editor) {
+          stack[i] = stack[i].clone(editor);
         }
-
-        if (numNodes == nodes.length) {
-          grow();
-        }
-
-        nodes[numNodes] = child;
-        offsets[numNodes] = offset(numNodes) + size;
-        numNodes++;
-
-        // we need to go deeper
-      } else {
-        int idx = numNodes - 1;
-        nodes[idx] = ((Node) nodes[idx]).addLast(editor, child);
-        offsets[idx] += size;
       }
 
-      return this;
+      Node parent = stack[stack.length - 1];
+      if (parent.nodes.length == parent.numNodes) {
+        parent.grow();
+      }
+      parent.offsets[parent.numNodes] = parent.size();
+      parent.numNodes++;
+
+      for (int i = 0; i < stack.length; i++) {
+        Node n = stack[i];
+        int lastIdx = n.numNodes - 1;
+        n.nodes[lastIdx] = i == stack.length - 1 ? chunk : stack[i + 1];
+        n.offsets[lastIdx] += chunk.length;
+        n.updateStrict();
+      }
+
+      return stack[0];
     }
 
-    private Node pushFirst(Object child) {
+    public Node pushFirst(Object[] chunk, Object editor) {
 
-      boolean isNode = child instanceof Node;
-
-      if (isNode && ((Node) child).shift > shift) {
-        return ((Node) child).addLast(editor, this);
+      if (size() == 0 && shift > SHIFT_INCREMENT) {
+        return pushLast(chunk, editor);
       }
 
-      int childShift = !isNode ? 0 : ((Node) child).shift;
-      boolean isFull = numNodes == 0 || isFull(0, childShift);
-
-      // we need to add a new level
-      if (numNodes == MAX_BRANCHES && isFull) {
-        return new Node(editor, false, shift + SHIFT_INCREMENT).pushLast(child).pushLast(this);
+      Node[] stack = new Node[shift / SHIFT_INCREMENT];
+      stack[0] = this;
+      for (int i = 1; i < stack.length; i++) {
+        Node n = stack[i - 1];
+        stack[i] = (Node) n.nodes[0];
       }
 
-      int size = nodeSize(child);
+      // we need to grow a parent
+      if (stack[stack.length - 1].numNodes == MAX_BRANCHES) {
+        return numNodes == MAX_BRANCHES
+                ? new Node(editor, shift + SHIFT_INCREMENT).pushLast(chunk, editor).pushLast(this, editor)
+                : pushFirst(new Node(editor, SHIFT_INCREMENT).pushLast(chunk, editor), editor);
+      }
 
-      // we need to prepend
-      if (isFull) {
-
-        strict = strict && ((!isNode && nodeSize(child) == MAX_BRANCHES) || (isFull && isNode && ((Node) child).strict));
-
-        if (childShift < shift - SHIFT_INCREMENT) {
-          child = new Node(editor, false, shift - SHIFT_INCREMENT).pushLast(child);
-        }
-
-        if (numNodes == nodes.length) {
-          grow();
-        }
-
-        arraycopy(nodes, 0, nodes, 1, numNodes);
-        nodes[0] = child;
-        for (int i = numNodes; i > 0; i--) {
-          offsets[i] = offsets[i - 1] + size;
-        }
-        offsets[0] = size;
-        numNodes++;
-
-        // we need to go deeper
-      } else {
-        Node rn = (Node) nodes[0];
-        nodes[0] = rn.addFirst(editor, child);
-
-        for (int i = 0; i < numNodes; i++) {
-          offsets[i] += size;
+      for (int i = 0; i < stack.length; i++) {
+        if (stack[i].editor != editor) {
+          stack[i] = stack[i].clone(editor);
         }
       }
 
-      strict = false;
-      return this;
+      Node parent = stack[stack.length - 1];
+      if (parent.nodes.length == parent.numNodes) {
+        parent.grow();
+      }
+      arraycopy(parent.nodes, 0, parent.nodes, 1, parent.numNodes);
+      arraycopy(parent.offsets, 0, parent.offsets, 1, parent.numNodes);
+      parent.offsets[0] = 0;
+      parent.numNodes++;
+
+      for (int i = 0; i < stack.length; i++) {
+        Node n = stack[i];
+        n.nodes[0] = i == stack.length - 1 ? chunk : stack[i + 1];
+        for (int j = 0; j < n.numNodes; j++) {
+          n.offsets[j] += chunk.length;
+        }
+        n.updateStrict();
+      }
+
+      return stack[0];
     }
 
-    private Node popFirst() {
-      int delta = 0;
-      boolean shiftLeft = false;
-      if (numNodes == 0) {
+    public Node pushLast(Node node, Object editor) {
+
+      if (node.size() == 0) {
         return this;
-
-      } else if (shift == SHIFT_INCREMENT) {
-        delta = -offsets[0];
-        shiftLeft = true;
-
-      } else {
-        Node rn = (Node) nodes[0];
-        int prevSize = rn.size();
-        Node rnPrime = rn.popFirst();
-        delta = rnPrime.size() - prevSize;
-        shiftLeft = rnPrime.size() == 0;
-
-        nodes[0] = rnPrime;
       }
 
-      if (shiftLeft) {
-        numNodes--;
-        arraycopy(nodes, 1, nodes, 0, numNodes);
-        nodes[numNodes] = null;
-        for (int i = 0; i < numNodes; i++) {
-          offsets[i] = offsets[i + 1] + delta;
-        }
-        offsets[numNodes] = 0;
-      } else {
-        for (int i = 0; i < numNodes; i++) {
-          offsets[i] += delta;
+      if (shift < node.shift) {
+        return node.pushFirst(this, editor);
+      } else if (shift == node.shift) {
+        return from(editor, shift + SHIFT_INCREMENT, this, node);
+      }
+
+      Node[] stack = new Node[(shift - node.shift) / SHIFT_INCREMENT];
+      stack[0] = this;
+      for (int i = 1; i < stack.length; i++) {
+        Node n = stack[i - 1];
+        stack[i] = (Node) n.nodes[n.numNodes - 1];
+      }
+
+      // we need to grow a parent
+      if (stack[stack.length - 1].numNodes == MAX_BRANCHES) {
+        return pushLast(from(editor, node.shift + SHIFT_INCREMENT, node), editor);
+      }
+
+      for (int i = 0; i < stack.length; i++) {
+        if (stack[i].editor != editor) {
+          stack[i] = stack[i].clone(editor);
         }
       }
 
-      strict = false;
-      return this;
+      Node parent = stack[stack.length - 1];
+      if (parent.nodes.length == parent.numNodes) {
+        parent.grow();
+      }
+      parent.offsets[parent.numNodes] = parent.size();
+      parent.numNodes++;
+
+      int nSize = node.size();
+
+      for (int i = 0; i < stack.length; i++) {
+        Node n = stack[i];
+        int lastIdx = n.numNodes - 1;
+        n.nodes[lastIdx] = i == stack.length - 1 ? node : stack[i + 1];
+        n.offsets[lastIdx] += nSize;
+        n.updateStrict();
+      }
+
+      return stack[0];
     }
 
-    private Node popLast() {
-      if (numNodes == 0) {
+    public Node pushFirst(Node node, Object editor) {
+
+      if (node.size() == 0) {
         return this;
+      }
 
-      } else if (shift == SHIFT_INCREMENT) {
-        numNodes--;
-        nodes[numNodes] = null;
-        offsets[numNodes] = 0;
+      if (shift < node.shift) {
+        return node.pushLast(this, editor);
+      } else if (shift == node.shift) {
+        return from(editor, shift + SHIFT_INCREMENT, node, this);
+      }
 
-      } else {
-        Node rn = (Node) nodes[numNodes - 1];
-        int prevSize = rn.size();
-        Node rnPrime = rn.popLast();
+      Node[] stack = new Node[(shift - node.shift) / SHIFT_INCREMENT];
+      stack[0] = this;
+      for (int i = 1; i < stack.length; i++) {
+        Node n = stack[i - 1];
+        stack[i] = (Node) n.nodes[0];
+      }
 
-        if (rnPrime.size() == 0) {
-          numNodes--;
-          nodes[numNodes] = null;
-          offsets[numNodes] = 0;
+      // we need to grow a parent
+      if (stack[stack.length - 1].numNodes == MAX_BRANCHES) {
+        return pushFirst(from(editor, node.shift + SHIFT_INCREMENT, node), editor);
+      }
+
+      for (int i = 0; i < stack.length; i++) {
+        if (stack[i].editor != editor) {
+          stack[i] = stack[i].clone(editor);
+        }
+      }
+
+      Node parent = stack[stack.length - 1];
+      if (parent.nodes.length == parent.numNodes) {
+        parent.grow();
+      }
+      arraycopy(parent.nodes, 0, parent.nodes, 1, parent.numNodes);
+      arraycopy(parent.offsets, 0, parent.offsets, 1, parent.numNodes);
+      parent.numNodes++;
+      parent.offsets[0] = 0;
+
+      int nSize = node.size();
+
+      for (int i = 0; i < stack.length; i++) {
+        Node n = stack[i];
+        n.nodes[0] = i == stack.length - 1 ? node : stack[i + 1];
+        for (int j = 0; j < n.numNodes; j++) {
+          n.offsets[j] += nSize;
+        }
+        n.updateStrict();
+      }
+
+      return stack[0];
+    }
+
+    public Node popFirst(Object editor) {
+
+      Node[] stack = new Node[shift / SHIFT_INCREMENT];
+      stack[0] = editor == this.editor ? this : clone(editor);
+      for (int i = 1; i < stack.length; i++) {
+        Node n = stack[i - 1];
+        stack[i] = (Node) n.nodes[0];
+      }
+
+      Node parent = stack[stack.length - 1];
+      Object[] chunk = (Object[]) parent.nodes[0];
+
+      for (int i = 0; i < stack.length; i++) {
+        Node n = stack[i];
+        for (int j = 0; j < n.numNodes; j++) {
+          n.offsets[j] -= chunk.length;
+        }
+        n.updateStrict();
+
+        if (n.offsets[0] == 0) {
+
+          // shift everything left
+          n.numNodes--;
+          if (n.numNodes == 1 && n.shift > SHIFT_INCREMENT) {
+            return (Node) n.nodes[1];
+          }
+
+          arraycopy(n.nodes, 1, n.nodes, 0, n.numNodes);
+          arraycopy(n.offsets, 1, n.offsets, 0, n.numNodes);
+          n.nodes[n.numNodes] = null;
+          n.offsets[n.numNodes] = 0;
+
+          // no need to go any deeper
+          break;
         } else {
-          nodes[numNodes - 1] = rnPrime;
-          offsets[numNodes - 1] += rnPrime.size() - prevSize;
+          if (stack[i + 1].editor != editor) {
+            stack[i + 1] = stack[i + 1].clone(editor);
+          }
+          n.nodes[0] = stack[i + 1];
         }
       }
 
-      return this;
+      return stack[0];
+    }
+
+    public Node popLast(Object editor) {
+
+      Node[] stack = new Node[shift / SHIFT_INCREMENT];
+      stack[0] = editor == this.editor ? this : clone(editor);
+      for (int i = 1; i < stack.length; i++) {
+        Node n = stack[i - 1];
+        stack[i] = (Node) n.nodes[n.numNodes - 1];
+      }
+
+      Node parent = stack[stack.length - 1];
+      Object[] chunk = (Object[]) parent.nodes[parent.numNodes - 1];
+
+      for (int i = 0; i < stack.length; i++) {
+        Node n = stack[i];
+        int lastIdx = n.numNodes - 1;
+        n.offsets[lastIdx] -= chunk.length;
+
+        if (n.offset(lastIdx + 1) == n.offset(lastIdx)) {
+
+          // lop off the rightmost node
+          n.numNodes--;
+          if (n.numNodes == 1 && n.shift > SHIFT_INCREMENT) {
+            return (Node) n.nodes[0];
+          }
+
+          n.nodes[n.numNodes] = null;
+          n.offsets[n.numNodes] = 0;
+          n.updateStrict();
+
+          // no need to go any further
+          break;
+        } else {
+          if (stack[i + 1].editor != editor) {
+            stack[i + 1] = stack[i + 1].clone(editor);
+          }
+          n.nodes[lastIdx] = stack[i + 1];
+          n.updateStrict();
+        }
+      }
+
+      return stack[0];
     }
 
     private void grow() {
@@ -438,14 +546,16 @@ public class ListNodes {
       this.nodes = n;
     }
 
+    private void updateStrict() {
+      isStrict = numNodes <= 1 || offset(numNodes - 1) == (numNodes - 1) * (1 << shift);
+    }
+
     private Node clone(Object editor) {
-      Node n = new Node();
-      n.strict = strict;
+      Node n = new Node(shift);
       n.editor = editor;
       n.numNodes = numNodes;
       n.offsets = offsets.clone();
       n.nodes = nodes.clone();
-      n.shift = shift;
 
       return n;
     }

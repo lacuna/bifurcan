@@ -13,6 +13,8 @@ public class RopeNodes {
   public static final int MAX_BRANCHES = 1 << SHIFT_INCREMENT;
   public static final int MAX_CHUNK_CODE_UNITS = MAX_BRANCHES;
 
+  private static final Node EMPTY = new Node(new Object(), SHIFT_INCREMENT);
+
   public interface ChunkUpdater {
     byte[] update(int offset, byte[] chunk);
   }
@@ -41,7 +43,7 @@ public class RopeNodes {
     }
   }
 
-  public static Node concat(Node a, Object b, Object editor) {
+  public static Node pushLast(Node a, Object b, Object editor) {
     if (b instanceof byte[]) {
       return a.pushLast((byte[]) b, editor);
     } else {
@@ -205,17 +207,10 @@ public class RopeNodes {
       }
 
       if (shift == node.shift) {
-
         Node newNode = this.editor == editor ? this : clone(editor);
 
-        if (node.shift == SHIFT_INCREMENT) {
-          for (int i = 0; i < node.numNodes; i++) {
-            newNode = newNode.pushLast((byte[]) node.nodes[i], editor);
-          }
-        } else {
-          for (int i = 0; i < node.numNodes; i++) {
-            newNode = newNode.pushLast((Node) node.nodes[i], editor);
-          }
+        for (int i = 0; i < node.numNodes; i++) {
+          newNode = RopeNodes.pushLast(newNode, node.nodes[i], editor);
         }
 
         return newNode;
@@ -232,6 +227,8 @@ public class RopeNodes {
 
       if (start == end) {
         return new Node(editor, SHIFT_INCREMENT);
+      } else if (start == 0 && end == numCodePoints()) {
+        return this;
       }
 
       int startIdx = indexFor(start, pointOffsets);
@@ -255,16 +252,16 @@ public class RopeNodes {
         // first partial node
         int sLower = offsetFor(startIdx, pointOffsets);
         int sUpper = offsetFor(startIdx + 1, pointOffsets);
-        newNode = RopeNodes.concat(newNode, RopeNodes.slice(nodes[startIdx], start - sLower, sUpper - sLower, editor), editor);
+        newNode = RopeNodes.pushLast(newNode, RopeNodes.slice(nodes[startIdx], start - sLower, sUpper - sLower, editor), editor);
 
         // intermediate full nodes
         for (int i = startIdx + 1; i < endIdx; i++) {
-          newNode = RopeNodes.concat(newNode, nodes[i], editor);
+          newNode = RopeNodes.pushLast(newNode, nodes[i], editor);
         }
 
         // last partial node
         int eLower = offsetFor(endIdx, pointOffsets);
-        return RopeNodes.concat(newNode, RopeNodes.slice(nodes[endIdx], 0, end - eLower, editor), editor);
+        return RopeNodes.pushLast(newNode, RopeNodes.slice(nodes[endIdx], 0, end - eLower, editor), editor);
       }
     }
 
@@ -283,17 +280,12 @@ public class RopeNodes {
         stack[i] = (Node) n.nodes[n.numNodes - 1];
       }
 
-      boolean isFull = stack[stack.length - 1].numNodes == MAX_BRANCHES;
-
       // we need to grow a parent
-      if (isFull) {
+      if (stack[stack.length - 1].numNodes == MAX_BRANCHES) {
         return numNodes == MAX_BRANCHES
                 ? new Node(editor, shift + SHIFT_INCREMENT).pushLast(this, editor).pushLast(chunk, editor)
                 : pushLast(new Node(editor, SHIFT_INCREMENT).pushLast(chunk, editor), editor);
       }
-
-      int numCodePoints = UnicodeChunk.numCodePoints(chunk);
-      int numCodeUnits = UnicodeChunk.numCodeUnits(chunk);
 
       for (int i = 0; i < stack.length; i++) {
         if (stack[i].editor != editor) {
@@ -301,9 +293,12 @@ public class RopeNodes {
         }
       }
 
+      int numCodePoints = UnicodeChunk.numCodePoints(chunk);
+      int numCodeUnits = UnicodeChunk.numCodeUnits(chunk);
+
       Node parent = stack[stack.length - 1];
       if (parent.nodes.length == parent.numNodes) {
-        parent.grow(parent.numNodes << 1);
+        parent.grow(parent.numNodes << 2);
       }
       parent.unitOffsets[parent.numNodes] = parent.numCodeUnits();
       parent.pointOffsets[parent.numNodes] = parent.numCodePoints();
@@ -344,9 +339,6 @@ public class RopeNodes {
         return pushLast(from(editor, node.shift + SHIFT_INCREMENT, node), editor);
       }
 
-      int numCodePoints = node.numCodePoints();
-      int numCodeUnits = node.numCodeUnits();
-
       for (int i = 0; i < stack.length; i++) {
         if (stack[i].editor != editor) {
           stack[i] = stack[i].clone(editor);
@@ -354,16 +346,15 @@ public class RopeNodes {
       }
 
       Node parent = stack[stack.length - 1];
-      if (parent.shift - node.shift != SHIFT_INCREMENT) {
-        throw new IllegalStateException();
-      }
-
       if (parent.nodes.length == parent.numNodes) {
         parent.grow(parent.numNodes << 1);
       }
       parent.unitOffsets[parent.numNodes] = parent.numCodeUnits();
       parent.pointOffsets[parent.numNodes] = parent.numCodePoints();
       parent.numNodes++;
+
+      int numCodePoints = node.numCodePoints();
+      int numCodeUnits = node.numCodeUnits();
 
       for (int i = 0; i < stack.length; i++) {
         Node n = stack[i];
@@ -400,9 +391,6 @@ public class RopeNodes {
         return pushFirst(from(editor, node.shift + SHIFT_INCREMENT, node), editor);
       }
 
-      int numCodePoints = node.numCodePoints();
-      int numCodeUnits = node.numCodeUnits();
-
       for (int i = 0; i < stack.length; i++) {
         if (stack[i].editor != editor) {
           stack[i] = stack[i].clone(editor);
@@ -419,6 +407,9 @@ public class RopeNodes {
       parent.numNodes++;
       parent.unitOffsets[0] = 0;
       parent.pointOffsets[0] = 0;
+
+      int numCodePoints = node.numCodePoints();
+      int numCodeUnits = node.numCodeUnits();
 
       for (int i = 0; i < stack.length; i++) {
         Node n = stack[i];
@@ -451,10 +442,10 @@ public class RopeNodes {
 
       Node n = new Node(editor);
       n.shift = shift;
+      n.numNodes = numNodes;
       n.unitOffsets = unitOffsets.clone();
       n.pointOffsets = pointOffsets.clone();
       n.nodes = nodes.clone();
-      n.numNodes = numNodes;
 
       return n;
     }

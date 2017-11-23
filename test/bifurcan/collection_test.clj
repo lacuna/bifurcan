@@ -80,7 +80,7 @@
    :add-last     [gen-element]
    :set          [gen/pos-int gen-element]
    :slice        [gen/pos-int gen/pos-int]
-   :concat       [(gen/vector gen-element 0 33)]
+   :concat       [(gen/vector gen-element 0 1e3)]
    :remove-first []
    :remove-last  []})
 
@@ -228,10 +228,14 @@
   [a [] clj-list
    b (List.) bifurcan-list
    c (.linear (List.)) bifurcan-list]
-  (and
-    (= b c)
-    (list= a b)
-    (list= a c)))
+  (if (and
+        (= b c)
+        (list= a b)
+        (list= a c))
+    true
+    (do
+      (prn (count a))
+      false)))
 
 (u/def-collection-check test-virtual-list iterations list-actions
   [a [] clj-list
@@ -334,10 +338,16 @@
 ;; IList concat
 
 (defspec test-list-concat iterations
-  (prop/for-all [a (list-gen #(List.))
-                 b (list-gen #(List.))]
-    (= (concat (->vec a) (->vec b))
-      (->vec (.concat ^IList a b)))))
+  (prop/for-all [a (-> list-actions u/actions->generator)
+                 b (-> list-actions u/actions->generator)]
+    (let [a (u/apply-actions a (List.) bifurcan-list)
+          b (u/apply-actions b (List.) bifurcan-list)]
+      (if (list= (concat (->vec a) (->vec b))
+            (.concat ^IList a b))
+        true
+        (do
+          (prn (.size a))
+          false)))))
 
 (defspec test-linear-list-concat iterations
   (prop/for-all [a (list-gen #(LinearList.))

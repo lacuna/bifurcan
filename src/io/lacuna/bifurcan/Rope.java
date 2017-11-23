@@ -25,12 +25,14 @@ import static java.lang.Character.isLowSurrogate;
  *
  * @author ztellman
  */
-public class Rope implements Comparable<Rope> {
+public class Rope implements Comparable<Rope>, ILinearizable<Rope>, IForkable<Rope> {
 
+  private final boolean linear;
   private final Object editor;
   public Node root;
 
-  Rope(Object editor, Node node) {
+  Rope(Object editor, Node node, boolean linear) {
+    this.linear = linear;
     this.editor = editor;
     this.root = node;
   }
@@ -51,26 +53,44 @@ public class Rope implements Comparable<Rope> {
       }
     }
 
-    return new Rope(editor, root);
+    return new Rope(editor, root, false);
 
   }
 
+  /**
+   * @param rope another {@code Rope}
+   * @return a new Rope which is the concatenation of these two values
+   */
   public Rope concat(Rope rope) {
     Object editor = new Object();
-    return new Rope(editor, root.concat(rope.root, editor));
+    return new Rope(editor, root.concat(rope.root, editor), linear);
   }
 
+  /**
+   * @return the nth code point within the rope
+   * @throws IndexOutOfBoundsException if {@code idx} is not within {@code [0, size())}
+   */
   public int nth(int idx) {
+    if (idx < 0 || idx >= size()) {
+      throw new IndexOutOfBoundsException();
+    }
     return root.nthPoint(idx);
   }
 
+  /**
+   * @return the number of code points in the rope
+   */
   public int size() {
     return root.numCodePoints();
   }
 
+  /**
+   * @return a rope without the code points within {@code [start, end)}
+   * @throws IllegalArgumentException if {@code start} or {@code end} are not within {@code [0, size()) }
+   */
   public Rope remove(int start, int end) {
 
-    Object editor = new Object();
+    Object editor = linear ? this.editor : new Object();
 
     if (end < start || start < 0 || end > size()) {
       throw new IllegalArgumentException("[" + start + ", " + end + ") is not a valid range");
@@ -81,6 +101,7 @@ public class Rope implements Comparable<Rope> {
     // try to update a single leaf
     Node newRoot = root.update(0, start, editor, (offset, chunk) -> {
       int len = UnicodeChunk.numCodePoints(chunk);
+
       if (end < offset + len) {
         return UnicodeChunk.concat(
                 UnicodeChunk.slice(chunk, 0, start - offset),
@@ -93,7 +114,13 @@ public class Rope implements Comparable<Rope> {
     if (newRoot == null) {
       newRoot = root.slice(0, start, editor).concat(root.slice(end, size(), editor), editor);
     }
-    return new Rope(editor, newRoot);
+
+    if (linear) {
+      root = newRoot;
+      return this;
+    } else {
+      return new Rope(editor, newRoot, false);
+    }
   }
 
   private Rope insert(final int index, Iterator<byte[]> chunks, int numCodeUnits) {
@@ -102,11 +129,12 @@ public class Rope implements Comparable<Rope> {
       throw new IndexOutOfBoundsException();
     }
 
-    Object editor = new Object();
+    Object editor = linear ? this.editor : new Object();
+    Node newRoot = null;
 
     // can we just update a single leaf node?
     if (numCodeUnits < MAX_CHUNK_CODE_UNITS) {
-      Node newRoot = root.update(0, index, editor, (offset, chunk) -> {
+      newRoot = root.update(0, index, editor, (offset, chunk) -> {
         if (numCodeUnits + UnicodeChunk.numCodeUnits(chunk) <= MAX_CHUNK_CODE_UNITS) {
           byte[] newChunk = UnicodeChunk.slice(chunk, 0, index - offset);
           while (chunks.hasNext()) {
@@ -117,22 +145,27 @@ public class Rope implements Comparable<Rope> {
           return null;
         }
       });
+    }
 
-      // success!
-      if (newRoot != null) {
-        return new Rope(editor, newRoot);
+    if (newRoot == null) {
+      newRoot = root.slice(0, index, editor);
+      while (chunks.hasNext()) {
+        newRoot = newRoot.pushLast(chunks.next(), editor);
       }
+      newRoot = newRoot.concat(root.slice(index, size(), editor), editor);
     }
 
-    Node newRoot = root.slice(0, index, editor);
-    while (chunks.hasNext()) {
-      newRoot = newRoot.pushLast(chunks.next(), editor);
+    if (linear) {
+      root = newRoot;
+      return this;
+    } else {
+      return new Rope(editor, newRoot, false);
     }
-    newRoot = newRoot.concat(root.slice(index, size(), editor), editor);
-
-    return new Rope(editor, newRoot);
   }
 
+  /**
+   * @return a new rope with {@code rope} inserted after the first {@code index} code points
+   */
   public Rope insert(int index, Rope rope) {
     if (rope.size() == 0) {
       return this;
@@ -142,6 +175,9 @@ public class Rope implements Comparable<Rope> {
 
   }
 
+  /**
+   * @return a new rope with {@code cs} inserted after the first {@code index} code points
+   */
   public Rope insert(int index, CharSequence cs) {
     if (cs.length() == 0) {
       return this;
@@ -149,36 +185,67 @@ public class Rope implements Comparable<Rope> {
     return insert(index, chunks(cs), cs.length());
   }
 
+  /**
+   * @return a new rope representing the code points within {@code [start, end)}
+   * @throws IllegalArgumentException if {@code end} < {@code start}, or {@code start} and {@code end} are not within {@code [0, size())}
+   */
   public Rope slice(int start, int end) {
     if (end < start || start < 0 || end > size()) {
       throw new IllegalArgumentException("[" + start + ", " + end + ") is not a valid range");
     }
 
     Object editor = new Object();
-
-    return new Rope(editor, root.slice(start, end, editor));
+    return new Rope(editor, root.slice(start, end, editor), linear);
   }
 
+  @Override
+  public Rope forked() {
+    return linear ? new Rope(new Object(), root, false) : this;
+  }
+
+  @Override
+  public Rope linear() {
+    return linear ? this : new Rope(new Object(), root, true);
+  }
+
+  /**
+   * @return a sequence of bytes representing the UTF-8 encoding of the rope
+   */
   public Iterator<ByteBuffer> bytes() {
     return Iterators.map(chunks(), ary -> ByteBuffer.wrap(ary, 2, ary.length - 2).slice());
   }
 
+  /**
+   * @return a sequence of integers representing the UTF-16 code units from back to front
+   */
   public PrimitiveIterator.OfInt reverseChars() {
     return IntIterators.flatMap(reverseChunks(), UnicodeChunk::reverseCodeUnitIterator);
   }
 
+  /**
+   * @return a sequence of integers representing the UTF-16 code units from front to back
+   */
   public PrimitiveIterator.OfInt chars() {
     return IntIterators.flatMap(chunks(), UnicodeChunk::codeUnitIterator);
   }
 
+  /**
+   * @return a sequence of integers representing the code points from back to front
+   */
   public PrimitiveIterator.OfInt reverseCodePoints() {
     return IntIterators.flatMap(reverseChunks(), UnicodeChunk::reverseCodePointIterator);
   }
 
+  /**
+   * @return a sequence of integers representing the code points from front to back
+   */
   public PrimitiveIterator.OfInt codePoints() {
     return IntIterators.flatMap(chunks(), UnicodeChunk::codePointIterator);
   }
 
+  /**
+   * @return a corresponding Java-style {@code String} in {@code O(N)} time
+   */
   @Override
   public String toString() {
     char[] cs = new char[root.numCodeUnits()];
@@ -192,7 +259,7 @@ public class Rope implements Comparable<Rope> {
   }
 
   /**
-   * @return a corresponding Java-style {@code CharSequence}
+   * @return a corresponding Java-style {@code CharSequence} in {@code O(1)} time
    */
   public CharSequence toCharSequence() {
     return new CharSequence() {
@@ -239,6 +306,9 @@ public class Rope implements Comparable<Rope> {
     }
   }
 
+  /**
+   * @return a value representing the lexicographic comparison of the code points
+   */
   @Override
   public int compareTo(Rope o) {
     if (this == o) {
@@ -292,7 +362,7 @@ public class Rope implements Comparable<Rope> {
     };
   }
 
-  public static Iterator<byte[]> chunks(CharSequence cs) {
+  private static Iterator<byte[]> chunks(CharSequence cs) {
     return new Iterator<byte[]>() {
       int offset = 0;
 

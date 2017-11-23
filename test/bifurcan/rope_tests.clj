@@ -55,7 +55,7 @@
 (def gen-string-unicode
   (gen/fmap
     codepoints->str
-    (gen/vector (gen/elements [0 0x80 0x800 0x10000]) 0 33)))
+    (gen/vector (gen/elements [0 0x80 0x800 0x10000]) 0 128)))
 
 (def actions
   {:insert [gen/pos-int gen-string-unicode]

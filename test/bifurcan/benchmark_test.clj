@@ -483,8 +483,8 @@
   (binding [c/*final-gc-problem-threshold* 0.1]
     (-> (c/quick-benchmark* f
           (merge
-            {:samples (long (max 30 (/ 80 (Math/log10 n))))
-             :target-execution-time 5e7}
+            {:samples 40
+             :target-execution-time 1e8}
             (if *warmup*
               {:samples 6
                :warmup-jit-period 1e10
@@ -531,10 +531,9 @@
     (benchmark n
       #(let-mutable [s s]
          (doary-int [i indices]
-           (set! s (insert s s' (long i))))
-         s))))
+           (set! s (insert s s' (long i))))))))
 
-(defn benchmark-remove [n {:keys [base entries construct remove]}]
+(defn benchmark-remove [^long n {:keys [base entries construct remove]}]
   (let [s       (construct (base) (entries n))
         indices (->> n range shuffle int-array)]
     (benchmark n
@@ -601,7 +600,7 @@
 
 (def bench->types
   {:construct    [benchmark-construct
-                  (-> all-colls set (disj java-string rope))]
+                  (-> all-colls set (disj java-string))]
    :lookup       [benchmark-lookup
                   all-colls]
    :clone        [benchmark-clone
@@ -688,6 +687,7 @@
    "list_iterate" [:iteration lists]
    "set_iterate" [:iteration sets]
 
+   "string_construct" [:construct strings]
    "string_lookup" [:lookup strings]
    "string_insert" [:insert strings]
    "string_remove" [:remove strings]
@@ -738,15 +738,28 @@
           (nth all-colls (read-string idx)))))
 
     "benchmark"
-    (let [[n step] args
+    (let [[n step]   args
           descriptor (->> (range (count all-colls))
                        (map (fn [idx]
-                              (when (#{java-string rope} (nth all-colls idx))
+                              (when ((constantly true)
+                                      #_#{bifurcan-list clojure-vector}
+                                      (nth all-colls idx))
                                 (let [coll (-> all-colls (nth idx) :label)]
                                   (println "benchmarking" coll)
                                   [coll (benchmark-collection (or n "1e6") (or step "1") idx)]))))
-                       (into {}))]
-      (spit "benchmarks/benchmarks.edn" (pr-str descriptor))
+                       (into {}))
+
+          ;; merge with the existing benchmarks, if we didn't regenerate all of them
+          descriptor (merge-with #(merge-with merge %1 %2)
+                       (try
+                         (read-string
+                           (slurp "benchmarks/data/benchmarks.edn"))
+                         (catch Throwable e
+                           nil))
+                       descriptor)]
+
+      (spit "benchmarks/data/benchmarks.edn" (pr-str descriptor))
+
       (write-out-csvs descriptor)))
 
   (flush)
