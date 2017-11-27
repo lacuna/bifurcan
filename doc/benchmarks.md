@@ -22,7 +22,7 @@ Unlike Java's `HashMap` and `HashSet`, Bifurcan's `LinearMap` and `LinearSet` st
 
 ## Maps
 
-Included here, for comparison, is Java's mutable `HashMap`, Clojure's immutable `PersistentHashMap`, and the `PersistentTrieMap` provided [here](https://github.com/usethesource/capsule) which is the reference implementation for [CHAMP](https://michael.steindorfer.name/publications/oopsla15.pdf).  
+Included here, for comparison, are Java's mutable `HashMap`, Clojure's immutable `PersistentHashMap`, and the `PersistentTrieMap` provided [here](https://github.com/usethesource/capsule) which is the reference implementation for [CHAMP](https://michael.steindorfer.name/publications/oopsla15.pdf).  
 
 ![](../benchmarks/images/map_construct.png)
 
