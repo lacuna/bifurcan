@@ -57,6 +57,13 @@ public interface ISet<V> extends
   IList<V> elements();
 
   /**
+   * @return true if this set contains every element in {@code set}
+   */
+  default boolean containsAll(ISet<V> set) {
+    return set.elements().stream().allMatch(this::contains);
+  }
+
+  /**
    * @return the set, containing {@code rowValue}
    */
   default ISet<V> add(V value) {

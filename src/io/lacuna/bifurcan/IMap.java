@@ -87,6 +87,21 @@ public interface IMap<K, V> extends
   long size();
 
   /**
+   * @param set a set of keys
+   * @return true if this map contains all elements in {@code set}
+   */
+  default boolean containsAll(ISet<K> set) {
+    return set.elements().stream().allMatch(this::contains);
+  }
+
+  /**
+   * @return true if this map contains all keys in {@code map}
+   */
+  default boolean containsAll(IMap<K, ?> map) {
+    return containsAll(map.keys());
+  }
+
+  /**
    * @return true, if the collection is linear
    */
   default boolean isLinear() {

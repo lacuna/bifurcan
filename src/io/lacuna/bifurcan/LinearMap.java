@@ -6,7 +6,6 @@ import java.util.*;
 import java.util.Map;
 import java.util.function.*;
 
-import static io.lacuna.bifurcan.Lists.lazyMap;
 import static io.lacuna.bifurcan.utils.Bits.log2Ceil;
 import static java.lang.System.arraycopy;
 
@@ -340,7 +339,34 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
     if (m instanceof LinearMap) {
       return intersection((LinearMap<K, ?>) m);
     } else {
-      return (LinearMap<K, V>) Maps.intersection(new LinearMap<K, V>(), this, m.keys());
+      return (LinearMap<K, V>) Maps.intersection(new LinearMap<>(), this, m.keys());
+    }
+  }
+
+  @Override
+  public LinearMap<K, V> intersection(ISet<K> keys) {
+    if (keys instanceof LinearSet) {
+      return intersection(((LinearSet<K>) keys).map);
+    } else {
+      return (LinearMap<K, V>) Maps.intersection(new LinearMap<>(), this, keys);
+    }
+  }
+
+  @Override
+  public boolean containsAll(ISet<K> set) {
+    if (set instanceof LinearSet) {
+      return isSubset(((LinearSet<K>) set).map);
+    } else {
+      return set.elements().stream().allMatch(this::contains);
+    }
+  }
+
+  @Override
+  public boolean containsAll(IMap<K, ?> map) {
+    if (map instanceof LinearMap) {
+      return isSubset((LinearMap<K, ?>) map);
+    } else {
+      return map.keys().stream().allMatch(this::contains);
     }
   }
 
@@ -372,6 +398,20 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
     LinearMap<K, V> result = new LinearMap<>(Math.min(size, (int) m.size()));
     combine(m, result, i -> i != -1);
     return result;
+  }
+
+  private boolean isSubset(LinearMap<K, ?> m) {
+    for (long row : m.table) {
+      if (Row.populated(row)) {
+        int currKeyIndex = Row.keyIndex(row);
+        K currKey = (K) m.entries[currKeyIndex];
+        if (m.tableIndex(Row.hash(row), currKey) == -1) {
+          return false;
+        }
+      }
+    }
+
+    return true;
   }
 
   private void combine(LinearMap<K, ?> m, LinearMap<K, V> result, IntPredicate indexPredicate) {

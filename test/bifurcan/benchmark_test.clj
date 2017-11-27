@@ -26,6 +26,14 @@
     Collection
     Iterator
     PrimitiveIterator$OfInt]
+   [io.usethesource.capsule.core
+    PersistentTrieMap
+    PersistentTrieSet]
+   [io.usethesource.capsule
+    Map$Transient
+    Map$Immutable
+    Set$Transient
+    Set$Immutable]
    [io.lacuna.bifurcan
     IntMap
     Map
@@ -193,6 +201,24 @@
         (.remove m k)))
     m))
 
+(defn union-capsule-maps [^Map$Immutable a ^Map$Immutable b]
+  (let [m (.asTransient a)]
+    (.__putAll m b)
+    (.freeze m)))
+
+(defn diff-capsule-maps [^Map$Immutable a ^Map$Immutable b]
+  (let [m (.asTransient a)]
+    (doit [k (.keySet b)]
+      (.__remove m k))
+    (.freeze m)))
+
+(defn intersect-capsule-maps [^Map$Immutable a ^Map$Immutable b]
+  (let [m (.asTransient a)]
+    (doit [k (.keySet a)]
+      (when-not (.containsKey b k)
+        (.__remove m k)))
+    (.freeze m)))
+
 (defn construct-clojure-map [m vs]
   (let-mutable [m (transient m)]
     (doary [v vs]
@@ -205,9 +231,22 @@
       (set! s (conj! s v)))
     (persistent! s)))
 
-(defn lookup-hash-set [^HashSet s vs]
+(defn construct-capsule-map [^Map$Immutable m ks]
+  (let [val ""
+        m   (.asTransient m)]
+    (doary [k ks]
+      (.__put ^Map$Transient m k val))
+    (.freeze ^Map$Transient m)))
+
+(defn construct-capsule-set [^Set$Immutable s vs]
+  (let [s (.asTransient s)]
+    (doary [v vs]
+      (.__insert ^Set$Transient s v))
+    (.freeze ^Set$Transient s)))
+
+(defn lookup-java-set [^java.util.Set s vs]
   (doary [v vs]
-    (.contains ^HashSet s v)))
+    (.contains s v)))
 
 (defn lookup-clojure-set [s vs]
   (doary [v vs]
@@ -221,7 +260,7 @@
   (doary [k ks]
     (nth v k)))
 
-(defn lookup-hash-map [^HashMap m ks]
+(defn lookup-java-map [^java.util.Map m ks]
   (doary [k ks]
     (.get m k)))
 
@@ -355,34 +394,47 @@
      :entries generate-numbers
      :clone #(.clone ^IntMap %)}))
 
+(def capsule-map
+  {:label        "usethesource.PersistentTrieMap"
+   :construct    construct-capsule-map
+   :base         #(PersistentTrieMap/of)
+   :entries      generate-entries
+   :lookup       lookup-java-map
+   :iterator     #(-> ^java.util.Map % .entrySet .iterator)
+   :consume      consume-java-entry-iterator
+   :union        union-capsule-maps
+   :difference   diff-capsule-maps
+   :intersection intersect-capsule-maps
+   :add          #(.__put ^Map$Immutable %1 %2 "")
+   :remove       #(.__remove ^Map$Immutable %1 %2)})
+
 (def java-hash-map
-  (let [o {:tag HashMap}]
-    (merge (base-collection "java.util.HashMap" HashMap)
-      {:entries generate-entries
-       :construct construct-hash-map
-       :lookup lookup-hash-map
-       :clone #(.clone ^HashMap %)
-       :iterator #(-> ^HashMap % .entrySet .iterator)
-       :consume consume-java-entry-iterator
-       :union union-hash-maps
-       :difference diff-hash-maps
-       :intersection intersect-hash-maps
-       :add #(doto ^HashMap %1 (.put %2 nil))
-       :remove #(doto ^HashMap %1 (.remove %2))})))
+  (merge (base-collection "java.util.HashMap" HashMap)
+    {:entries      generate-entries
+     :construct    construct-hash-map
+     :lookup       lookup-java-map
+     :clone        #(.clone ^HashMap %)
+     :iterator     #(-> ^java.util.Map % .entrySet .iterator)
+     :consume      consume-java-entry-iterator
+     :union        union-hash-maps
+     :difference   diff-hash-maps
+     :intersection intersect-hash-maps
+     :add          #(doto ^HashMap %1 (.put %2 nil))
+     :remove       #(doto ^HashMap %1 (.remove %2))}))
 
 (def clojure-map
-  {:label "clojure.lang.PersistentHashMap"
-   :base (constantly {})
-   :entries generate-entries
-   :construct construct-clojure-map
-   :lookup lookup-clojure-map
-   :iterator iterator
-   :consume consume-java-entry-iterator
-   :union merge
-   :difference #(apply dissoc %1 (keys %2))
+  {:label        "clojure.lang.PersistentHashMap"
+   :base         (constantly {})
+   :entries      generate-entries
+   :construct    construct-clojure-map
+   :lookup       lookup-clojure-map
+   :iterator     iterator
+   :consume      consume-java-entry-iterator
+   :union        merge
+   :difference   #(apply dissoc %1 (keys %2))
    :intersection #(select-keys %1 (keys %2))
-   :add #(assoc %1 %2 nil)
-   :remove dissoc})
+   :add          #(assoc %1 %2 nil)
+   :remove       dissoc})
 
 (def linear-set
   (merge
@@ -396,84 +448,98 @@
 
 (def java-hash-set
   (merge (base-collection "java.util.HashSet" HashSet)
-    {:construct construct-hash-set
-     :lookup lookup-hash-set
-     :entries generate-entries
-     :iterator iterator
-     :consume consume-iterator
-     :clone #(.clone ^HashSet %)
-     :union #(doto ^HashSet (.clone ^HashSet %1) (.addAll %2))
-     :difference #(doto ^HashSet (.clone ^HashSet %1) (.removeAll %2))
+    {:construct    construct-hash-set
+     :lookup       lookup-java-set
+     :entries      generate-entries
+     :iterator     iterator
+     :consume      consume-iterator
+     :clone        #(.clone ^HashSet %)
+     :union        #(doto ^HashSet (.clone ^HashSet %1) (.addAll %2))
+     :difference   #(doto ^HashSet (.clone ^HashSet %1) (.removeAll %2))
      :intersection intersect-hash-sets
-     :add #(doto ^HashSet %1 (.add %2))
-     :remove #(doto ^HashSet %1 (.remove %2))}))
+     :add          #(doto ^HashSet %1 (.add %2))
+     :remove       #(doto ^HashSet %1 (.remove %2))}))
+
+(def capsule-set
+  {:label        "usethesource.PersistentTrieSet"
+   :construct construct-capsule-set
+   :base         #(PersistentTrieSet/of)
+   :entries      generate-entries
+   :lookup       lookup-java-set
+   :iterator     #(.iterator ^Iterable %)
+   :consume      consume-iterator
+   :union        #(.__insertAll ^Set$Immutable %1 %2)
+   :difference   #(.__removeAll ^Set$Immutable %1 %2)
+   :intersection #(.__retainAll ^Set$Immutable %1 %2)
+   :add          #(.__insert ^Set$Immutable %1 %2)
+   :remove       #(.__remove ^Set$Immutable %1 %2)})
 
 (def clojure-set
-  {:label "clojure.lang.PersistentHashSet"
-   :base (constantly #{})
-   :construct construct-clojure-set
-   :entries generate-entries
-   :iterator iterator
-   :consume consume-iterator
-   :lookup lookup-clojure-set
-   :union set/union
-   :difference set/difference
+  {:label        "clojure.lang.PersistentHashSet"
+   :base         (constantly #{})
+   :construct    construct-clojure-set
+   :entries      generate-entries
+   :iterator     iterator
+   :consume      consume-iterator
+   :lookup       lookup-clojure-set
+   :union        set/union
+   :difference   set/difference
    :intersection set/intersection
-   :add conj
-   :remove disj})
+   :add          conj
+   :remove       disj})
 
 (def linear-list (base-list "LinearList" LinearList))
 
 (def bifurcan-list (base-list "List" List))
 
 (def java-array-list
-  {:label "java.util.ArrayList"
-   :base #(ArrayList.)
-   :entries generate-numbers
+  {:label     "java.util.ArrayList"
+   :base      #(ArrayList.)
+   :entries   generate-numbers
    :construct construct-java-list
-   :lookup lookup-java-list
-   :iterator iterator
-   :consume consume-iterator
-   :clone #(.clone ^ArrayList %)
-   :concat #(doto ^ArrayList (.clone ^ArrayList %) (.addAll %2))})
+   :lookup    lookup-java-list
+   :iterator  iterator
+   :consume   consume-iterator
+   :clone     #(.clone ^ArrayList %)
+   :concat    #(doto ^ArrayList (.clone ^ArrayList %) (.addAll %2))})
 
 (def clojure-vector
-  {:label "clojure.lang.PersistentVector"
-   :base (constantly [])
-   :entries generate-numbers
+  {:label     "clojure.lang.PersistentVector"
+   :base      (constantly [])
+   :entries   generate-numbers
    :construct construct-clojure-vector
-   :iterator iterator
-   :consume consume-iterator
-   :lookup lookup-clojure-vector
-   :concat concat-clojure-vectors})
+   :iterator  iterator
+   :consume   consume-iterator
+   :lookup    lookup-clojure-vector
+   :concat    concat-clojure-vectors})
 
 (def java-string
-  {:label "String"
-   :base (constantly "")
-   :lookup #(doary-int [i %2]
-              (.codePointAt ^String %1 (.offsetByCodePoints ^String %1 0 i)))
-   :indices range
-   :entries generate-string
+  {:label     "String"
+   :base      (constantly "")
+   :lookup    #(doary-int [i %2]
+                 (.codePointAt ^String %1 (.offsetByCodePoints ^String %1 0 i)))
+   :indices   range
+   :entries   generate-string
    :construct concat-string
-   :consume consume-int-iterator
-   :iterator #(.iterator (.codePoints ^String %))
-   :concat concat-string
-   :remove remove-string
-   :insert insert-string})
+   :consume   consume-int-iterator
+   :iterator  #(.iterator (.codePoints ^String %))
+   :concat    concat-string
+   :remove    remove-string
+   :insert    insert-string})
 
 (def rope
-  {:label "Rope"
-   :base (constantly (Rope/from ""))
-   :lookup #(doary-int [i %2]
-              (.nth ^Rope %1 i))
-   :indices range
-   :entries generate-string
+  {:label     "Rope"
+   :base      (constantly (Rope/from ""))
+   :lookup    #(doary-int [i %2]
+                 (.nth ^Rope %1 i))
+   :indices   range
+   :entries   generate-string
    :construct #(.concat ^Rope %1 (Rope/from %2))
-   :consume consume-int-iterator
-   :iterator #(.codePoints ^Rope %)
-   :concat concat-rope
-   :remove remove-rope
-   :insert insert-rope})
+   :consume   consume-int-iterator
+   :iterator  #(.codePoints ^Rope %)
+   :concat    concat-rope
+   :remove    remove-rope
+   :insert    insert-rope})
 
 ;;;
 
@@ -513,7 +579,7 @@
 
 (defn benchmark-iteration [n {:keys [base entries construct iterator consume] :as m}]
   (let [c (construct (base) (entries n))]
-    (benchmark n #(consume (iterator c)))))
+    (#_benchmark #_n dotimes [_ 1e9] (consume (iterator c)))))
 
 (defn benchmark-iteration [n {:keys [base entries construct iterator consume] :as m}]
   (let [c (construct (base) (entries n))]
@@ -541,17 +607,17 @@
          (remove s (long i) (unchecked-inc (long i)))))))
 
 (defn benchmark-equals [n {:keys [label base entries construct add remove iterator]}]
-  (let [n (long n)
-        s (entries n)
-        a (construct (base) s)
-        b (construct (base) s)
+  (let [n        (long n)
+        s        (entries n)
+        a        (construct (base) s)
+        b        (construct (base) s)
         int-map? (= "IntMap" label)]
     (benchmark n
-      #(let [e (aget ^objects s (rand-int n))
+      #(let [e  (aget ^objects s (rand-int n))
              e' (if int-map?
                   (long (rand-int Integer/MAX_VALUE))
                   (Obj. (rand-int Integer/MAX_VALUE)))
-             b (-> b (remove e) (add e'))]
+             b  (-> b (remove e) (add e'))]
          (.equals ^Object a b)
          (-> b (remove e') (add e))
          nil))))
@@ -562,8 +628,8 @@
               (concat
                 (->> s-a (take (/ n 2)) shuffle)
                 (->> (entries (* n 1.5)) (drop n))))
-        a (construct (base) s-a)
-        b (construct (base) s-b)]
+        a   (construct (base) s-a)
+        b   (construct (base) s-b)]
     (benchmark n #(do (union a b) nil))))
 
 (defn benchmark-difference [n {:keys [base entries construct difference clone]}]
@@ -588,9 +654,9 @@
 
 ;;;
 
-(def maps [linear-map bifurcan-map java-hash-map clojure-map int-map])
+(def maps [linear-map bifurcan-map java-hash-map clojure-map int-map capsule-map])
 
-(def sets [linear-set bifurcan-set java-hash-set clojure-set])
+(def sets [linear-set bifurcan-set java-hash-set clojure-set capsule-set])
 
 (def lists [linear-list bifurcan-list java-array-list clojure-vector])
 
@@ -624,7 +690,7 @@
    })
 
 (defn run-benchmarks [n coll]
-  (let [bench->types bench->types #_(select-keys bench->types [:insert :remove])]
+  (let [bench->types bench->types #_(select-keys bench->types [:iteration])]
     (println "benchmarking:" n)
     (->> bench->types
       (map (fn [[k [f colls]]] [k (when (-> colls set (contains? coll)) (f n coll))]))
@@ -742,7 +808,7 @@
           descriptor (->> (range (count all-colls))
                        (map (fn [idx]
                               (when ((constantly true)
-                                      #_#{bifurcan-list clojure-vector}
+                                     #_#{capsule-set capsule-map bifurcan-map int-map bifurcan-set}
                                       (nth all-colls idx))
                                 (let [coll (-> all-colls (nth idx) :label)]
                                   (println "benchmarking" coll)

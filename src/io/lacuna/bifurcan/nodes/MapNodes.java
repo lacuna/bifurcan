@@ -7,6 +7,7 @@ import io.lacuna.bifurcan.utils.Bits;
 import io.lacuna.bifurcan.utils.Iterators;
 
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 import java.util.PrimitiveIterator;
 import java.util.function.BiPredicate;
 import java.util.function.BinaryOperator;
@@ -122,8 +123,8 @@ public class MapNodes {
           node = new Collision<>(hash, currKey, currValue, key, value);
         } else {
           node = new Node<K, V>(editor)
-              .put(shift + SHIFT_INCREMENT, editor, hashes[idx], currKey, currValue, equals, merge)
-              .put(shift + SHIFT_INCREMENT, editor, hash, key, value, equals, merge);
+                  .put(shift + SHIFT_INCREMENT, editor, hashes[idx], currKey, currValue, equals, merge)
+                  .put(shift + SHIFT_INCREMENT, editor, hash, key, value, equals, merge);
         }
 
         removeEntry(mask).putNode(mask, node);
@@ -234,42 +235,78 @@ public class MapNodes {
     // iteration
 
     public Iterator<IEntry<K, V>> iterator() {
-
+      
       return new Iterator<IEntry<K, V>>() {
 
-        final LinearList nodes = LinearList.from(nodes());
+        final Node[] stack = new Node[7];
+        final byte[] cursors = new byte[14];
+        int depth = 0;
+
+        {
+          stack[0] = Node.this;
+          cursors[1] = (byte) bitCount(Node.this.nodemap);
+        }
 
         Object[] content = Node.this.content;
         int idx = 0;
         int limit = bitCount(Node.this.datamap) << 1;
 
+        private boolean nextNode() {
+
+          while (depth >= 0) {
+
+            int pos = depth << 1;
+            int idx = cursors[pos];
+            int limit = cursors[pos + 1];
+
+            if (idx < limit) {
+              Node<K, V> curr = stack[depth];
+              INode<K, V> next = (INode<K, V>) curr.content[curr.content.length - 1 - idx];
+              cursors[pos]++;
+
+              if (next instanceof Node) {
+                Node<K, V> n = (Node<K, V>) next;
+
+                if (n.nodemap != 0) {
+                  stack[++depth] = n;
+                  cursors[pos + 2] = 0;
+                  cursors[pos + 3] = (byte) bitCount(n.nodemap);
+                }
+
+                if (n.datamap != 0) {
+                  this.content = n.content;
+                  this.idx = 0;
+                  this.limit = bitCount(n.datamap) << 1;
+
+                  return true;
+                }
+
+              } else {
+                Collision<K, V> c = (Collision<K, V>) next;
+                this.content = c.entries;
+                this.idx = 0;
+                this.limit = c.entries.length;
+
+                return true;
+              }
+            } else {
+              depth--;
+            }
+          }
+
+          return false;
+        }
+
         @Override
         public boolean hasNext() {
-          return idx < limit || nodes.size() > 0;
+          return idx < limit || nextNode();
         }
 
         @Override
         public IEntry<K, V> next() {
-          while (idx >= limit) {
-            Object node = nodes.popFirst();
-
-            if (node instanceof Node) {
-              Node<K, V> n = (Node<K, V>) node;
-              content = n.content;
-              idx = 0;
-              limit = bitCount(n.datamap) << 1;
-
-              if (n.nodemap != 0) {
-                int len = n.content.length;
-                for (int i = len - bitCount(n.nodemap); i < len; i++) {
-                  nodes.addLast(n.content[i]);
-                }
-              }
-            } else {
-              Collision<K, V> c = (Collision<K, V>) node;
-              content = c.entries;
-              idx = 0;
-              limit = c.entries.length;
+          if (idx >= limit) {
+            if (!nextNode()) {
+              throw new NoSuchElementException();
             }
           }
 
@@ -283,11 +320,11 @@ public class MapNodes {
     @Override
     public Iterable<IEntry<K, V>> entries() {
       return () ->
-          Iterators.range(bitCount(datamap),
-              i -> {
-                int idx = (int) (i << 1);
-                return new Maps.Entry<>((K) content[idx], (V) content[idx + 1]);
-              });
+              Iterators.range(bitCount(datamap),
+                      i -> {
+                        int idx = (int) (i << 1);
+                        return new Maps.Entry<>((K) content[idx], (V) content[idx + 1]);
+                      });
     }
 
     // misc
@@ -345,16 +382,16 @@ public class MapNodes {
 
     private Iterable<INode<K, V>> nodes() {
       return () ->
-          Iterators.range(
-              content.length - Integer.bitCount(nodemap),
-              content.length,
-              i -> (INode<K, V>) content[(int) i]);
+              Iterators.range(
+                      content.length - Integer.bitCount(nodemap),
+                      content.length,
+                      i -> (INode<K, V>) content[(int) i]);
     }
 
     private INode<K, V> collapse(int shift) {
       return (shift > 0 && datamap == 0 && Bits.isPowerOfTwo(nodemap) && node(nodemap) instanceof Collision)
-          ? node(nodemap)
-          : this;
+              ? node(nodemap)
+              : this;
     }
 
     private void grow() {
@@ -529,13 +566,13 @@ public class MapNodes {
     public INode<K, V> put(int shift, Object editor, int hash, K key, V value, BiPredicate<K, K> equals, BinaryOperator<V> merge) {
       if (hash != this.hash) {
         return new Node<K, V>(editor)
-            .putNode(hashMask(this.hash, shift), this)
-            .put(shift, editor, hash, key, value, equals, merge);
+                .putNode(hashMask(this.hash, shift), this)
+                .put(shift, editor, hash, key, value, equals, merge);
       } else {
         int idx = indexOf(key, equals);
         return idx < 0
-            ? new Collision<K, V>(hash, ArrayVector.append(entries, key, value))
-            : new Collision<K, V>(hash, ArrayVector.set(entries, idx, key, merge.apply((V) entries[idx + 1], value)));
+                ? new Collision<K, V>(hash, ArrayVector.append(entries, key, value))
+                : new Collision<K, V>(hash, ArrayVector.set(entries, idx, key, merge.apply((V) entries[idx + 1], value)));
       }
     }
 
@@ -553,11 +590,11 @@ public class MapNodes {
 
     public Iterable<IEntry<K, V>> entries() {
       return () ->
-          Iterators.range(entries.length >> 1,
-              i -> {
-                int idx = (int) (i << 1);
-                return new Maps.Entry<>((K) entries[idx], (V) entries[idx + 1]);
-              });
+              Iterators.range(entries.length >> 1,
+                      i -> {
+                        int idx = (int) (i << 1);
+                        return new Maps.Entry<>((K) entries[idx], (V) entries[idx + 1]);
+                      });
     }
 
     // misc
@@ -626,8 +663,8 @@ public class MapNodes {
       if (n.isEntry(mask)) {
         int idx = n.entryIndex(mask);
         return n.hashes[idx] == hash && equals.test(key, (K) n.content[idx << 1])
-            ? n.content[(idx << 1) + 1]
-            : defaultValue;
+                ? n.content[(idx << 1) + 1]
+                : defaultValue;
 
         // we must go deeper
       } else if (n.isNode(mask)) {
@@ -711,14 +748,14 @@ public class MapNodes {
         case NODE_ENTRY:
           idx = b.entryIndex(mask);
           result = (Node<K, V>) result
-              .putNode(mask, a.node(mask))
-              .put(shift, editor, b.hash(idx), (K) b.content[idx << 1], (V) b.content[(idx << 1) + 1], equals, merge);
+                  .putNode(mask, a.node(mask))
+                  .put(shift, editor, b.hash(idx), (K) b.content[idx << 1], (V) b.content[(idx << 1) + 1], equals, merge);
           break;
         case ENTRY_NODE:
           idx = a.entryIndex(mask);
           result = (Node<K, V>) result
-              .putNode(mask, b.node(mask))
-              .put(shift, editor, a.hash(idx), (K) a.content[idx << 1], (V) a.content[(idx << 1) + 1], equals, (x, y) -> merge.apply(y, x));
+                  .putNode(mask, b.node(mask))
+                  .put(shift, editor, a.hash(idx), (K) a.content[idx << 1], (V) a.content[(idx << 1) + 1], equals, (x, y) -> merge.apply(y, x));
           break;
         case NONE_NONE:
           break;
@@ -942,8 +979,8 @@ public class MapNodes {
           INode<K, V> child = node.node(mask);
           if (child instanceof Node && child.size() >= (targetSize << 1)) {
             split(editor, (Node<K, V>) child, targetSize).stream()
-                .map(n -> new Node<K, V>(editor).putNode(mask, n))
-                .forEach(result::addLast);
+                    .map(n -> new Node<K, V>(editor).putNode(mask, n))
+                    .forEach(result::addLast);
           } else {
             acc = acc.putNode(mask, child);
           }

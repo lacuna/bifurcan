@@ -29,7 +29,7 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
 
   private final BiPredicate<K, K> equalsFn;
   private final ToIntFunction<K> hashFn;
-  private Node<K, V> root;
+  public Node<K, V> root;
   private final boolean linear;
   private final Object editor = new Object();
 

@@ -14,7 +14,7 @@ import java.util.function.ToIntFunction;
  */
 public class LinearSet<V> implements ISet<V>, Cloneable {
 
-  private LinearMap<V, Void> map;
+  LinearMap<V, Void> map;
 
   ///
 

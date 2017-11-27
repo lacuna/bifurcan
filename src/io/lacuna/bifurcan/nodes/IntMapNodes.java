@@ -274,43 +274,68 @@ public class IntMapNodes {
     }
 
     public Iterator<IEntry<Long, V>> iterator() {
+
+      if (size() == 0) {
+        return Iterators.EMPTY;
+      }
+
       return new Iterator<IMap.IEntry<Long, V>>() {
 
-        final LinearList<Node<V>> nodeStack = new LinearList<>();
-        final LinearList<PrimitiveIterator.OfInt> maskStack = new LinearList<>();
-        Node<V> node = Node.this;
-        PrimitiveIterator.OfInt masks = node.masks();
+        Node<V>[] stack = new Node[16];
+        byte[] cursors = new byte[32];
+        int depth = 0;
+
+        {
+          stack[0] = Node.this;
+          int bits = Node.this.nodemap | Node.this.datamap;
+          cursors[0] = (byte) Util.startIndex(bits);
+          cursors[1] = (byte) Util.endIndex(bits);
+          nextValue();
+        }
+
+        private void nextValue() {
+          while (depth >= 0) {
+            int pos = depth << 1;
+            int idx = cursors[pos];
+            int limit = cursors[pos + 1];
+
+            if (idx <= limit) {
+              Node<V> curr = stack[depth];
+              int mask = 1 << idx;
+
+              if (curr.isEntry(mask)) {
+                return;
+              } else if (curr.isNode(mask)) {
+                Node<V> next = curr.node(mask);
+                stack[++depth] = next;
+                int bits = next.nodemap | next.datamap;
+                cursors[pos + 2] = (byte) Util.startIndex(bits);
+                cursors[pos + 3] = (byte) Util.endIndex(bits);
+                cursors[pos]++;
+              } else {
+                cursors[pos]++;
+              }
+            } else {
+              depth--;
+            }
+          }
+        }
 
         @Override
         public boolean hasNext() {
-          return masks.hasNext() || nodeStack.size() > 0;
+          return depth >= 0;
         }
 
         @Override
         public IMap.IEntry<Long, V> next() {
-          while (true) {
+          Node<V> n = stack[depth];
+          int mask = 1 << cursors[depth << 1];
+          int idx = n.entryIndex(mask);
+          Maps.Entry<Long, V> e = new Maps.Entry<>(n.keys[idx], (V) n.content[idx]);
 
-            if (!masks.hasNext()) {
-              if (nodeStack.size() == 0) {
-                throw new NoSuchElementException();
-              }
-              node = nodeStack.popLast();
-              masks = maskStack.popLast();
-            }
-
-            int mask = masks.nextInt();
-            if (node.isEntry(mask)) {
-              int idx = node.entryIndex(mask);
-              return new Maps.Entry<>(node.keys[idx], (V) node.content[idx]);
-            } else if (node.isNode(mask)) {
-              if (masks.hasNext()) {
-                nodeStack.addLast(node);
-                maskStack.addLast(masks);
-              }
-              node = node.node(mask);
-              masks = node.masks();
-            }
-          }
+          cursors[depth << 1]++;
+          nextValue();
+          return e;
         }
       };
     }
