@@ -235,7 +235,7 @@ public class MapNodes {
     // iteration
 
     public Iterator<IEntry<K, V>> iterator() {
-      
+
       return new Iterator<IEntry<K, V>>() {
 
         final Node[] stack = new Node[7];

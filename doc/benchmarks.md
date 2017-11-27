@@ -22,9 +22,11 @@ Unlike Java's `HashMap` and `HashSet`, Bifurcan's `LinearMap` and `LinearSet` st
 
 ## Maps
 
+Included here, for comparison, is Java's mutable `HashMap`, Clojure's immutable `PersistentHashMap`, and the `PersistentTrieMap` provided [here](https://github.com/usethesource/capsule) which is the reference implementation for [CHAMP](https://michael.steindorfer.name/publications/oopsla15.pdf).  
+
 ![](../benchmarks/images/map_construct.png)
 
-Due to its contiguous layout, `LinearMap` is significantly faster at iteration.  `Map` is about 2x faster than Clojure's `PersistentHashMap` because of a contiguous layout within each node, and `IntMap` is somewhat slower due to the fact that it does an in-order traversal of entries.
+Due to its contiguous layout, `LinearMap` is significantly faster at iteration.  `Map` and `PersistentTrieMap` are several times faster than Clojure's `PersistentHashMap` because of a contiguous layout within each node, but `IntMap` is somewhat slower due to the fact that it does an in-order traversal of entries.
 
 ![](../benchmarks/images/map_iterate.png)
 
@@ -32,7 +34,7 @@ The difference between the immutable data structures is largely due to Clojure's
 
 ![](../benchmarks/images/map_lookup.png)
 
-These set operations are performed on two data structures of the same type, whose entries half overlap.  Both `Map` and `IntMap` perform these operations structurally, meaning that the more dissimilar the two collections are, the faster the operation.  Even if the two collections overlap completely, these are still expected to be significantly than the Clojure equivalent, which modify the collections one element at a time.
+These set operations are performed on two data structures of the same type, whose entries half overlap.  Both `Map` and `IntMap` perform these operations structurally, meaning that the more dissimilar the two collections are, the faster the operation.  Even if the two collections overlap completely, these are still expected to be significantly than the Clojure and CHAMP equivalents, which modify the collections one element at a time.
 
 ![](../benchmarks/images/map_difference.png)
 
@@ -40,9 +42,9 @@ These set operations are performed on two data structures of the same type, whos
 
 ![](../benchmarks/images/map_union.png)
 
-Equality checks are benchmarked by taking two identical collections, and then altering a single, random element for each benchmark run.  Discovering the collections are not equal should require, on average, examining half of the elements.
+Equality checks are benchmarked by taking two identical collections, and then altering a single, random element for each benchmark run.  Discovering the collections are not equal should require, on average, examining half of the elements.  However, `PersistentTrieMap` maintains an incremental hash value which makes the equality check near-instant.  
 
-However, both `Map` and `IntMap` also use their structure to perform equality checks.  If any node's distribution of entries or children differs, it can short-circuit and immediately return false.
+`Map` and `IntMap` do not maintain incremental hash values, but instead use their structure to perform equality checks.  If any node's distribution of entries or children differs, it can short-circuit and immediately return false.
 
 ![](../benchmarks/images/map_equals.png)
 
