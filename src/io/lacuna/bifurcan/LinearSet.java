@@ -90,6 +90,14 @@ public class LinearSet<V> implements ISet<V>, Cloneable {
     }
   }
 
+  public static <V> LinearSet<V> of(V... elements) {
+    LinearSet<V> set = new LinearSet<>(elements.length);
+    for (V e : elements) {
+      set.add(e);
+    }
+    return set;
+  }
+
   ///
 
   @Override
@@ -221,6 +229,5 @@ public class LinearSet<V> implements ISet<V>, Cloneable {
   public String toString() {
     return Sets.toString(this);
   }
-
 
 }

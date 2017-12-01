@@ -114,6 +114,14 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
     resize(initialCapacity);
   }
 
+  private LinearMap(int tableLength, int entriesLength, ToIntFunction<K> hashFn, BiPredicate<K, K> equalsFn) {
+    this.hashFn = hashFn;
+    this.equalsFn = equalsFn;
+    this.size = 0;
+
+    resize(tableLength, entriesLength);
+  }
+
   /// Accessors
 
   @Override
@@ -183,7 +191,7 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
   }
 
   @Override
-  public IMap<K, V> update(K key, Function<V, V> update) {
+  public LinearMap<K, V> update(K key, Function<V, V> update) {
     int idx = tableIndex(keyHash(key), key);
     if (idx >= 0) {
       long row = table[idx];
@@ -246,7 +254,7 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
 
   @Override
   public LinearMap<K, V> clone() {
-    LinearMap<K, V> m = new LinearMap<K, V>((int)(entries.length * LOAD_FACTOR), hashFn, equalsFn);
+    LinearMap<K, V> m = new LinearMap<K, V>(table.length, entries.length, hashFn, equalsFn);
     m.size = size;
     m.indexMask = indexMask;
     arraycopy(table, 0, m.table, 0, table.length);
@@ -378,6 +386,7 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
     }
 
     LinearMap<K, V> result = this.clone();
+
     result.resize(result.size + m.size);
     for (long row : m.table) {
       if (Row.populated(row)) {
@@ -430,6 +439,33 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
     }
   }
 
+  private void resize(int tableLength, int entriesLength) {
+    indexMask = tableLength - 1;
+
+    // update table
+    if (table == null) {
+      table = new long[tableLength];
+    } else if (table.length != tableLength) {
+      long[] oldTable = table;
+      this.table = new long[tableLength];
+      for (long row : oldTable) {
+        if (Row.populated(row)) {
+          int hash = Row.hash(row);
+          putTable(hash, Row.keyIndex(row), estimatedIndex(hash));
+        }
+      }
+    }
+
+    // update entries
+    if (entries == null) {
+      entries = new Object[entriesLength];
+    } else {
+      Object[] nEntries = new Object[entriesLength];
+      arraycopy(entries, 0, nEntries, 0, size << 1);
+      entries = nEntries;
+    }
+  }
+
   private void resize(int capacity) {
 
     if (capacity > MAX_CAPACITY) {
@@ -437,32 +473,8 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
     }
 
     capacity = Math.max(4, capacity);
-    int tableLength = (1 << log2Ceil((long) Math.ceil(capacity / LOAD_FACTOR)));
-    indexMask = tableLength - 1;
-
-    // update table
-    if (table == null) {
-      table = new long[tableLength];
-    } else if (table.length != tableLength) {
-      long[] nTable = new long[tableLength];
-      for (long row : table) {
-        if (Row.populated(row)) {
-          int hash = Row.hash(row);
-          putTable(nTable, hash, Row.keyIndex(row), estimatedIndex(hash));
-        }
-      }
-      table = nTable;
-    }
-
-    // update entries
-    if (entries == null) {
-      entries = new Object[capacity << 1];
-    } else {
-      Object[] nEntries = new Object[capacity << 1];
-      arraycopy(entries, 0, nEntries, 0, size << 1);
-      entries = nEntries;
-    }
-
+    int tableLength = 1 << log2Ceil((long) Math.ceil(capacity / LOAD_FACTOR));
+    resize(tableLength, capacity << 1);
   }
 
   private int tableIndex(int hash, K key) {
@@ -477,7 +489,7 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
     }
   }
 
-  private void putTable(long[] table, int hash, int keyIndex, int tableIndex) {
+  private void putTable(int hash, int keyIndex, int tableIndex) {
     int tombstoneIdx = -1;
     for (int idx = tableIndex, dist = probeDistance(hash, tableIndex), abs = 0; ; idx = nextIndex(idx), dist++, abs++) {
       long row = table[idx];
@@ -526,7 +538,7 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
   }
 
   private void putTable(int hash, int keyIndex) {
-    putTable(table, hash, keyIndex, estimatedIndex(hash));
+    putTable(hash, keyIndex, estimatedIndex(hash));
   }
 
   // factored out for better inlining
@@ -574,7 +586,7 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
         } else if (isNone || isTombstone) {
           table[idx] = nRow;
         } else {
-          putTable(table, hash, keyIndex, idx);
+          putTable(hash, keyIndex, idx);
         }
 
         break;

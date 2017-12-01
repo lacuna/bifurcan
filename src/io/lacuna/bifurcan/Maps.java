@@ -61,6 +61,24 @@ public class Maps {
     public IMap linear() {
       return new Map().linear();
     }
+
+    @Override
+    public int hashCode() {
+      return 0;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (obj instanceof IMap) {
+        return ((IMap) obj).size() == 0;
+      }
+      return false;
+    }
+
+    @Override
+    public String toString() {
+      return Maps.toString(this);
+    }
   };
 
   public static class Entry<K, V> implements IEntry<K, V> {

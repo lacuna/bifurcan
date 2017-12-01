@@ -7,6 +7,7 @@ import java.util.Iterator;
 import java.util.Spliterator;
 import java.util.Spliterators;
 import java.util.function.BiPredicate;
+import java.util.function.LongFunction;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -16,10 +17,10 @@ import java.util.stream.StreamSupport;
  */
 @SuppressWarnings("unchecked")
 public interface IList<V> extends
-    ISplittable<IList<V>>,
-    Iterable<V>,
-    IForkable<IList<V>>,
-    ILinearizable<IList<V>> {
+        ISplittable<IList<V>>,
+        Iterable<V>,
+        IForkable<IList<V>>,
+        ILinearizable<IList<V>> {
 
   /**
    * @return the element at {@code idx}
@@ -144,7 +145,7 @@ public interface IList<V> extends
 
   /**
    * @param start the inclusive start of the range
-   * @param end the exclusive end of the range
+   * @param end   the exclusive end of the range
    * @return a read-only view into this sub-range of the list
    */
   default IList<V> slice(long start, long end) {

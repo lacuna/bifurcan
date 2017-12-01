@@ -51,7 +51,7 @@ public class LinearList<V> implements IList<V>, Cloneable {
     this.elements = elements;
   }
 
-  public static <V> LinearList<V> from(V... elements) {
+  public static <V> LinearList<V> of(V... elements) {
     LinearList<V> list = new LinearList<V>(elements.length);
     for (V e : elements) {
       list.addLast(e);

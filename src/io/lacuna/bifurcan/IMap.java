@@ -3,10 +3,7 @@ package io.lacuna.bifurcan;
 import io.lacuna.bifurcan.Maps.VirtualMap;
 
 import java.util.*;
-import java.util.function.BiPredicate;
-import java.util.function.BinaryOperator;
-import java.util.function.Function;
-import java.util.function.ToIntFunction;
+import java.util.function.*;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -15,10 +12,11 @@ import java.util.stream.StreamSupport;
  */
 @SuppressWarnings("unchecked")
 public interface IMap<K, V> extends
-    Iterable<IMap.IEntry<K, V>>,
-    ISplittable<IMap<K, V>>,
-    ILinearizable<IMap<K, V>>,
-    IForkable<IMap<K, V>> {
+        Iterable<IMap.IEntry<K, V>>,
+        ISplittable<IMap<K, V>>,
+        ILinearizable<IMap<K, V>>,
+        IForkable<IMap<K, V>>,
+        Function<K, V> {
 
   interface IEntry<K, V> {
     K key();
@@ -230,10 +228,10 @@ public interface IMap<K, V> extends
   @Override
   default IList<? extends IMap<K, V>> split(int parts) {
     return keys()
-        .split(parts)
-        .stream()
-        .map(ks -> Maps.from(ks, k -> get(k, null)))
-        .collect(Lists.collector());
+            .split(parts)
+            .stream()
+            .map(ks -> Maps.from(ks, k -> get(k, null)))
+            .collect(Lists.collector());
   }
 
   /**
@@ -243,5 +241,10 @@ public interface IMap<K, V> extends
    */
   default boolean equals(IMap<K, V> m, BiPredicate<V, V> equals) {
     return Maps.equals(this, m, equals);
+  }
+
+  @Override
+  default V apply(K k) {
+    return get(k, null);
   }
 }

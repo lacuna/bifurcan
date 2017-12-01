@@ -43,7 +43,7 @@ public class List<V> implements IList<V>, Cloneable {
     this.suffix = suffix;
   }
 
-  public static <V> List<V> from(V... elements) {
+  public static <V> List<V> of(V... elements) {
     List<V> list = new List<V>().linear();
     for (V e : elements) {
       list.addLast(e);

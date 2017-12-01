@@ -3,7 +3,7 @@
 (cemerick.pomegranate.aether/register-wagon-factory!
   "http" #(org.apache.maven.wagon.providers.http.HttpWagon.))
 
-(defproject io.lacuna/bifurcan "0.1.0-alpha2"
+(defproject io.lacuna/bifurcan "0.1.0-alpha3"
   :java-source-paths ["src"]
   :dependencies []
   :test-selectors {:default   #(not
@@ -49,5 +49,5 @@
   :classifiers {:javadoc {:java-source-paths ^:replace []
                           :source-paths      ^:replace []
                           :resource-paths    ^:replace ["javadoc"]}
-                :sources {:java-source-paths ^:replace ["src"]
-                          :resource-paths    ^:replace []}})
+                :sources {:source-paths   ^:replace ["src"]
+                          :resource-paths ^:replace []}})

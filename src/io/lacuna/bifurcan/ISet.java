@@ -6,6 +6,7 @@ import java.util.Objects;
 import java.util.Spliterator;
 import java.util.Spliterators;
 import java.util.function.BiPredicate;
+import java.util.function.Predicate;
 import java.util.function.ToIntFunction;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -15,10 +16,11 @@ import java.util.stream.StreamSupport;
  * @author ztellman
  */
 public interface ISet<V> extends
-    Iterable<V>,
-    ISplittable<ISet<V>>,
-    ILinearizable<ISet<V>>,
-    IForkable<ISet<V>> {
+        Iterable<V>,
+        ISplittable<ISet<V>>,
+        ILinearizable<ISet<V>>,
+        IForkable<ISet<V>>,
+        Predicate<V> {
 
   /**
    * @return the hash function used by the set
@@ -39,7 +41,9 @@ public interface ISet<V> extends
    */
   boolean contains(V value);
 
-  /**s
+  /**
+   * s
+   *
    * @return the number of elements in the set
    */
   long size();
@@ -61,6 +65,13 @@ public interface ISet<V> extends
    */
   default boolean containsAll(ISet<V> set) {
     return set.elements().stream().allMatch(this::contains);
+  }
+
+  /**
+   * @return true if this set contains any element in {@code set}
+   */
+  default boolean containsAny(ISet<V> set) {
+    return set.elements().stream().anyMatch(this::contains);
   }
 
   /**
@@ -165,4 +176,10 @@ public interface ISet<V> extends
     parts = Math.max(1, Math.min((int) size(), parts));
     return elements().split(parts).stream().map(LinearSet::from).collect(Lists.collector());
   }
+
+  @Override
+  default boolean test(V v) {
+    return contains(v);
+  }
+
 }

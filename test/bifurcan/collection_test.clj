@@ -89,8 +89,11 @@
    :remove [gen/large-integer]})
 
 (def set-actions
-  {:add    [gen/large-integer]
-   :remove [gen/large-integer]})
+  {:add          [gen/large-integer]
+   :remove       [gen/large-integer]
+   :union        [(gen/vector gen/large-integer 0 32)]
+   :intersection [(gen/vector gen/large-integer 0 32)]
+   :difference   [(gen/vector gen/large-integer 0 32)]})
 
 (def clj-list
   {:add-first    #(cons %2 %1)
@@ -124,12 +127,23 @@
    :remove #(.remove ^IMap %1 %2)})
 
 (def clj-set
-  {:add    conj!
-   :remove disj!})
+  {:add          conj!
+   :remove       disj!
+   :union        #(reduce conj! %1 %2)
+   :difference   #(reduce disj! %1 %2)
+   :intersection #(-> % persistent! (set/intersection (set %2)) transient)})
+
+(defn construct-set [template elements]
+  (if (instance? Set template)
+    (Set/from elements)
+    (LinearSet/from elements)))
 
 (def bifurcan-set
-  {:add    #(.add ^ISet %1 %2)
-   :remove #(.remove ^ISet %1 %2)})
+  {:add          #(.add ^ISet %1 %2)
+   :remove       #(.remove ^ISet %1 %2)
+   :union        #(.union ^ISet %1 (construct-set %1 %2))
+   :intersection #(.intersection ^ISet %1 (construct-set %1 %2))
+   :difference   #(.difference ^ISet %1 (construct-set %1 %2))})
 
 ;;;
 

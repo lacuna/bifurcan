@@ -50,6 +50,24 @@ public class Sets {
     public ISet linear() {
       return new Set().linear();
     }
+
+    @Override
+    public int hashCode() {
+      return 0;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (obj instanceof ISet) {
+        return ((ISet) obj).size() == 0;
+      }
+      return false;
+    }
+
+    @Override
+    public String toString() {
+      return Sets.toString(this);
+    }
   };
 
   static class VirtualSet<V> implements ISet<V> {
@@ -154,6 +172,24 @@ public class Sets {
       } else {
         return new VirtualSet<V>(added.linear(), removed.linear(), base, true);
       }
+    }
+
+    @Override
+    public int hashCode() {
+      return (int) Sets.hash(this);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (obj instanceof ISet) {
+        return Sets.equals(this, (ISet) obj);
+      }
+      return false;
+    }
+
+    @Override
+    public String toString() {
+      return Sets.toString(this);
     }
   }
 

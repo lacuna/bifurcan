@@ -66,6 +66,14 @@ public class Set<V> implements ISet<V>, Cloneable {
     return from(iterable.iterator());
   }
 
+  public static <V> Set<V> of(V... elements) {
+    Set<V> set = new Set<V>().linear();
+    for (V e : elements) {
+      set.add(e);
+    }
+    return set.forked();
+  }
+
   ///
 
   @Override
