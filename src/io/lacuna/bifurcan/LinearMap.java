@@ -79,14 +79,21 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
   }
 
   /**
-   * @param entries a list of {@code IEntry} objects
-   * @return a {@code LinearMap} representing the entries in the list
+   * @param entries a sequence of {@code IEntry} objects
+   * @return a {@code LinearMap} representing the entries in the sequence
    */
-  public static <K, V> LinearMap<K, V> from(IList<IEntry<K, V>> entries) {
-    if (entries.size() > MAX_CAPACITY) {
-      throw new IllegalArgumentException("LinearMap cannot hold more than 1 << 29 entries");
-    }
-    return entries.stream().collect(Maps.linearCollector(IEntry::key, IEntry::value, (int) entries.size()));
+  public static <K, V> LinearMap<K, V> from(Iterable<IEntry<K, V>> entries) {
+    return from(entries.iterator());
+  }
+
+  /**
+   * @param entries an iterator of {@code IEntry} objects
+   * @return a {@code LinearMap} representing the entries remaining in the iterator
+   */
+  public static <K, V> LinearMap<K, V> from(Iterator<IEntry<K, V>> entries) {
+    LinearMap<K, V> m = new LinearMap<>();
+    entries.forEachRemaining(e -> m.put(e.key(), e.value()));
+    return m;
   }
 
   /**
@@ -99,8 +106,8 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
 
   /**
    * @param initialCapacity the initial capacity of the map
-   * @param hashFn a function which yields the hash value of keys
-   * @param equalsFn a function which checks equality of keys
+   * @param hashFn          a function which yields the hash value of keys
+   * @param equalsFn        a function which checks equality of keys
    */
   public LinearMap(int initialCapacity, ToIntFunction<K> hashFn, BiPredicate<K, K> equalsFn) {
     if (initialCapacity > MAX_CAPACITY) {
@@ -191,7 +198,7 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
   }
 
   @Override
-  public LinearMap<K, V> update(K key, Function<V, V> update) {
+  public LinearMap<K, V> update(K key, UnaryOperator<V> update) {
     int idx = tableIndex(keyHash(key), key);
     if (idx >= 0) {
       long row = table[idx];
@@ -207,21 +214,21 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
   @Override
   public IList<IEntry<K, V>> entries() {
     return Lists.from(
-        size,
-        i -> {
-          int idx = ((int) i) << 1;
-          return new Maps.Entry<>((K) entries[idx], (V) entries[idx + 1]);
-        },
-        () -> iterator());
+            size,
+            i -> {
+              int idx = ((int) i) << 1;
+              return new Maps.Entry<>((K) entries[idx], (V) entries[idx + 1]);
+            },
+            () -> iterator());
   }
 
   @Override
   public Iterator<IEntry<K, V>> iterator() {
     return Iterators.range(size,
-        i -> {
-          int idx = (int) (i << 1);
-          return new Maps.Entry<>((K) entries[idx], (V) entries[idx + 1]);
-        });
+            i -> {
+              int idx = (int) (i << 1);
+              return new Maps.Entry<>((K) entries[idx], (V) entries[idx + 1]);
+            });
   }
 
   @Override
@@ -378,6 +385,34 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
     }
   }
 
+  @Override
+  public boolean containsAny(ISet<K> set) {
+
+    if (size() < set.size()) {
+      return set.containsAny(this);
+    }
+
+    if (set instanceof LinearSet) {
+      return intersects(((LinearSet<K>) set).map);
+    } else {
+      return set.elements().stream().anyMatch(this::contains);
+    }
+  }
+
+  @Override
+  public boolean containsAny(IMap<K, ?> map) {
+
+    if (size() < map.size()) {
+      return map.containsAny(this);
+    }
+
+    if (map instanceof LinearMap) {
+      return intersects((LinearMap<K, ?>) map);
+    } else {
+      return map.keys().stream().anyMatch(this::contains);
+    }
+  }
+
   /// Bookkeeping functions
 
   LinearMap<K, V> merge(LinearMap<K, V> m, BinaryOperator<V> mergeFn) {
@@ -416,6 +451,20 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
         K currKey = (K) m.entries[currKeyIndex];
         if (m.tableIndex(Row.hash(row), currKey) == -1) {
           return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
+  private boolean intersects(LinearMap<K, ?> m) {
+    for (long row : m.table) {
+      if (Row.populated(row)) {
+        int currKeyIndex = Row.keyIndex(row);
+        K currKey = (K) m.entries[currKeyIndex];
+        if (m.tableIndex(Row.hash(row), currKey) != -1) {
+          return true;
         }
       }
     }

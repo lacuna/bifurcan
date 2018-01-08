@@ -7,6 +7,7 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.Objects;
 import java.util.function.BiPredicate;
+import java.util.function.BinaryOperator;
 import java.util.function.ToIntFunction;
 
 /**
@@ -17,6 +18,7 @@ import java.util.function.ToIntFunction;
 public class Set<V> implements ISet<V>, Cloneable {
 
   Map<V, Void> map;
+  private int hash = -1;
 
   public Set() {
     this(Objects::hashCode, Objects::equals);
@@ -109,24 +111,22 @@ public class Set<V> implements ISet<V>, Cloneable {
 
   @Override
   public Set<V> add(V value) {
-    Map<V, Void> mapPrime = map.put(value, null);
-    if (map.isLinear()) {
-      map = mapPrime;
-      return this;
-    } else {
-      return new Set<V>(mapPrime);
-    }
+    return add(value, map.editor);
+  }
+
+  public Set<V> add(V value, Object editor) {
+    Map<V, Void> mapPrime = map.put(value, null, (BinaryOperator<Void>) Maps.MERGE_LAST_WRITE_WINS, editor);
+    return map == mapPrime ? this : new Set<>(mapPrime);
   }
 
   @Override
   public Set<V> remove(V value) {
-    Map<V, Void> mapPrime = map.remove(value);
-    if (map.isLinear()) {
-      map = mapPrime;
-      return this;
-    } else {
-      return new Set<V>(mapPrime);
-    }
+    return remove(value, map.editor);
+  }
+
+  public Set<V> remove(V value, Object editor) {
+    Map<V, Void> mapPrime = map.remove(value, editor);
+    return map == mapPrime ? this : new Set<>(mapPrime);
   }
 
   @Override
@@ -178,7 +178,10 @@ public class Set<V> implements ISet<V>, Cloneable {
 
   @Override
   public int hashCode() {
-    return (int) Sets.hash(this);
+    if (isLinear() || hash == -1) {
+      hash = (int) Sets.hash(this);
+    }
+    return hash;
   }
 
   @Override

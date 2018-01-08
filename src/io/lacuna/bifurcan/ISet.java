@@ -68,10 +68,28 @@ public interface ISet<V> extends
   }
 
   /**
+   * @return true if this set contains every key in {@code map}
+   */
+  default boolean containsAll(IMap<V, ?> map) {
+    return containsAll(map.keys());
+  }
+
+  /**
    * @return true if this set contains any element in {@code set}
    */
   default boolean containsAny(ISet<V> set) {
-    return set.elements().stream().anyMatch(this::contains);
+    if (size() < set.size()) {
+      return set.containsAny(this);
+    } else {
+      return set.elements().stream().anyMatch(this::contains);
+    }
+  }
+
+  /**
+   * @return true if this set contains any key in {@code map}
+   */
+  default boolean containsAny(IMap<V, ?> map) {
+    return containsAny(map.keys());
   }
 
   /**

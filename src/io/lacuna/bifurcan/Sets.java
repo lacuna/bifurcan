@@ -340,8 +340,8 @@ public class Sets {
 
       @Override
       public boolean equals(Object obj) {
-        if (obj instanceof Set) {
-          return Sets.equals(this, (Set<V>) obj);
+        if (obj instanceof ISet) {
+          return Sets.equals(this, (ISet<V>) obj);
         }
         return false;
       }
@@ -373,6 +373,24 @@ public class Sets {
       @Override
       public IList<V> elements() {
         return (IList<V>) Lists.from(s.toArray());
+      }
+
+      @Override
+      public int hashCode() {
+        return (int) Sets.hash(this);
+      }
+
+      @Override
+      public boolean equals(Object obj) {
+        if (obj instanceof ISet) {
+          return Sets.equals(this, (ISet<V>) obj);
+        }
+        return false;
+      }
+
+      @Override
+      public String toString() {
+        return Sets.toString(this);
       }
     };
   }

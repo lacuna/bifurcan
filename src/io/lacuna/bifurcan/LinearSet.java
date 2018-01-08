@@ -178,7 +178,7 @@ public class LinearSet<V> implements ISet<V>, Cloneable {
     } else {
       LinearMap<V, Void> m = map.clone();
       for (V e : this) {
-        if (s.contains(e)) {
+        if (!s.contains(e)) {
           m.remove(e);
         }
       }
