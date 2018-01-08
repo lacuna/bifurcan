@@ -461,22 +461,27 @@ public class MapNodes {
     }
 
     Node<K, V> putNode(final int mask, INode<K, V> node) {
-      int count = (bitCount(datamap) << 1) + bitCount(nodemap);
-      if ((count + 1) > content.length) {
-        grow();
+      if (node.size() == 1) {
+        IEntry<K, V> e = node.nth(0);
+        return putEntry(mask, node.hash(0), e.key(), e.value());
+      } else {
+        int count = (bitCount(datamap) << 1) + bitCount(nodemap);
+        if ((count + 1) > content.length) {
+          grow();
+        }
+
+        int idx = nodeIndex(mask);
+        int numNodes = bitCount(nodemap);
+        if (numNodes > 0) {
+          arraycopy(content, content.length - numNodes, content, content.length - 1 - numNodes, numNodes - idx);
+        }
+        nodemap |= mask;
+        size += node.size();
+
+        content[content.length - 1 - idx] = node;
+
+        return this;
       }
-
-      int idx = nodeIndex(mask);
-      int numNodes = bitCount(nodemap);
-      if (numNodes > 0) {
-        arraycopy(content, content.length - numNodes, content, content.length - 1 - numNodes, numNodes - idx);
-      }
-      nodemap |= mask;
-      size += node.size();
-
-      content[content.length - 1 - idx] = node;
-
-      return this;
     }
 
     Node<K, V> removeNode(final int mask, long nodeSize) {
@@ -936,7 +941,7 @@ public class MapNodes {
           K key = (K) b.content[idx << 1];
           Object val = get(a, shift, hash, key, equals, DEFAULT_VALUE);
           if (val != DEFAULT_VALUE) {
-            result = (Node<K, V>) result.put(shift, editor, hash, key, (V) val, equals, null);
+            result = result.put(shift, editor, hash, key, (V) val, equals, null);
           }
           break;
         case ENTRY_NODE:

@@ -29,11 +29,13 @@ public interface IGraph<V, E> extends ILinearizable<IGraph<V, E>>, IForkable<IGr
 
   /**
    * @return the set of all incoming edges to {@code vertex}
+   * @throws IllegalArgumentException if no such vertex exists
    */
   ISet<V> in(V vertex);
 
   /**
    * @return the set of all outgoing edges from {@code vertex}
+   * @throws IllegalArgumentException if no such vertex exists
    */
   ISet<V> out(V vertex);
 

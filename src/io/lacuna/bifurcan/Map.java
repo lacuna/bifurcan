@@ -27,7 +27,7 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
 
   private final BiPredicate<K, K> equalsFn;
   private final ToIntFunction<K> hashFn;
-  private Node<K, V> root;
+  public Node<K, V> root;
   private int hash = -1;
   final Object editor;
 
@@ -170,7 +170,7 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
 
     if (rootPrime == root) {
       return this;
-    } else if (isLinear()&& editor == this.editor) {
+    } else if (isLinear() && editor == this.editor) {
       root = rootPrime;
       return this;
     } else {
@@ -210,9 +210,9 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
   public List<Map<K, V>> split(int parts) {
     List<Map<K, V>> list = new List<Map<K, V>>().linear();
     MapNodes.split(new Object(), root, (int) Math.ceil(size() / (float) parts))
-        .stream()
-        .map(n -> new Map<K, V>(n, hashFn, equalsFn, false))
-        .forEach(list::addLast);
+            .stream()
+            .map(n -> new Map<K, V>(n, hashFn, equalsFn, false))
+            .forEach(list::addLast);
     return list.forked();
   }
 
@@ -317,7 +317,7 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
 
   @Override
   public Map<K, V> clone() {
-    return isLinear()? forked().linear() : this;
+    return isLinear() ? forked().linear() : this;
   }
 
   private int keyHash(K key) {

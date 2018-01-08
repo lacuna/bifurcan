@@ -7,9 +7,9 @@ import java.util.function.BinaryOperator;
  */
 public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
 
-  private final DirectedGraph<V, E> graph;
-  private final Set<V> top;
-  private final Set<V> bottom;
+  private DirectedGraph<V, E> graph;
+  private Set<V> top;
+  private Set<V> bottom;
 
   private DirectedAcyclicGraph(DirectedGraph<V, E> graph, Set<V> top, Set<V> bottom) {
     this.graph = graph;
@@ -68,18 +68,35 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
 
     // TODO: check for cycle
 
-    return new DirectedAcyclicGraph<>(
-            graph.link(from, to, edge, merge),
-            top.remove(to),
-            bottom.remove(from));
+    DirectedGraph<V, E> graphPrime = graph.link(from, to, edge, merge);
+    Set<V> topPrime = top.remove(to);
+    Set<V> bottomPrime = bottom.remove(from);
+
+    if (isLinear()) {
+      graph = graphPrime;
+      top = topPrime;
+      bottom = bottomPrime;
+      return this;
+    } else {
+      return new DirectedAcyclicGraph<>(graphPrime, topPrime, bottomPrime);
+    }
   }
 
   @Override
   public DirectedAcyclicGraph<V, E> unlink(V from, V to) {
-    return new DirectedAcyclicGraph<>(
-            graph.unlink(from, to),
-            graph.in(to).size() == 1 ? top.add(to) : top,
-            graph.out(from).size() == 1 ? bottom.add(from) : bottom);
+
+    DirectedGraph<V, E> graphPrime = graph.unlink(from, to);
+    Set<V> topPrime = graph.in(to).size() == 1 ? top.add(to) : top;
+    Set<V> bottomPrime = graph.out(from).size() == 1 ? bottom.add(from) : bottom;
+
+    if (isLinear() || graph == graphPrime) {
+      graph = graphPrime;
+      top = topPrime;
+      bottom = bottomPrime;
+      return this;
+    } else {
+      return new DirectedAcyclicGraph<>(graphPrime, topPrime, bottomPrime);
+    }
   }
 
   @Override
@@ -88,21 +105,49 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
   }
 
   @Override
+  public IGraph<V, E> select(ISet<V> vertices) {
+    return new DirectedAcyclicGraph<>(
+            graph.select(vertices),
+            top.intersection(vertices),
+            bottom.intersection(vertices));
+  }
+
+  @Override
   public DirectedAcyclicGraph<V, E> add(V vertex) {
     if (graph.vertices().contains(vertex)) {
       return this;
     } else {
-      return new DirectedAcyclicGraph<>(graph.add(vertex), top.add(vertex), bottom.add(vertex));
+
+      DirectedGraph<V, E> graphPrime = graph.add(vertex);
+      Set<V> topPrime = top.add(vertex);
+      Set<V> bottomPrime = bottom.add(vertex);
+
+      if (isLinear()) {
+        graph = graphPrime;
+        top = topPrime;
+        bottom = bottomPrime;
+        return this;
+      } else {
+        return new DirectedAcyclicGraph<>(graphPrime, topPrime, bottomPrime);
+      }
     }
   }
 
   @Override
   public IGraph<V, E> remove(V vertex) {
     if (graph.vertices().contains(vertex)) {
-      return new DirectedAcyclicGraph<>(
-              graph.remove(vertex),
-              top.union(graph.out(vertex).stream().filter(v -> graph.in(v).size() == 1).collect(Sets.collector())),
-              bottom.union(graph.in(vertex).stream().filter(v -> graph.out(v).size() == 1).collect(Sets.collector())));
+      DirectedGraph<V, E> graphPrime = graph.remove(vertex);
+      Set<V> topPrime = top.union(graph.out(vertex).stream().filter(v -> graph.in(v).size() == 1).collect(Sets.collector()));
+      Set<V> bottomPrime = bottom.union(graph.in(vertex).stream().filter(v -> graph.out(v).size() == 1).collect(Sets.collector()));
+
+      if (isLinear()) {
+        graph = graphPrime;
+        top = topPrime;
+        bottom = bottomPrime;
+        return this;
+      } else {
+        return new DirectedAcyclicGraph<>(graphPrime, topPrime, bottomPrime);
+      }
     } else {
       return this;
     }

@@ -147,7 +147,7 @@
 
 ;;;
 
-(def iterations 1e4)
+(def iterations 1e6)
 
 ;; Generators
 

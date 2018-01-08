@@ -17,7 +17,7 @@ import java.util.function.ToIntFunction;
  */
 public class Set<V> implements ISet<V>, Cloneable {
 
-  Map<V, Void> map;
+  public Map<V, Void> map;
   private int hash = -1;
 
   public Set() {

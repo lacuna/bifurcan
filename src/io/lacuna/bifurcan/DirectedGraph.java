@@ -163,11 +163,12 @@ public class DirectedGraph<V, E> implements IGraph<V, E> {
 
   @Override
   public DirectedGraph<V, E> select(ISet<V> vertices) {
+    Set<V> selected = this.vertices.intersection(vertices);
     return new DirectedGraph<>(
             isLinear(),
-            Set.from(vertices),
-            vertices.stream().collect(Maps.collector(v -> v, v -> out.get(v).map(x -> x.intersection(vertices)).orElseGet(Map::new))),
-            vertices.stream().collect(Maps.collector(v -> v, v -> in.get(v).map(x -> x.intersection(vertices)).orElseGet(Set::new))));
+            selected,
+            vertices.stream().collect(Maps.collector(v -> v, v -> out.get(v).map(x -> x.intersection(selected)).orElseGet(Map::new))),
+            vertices.stream().collect(Maps.collector(v -> v, v -> in.get(v).map(x -> x.intersection(selected)).orElseGet(Set::new))));
   }
 
   @Override
