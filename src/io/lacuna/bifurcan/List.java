@@ -21,12 +21,10 @@ public class List<V> implements IList<V>, Cloneable {
   private Node root;
   private byte prefixLen, suffixLen;
   public Object[] prefix, suffix;
-
-  private final boolean linear;
-  private final Object editor = new Object();
+  private final Object editor;
 
   public List() {
-    this.linear = false;
+    this.editor = null;
     this.root = Node.EMPTY;
     this.prefixLen = 0;
     this.prefix = null;
@@ -35,7 +33,7 @@ public class List<V> implements IList<V>, Cloneable {
   }
 
   List(boolean linear, Node root, int prefixLen, Object[] prefix, int suffixLen, Object[] suffix) {
-    this.linear = linear;
+    this.editor = linear ? new Object() : null;
     this.root = root;
     this.prefixLen = (byte) prefixLen;
     this.suffixLen = (byte) suffixLen;
@@ -99,27 +97,27 @@ public class List<V> implements IList<V>, Cloneable {
 
   @Override
   public boolean isLinear() {
-    return linear;
+    return editor != null;
   }
 
   @Override
   public List<V> addLast(V value) {
-    return (linear ? this : clone()).pushLast(value);
+    return (isLinear() ? this : clone()).pushLast(value);
   }
 
   @Override
   public List<V> addFirst(V value) {
-    return (linear ? this : clone()).pushFirst(value);
+    return (isLinear() ? this : clone()).pushFirst(value);
   }
 
   @Override
   public List<V> removeLast() {
-    return (linear ? this : clone()).popLast();
+    return (isLinear() ? this : clone()).popLast();
   }
 
   @Override
   public List<V> removeFirst() {
-    return (linear ? this : clone()).popFirst();
+    return (isLinear() ? this : clone()).popFirst();
   }
 
   @Override
@@ -132,7 +130,7 @@ public class List<V> implements IList<V>, Cloneable {
     if (idx == size) {
       return addLast(value);
     } else {
-      return (linear ? this : clone()).overwrite((int) idx, value);
+      return (isLinear() ? this : clone()).overwrite((int) idx, value);
     }
   }
 
@@ -223,9 +221,10 @@ public class List<V> implements IList<V>, Cloneable {
       arraycopy(suffix, sStart, suf, 0, sLen);
     }
 
-    return new List<V>(linear,
-        root.slice(Math.max(0, min(root.size(), s - prefixLen)), Math.max(0, min(root.size(), e - prefixLen)), editor),
-        pLen, pre, sLen, suf);
+    return new List<V>(
+            isLinear(),
+            root.slice(Math.max(0, min(root.size(), s - prefixLen)), Math.max(0, min(root.size(), e - prefixLen)), new Object()),
+            pLen, pre, sLen, suf);
   }
 
   @Override
@@ -249,9 +248,10 @@ public class List<V> implements IList<V>, Cloneable {
         r = r.concat(b.root, editor);
       }
 
-      return new List<V>(linear, r,
-          prefixLen, prefixLen > 0 ? prefix.clone() : null,
-          b.suffixLen, b.suffixLen > 0 ? b.suffix.clone() : null);
+      return new List<V>(
+              isLinear(), r,
+              prefixLen, prefixLen > 0 ? prefix.clone() : null,
+              b.suffixLen, b.suffixLen > 0 ? b.suffix.clone() : null);
 
     } else {
       return Lists.concat(this, l);
@@ -260,12 +260,12 @@ public class List<V> implements IList<V>, Cloneable {
 
   @Override
   public List<V> forked() {
-    return linear ? new List(false, root, prefixLen, prefix, suffixLen, suffix) : this;
+    return isLinear() ? new List(false, root, prefixLen, prefix, suffixLen, suffix) : this;
   }
 
   @Override
   public List<V> linear() {
-    return linear ? this : new List(true, root, prefixLen, prefix, suffixLen, suffix);
+    return isLinear() ? this : new List(true, root, prefixLen, prefix, suffixLen, suffix);
   }
 
   @Override
@@ -283,9 +283,10 @@ public class List<V> implements IList<V>, Cloneable {
 
   @Override
   public List<V> clone() {
-    return new List<V>(linear, root,
-        prefixLen, prefix == null ? null : prefix.clone(),
-        suffixLen, suffix == null ? null : suffix.clone());
+    return new List<V>(
+            isLinear(), root,
+            prefixLen, prefix == null ? null : prefix.clone(),
+            suffixLen, suffix == null ? null : suffix.clone());
   }
 
   ///
@@ -339,6 +340,7 @@ public class List<V> implements IList<V>, Cloneable {
     prefixLen++;
 
     if (prefixLen == 32) {
+      Object editor = isLinear() ? this.editor : new Object();
       root = root.pushFirst(prefix, editor);
       prefix = null;
       prefixLen = 0;
@@ -360,6 +362,7 @@ public class List<V> implements IList<V>, Cloneable {
     suffix[suffixLen++] = value;
 
     if (suffixLen == 32) {
+      Object editor = isLinear() ? this.editor : new Object();
       root = root.pushLast(suffix, editor);
       suffix = null;
       suffixLen = 0;
@@ -374,6 +377,7 @@ public class List<V> implements IList<V>, Cloneable {
       if (root.size() > 0) {
         Object[] chunk = root.first();
         if (chunk != null) {
+          Object editor = isLinear() ? this.editor : new Object();
           prefix = chunk.clone();
           prefixLen = (byte) prefix.length;
           root = root.popFirst(editor);
@@ -398,6 +402,7 @@ public class List<V> implements IList<V>, Cloneable {
       if (root.size() > 0) {
         Object[] chunk = root.last();
         if (chunk != null) {
+          Object editor = isLinear() ? this.editor : new Object();
           suffix = chunk.clone();
           suffixLen = (byte) suffix.length;
           root = root.popLast(editor);

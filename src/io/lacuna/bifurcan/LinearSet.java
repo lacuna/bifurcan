@@ -38,6 +38,14 @@ public class LinearSet<V> implements ISet<V>, Cloneable {
     map = new LinearMap<>(initialCapacity, hashFn, equalsFn);
   }
 
+  /**
+   * @param hashFn the hash function used by the set
+   * @param equalsFn the equality semantics used by the set
+   */
+  public LinearSet(ToIntFunction<V> hashFn, BiPredicate<V, V> equalsFn) {
+    map = new LinearMap<>(8, hashFn, equalsFn);
+  }
+
   private LinearSet(LinearMap<V, Void> map) {
     this.map = map;
   }

@@ -32,7 +32,7 @@ public class Set<V> implements ISet<V>, Cloneable {
     map = new Map<>(hashFn, equalsFn);
   }
 
-  private Set(Map<V, Void> map) {
+  Set(Map<V, Void> map) {
     this.map = map;
   }
 
@@ -116,6 +116,10 @@ public class Set<V> implements ISet<V>, Cloneable {
 
   public Set<V> add(V value, Object editor) {
     Map<V, Void> mapPrime = map.put(value, null, (BinaryOperator<Void>) Maps.MERGE_LAST_WRITE_WINS, editor);
+    if (isLinear() || editor != map.editor) {
+      hash = -1;
+    }
+
     return map == mapPrime ? this : new Set<>(mapPrime);
   }
 
@@ -126,6 +130,10 @@ public class Set<V> implements ISet<V>, Cloneable {
 
   public Set<V> remove(V value, Object editor) {
     Map<V, Void> mapPrime = map.remove(value, editor);
+    if (isLinear() || editor != map.editor) {
+      hash = -1;
+    }
+
     return map == mapPrime ? this : new Set<>(mapPrime);
   }
 
@@ -178,7 +186,7 @@ public class Set<V> implements ISet<V>, Cloneable {
 
   @Override
   public int hashCode() {
-    if (isLinear() || hash == -1) {
+    if (hash == -1) {
       hash = (int) Sets.hash(this);
     }
     return hash;

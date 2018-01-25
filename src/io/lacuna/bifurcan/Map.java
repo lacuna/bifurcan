@@ -113,6 +113,11 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
   ///
 
   @Override
+  public Set<K> keys() {
+    return new Set<K>((Map<K, Void>) this);
+  }
+
+  @Override
   public ToIntFunction<K> keyHash() {
     return hashFn;
   }
@@ -141,9 +146,11 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
   public Map<K, V> put(K key, V value, BinaryOperator<V> merge, Object editor) {
     Node<K, V> rootPrime = root.put(0, editor, keyHash(key), key, value, equalsFn, merge);
 
-    if (rootPrime == root) {
-      return this;
-    } else if (isLinear() && editor == this.editor) {
+    if (isLinear() || editor != this.editor) {
+      hash = -1;
+    }
+
+    if (isLinear() && editor == this.editor) {
       root = rootPrime;
       return this;
     } else {
@@ -168,9 +175,11 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
   public Map<K, V> remove(K key, Object editor) {
     Node<K, V> rootPrime = (Node<K, V>) root.remove(0, editor, keyHash(key), key, equalsFn);
 
-    if (rootPrime == root) {
-      return this;
-    } else if (isLinear() && editor == this.editor) {
+    if (isLinear() || editor != this.editor) {
+      hash = -1;
+    }
+
+    if (isLinear() && editor == this.editor) {
       root = rootPrime;
       return this;
     } else {
@@ -204,6 +213,12 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
     } else {
       return new Map<>(root, hashFn, equalsFn, true);
     }
+  }
+
+  @Override
+  public <U> Map<K, U> mapVals(Function<V, U> f) {
+    Map<K, U> m = stream().collect(Maps.collector(IEntry::key, e -> f.apply(e.value())));
+    return isLinear() ? m.linear() : m;
   }
 
   @Override
@@ -287,7 +302,7 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
 
   @Override
   public int hashCode() {
-    if (isLinear() || hash == -1) {
+    if (hash == -1) {
       hash = (int) Maps.hash(this);
     }
     return hash;

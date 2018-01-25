@@ -66,7 +66,168 @@ public class Graphs {
     }
   }
 
-  /// strongly connected components
+  /// utilities
+
+  public static <V, E> boolean equals(IGraph<V, E> a, IGraph<V, E> b) {
+    if (a.isDirected() != b.isDirected() || !a.vertices().equals(b.vertices())) {
+      return false;
+    }
+
+    for (V v : a.vertices()) {
+      ISet<V> aOut = a.out(v);
+      ISet<V> bOut = b.out(v);
+
+      if (!aOut.equals(bOut)) {
+        return false;
+      }
+
+      for (V w : aOut) {
+        if (Objects.equals(a.edge(v, w), b.edge(v, w))) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
+  public static <V, E> int hash(IGraph<V, E> g) {
+    int hash = g.vertices().stream().mapToInt(Objects::hashCode).reduce(0, (a, b) -> a ^ b);
+    if (g.isDirected()) {
+      for (V v : g.vertices()) {
+        for (V w : g.out(v)) {
+          hash = hash ^ (Objects.hashCode(w) * 31) ^ Objects.hashCode(g.edge(v, w));
+        }
+      }
+    } else {
+      for (V v : g.vertices()) {
+        for (V w : g.out(v)) {
+          hash = hash ^ Objects.hashCode(v) ^ Objects.hashCode(w) ^ Objects.hashCode(g.edge(v, w));
+        }
+      }
+    }
+    return hash;
+  }
+
+  public static <V, E> IGraph<V, E> merge(IGraph<V, E> a, IGraph<V, E> b, BinaryOperator<E> merge) {
+
+    if (a.isDirected() != b.isDirected()) {
+      throw new IllegalArgumentException("cannot merge directed and undirected graphs");
+    }
+
+    if (a.vertices().size() < b.vertices().size()) {
+      return merge(b, a, (x, y) -> merge.apply(y, x));
+    }
+
+    IGraph<V, E> result = a.forked().linear();
+    for (V src : b.vertices()) {
+      for (V dst : b.out(src)) {
+        a = a.link(src, dst, b.edge(src, dst), merge);
+      }
+    }
+    return result.forked();
+  }
+
+  /// undirected graphs
+
+  public static <V> Set<Set<V>> connectedComponents(IGraph<V, ?> graph) {
+    if (graph.isDirected()) {
+      throw new IllegalArgumentException("graph must be undirected, try Graphs.stronglyConnectedComponents instead");
+    }
+
+    LinearSet<V> traversed = new LinearSet<>((int) graph.vertices().size(), graph.vertexHash(), graph.vertexEquality());
+    Set<Set<V>> result = new Set<Set<V>>().linear();
+
+    for (V seed : graph.vertices()) {
+      if (!traversed.contains(seed)) {
+        traversed.add(seed);
+        Set<V> group = new Set<>(graph.vertexHash(), graph.vertexEquality()).linear();
+        bfsVertices(LinearList.of(seed), graph::out).forEachRemaining(group::add);
+        result.add(group.forked());
+      }
+    }
+
+    return result.forked();
+  }
+
+  private static class ArticulationPointState<V>  {
+    final V node;
+    final int depth;
+    int lowlink;
+    int childCount = 0;
+
+    public ArticulationPointState(V node, int depth) {
+      this.node = node;
+      this.depth = depth;
+      this.lowlink = depth;
+    }
+  }
+
+  public static <V> Set<V> articulationPoints(IGraph<V, ?> graph) {
+    if (graph.isDirected()) {
+      throw new IllegalArgumentException("graph must be undirected");
+    }
+
+    // algorithmic state
+    IMap<V, ArticulationPointState<V>> state = new LinearMap<>((int) graph.vertices().size(), graph.vertexHash(), graph.vertexEquality());
+
+    // call-stack state
+    LinearList<ArticulationPointState<V>> path = new LinearList<>();
+    LinearList<Iterator<V>> branches = new LinearList<>();
+
+    Set<V> result = new Set<V>().linear();
+
+    for (V seed : graph.vertices()) {
+
+      if (state.contains(seed)) {
+        continue;
+      }
+
+      ArticulationPointState<V> s = new ArticulationPointState<>(seed, 0);
+      path.addLast(s);
+      branches.addLast(graph.out(seed).iterator());
+      state.put(seed, s);
+
+      while (path.size() > 0) {
+
+        // traverse deeper
+        if (branches.last().hasNext()) {
+
+          V w = branches.last().next();
+          ArticulationPointState<V> vs = path.last();
+          ArticulationPointState<V> ws = state.get(w, null);
+          if (ws == null) {
+            ws = new ArticulationPointState<>(w, (int) path.size());
+            vs.childCount++;
+            state.put(w, ws);
+            path.addLast(ws);
+            branches.addLast(graph.out(w).iterator());
+          } else {
+            vs.lowlink = min(vs.lowlink, ws.depth);
+          }
+
+          // return
+        } else {
+          branches.popLast();
+          ArticulationPointState<V> ws = path.popLast();
+
+          if (path.size() > 0) {
+            ArticulationPointState<V> vs = path.last();
+            vs.lowlink = min(ws.lowlink, vs.lowlink);
+
+            if ((path.size() > 1 && ws.lowlink >= vs.depth)
+                    || (path.size() == 1 && vs.childCount > 1)) {
+              result.add(vs.node);
+            }
+          }
+        }
+      }
+    }
+
+    return result.forked();
+  }
+
+  /// directed graphs
 
   private static class TarjanState {
     final int index;
@@ -86,18 +247,22 @@ public class Graphs {
    *
    * @return all strongly connected components in the graph containing more than one vertex
    */
-  public static <V> ISet<ISet<V>> stronglyConnectedComponents(IGraph<V, ?> graph) {
+  public static <V> Set<Set<V>> stronglyConnectedComponents(IGraph<V, ?> graph) {
 
-    // required state for algorithm
-    IMap<V, TarjanState> state = new LinearMap<>();
+    if (!graph.isDirected()) {
+      throw new IllegalArgumentException("graph must be directed, try Graphs.connectedComponents instead");
+    }
+
+    // algorithmic state
+    IMap<V, TarjanState> state = new LinearMap<>((int) graph.vertices().size(), graph.vertexHash(), graph.vertexEquality());
     LinearList<V> stack = new LinearList<>();
     int idx = 0;
 
-    // call-stack state to avoid recursive calls
+    // call-stack state
     LinearList<V> path = new LinearList<>();
     LinearList<Iterator<V>> branches = new LinearList<>();
 
-    ISet<ISet<V>> result = new Set<ISet<V>>().linear();
+    Set<Set<V>> result = new Set<Set<V>>().linear();
 
     for (V seed : graph.vertices()) {
 
@@ -111,17 +276,15 @@ public class Graphs {
 
         // traverse deeper
         if (branches.last().hasNext()) {
+
           V w = branches.last().next();
           TarjanState ws = state.get(w, null);
           if (ws == null) {
             ws = new TarjanState(idx++);
             state.put(w, ws);
-            ISet<V> out = graph.out(w);
-            if (out.size() > 0) {
-              stack.addLast(w);
-              path.addLast(w);
-              branches.addLast(graph.out(w).iterator());
-            }
+            stack.addLast(w);
+            path.addLast(w);
+            branches.addLast(graph.out(w).iterator());
           } else if (ws.onStack) {
             TarjanState vs = state.get(path.last()).get();
             vs.lowlink = min(vs.lowlink, ws.index);
@@ -146,7 +309,7 @@ public class Graphs {
               stack.popLast();
               state.get(w).get().onStack = false;
             } else {
-              ISet<V> group = new Set<V>().linear();
+              Set<V> group = new Set<V>(graph.vertexHash(), graph.vertexEquality()).linear();
               for (; ; ) {
                 V x = stack.popLast();
                 group.add(x);
@@ -162,20 +325,6 @@ public class Graphs {
       } while (path.size() > 0);
     }
 
-    return result.forked();
-  }
-
-  public static <V, E> IGraph<V, E> merge(IGraph<V, E> a, IGraph<V, E> b, BinaryOperator<E> merge) {
-    if (a.vertices().size() < b.vertices().size()) {
-      return merge(b, a, (x, y) -> merge.apply(y, x));
-    }
-
-    IGraph<V, E> result = a.forked().linear();
-    for (V src : b.vertices()) {
-      for (V dst : b.out(src)) {
-        a = a.link(src, dst, b.edge(src, dst), merge);
-      }
-    }
     return result.forked();
   }
 

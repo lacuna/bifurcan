@@ -147,7 +147,7 @@
 
 ;;;
 
-(def iterations 1e6)
+(def iterations 1e4)
 
 ;; Generators
 
@@ -232,24 +232,16 @@
 (u/def-collection-check test-linear-list iterations list-actions
   [a [] clj-list
    b (LinearList.) bifurcan-list]
-  (if (list= a b)
-    true
-    (do
-      (prn (count a) (.size b))
-      false)))
+  (list= a b))
 
 (u/def-collection-check test-list iterations list-actions
   [a [] clj-list
    b (List.) bifurcan-list
    c (.linear (List.)) bifurcan-list]
-  (if (and
-        (= b c)
-        (list= a b)
-        (list= a c))
-    true
-    (do
-      (prn (count a))
-      false)))
+  (and
+    (= b c)
+    (list= a b)
+    (list= a c)))
 
 (u/def-collection-check test-virtual-list iterations list-actions
   [a [] clj-list
@@ -454,3 +446,43 @@
                  b (map-gen #(IntMap.))]
     (= (apply dissoc (->map a) (keys (->map b)))
       (->map (.difference ^IMap a ^IMap b)))))
+
+;; Set operations
+
+(defspec test-set-union iterations
+  (prop/for-all [a (set-gen #(Set.))
+                 b (set-gen #(Set.))]
+    (= (set/union (->set a) (->set b))
+      (->set (.union ^ISet a ^ISet b)))))
+
+(defspec test-set-difference iterations
+  (prop/for-all [a (set-gen #(Set.))
+                 b (set-gen #(Set.))]
+    (= (set/difference (->set a) (->set b))
+      (->set (.difference ^ISet a ^ISet b)))))
+
+(defspec test-set-intersection iterations
+  (prop/for-all [a (set-gen #(Set.))
+                 b (set-gen #(Set.))]
+    (= (set/intersection (->set a) (->set b))
+      (->set (.intersection ^ISet a ^ISet b)))))
+
+;; LinearSet operations
+
+(defspec test-linear-set-union iterations
+  (prop/for-all [a (set-gen #(LinearSet.))
+                 b (set-gen #(LinearSet.))]
+    (= (set/union (->set a) (->set b))
+      (->set (.union ^ISet a ^ISet b)))))
+
+(defspec test-linear-set-difference iterations
+  (prop/for-all [a (set-gen #(LinearSet.))
+                 b (set-gen #(LinearSet.))]
+    (= (set/difference (->set a) (->set b))
+      (->set (.difference ^ISet a ^ISet b)))))
+
+(defspec test-linear-set-intersection iterations
+  (prop/for-all [a (set-gen #(LinearSet.))
+                 b (set-gen #(LinearSet.))]
+    (= (set/intersection (->set a) (->set b))
+      (->set (.intersection ^ISet a ^ISet b)))))

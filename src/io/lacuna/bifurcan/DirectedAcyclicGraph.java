@@ -1,6 +1,9 @@
 package io.lacuna.bifurcan;
 
+import java.util.Iterator;
+import java.util.function.BiPredicate;
 import java.util.function.BinaryOperator;
+import java.util.function.ToIntFunction;
 
 /**
  * @author ztellman
@@ -63,10 +66,20 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
     return graph.out(vertex);
   }
 
+  /**
+   * @param from the source of the edge
+   * @param to the destination of the edge
+   * @param edge the value of the edge
+   * @param merge the merge function for the edge values, if an edge already exists
+   * @return a graph containing the new edge
+   * @throws IllegalArgumentException if the new edge creates a cycle
+   */
   @Override
   public DirectedAcyclicGraph<V, E> link(V from, V to, E edge, BinaryOperator<E> merge) {
 
-    // TODO: check for cycle
+    if (vertices().contains(from) && vertices().contains(to) && createsCycle(from, to)) {
+      throw new IllegalArgumentException("new edge creates a cycle");
+    }
 
     DirectedGraph<V, E> graphPrime = graph.link(from, to, edge, merge);
     Set<V> topPrime = top.remove(to);
@@ -169,18 +182,62 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
   }
 
   @Override
+  public boolean isDirected() {
+    return true;
+  }
+
+  @Override
+  public ToIntFunction<V> vertexHash() {
+    return graph.vertexHash();
+  }
+
+  @Override
+  public BiPredicate<V, V> vertexEquality() {
+    return graph.vertexEquality();
+  }
+
+  @Override
   public int hashCode() {
     return graph.hashCode();
   }
 
   @Override
   public boolean equals(Object obj) {
-    if (obj instanceof DirectedAcyclicGraph) {
-      return graph.equals(((DirectedAcyclicGraph<V, E>) obj).graph);
-    } else if (obj instanceof DirectedGraph) {
-      return graph.equals(obj);
-    } else {
+    return graph.equals(obj);
+  }
+
+  @Override
+  public String toString() {
+    return graph.toString();
+  }
+
+  ///
+
+  private boolean createsCycle(V from, V to) {
+    Iterator<V> upstreamIterator = Graphs.bfsVertices(LinearList.of(from), this::in);
+    Iterator<V> downstreamIterator = Graphs.bfsVertices(LinearList.of(to), this::out);
+
+    if (!upstreamIterator.hasNext() || !downstreamIterator.hasNext()) {
       return false;
     }
+
+    LinearSet<V> upstream = new LinearSet<V>(vertexHash(), vertexEquality());
+    LinearSet<V> downstream = new LinearSet<V>(vertexHash(), vertexEquality());
+
+    while (upstreamIterator.hasNext() && downstreamIterator.hasNext()) {
+      V a = upstreamIterator.next();
+      if (downstream.contains(a)) {
+        return true;
+      }
+      upstream.add(a);
+
+      V b = downstreamIterator.next();
+      if (upstream.contains(b)) {
+        return true;
+      }
+      downstream.add(b);
+    }
+
+    return false;
   }
 }

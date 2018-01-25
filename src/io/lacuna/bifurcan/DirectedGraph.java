@@ -1,6 +1,8 @@
 package io.lacuna.bifurcan;
 
+import java.util.function.BiPredicate;
 import java.util.function.BinaryOperator;
+import java.util.function.ToIntFunction;
 
 /**
  * @author ztellman
@@ -10,24 +12,26 @@ public class DirectedGraph<V, E> implements IGraph<V, E> {
   private static final Set EMPTY_SET = new Set();
 
   private final Object editor;
-  private Set<V> vertices;
   private Map<V, Map<V, E>> out;
   private Map<V, Set<V>> in;
 
   public DirectedGraph() {
-    this(false, new Set<>(), new Map<>(), new Map<>());
+    this(false, new Map<>(), new Map<>());
   }
 
-  private DirectedGraph(boolean linear, Set<V> vertices, Map<V, Map<V, E>> out, Map<V, Set<V>> in) {
+  public DirectedGraph(ToIntFunction<V> hashFn, BiPredicate<V, V> equalsFn) {
+    this(false, new Map<>(hashFn, equalsFn), new Map<>(hashFn, equalsFn));
+  }
+
+  private DirectedGraph(boolean linear, Map<V, Map<V, E>> out, Map<V, Set<V>> in) {
     this.editor = linear ? new Object() : null;
-    this.vertices = vertices;
     this.out = out;
     this.in = in;
   }
 
   @Override
   public Set<V> vertices() {
-    return vertices;
+    return out.keys();
   }
 
   @Override
@@ -38,10 +42,10 @@ public class DirectedGraph<V, E> implements IGraph<V, E> {
   }
 
   @Override
-  public ISet<V> in(V vertex) {
-    ISet<V> s = in.get(vertex, null);
+  public Set<V> in(V vertex) {
+    Set<V> s = in.get(vertex, null);
     if (s == null) {
-      if (vertices.contains(vertex)) {
+      if (out.contains(vertex)) {
         return EMPTY_SET;
       } else {
         throw new IllegalArgumentException("no such vertex");
@@ -52,17 +56,8 @@ public class DirectedGraph<V, E> implements IGraph<V, E> {
   }
 
   @Override
-  public ISet<V> out(V vertex) {
-    IMap<V, E> m = out.get(vertex, null);
-    if (m == null) {
-      if (vertices.contains(vertex)) {
-        return EMPTY_SET;
-      } else {
-        throw new IllegalArgumentException("no such vertex");
-      }
-    } else {
-      return m.keys();
-    }
+  public Set<V> out(V vertex) {
+    return out.get(vertex).map(Map::keys).orElseThrow(() -> new IllegalArgumentException("no such vertex"));
   }
 
   @Override
@@ -70,17 +65,33 @@ public class DirectedGraph<V, E> implements IGraph<V, E> {
 
     Object editor = isLinear() ? this.editor : new Object();
 
-    Set<V> verticesPrime = vertices.add(from, editor).add(to, editor);
-    Map<V, Map<V, E>> outPrime = out.update(from, m -> (m == null ? new Map<V, E>() : m).put(to, edge, merge, editor), editor);
-    Map<V, Set<V>> inPrime = in.update(to, s -> (s == null ? new Set<V>() : s).add(from, editor), editor);
+    Map<V, Map<V, E>> outPrime = out.update(from, m -> {
+      if (m == null) {
+        m = new Map<>(out.keyHash(), out.keyEquality());
+      }
+      return m.put(to, edge, merge, editor);
+    }, editor);
+
+    outPrime = outPrime.update(to, m -> {
+      if (m == null) {
+        m = new Map<>(out.keyHash(), out.keyEquality());
+      }
+      return m;
+    }, editor);
+
+    Map<V, Set<V>> inPrime = in.update(to, s -> {
+      if (s == null) {
+         s = new Set<>(out.keyHash(), out.keyEquality());
+      }
+      return s.add(from, editor);
+    }, editor);
 
     if (isLinear()) {
-      vertices = verticesPrime;
       out = outPrime;
       in = inPrime;
       return this;
     } else {
-      return new DirectedGraph<>(false, verticesPrime, outPrime, inPrime);
+      return new DirectedGraph<>(false, outPrime, inPrime);
     }
   }
 
@@ -96,7 +107,7 @@ public class DirectedGraph<V, E> implements IGraph<V, E> {
         in = inPrime;
         return this;
       } else {
-        return new DirectedGraph<>(false, vertices, outPrime, inPrime);
+        return new DirectedGraph<>(false, outPrime, inPrime);
       }
     } else {
       return this;
@@ -105,42 +116,40 @@ public class DirectedGraph<V, E> implements IGraph<V, E> {
 
   @Override
   public DirectedGraph<V, E> add(V vertex) {
-    if (vertices.contains(vertex)) {
+    if (out.contains(vertex)) {
       return this;
     } else {
       Object editor = isLinear() ? this : new Object();
-      Set<V> verticesPrime = vertices.add(vertex, editor);
       Map<V, Map<V, E>> outPrime = out.put(vertex, new Map<>(), (BinaryOperator<Map<V, E>>) Maps.MERGE_LAST_WRITE_WINS, editor);
 
       if (isLinear()) {
-        vertices = verticesPrime;
         out = outPrime;
         return this;
       } else {
-        return new DirectedGraph<>(false, verticesPrime, outPrime, in);
+        return new DirectedGraph<>(false, outPrime, in);
       }
     }
   }
 
   @Override
   public DirectedGraph<V, E> remove(V vertex) {
-    if (vertices.contains(vertex)) {
+    if (out.contains(vertex)) {
       Object editor = isLinear() ? this : new Object();
 
-      Set<V> verticesPrime = vertices.remove(vertex, editor);
       Map<V, Map<V, E>> outPrime = out.remove(vertex, editor);
+
       Map<V, Set<V>> inPrime = this.in.linear();
       for (V v : out.get(vertex).get().keys()) {
-        in = in.update(v, s -> s.remove(vertex, editor), editor);
+        inPrime.update(v, s -> s.remove(vertex, editor), editor);
       }
+      inPrime = inPrime.forked();
 
       if (isLinear()) {
-        vertices = verticesPrime;
         out = outPrime;
         in = inPrime;
         return this;
       } else {
-        return new DirectedGraph<>(false, verticesPrime, outPrime, inPrime);
+        return new DirectedGraph<>(false, outPrime, inPrime);
       }
     } else {
       return this;
@@ -153,7 +162,6 @@ public class DirectedGraph<V, E> implements IGraph<V, E> {
       DirectedGraph<V, E> g = (DirectedGraph<V, E>) graph;
       return new DirectedGraph<>(
               isLinear(),
-              vertices.union(g.vertices),
               out.merge(g.out, (a, b) -> a.merge(b, merge)),
               in.merge(g.in, Set::union));
     } else {
@@ -163,27 +171,40 @@ public class DirectedGraph<V, E> implements IGraph<V, E> {
 
   @Override
   public DirectedGraph<V, E> select(ISet<V> vertices) {
-    Set<V> selected = this.vertices.intersection(vertices);
-    return new DirectedGraph<>(
+    return new DirectedGraph<V, E>(
             isLinear(),
-            selected,
-            vertices.stream().collect(Maps.collector(v -> v, v -> out.get(v).map(x -> x.intersection(selected)).orElseGet(Map::new))),
-            vertices.stream().collect(Maps.collector(v -> v, v -> in.get(v).map(x -> x.intersection(selected)).orElseGet(Set::new))));
+            out.intersection(vertices).mapVals(m -> m.intersection(vertices)),
+            in.intersection(vertices).mapVals(s -> s.intersection(vertices)));
   }
 
   @Override
   public DirectedGraph<V, E> forked() {
-    return isLinear() ? new DirectedGraph<>(false, vertices, out, in) : this;
+    return isLinear() ? new DirectedGraph<>(false, out, in) : this;
   }
 
   @Override
   public DirectedGraph<V, E> linear() {
-    return isLinear() ? this : new DirectedGraph<>(true, vertices, out, in);
+    return isLinear() ? this : new DirectedGraph<>(true, out, in);
   }
 
   @Override
   public boolean isLinear() {
     return editor != null;
+  }
+
+  @Override
+  public boolean isDirected() {
+    return true;
+  }
+
+  @Override
+  public ToIntFunction<V> vertexHash() {
+    return out.keyHash();
+  }
+
+  @Override
+  public BiPredicate<V, V> vertexEquality() {
+    return out.keyEquality();
   }
 
   @Override
@@ -195,8 +216,11 @@ public class DirectedGraph<V, E> implements IGraph<V, E> {
   public boolean equals(Object obj) {
     if (obj instanceof DirectedGraph) {
       return ((DirectedGraph) obj).out.equals(out);
+    } else if (obj instanceof IGraph) {
+      return Graphs.equals(this, (IGraph<V, E>) obj);
+    } else {
+      return false;
     }
-    return false;
   }
 
   @Override

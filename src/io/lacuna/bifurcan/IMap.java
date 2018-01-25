@@ -97,6 +97,15 @@ public interface IMap<K, V> extends
   long size();
 
   /**
+   * @param f a function which transforms the values
+   * @param <U> the new type of the values
+   * @return a transformed map
+   */
+  default <U> IMap<K, U> mapVals(Function<V, U> f) {
+    return Maps.from(keys(), k -> get(k).map(f).get());
+  }
+
+  /**
    * @param set a set of keys
    * @return true if this map contains all elements in {@code set}
    */

@@ -1,7 +1,9 @@
 package io.lacuna.bifurcan;
 
 import java.util.Iterator;
+import java.util.function.BiPredicate;
 import java.util.function.BinaryOperator;
+import java.util.function.ToIntFunction;
 
 import static io.lacuna.bifurcan.Graphs.MERGE_LAST_WRITE_WINS;
 
@@ -28,12 +30,16 @@ public interface IGraph<V, E> extends ILinearizable<IGraph<V, E>>, IForkable<IGr
   E edge(V from, V to);
 
   /**
+   * In an undirected graph, this is equivalent to {@code out()}.
+   *
    * @return the set of all incoming edges to {@code vertex}
    * @throws IllegalArgumentException if no such vertex exists
    */
   ISet<V> in(V vertex);
 
   /**
+   * In an undirected graph, this is equivalent to {@code in()}.
+   *
    * @return the set of all outgoing edges from {@code vertex}
    * @throws IllegalArgumentException if no such vertex exists
    */
@@ -63,15 +69,59 @@ public interface IGraph<V, E> extends ILinearizable<IGraph<V, E>>, IForkable<IGr
    */
   IGraph<V, E> remove(V vertex);
 
+  /**
+   * @return a graph containing only the specified vertices and the edges between them
+   */
   default IGraph<V, E> select(ISet<V> vertices) {
     IGraph<V, E> g = this.linear();
-    for (V v : vertices().difference(vertices)) {
-      g = g.remove(v);
-    }
-    return g.forked();
+    vertices().difference(vertices).forEach(g::remove);
+    return this.isLinear() ? this : g.forked();
   }
 
+  /**
+   * @return
+   */
+  default IGraph<V, E> replace(V a, V b) {
+    return replace(a, b, (BinaryOperator<E>) Graphs.MERGE_LAST_WRITE_WINS);
+  }
+
+  /**
+   * @param a
+   * @param b
+   * @param merge
+   * @return
+   */
+  default IGraph<V, E> replace(V a, V b, BinaryOperator<E> merge) {
+    if (vertexEquality().test(a, b)) {
+      return this;
+    }
+
+    IGraph<V, E> g = this.linear();
+    this.in(a).forEach(v -> g.link(v, b, this.edge(v, a), merge));
+    g.remove(a);
+
+    return this.isLinear() ? this : g.forked();
+  }
+
+  /**
+   * @return
+   */
   boolean isLinear();
+
+  /**
+   * @return
+   */
+  boolean isDirected();
+
+  /**
+   * @return
+   */
+  ToIntFunction<V> vertexHash();
+
+  /**
+   * @return
+   */
+  BiPredicate<V, V> vertexEquality();
 
   // polymorphic utility methods
 
