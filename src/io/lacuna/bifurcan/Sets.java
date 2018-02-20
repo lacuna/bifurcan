@@ -32,6 +32,16 @@ public class Sets {
     }
 
     @Override
+    public long indexOf(Object element) {
+      return -1;
+    }
+
+    @Override
+    public Object nth(long index) {
+      throw new IndexOutOfBoundsException();
+    }
+
+    @Override
     public ISet add(Object value) {
       return new Set().add(value);
     }
@@ -111,12 +121,32 @@ public class Sets {
     }
 
     @Override
-    public IList<V> elements() {
+    public long indexOf(V element) {
       if (!altered()) {
-        return Lists.concat(added.elements(), base.elements());
+        long idx = added.indexOf(element);
+        if (idx == -1) {
+          idx = base.indexOf(element);
+          return idx == -1 ? idx : added.size() + idx;
+        } else {
+          return idx;
+        }
       } else {
         canonicalize();
-        return canonical.elements();
+        return canonical.indexOf(element);
+      }
+    }
+
+    @Override
+    public V nth(long index) {
+      if (!altered()) {
+        if (index < added.size()) {
+          return added.nth(index);
+        } else {
+          return base.nth(index - added.size());
+        }
+      } else {
+        canonicalize();
+        return canonical.nth(index);
       }
     }
 
@@ -282,7 +312,7 @@ public class Sets {
 
       @Override
       public boolean containsAll(Collection<?> c) {
-        return c.stream().allMatch(e -> contains(e));
+        return c.stream().allMatch(this::contains);
       }
 
       @Override
@@ -329,50 +359,18 @@ public class Sets {
       }
 
       @Override
+      public long indexOf(V element) {
+        throw new UnsupportedOperationException();
+      }
+
+      @Override
+      public V nth(long index) {
+        return elements.nth(index);
+      }
+
+      @Override
       public Iterator<V> iterator() {
         return iterator.get();
-      }
-
-      @Override
-      public int hashCode() {
-        return (int) Sets.hash(this);
-      }
-
-      @Override
-      public boolean equals(Object obj) {
-        if (obj instanceof ISet) {
-          return Sets.equals(this, (ISet<V>) obj);
-        }
-        return false;
-      }
-
-      @Override
-      public String toString() {
-        return Sets.toString(this);
-      }
-    };
-  }
-
-  public static <V> ISet<V> from(java.util.Set<V> s) {
-    return new ISet<V>() {
-      @Override
-      public boolean contains(V value) {
-        return s.contains(value);
-      }
-
-      @Override
-      public long size() {
-        return s.size();
-      }
-
-      @Override
-      public Iterator<V> iterator() {
-        return s.iterator();
-      }
-
-      @Override
-      public IList<V> elements() {
-        return (IList<V>) Lists.from(s.toArray());
       }
 
       @Override

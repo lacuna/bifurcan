@@ -3,6 +3,7 @@ package io.lacuna.bifurcan;
 import java.util.Iterator;
 import java.util.function.BiPredicate;
 import java.util.function.BinaryOperator;
+import java.util.function.Function;
 import java.util.function.ToIntFunction;
 
 import static io.lacuna.bifurcan.Graphs.MERGE_LAST_WRITE_WINS;
@@ -22,6 +23,11 @@ public interface IGraph<V, E> extends ILinearizable<IGraph<V, E>>, IForkable<IGr
    * @return the set of all vertices in the graph
    */
   ISet<V> vertices();
+
+  /**
+   * @return an iterator over every edge in the graph
+   */
+  Iterator<IEdge<V, E>> edges();
 
   /**
    * @return the value of the edge between {@code from} and {@code to}
@@ -68,6 +74,8 @@ public interface IGraph<V, E> extends ILinearizable<IGraph<V, E>>, IForkable<IGr
    * @return a graph with {@code vertex} removed, as well as all incoming and outgoing edges
    */
   IGraph<V, E> remove(V vertex);
+
+  <U> IGraph<V, U> mapEdges(Function<IEdge<V, E>, U> f);
 
   /**
    * @return a graph containing only the specified vertices and the edges between them
@@ -122,6 +130,11 @@ public interface IGraph<V, E> extends ILinearizable<IGraph<V, E>>, IForkable<IGr
    * @return
    */
   BiPredicate<V, V> vertexEquality();
+
+  /**
+   * @return
+   */
+  IGraph<V, E> transpose();
 
   // polymorphic utility methods
 

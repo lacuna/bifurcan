@@ -38,6 +38,16 @@ public class Maps {
     }
 
     @Override
+    public long indexOf(Object key) {
+      return -1;
+    }
+
+    @Override
+    public IEntry nth(long index) {
+      throw new IndexOutOfBoundsException();
+    }
+
+    @Override
     public long size() {
       return 0;
     }
@@ -247,12 +257,32 @@ public class Maps {
     }
 
     @Override
-    public synchronized IList<IEntry<K, V>> entries() {
+    public long indexOf(K key) {
       if (!altered()) {
-        return Lists.concat(added.entries(), base.entries());
+        long idx = added.indexOf(key);
+        if (idx == -1) {
+          idx = base.indexOf(key);
+          return idx == -1 ? idx : added.size() + idx;
+        } else {
+          return idx;
+        }
       } else {
         canonicalize();
-        return canonical.entries();
+        return canonical.indexOf(key);
+      }
+    }
+
+    @Override
+    public IEntry<K, V> nth(long index) {
+      if (!altered()) {
+        if (index < added.size()) {
+          return added.nth(index);
+        } else {
+          return base.nth(index - added.size());
+        }
+      } else {
+        canonicalize();
+        return canonical.nth(index);
       }
     }
 
@@ -331,13 +361,6 @@ public class Maps {
     });
   }
 
-  public static <K, V> IMap<K, V> from(java.util.Map<K, V> map) {
-    return from(
-        Sets.from(map.keySet()),
-        k -> map.get(k),
-        () -> Iterators.map(map.entrySet().iterator(), e -> new Maps.Entry<>(e.getKey(), e.getValue())));
-  }
-
   public static <K, V> IMap<K, V> from(ISet<K> keys, Function<K, V> lookup) {
     return from(keys, lookup, () -> Iterators.map(keys.iterator(), k -> new Maps.Entry<>(k, lookup.apply(k))));
   }
@@ -373,10 +396,14 @@ public class Maps {
       }
 
       @Override
-      public IList<IEntry<K, V>> entries() {
-        return keys.elements().stream()
-            .map(k -> (IEntry<K, V>) new Entry(k, lookup.apply(k)))
-            .collect(Lists.collector());
+      public long indexOf(K key) {
+        return keys.indexOf(key);
+      }
+
+      @Override
+      public IEntry<K, V> nth(long index) {
+        K key = keys.nth(index);
+        return new Entry<>(key, lookup.apply(key));
       }
 
       @Override
@@ -483,9 +510,21 @@ public class Maps {
 
       @Override
       public boolean equals(Object obj) {
+
         if (obj instanceof java.util.Map) {
-          return Maps.equals(map, from((java.util.Map<K, V>) obj));
+          java.util.Map<K, V> m = (java.util.Map<K, V>) obj;
+          if (size() != m.size()) {
+            return false;
+          } else if (this == m) {
+            return true;
+          }
+
+          return m.entrySet().stream().allMatch(e -> {
+            Object val = ((Map) map).get(e.getKey(), DEFAULT_VALUE);
+            return val != DEFAULT_VALUE && Objects.equals((V) val, e.getValue());
+          });
         }
+
         return false;
       }
 

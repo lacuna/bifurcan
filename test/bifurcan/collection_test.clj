@@ -71,6 +71,20 @@
     (-> b .iterator iterator-seq)
     (->> (.size b) range (map #(.nth b %)) seq)))
 
+(defn valid-map-indices? [^IMap m]
+  (->> m
+    .keys
+    .iterator
+    iterator-seq
+    (every? #(= % (.key (.nth m (.indexOf m %)))))))
+
+(defn valid-set-indices? [^ISet m]
+  (->> m
+    .elements
+    .iterator
+    iterator-seq
+    (every? #(= % (.nth m (.indexOf m %))))))
+
 ;;;
 
 (def gen-element (gen/elements [0 1]))
@@ -204,6 +218,14 @@
   (let [a (persistent! a)]
     (map= a b)))
 
+(u/def-collection-check test-map-indices iterations map-actions
+  [a (Map.) bifurcan-map]
+  (valid-map-indices? a))
+
+(u/def-collection-check test-int-map-indices iterations map-actions
+  [a (IntMap.) bifurcan-map]
+  (valid-map-indices? a))
+
 ;; Sets
 
 (u/def-collection-check test-linear-set iterations set-actions
@@ -226,6 +248,10 @@
    b Sets/EMPTY bifurcan-set]
   (let [a (persistent! a)]
     (set= a b)))
+
+(u/def-collection-check test-set-indices iterations set-actions
+  [a (Set.) bifurcan-set]
+  (valid-set-indices? a))
 
 ;; Lists
 

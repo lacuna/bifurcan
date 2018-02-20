@@ -6,9 +6,7 @@ import io.lacuna.bifurcan.utils.Iterators;
 
 import java.util.*;
 import java.util.Map;
-import java.util.function.BiPredicate;
-import java.util.function.BinaryOperator;
-import java.util.function.ToIntFunction;
+import java.util.function.*;
 
 /**
  * A map which has integer keys, which is an combination of Okasaki and Gill's
@@ -22,7 +20,7 @@ import java.util.function.ToIntFunction;
  *
  * @author ztellman
  */
-public class IntMap<V> implements IMap<Long, V>, Cloneable {
+public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
 
   private static final ToIntFunction<Long> HASH = n -> (int) (n ^ (n >>> 32));
   private static final Object DEFAULT_VALUE = new Object();
@@ -111,6 +109,11 @@ public class IntMap<V> implements IMap<Long, V>, Cloneable {
         negPrime == null ? Node.NEG_EMPTY : negPrime,
         posPrime == null ? Node.POS_EMPTY : posPrime,
         linear);
+  }
+
+  @Override
+  public IntMap<V> slice(Long min, Long max) {
+    return slice((long) min, (long) max);
   }
 
   @Override
@@ -230,6 +233,12 @@ public class IntMap<V> implements IMap<Long, V>, Cloneable {
     return remove((long) key);
   }
 
+  @Override
+  public <U> IntMap<U> mapValues(BiFunction<Long, V, U> f) {
+    Object editor = new Object();
+    return new IntMap<>(neg.mapVals(editor, f), pos.mapVals(editor, f), isLinear());
+  }
+
   public V get(long key, V defaultValue) {
     return (V) (key < 0 ? neg : pos).get(key, defaultValue);
   }
@@ -249,11 +258,17 @@ public class IntMap<V> implements IMap<Long, V>, Cloneable {
   }
 
   @Override
-  public IList<IEntry<Long, V>> entries() {
-    return Lists.from(
-        size(),
-        i -> (i < neg.size()) ? neg.nth((int) i) : pos.nth((int) (i - neg.size())),
-        this::iterator);
+  public long indexOf(Long key) {
+    return indexOf((long) key);
+  }
+
+  public long indexOf(long key) {
+    return key < 0 ? neg.indexOf(key) : neg.size() + pos.indexOf(key);
+  }
+
+  @Override
+  public IEntry<Long, V> nth(long index) {
+    return index < neg.size() ? neg.nth(index) : pos.nth(index - neg.size());
   }
 
   @Override
@@ -278,6 +293,11 @@ public class IntMap<V> implements IMap<Long, V>, Cloneable {
     }
   }
 
+  @Override
+  public IEntry<Long, V> floor(Long key) {
+    return floor((long) key);
+  }
+
   /**
    * @return the entry whose key is either equal to {@code key}, or just above it. If {@code key} is greater than the
    * maximum value in the map, returns {@code null}.
@@ -293,6 +313,11 @@ public class IntMap<V> implements IMap<Long, V>, Cloneable {
         return pos.size() > 0 ? pos.nth(0) : null;
       }
     }
+  }
+
+  @Override
+  public IEntry<Long, V> ceil(Long key) {
+    return ceil((long) key);
   }
 
   @Override

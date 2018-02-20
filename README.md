@@ -25,23 +25,9 @@ This library builds only on the primitives provided by the Java 8 standard libra
 * [List](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/List.html) is an immutable list, which also allows for modification at both ends, as well as random reads and writes.  Due to its [relaxed radix structure](https://infoscience.epfl.ch/record/169879/files/RMTrees.pdf), it also allows for near constant-time slices and concatenation.
 * [IntMap](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/IntMap.html) is an immutable sorted map of integers onto arbitrary values, and can be used as an efficient sparse vector.
 * [Rope](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/Rope.html) is an immutable tree-based sequence of Unicode characters.  Unlike Java's `String`, it uses UTF-8 encoding and can efficiently index via both full code points and Java's preferred UTF-16 code units.
+* [Graph](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/Graph.html), [DirectedGraph](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/DirectedGraph.html), and [DirectedAcyclicGraph](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/DirectedAcyclicGraph.html) implementations, which provide immutable graph data structures.
 
 Full benchmarks for these collections [can be found here](https://github.com/lacuna/bifurcan/blob/master/doc/benchmarks.md).  Full documentation [can be found here](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/package-summary.html).
-
-Bifurcan also allows for "virtual" collections, which can be defined using functions:
-
-```java
-// creates a list representing numbers from 0 to 999,999 without any backing memory
-IList<Long> list = Lists.from(1_000_000, i -> i);
-
-// creates a set representing that same range
-ISet<Long> set = Sets.from(list, i -> 0 <= i && i < 1_000_000);
-  
-// creates a map of the numbers onto their corresponding square
-IMap<Long, Long> map = Maps.from(set, i -> i * i);
-```
-
-Each of these collections are identical to their concrete, immutable equivalent.  They can be updated, in which case only the changes to the underlying collection will be stored in memory.
 
 ### "linear" and "forked" collections
 
@@ -51,10 +37,10 @@ Immutable data structures free us from having to care.  Functions can update or 
 
 This freedom, however, comes at a cost.  Updates to immutable data structures require a subset of the structure to be copied, which is much more expensive than simply overwriting existing memory.
 
-If a data structure is referenced in multiple places, this is a cost which is typically worth paying.  However, this is just wasteful:
+If a data structure is referenced in multiple places, this is usually a cost worth paying.  However, in this case it's just wasteful:
 
 ```java
-Set<Long> set = new Set();
+Set<Long> set = new Set<>();
 for (int i = 0; i < 1000; i++) {
   set = set.add(i);
 }
@@ -65,7 +51,7 @@ This will create 999 intermediate copies of the set, none of which we care about
 Where the dataflow is linear, we can safely use mutable collections.  Where it is not, we prefer to use immutable collections.  Since this linear flow is a local property, we would also like mutability to be a local property:
 
 ```java
-Set<Long> set = new Set().linear();
+Set<Long> set = new Set<>().linear();
 for (int i = 0; i < 1000; i++) {
   set.add(i);
 }
@@ -75,7 +61,7 @@ set = set.forked();
 The call to `linear()` indicates that the collection has a single owner, and may be updated in-place.  The call to `forked()` indicates that this is no true.  By allowing temporary mutability, we gain huge performance benefits.  However, there is still a cost relative to purely mutable data structures.  For this reason, Bifurcan provides permanently linear variants of each collection:
 
 ```java
-LinearSet<Long> set = new LinearSet();
+LinearSet<Long> set = new LinearSet<>();
 for (int i = 0; i < 1000; i++) {
   set.add(i);
 }

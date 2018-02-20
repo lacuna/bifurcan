@@ -182,6 +182,17 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
   }
 
   @Override
+  public <U> LinearMap<K, U> mapValues(BiFunction<K, V, U> f) {
+    LinearMap m = clone();
+    for (int i = 0; i < m.size(); i++) {
+      int idx = i << 1;
+      m.entries[idx] = f.apply((K) m.entries[idx], (V) m.entries[idx + 1]);
+    }
+
+    return m;
+  }
+
+  @Override
   public boolean contains(K key) {
     return tableIndex(keyHash(key), key) >= 0;
   }
@@ -212,14 +223,15 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
   }
 
   @Override
-  public IList<IEntry<K, V>> entries() {
-    return Lists.from(
-            size,
-            i -> {
-              int idx = ((int) i) << 1;
-              return new Maps.Entry<>((K) entries[idx], (V) entries[idx + 1]);
-            },
-            () -> iterator());
+  public long indexOf(K key) {
+    int idx = tableIndex(keyHash(key), key);
+    return idx >= 0 ? Row.keyIndex(table[idx]) : -1;
+  }
+
+  @Override
+  public IEntry<K, V> nth(long index) {
+    int idx = ((int) index) << 1;
+    return new Maps.Entry<>((K) entries[idx], (V) entries[idx + 1]);
   }
 
   @Override

@@ -58,7 +58,19 @@ public interface ISet<V> extends
   /**
    * @return an {@code IList} containing all the elements in the set
    */
-  IList<V> elements();
+  default IList<V> elements() {
+    return Lists.from(size(), this::nth, this::iterator);
+  }
+
+  /**
+   * @return the position of {@code element} in {@code nth()}, or -1 if it is not present
+   */
+  long indexOf(V element);
+
+  /**
+   * @return the nth element in the set
+   */
+  V nth(long index);
 
   /**
    * @return true if this set contains every element in {@code set}

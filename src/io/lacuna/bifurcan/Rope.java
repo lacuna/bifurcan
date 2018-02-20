@@ -29,13 +29,12 @@ public class Rope implements Comparable<Rope>, ILinearizable<Rope>, IForkable<Ro
 
   public static final Rope EMPTY = Rope.from("");
 
-  private final boolean linear;
   private final Object editor;
   private Node root;
+  private int hash = -1;
 
-  Rope(Object editor, Node node, boolean linear) {
-    this.linear = linear;
-    this.editor = editor;
+  Rope(Node node, boolean linear) {
+    this.editor = linear ? new Object() : null;
     this.root = node;
   }
 
@@ -55,7 +54,7 @@ public class Rope implements Comparable<Rope>, ILinearizable<Rope>, IForkable<Ro
       }
     }
 
-    return new Rope(editor, root, false);
+    return new Rope(root, false);
 
   }
 
@@ -64,8 +63,7 @@ public class Rope implements Comparable<Rope>, ILinearizable<Rope>, IForkable<Ro
    * @return a new Rope which is the concatenation of these two values
    */
   public Rope concat(Rope rope) {
-    Object editor = new Object();
-    return new Rope(editor, root.concat(rope.root, editor), linear);
+    return new Rope(root.concat(rope.root, new Object()), isLinear());
   }
 
   /**
@@ -92,7 +90,7 @@ public class Rope implements Comparable<Rope>, ILinearizable<Rope>, IForkable<Ro
    */
   public Rope remove(int start, int end) {
 
-    Object editor = linear ? this.editor : new Object();
+    Object editor = isLinear() ? this.editor : new Object();
 
     if (end < start || start < 0 || end > size()) {
       throw new IllegalArgumentException("[" + start + ", " + end + ") is not a valid range");
@@ -117,11 +115,11 @@ public class Rope implements Comparable<Rope>, ILinearizable<Rope>, IForkable<Ro
       newRoot = root.slice(0, start, editor).concat(root.slice(end, size(), editor), editor);
     }
 
-    if (linear) {
+    if (isLinear()) {
       root = newRoot;
       return this;
     } else {
-      return new Rope(editor, newRoot, false);
+      return new Rope(newRoot, false);
     }
   }
 
@@ -131,7 +129,7 @@ public class Rope implements Comparable<Rope>, ILinearizable<Rope>, IForkable<Ro
       throw new IndexOutOfBoundsException();
     }
 
-    Object editor = linear ? this.editor : new Object();
+    Object editor = isLinear() ? this.editor : new Object();
     Node newRoot = null;
 
     // can we just update a single leaf node?
@@ -157,11 +155,11 @@ public class Rope implements Comparable<Rope>, ILinearizable<Rope>, IForkable<Ro
       newRoot = newRoot.concat(root.slice(index, size(), editor), editor);
     }
 
-    if (linear) {
+    if (isLinear()) {
       root = newRoot;
       return this;
     } else {
-      return new Rope(editor, newRoot, false);
+      return new Rope(newRoot, false);
     }
   }
 
@@ -196,18 +194,21 @@ public class Rope implements Comparable<Rope>, ILinearizable<Rope>, IForkable<Ro
       throw new IllegalArgumentException("[" + start + ", " + end + ") is not a valid range");
     }
 
-    Object editor = new Object();
-    return new Rope(editor, root.slice(start, end, editor), linear);
+    return new Rope(root.slice(start, end, new Object()), isLinear());
+  }
+
+  public boolean isLinear() {
+    return editor != null;
   }
 
   @Override
   public Rope forked() {
-    return linear ? new Rope(new Object(), root, false) : this;
+    return isLinear() ? new Rope(root, false) : this;
   }
 
   @Override
   public Rope linear() {
-    return linear ? this : new Rope(new Object(), root, true);
+    return isLinear() ? this : new Rope(root, true);
   }
 
   /**

@@ -169,7 +169,10 @@ public class Graphs {
     }
 
     // algorithmic state
-    IMap<V, ArticulationPointState<V>> state = new LinearMap<>((int) graph.vertices().size(), graph.vertexHash(), graph.vertexEquality());
+    IMap<V, ArticulationPointState<V>> state = new LinearMap<>(
+            (int) graph.vertices().size(),
+            graph.vertexHash(),
+            graph.vertexEquality());
 
     // call-stack state
     LinearList<ArticulationPointState<V>> path = new LinearList<>();
@@ -254,9 +257,11 @@ public class Graphs {
     }
 
     // algorithmic state
-    IMap<V, TarjanState> state = new LinearMap<>((int) graph.vertices().size(), graph.vertexHash(), graph.vertexEquality());
+    IMap<V, TarjanState> state = new LinearMap<>(
+            (int) graph.vertices().size(),
+            graph.vertexHash(),
+            graph.vertexEquality());
     LinearList<V> stack = new LinearList<>();
-    int idx = 0;
 
     // call-stack state
     LinearList<V> path = new LinearList<>();
@@ -280,7 +285,7 @@ public class Graphs {
           V w = branches.last().next();
           TarjanState ws = state.get(w, null);
           if (ws == null) {
-            ws = new TarjanState(idx++);
+            ws = new TarjanState((int) state.size());
             state.put(w, ws);
             stack.addLast(w);
             path.addLast(w);
@@ -354,39 +359,6 @@ public class Graphs {
         });
 
         return v;
-      }
-    };
-  }
-
-  public static <V, E> Iterator<IEdge<V, E>> bfsEdges(Iterable<V> start, IGraph<V, E> graph, Function<V, Iterable<V>> adjacent) {
-    LinearList<Edge<V, E>> queue = new LinearList<>();
-    ISet<V> traversed = new LinearSet<V>();
-
-    for (V v : start) {
-      traversed.add(v);
-      for (V w : adjacent.apply(v)) {
-        queue.addLast(Edge.create(graph, v, w));
-      }
-    }
-
-    return new Iterator<IEdge<V, E>>() {
-      @Override
-      public boolean hasNext() {
-        return queue.size() > 0;
-      }
-
-      @Override
-      public Edge<V, E> next() {
-        Edge<V, E> e = queue.popFirst();
-        traversed.add(e.to);
-
-        adjacent.apply(e.to).forEach(w -> {
-          if (!traversed.contains(w)) {
-            queue.addLast(Edge.create(graph, e.to, w));
-          }
-        });
-
-        return e;
       }
     };
   }

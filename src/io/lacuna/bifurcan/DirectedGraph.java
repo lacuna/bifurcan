@@ -1,7 +1,12 @@
 package io.lacuna.bifurcan;
 
+import io.lacuna.bifurcan.utils.Functions;
+import io.lacuna.bifurcan.utils.Iterators;
+
+import java.util.Iterator;
 import java.util.function.BiPredicate;
 import java.util.function.BinaryOperator;
+import java.util.function.Function;
 import java.util.function.ToIntFunction;
 
 /**
@@ -35,6 +40,14 @@ public class DirectedGraph<V, E> implements IGraph<V, E> {
   }
 
   @Override
+  public Iterator<IEdge<V, E>> edges() {
+    return out.entries().stream()
+            .flatMap(outer -> outer.value().entries().stream()
+                    .map(inner -> (IEdge<V, E>) new Graphs.Edge<V, E>(inner.value(), inner.key(), outer.key())))
+            .iterator();
+  }
+
+  @Override
   public E edge(V from, V to) {
     return out.get(from)
             .flatMap(m -> m.get(to))
@@ -61,6 +74,14 @@ public class DirectedGraph<V, E> implements IGraph<V, E> {
   }
 
   @Override
+  public <U> DirectedGraph<V, U> mapEdges(Function<IEdge<V, E>, U> f) {
+    return new DirectedGraph<>(
+            isLinear(),
+            out.mapValues((u, m) -> m.mapValues((v, e) -> f.apply(new Graphs.Edge<>(e, u, v)))),
+            in);
+  }
+
+  @Override
   public DirectedGraph<V, E> link(V from, V to, E edge, BinaryOperator<E> merge) {
 
     Object editor = isLinear() ? this.editor : new Object();
@@ -81,7 +102,7 @@ public class DirectedGraph<V, E> implements IGraph<V, E> {
 
     Map<V, Set<V>> inPrime = in.update(to, s -> {
       if (s == null) {
-         s = new Set<>(out.keyHash(), out.keyEquality());
+        s = new Set<>(out.keyHash(), out.keyEquality());
       }
       return s.add(from, editor);
     }, editor);
@@ -173,8 +194,8 @@ public class DirectedGraph<V, E> implements IGraph<V, E> {
   public DirectedGraph<V, E> select(ISet<V> vertices) {
     return new DirectedGraph<V, E>(
             isLinear(),
-            out.intersection(vertices).mapVals(m -> m.intersection(vertices)),
-            in.intersection(vertices).mapVals(s -> s.intersection(vertices)));
+            out.intersection(vertices).mapValues((x, m) -> m.intersection(vertices)),
+            in.intersection(vertices).mapValues((x, s) -> s.intersection(vertices)));
   }
 
   @Override
@@ -195,6 +216,14 @@ public class DirectedGraph<V, E> implements IGraph<V, E> {
   @Override
   public boolean isDirected() {
     return true;
+  }
+
+  @Override
+  public DirectedGraph<V, E> transpose() {
+    return new DirectedGraph<>(
+            isLinear(),
+            in.mapValues((u, s) -> s.map.mapValues((v, x) -> this.edge(u, v))),
+            out.mapValues((x, m) -> m.keys()));
   }
 
   @Override

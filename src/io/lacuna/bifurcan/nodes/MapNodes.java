@@ -9,8 +9,10 @@ import io.lacuna.bifurcan.utils.Iterators;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.PrimitiveIterator;
+import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
 import java.util.function.BinaryOperator;
+import java.util.function.Function;
 
 import static io.lacuna.bifurcan.nodes.MapNodes.Node.SHIFT_INCREMENT;
 import static io.lacuna.bifurcan.nodes.Util.*;
@@ -33,11 +35,15 @@ public class MapNodes {
 
     INode<K, V> remove(int shift, Object editor, int hash, K key, BiPredicate<K, K> equals);
 
+    <U> INode<K, U> mapVals(Object editor, BiFunction<K, V, U> f);
+
     int hash(int idx);
 
     long size();
 
     IEntry<K, V> nth(long idx);
+
+    long indexOf(int shift, int hash, K key, BiPredicate<K, K> equals);
 
     Iterable<IEntry<K, V>> entries();
 
@@ -71,19 +77,43 @@ public class MapNodes {
     // lookup
 
     @Override
+    public long indexOf(int shift, int hash, K key, BiPredicate<K, K> equals) {
+      int mask = hashMask(hash, shift);
+      if (isEntry(mask)) {
+        int idx = entryIndex(mask);
+        return hash == hashes[idx] && equals.test(key, (K) content[idx << 1]) ? idx : -1;
+
+      } else if (isNode(mask)) {
+        long idx = node(mask).indexOf(shift + SHIFT_INCREMENT, hash, key, equals);
+        if (idx == -1) {
+          return -1;
+        } else {
+          int nodeIdx = nodeIndex(mask);
+          idx += bitCount(datamap);
+          for (int i = 0; i < nodeIdx; i++) {
+            idx += ((INode<K, V>) content[content.length - (i + 1)]).size();
+          }
+          return idx;
+        }
+
+      } else {
+        return -1;
+      }
+    }
+
+    @Override
     public IEntry<K, V> nth(long idx) {
 
       // see if the entry is local to this node
-      int entries = Integer.bitCount(datamap);
-      if (idx < entries) {
-        K key = (K) content[(int) idx << 1];
-        V val = (V) content[((int) idx << 1) + 1];
-        return new Maps.Entry<>(key, val);
+      int numEntries = bitCount(datamap);
+      if (idx < numEntries) {
+        int contentIdx = (int) (idx << 1);
+        return new Maps.Entry<>((K) content[contentIdx], (V) content[contentIdx + 1]);
       }
 
       // see if the entry is local to our children
-      idx -= entries;
       if (idx < size) {
+        idx -= numEntries;
         for (INode<K, V> node : nodes()) {
           if (idx < node.size()) {
             return node.nth(idx);
@@ -231,6 +261,21 @@ public class MapNodes {
         return this;
       }
     }
+
+    public <U> Node<K, U> mapVals(Object editor, BiFunction<K, V, U> f) {
+      Node n = clone(editor);
+      for (int i = bitCount(n.datamap); i >= 0; i--) {
+        int idx = i << 1;
+        n.content[idx] = f.apply((K) n.content[idx], (V) n.content[idx + 1]);
+      }
+
+      for (int i = content.length - 1 - bitCount(n.nodemap); i < content.length; i++) {
+        n.content[i] = ((Node<K, V>) n.content[i]).mapVals(editor, f);
+      }
+
+      return n;
+    }
+
 
     // iteration
 
@@ -381,11 +426,7 @@ public class MapNodes {
     }
 
     private Iterable<INode<K, V>> nodes() {
-      return () ->
-              Iterators.range(
-                      content.length - Integer.bitCount(nodemap),
-                      content.length,
-                      i -> (INode<K, V>) content[(int) i]);
+      return () -> Iterators.range(0, bitCount(nodemap), i -> (INode<K, V>) content[content.length - 1 - (int) i]);
     }
 
     private INode<K, V> collapse(int shift) {
@@ -565,6 +606,19 @@ public class MapNodes {
       return new Maps.Entry<>((K) entries[i], (V) entries[i + 1]);
     }
 
+    @Override
+    public long indexOf(int shift, int hash, K key, BiPredicate<K, K> equals) {
+      if (this.hash == hash) {
+        for (int i = 0; i < entries.length; i += 2) {
+          if (equals.test(key, (K) entries[i])) {
+            return i >> 1;
+          }
+        }
+      }
+
+      return -1;
+    }
+
     // update
 
     @Override
@@ -590,6 +644,16 @@ public class MapNodes {
         return idx < 0 ? this : new Collision<K, V>(hash, ArrayVector.remove(entries, idx, 2));
       }
     }
+
+    public <U> Collision<K, U> mapVals(Object editor, BiFunction<K, V, U> f) {
+      Collision c = new Collision(hash, entries.clone());
+      for (int i = 0; i < entries.length; i += 2) {
+        c.entries[i + 1] = f.apply((K) c.entries[i], (V) c.entries[i + 1]);
+      }
+
+      return c;
+    }
+
 
     // iteration
 

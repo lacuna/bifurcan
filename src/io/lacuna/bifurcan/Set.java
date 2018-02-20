@@ -104,9 +104,13 @@ public class Set<V> implements ISet<V>, Cloneable {
   }
 
   @Override
-  public IList<V> elements() {
-    IList<IEntry<V, Void>> entries = map.entries();
-    return Lists.from(size(), i -> entries.nth(i).key(), this::iterator);
+  public long indexOf(V element) {
+    return map.indexOf(element);
+  }
+
+  @Override
+  public V nth(long index) {
+    return map.nth(index).key();
   }
 
   @Override

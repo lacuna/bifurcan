@@ -1,8 +1,12 @@
 package io.lacuna.bifurcan;
 
+import io.lacuna.bifurcan.utils.Functions;
+
+import java.util.Iterator;
 import java.util.Objects;
 import java.util.function.BiPredicate;
 import java.util.function.BinaryOperator;
+import java.util.function.Function;
 import java.util.function.ToIntFunction;
 
 /**
@@ -11,8 +15,7 @@ import java.util.function.ToIntFunction;
 public class Graph<V, E> implements IGraph<V, E> {
 
   private static class VertexSet<V> {
-    private final V v, w;
-    private int hash = -1;
+    final V v, w;
 
     VertexSet(V v, V w) {
       this.v = v;
@@ -20,18 +23,11 @@ public class Graph<V, E> implements IGraph<V, E> {
     }
 
     int hashCode(ToIntFunction<V> hashFn) {
-      if (hash == -1) {
-        hash = hashFn.applyAsInt(v) ^ hashFn.applyAsInt(w);
-      }
-      return hash;
+      return hashFn.applyAsInt(v) ^ hashFn.applyAsInt(w);
     }
 
     boolean equals(BiPredicate<V, V> equalsFn, VertexSet<V> t) {
-      if (equalsFn.test(v, t.v)) {
-        return equalsFn.test(w, t.w);
-      } else {
-        return equalsFn.test(v, t.w) && equalsFn.test(w, t.v);
-      }
+      return (equalsFn.test(v, t.v) && equalsFn.test(w, t.w)) || (equalsFn.test(v, t.w) && equalsFn.test(w, t.v));
     }
   }
 
@@ -59,22 +55,27 @@ public class Graph<V, E> implements IGraph<V, E> {
   }
 
   @Override
+  public Iterator<IEdge<V, E>> edges() {
+    return edges.stream().map(e -> (IEdge<V, E>) new Graphs.Edge<>(e.value(), e.key().v, e.key().w)).iterator();
+  }
+
+  @Override
   public E edge(V from, V to) {
     return edges.get(new VertexSet<>(from, to)).orElseThrow(() -> new IllegalArgumentException("no such edge"));
   }
 
   @Override
-  public ISet<V> in(V vertex) {
+  public Set<V> in(V vertex) {
     return out(vertex);
   }
 
   @Override
-  public ISet<V> out(V vertex) {
+  public Set<V> out(V vertex) {
     return adjacent.get(vertex).orElseThrow(() -> new IllegalArgumentException("no such vertex"));
   }
 
   @Override
-  public IGraph<V, E> link(V from, V to, E edge, BinaryOperator<E> merge) {
+  public Graph<V, E> link(V from, V to, E edge, BinaryOperator<E> merge) {
     Object editor = isLinear() ? this.editor : new Object();
 
     Map<V, Set<V>> adjacentPrime = adjacent
@@ -93,7 +94,7 @@ public class Graph<V, E> implements IGraph<V, E> {
   }
 
   @Override
-  public IGraph<V, E> unlink(V from, V to) {
+  public Graph<V, E> unlink(V from, V to) {
     VertexSet<V> t = new VertexSet<>(from, to);
 
     if (!edges.contains(t)) {
@@ -113,7 +114,7 @@ public class Graph<V, E> implements IGraph<V, E> {
   }
 
   @Override
-  public IGraph<V, E> add(V vertex) {
+  public Graph<V, E> add(V vertex) {
     if (adjacent.contains(vertex)) {
       return this;
     }
@@ -131,7 +132,7 @@ public class Graph<V, E> implements IGraph<V, E> {
   }
 
   @Override
-  public IGraph<V, E> remove(V vertex) {
+  public Graph<V, E> remove(V vertex) {
     if (!adjacent.contains(vertex)) {
       return this;
     }
@@ -159,6 +160,14 @@ public class Graph<V, E> implements IGraph<V, E> {
   }
 
   @Override
+  public <U> Graph<V, U> mapEdges(Function<IEdge<V, E>, U> f) {
+    return new Graph<>(
+            isLinear(),
+            adjacent,
+            edges.mapValues((k, v) -> f.apply(new Graphs.Edge<V, E>(v, k.v, k.w))));
+  }
+
+  @Override
   public boolean isLinear() {
     return editor != null;
   }
@@ -166,6 +175,11 @@ public class Graph<V, E> implements IGraph<V, E> {
   @Override
   public boolean isDirected() {
     return false;
+  }
+
+  @Override
+  public Graph<V, E> transpose() {
+    return this;
   }
 
   @Override
@@ -179,7 +193,7 @@ public class Graph<V, E> implements IGraph<V, E> {
   }
 
   @Override
-  public IGraph<V, E> merge(IGraph<V, E> graph, BinaryOperator<E> merge) {
+  public Graph<V, E> merge(IGraph<V, E> graph, BinaryOperator<E> merge) {
     if (graph instanceof Graph) {
       Graph<V, E> g = (Graph<V, E>) graph;
       return new Graph<>(
@@ -187,17 +201,17 @@ public class Graph<V, E> implements IGraph<V, E> {
               adjacent.merge(g.adjacent, Set::union),
               edges.merge(g.edges, merge));
     } else {
-      return Graphs.merge(this, graph, merge);
+      return (Graph<V, E>) Graphs.merge(this, graph, merge);
     }
   }
 
   @Override
-  public IGraph<V, E> forked() {
+  public Graph<V, E> forked() {
     return isLinear() ? new Graph<>(false, adjacent, edges) : this;
   }
 
   @Override
-  public IGraph<V, E> linear() {
+  public Graph<V, E> linear() {
     return isLinear() ? this : new Graph<>(true, adjacent, edges);
   }
 

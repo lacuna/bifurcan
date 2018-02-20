@@ -146,9 +146,13 @@ public class LinearSet<V> implements ISet<V>, Cloneable {
   }
 
   @Override
-  public IList<V> elements() {
-    IList<IMap.IEntry<V, Void>> entries = map.entries();
-    return Lists.from(entries.size(), i -> entries.nth(i).key(), () -> iterator());
+  public long indexOf(V element) {
+    return map.indexOf(element);
+  }
+
+  @Override
+  public V nth(long index) {
+    return map.nth(index).key();
   }
 
   @Override

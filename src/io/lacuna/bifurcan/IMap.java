@@ -75,7 +75,19 @@ public interface IMap<K, V> extends
   /**
    * @return a list containing all the entries within the map
    */
-  IList<IEntry<K, V>> entries();
+  default IList<IEntry<K, V>> entries() {
+    return Lists.from(size(), this::nth, this::iterator);
+  }
+
+  /**
+   * @return the index of {@code key} within {@code nth()}, or -1 if it is not present
+   */
+  long indexOf(K key);
+
+  /**
+   * @return the nth entry in the map
+   */
+  IEntry<K, V> nth(long index);
 
   /**
    * @return a set representing all keys in the map
@@ -99,10 +111,14 @@ public interface IMap<K, V> extends
   /**
    * @param f a function which transforms the values
    * @param <U> the new type of the values
-   * @return a transformed map
+   * @return a transformed map which shares the same equality semantics
    */
-  default <U> IMap<K, U> mapVals(Function<V, U> f) {
-    return Maps.from(keys(), k -> get(k).map(f).get());
+  default <U> IMap<K, U> mapValues(BiFunction<K, V, U> f) {
+    Map<K, U> m = new Map<K, U>(keyHash(), keyEquality()).linear();
+    for (IEntry<K, V> e : entries()) {
+      m.put(e.key(), f.apply(e.key(), e.value()));
+    }
+    return isLinear() ? m : m.forked();
   }
 
   /**

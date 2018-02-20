@@ -13,8 +13,6 @@ public class RopeNodes {
   public static final int MAX_BRANCHES = 1 << SHIFT_INCREMENT;
   public static final int MAX_CHUNK_CODE_UNITS = MAX_BRANCHES;
 
-  private static final Node EMPTY = new Node(new Object(), SHIFT_INCREMENT);
-
   public interface ChunkUpdater {
     byte[] update(int offset, byte[] chunk);
   }

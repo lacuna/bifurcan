@@ -12,8 +12,10 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.PrimitiveIterator;
+import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
 import java.util.function.BinaryOperator;
+import java.util.function.Function;
 
 import static io.lacuna.bifurcan.nodes.Util.*;
 import static io.lacuna.bifurcan.utils.Bits.bitOffset;
@@ -76,7 +78,7 @@ public class IntMapNodes {
       }
     }
 
-    public IEntry<Long, V> nth(int idx) {
+    public IEntry<Long, V> nth(long idx) {
       PrimitiveIterator.OfInt masks = masks();
       while (masks.hasNext()) {
         int mask = masks.nextInt();
@@ -97,6 +99,33 @@ public class IntMapNodes {
       }
 
       throw new IndexOutOfBoundsException();
+    }
+
+    public long indexOf(long key) {
+      Node<V> n = this;
+      long idx = 0;
+
+      for (;;) {
+        int mask = n.mask(key);
+        if (n.isEntry(mask) || n.isNode(mask)) {
+          PrimitiveIterator.OfInt masks = n.masks();
+          while (masks.hasNext()) {
+            int m = masks.next();
+            if (mask == m) {
+              if (n.isEntry(mask)) {
+                return idx;
+              } else {
+                n = n.node(mask);
+                break;
+              }
+            } else {
+              idx += n.isEntry(m) ? 1 : n.node(m).size();
+            }
+          }
+        } else {
+          return -1;
+        }
+      }
     }
 
     public IEntry<Long, V> floor(long key) {
@@ -178,6 +207,19 @@ public class IntMapNodes {
     }
 
     // update
+
+    public <U> Node<U> mapVals(Object editor, BiFunction<Long, V, U> f) {
+      Node n = clone(editor);
+      for (int i = bitCount(n.datamap); i >= 0; i--) {
+        n.content[i] = f.apply(n.keys[i], (V) n.content[i]);
+      }
+
+      for (int i = content.length - 1 - bitCount(n.nodemap); i < content.length; i++) {
+        n.content[i] = ((Node<V>) n.content[i]).mapVals(editor, f);
+      }
+
+      return n;
+    }
 
     public Node<V> put(Object editor, long k, V v, BinaryOperator<V> mergeFn) {
 

@@ -3,12 +3,19 @@ package io.lacuna.bifurcan;
 import java.util.Iterator;
 import java.util.function.BiPredicate;
 import java.util.function.BinaryOperator;
+import java.util.function.Function;
 import java.util.function.ToIntFunction;
 
 /**
  * @author ztellman
  */
 public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
+
+  public static class CycleException extends IllegalArgumentException {
+    public CycleException(String message) {
+      super(message);
+    }
+  }
 
   private DirectedGraph<V, E> graph;
   private Set<V> top;
@@ -26,11 +33,11 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
 
   /**
    * @return a directed acyclic graph equivalent to {@code graph}
-   * @throws IllegalArgumentException if {@code graph} contains a cycle
+   * @throws CycleException if {@code graph} contains a cycle
    */
   public static <V, E> DirectedAcyclicGraph<V, E> from(DirectedGraph<V, E> graph) {
     if (Graphs.stronglyConnectedComponents(graph).size() > 0) {
-      throw new IllegalArgumentException("graph contains a cycle");
+      throw new CycleException("graph contains a cycle");
     }
     return new DirectedAcyclicGraph<>(
             graph,
@@ -38,17 +45,22 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
             graph.vertices().stream().filter(v -> graph.out(v).size() == 0).collect(Sets.collector()));
   }
 
-  public ISet<V> top() {
+  public Set<V> top() {
     return top;
   }
 
-  public ISet<V> bottom() {
+  public Set<V> bottom() {
     return bottom;
   }
 
   @Override
-  public ISet<V> vertices() {
+  public Set<V> vertices() {
     return graph.vertices();
+  }
+
+  @Override
+  public Iterator<IEdge<V, E>> edges() {
+    return graph.edges();
   }
 
   @Override
@@ -57,12 +69,12 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
   }
 
   @Override
-  public ISet<V> in(V vertex) {
+  public Set<V> in(V vertex) {
     return graph.in(vertex);
   }
 
   @Override
-  public ISet<V> out(V vertex) {
+  public Set<V> out(V vertex) {
     return graph.out(vertex);
   }
 
@@ -72,13 +84,13 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
    * @param edge the value of the edge
    * @param merge the merge function for the edge values, if an edge already exists
    * @return a graph containing the new edge
-   * @throws IllegalArgumentException if the new edge creates a cycle
+   * @throws CycleException if the new edge creates a cycle
    */
   @Override
   public DirectedAcyclicGraph<V, E> link(V from, V to, E edge, BinaryOperator<E> merge) {
 
     if (vertices().contains(from) && vertices().contains(to) && createsCycle(from, to)) {
-      throw new IllegalArgumentException("new edge creates a cycle");
+      throw new CycleException("new edge creates a cycle");
     }
 
     DirectedGraph<V, E> graphPrime = graph.link(from, to, edge, merge);
@@ -118,7 +130,7 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
   }
 
   @Override
-  public IGraph<V, E> select(ISet<V> vertices) {
+  public DirectedAcyclicGraph<V, E> select(ISet<V> vertices) {
     return new DirectedAcyclicGraph<>(
             graph.select(vertices),
             top.intersection(vertices),
@@ -147,7 +159,7 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
   }
 
   @Override
-  public IGraph<V, E> remove(V vertex) {
+  public DirectedAcyclicGraph<V, E> remove(V vertex) {
     if (graph.vertices().contains(vertex)) {
       DirectedGraph<V, E> graphPrime = graph.remove(vertex);
       Set<V> topPrime = top.union(graph.out(vertex).stream().filter(v -> graph.in(v).size() == 1).collect(Sets.collector()));
@@ -167,12 +179,12 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
   }
 
   @Override
-  public IGraph<V, E> forked() {
+  public DirectedAcyclicGraph<V, E> forked() {
     return graph.isLinear() ? new DirectedAcyclicGraph<>(graph.linear(), top.linear(), bottom.linear()) : this;
   }
 
   @Override
-  public IGraph<V, E> linear() {
+  public DirectedAcyclicGraph<V, E> linear() {
     return graph.isLinear() ? this : new DirectedAcyclicGraph<>(graph.forked(), top.forked(), bottom.linear());
   }
 
@@ -184,6 +196,16 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
   @Override
   public boolean isDirected() {
     return true;
+  }
+
+  @Override
+  public <U> DirectedAcyclicGraph<V, U> mapEdges(Function<IEdge<V, E>, U> f) {
+    return new DirectedAcyclicGraph<>(graph.mapEdges(f), top, bottom);
+  }
+
+  @Override
+  public DirectedAcyclicGraph<V, E> transpose() {
+    return new DirectedAcyclicGraph<>(graph.transpose(), bottom, top);
   }
 
   @Override

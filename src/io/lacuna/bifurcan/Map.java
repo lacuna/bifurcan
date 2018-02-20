@@ -193,8 +193,16 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
   }
 
   @Override
-  public IList<IEntry<K, V>> entries() {
-    return Lists.from(size(), i -> root.nth(i), () -> iterator());
+  public long indexOf(K key) {
+    return root.indexOf(0, keyHash(key), key, keyEquality());
+  }
+
+  @Override
+  public IEntry<K, V> nth(long index) {
+    if (index < 0 || index >= size()) {
+      throw new IndexOutOfBoundsException();
+    }
+    return root.nth(index);
   }
 
   @Override
@@ -216,9 +224,8 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
   }
 
   @Override
-  public <U> Map<K, U> mapVals(Function<V, U> f) {
-    Map<K, U> m = stream().collect(Maps.collector(IEntry::key, e -> f.apply(e.value())));
-    return isLinear() ? m.linear() : m;
+  public <U> Map<K, U> mapValues(BiFunction<K, V, U> f) {
+    return new Map<K, U>(root.mapVals(new Object(), f), hashFn, equalsFn, isLinear());
   }
 
   @Override
