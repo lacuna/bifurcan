@@ -58,7 +58,7 @@ for (int i = 0; i < 1000; i++) {
 set = set.forked();
 ```
 
-The call to `linear()` indicates that the collection has a single owner, and may be updated in-place.  The call to `forked()` indicates that this is no true.  By allowing temporary mutability, we gain huge performance benefits.  However, there is still a cost relative to purely mutable data structures.  For this reason, Bifurcan provides permanently linear variants of each collection:
+The call to `linear()` indicates that the collection has a single owner, and may be updated in-place.  The call to `forked()` indicates that this is no longer true.  By allowing temporary mutability, we gain huge performance benefits.  There is still a cost, however, relative to purely mutable data structures.  For this reason, Bifurcan provides permanently linear variants of each collection:
 
 ```java
 LinearSet<Long> set = new LinearSet<>();
@@ -83,6 +83,6 @@ This separation of concerns provides greater flexibility, but also requires more
 
 ### license
 
-Copyright © 2016-2017 Zachary Tellman
+Copyright © 2016-2018 Zachary Tellman
 
 Distributed under the MIT License

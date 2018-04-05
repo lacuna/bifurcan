@@ -26,13 +26,19 @@ Included here, for comparison, are Java's mutable `HashMap`, Clojure's immutable
 
 ![](../benchmarks/images/map_construct.png)
 
+---
+
 Due to its contiguous layout, `LinearMap` is significantly faster at iteration.  `Map` and `PersistentTrieMap` are several times faster than Clojure's `PersistentHashMap` because of a contiguous layout within each node, but `IntMap` is somewhat slower due to the fact that it does an in-order traversal of entries.
 
 ![](../benchmarks/images/map_iterate.png)
 
+---
+
 The difference between the immutable data structures is largely due to Clojure's custom equality semantics, which can add significant overhead.  As the collections grow larger, this difference is overwhelmed by the cost of lookups in main memory.
 
 ![](../benchmarks/images/map_lookup.png)
+
+---
 
 These set operations are performed on two data structures of the same type, whose entries half overlap.  Both `Map` and `IntMap` perform these operations structurally, meaning that the more dissimilar the two collections are, the faster the operation.  Even if the two collections overlap completely, these are still expected to be significantly than the Clojure and CHAMP equivalents, which modify the collections one element at a time.
 
@@ -41,6 +47,8 @@ These set operations are performed on two data structures of the same type, whos
 ![](../benchmarks/images/map_intersection.png)
 
 ![](../benchmarks/images/map_union.png)
+
+---
 
 Equality checks are benchmarked by taking two identical collections, and then altering a single, random element for each benchmark run.  Discovering the collections are not equal should require, on average, examining half of the elements.  However, `PersistentTrieMap` maintains an incremental hash value which makes the equality check near-instant.  
 
