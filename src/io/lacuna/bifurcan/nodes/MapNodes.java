@@ -1,7 +1,6 @@
 package io.lacuna.bifurcan.nodes;
 
 import io.lacuna.bifurcan.*;
-import io.lacuna.bifurcan.IMap.IEntry;
 import io.lacuna.bifurcan.utils.ArrayVector;
 import io.lacuna.bifurcan.utils.Bits;
 import io.lacuna.bifurcan.utils.Iterators;
@@ -12,7 +11,6 @@ import java.util.PrimitiveIterator;
 import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
 import java.util.function.BinaryOperator;
-import java.util.function.Function;
 
 import static io.lacuna.bifurcan.nodes.MapNodes.Node.SHIFT_INCREMENT;
 import static io.lacuna.bifurcan.nodes.Util.*;
@@ -264,12 +262,12 @@ public class MapNodes {
 
     public <U> Node<K, U> mapVals(Object editor, BiFunction<K, V, U> f) {
       Node n = clone(editor);
-      for (int i = bitCount(n.datamap); i >= 0; i--) {
+      for (int i = bitCount(n.datamap) - 1; i >= 0; i--) {
         int idx = i << 1;
         n.content[idx] = f.apply((K) n.content[idx], (V) n.content[idx + 1]);
       }
 
-      for (int i = content.length - 1 - bitCount(n.nodemap); i < content.length; i++) {
+      for (int i = content.length - bitCount(n.nodemap); i < content.length; i++) {
         n.content[i] = ((Node<K, V>) n.content[i]).mapVals(editor, f);
       }
 

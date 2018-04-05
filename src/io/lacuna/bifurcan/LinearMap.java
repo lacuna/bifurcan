@@ -186,7 +186,7 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
     LinearMap m = clone();
     for (int i = 0; i < m.size(); i++) {
       int idx = i << 1;
-      m.entries[idx] = f.apply((K) m.entries[idx], (V) m.entries[idx + 1]);
+      m.entries[idx + 1] = f.apply((K) m.entries[idx], (V) m.entries[idx + 1]);
     }
 
     return m;

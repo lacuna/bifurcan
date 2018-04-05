@@ -6,6 +6,7 @@
    [clojure.test :refer :all]
    [clojure.test.check.generators :as gen]
    [bifurcan.test-utils :as u]
+   [bifurcan.rope-tests]
    [criterium.core :as c]
    [clojure.set :as set]
    [clojure.pprint :refer (pprint)]
@@ -46,7 +47,7 @@
     LinearList
     LinearMap
     LinearSet
-    IMap$IEntry
+    IEntry
     Rope]))
 
 (set! *warn-on-reflection* true)
@@ -151,7 +152,7 @@
 (defn consume-entry-iterator [^Iterator it]
   (loop [x nil]
     (if (.hasNext it)
-      (recur (or (.key ^IMap$IEntry (.next it)) x))
+      (recur (or (.key ^IEntry (.next it)) x))
       x)))
 
 (defn consume-java-entry-iterator [^Iterator it]

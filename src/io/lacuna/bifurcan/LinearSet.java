@@ -5,6 +5,7 @@ import io.lacuna.bifurcan.utils.Iterators;
 import java.util.Iterator;
 import java.util.Objects;
 import java.util.function.BiPredicate;
+import java.util.function.Function;
 import java.util.function.ToIntFunction;
 
 /**
@@ -159,6 +160,11 @@ public class LinearSet<V> implements ISet<V>, Cloneable {
   public Iterator<V> iterator() {
     final Object[] entries = map.entries;
     return Iterators.range(size(), i -> (V) entries[(int) i << 1]);
+  }
+
+  @Override
+  public <U> LinearMap<V, U> zip(Function<V, U> f) {
+    return map.mapValues((k, v) -> f.apply(k));
   }
 
   @Override

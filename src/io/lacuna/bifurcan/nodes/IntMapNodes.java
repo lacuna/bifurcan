@@ -1,10 +1,6 @@
 package io.lacuna.bifurcan.nodes;
 
-import io.lacuna.bifurcan.IList;
-import io.lacuna.bifurcan.IMap;
-import io.lacuna.bifurcan.IMap.IEntry;
-import io.lacuna.bifurcan.LinearList;
-import io.lacuna.bifurcan.Maps;
+import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.utils.Bits;
 import io.lacuna.bifurcan.utils.Iterators;
 
@@ -321,7 +317,7 @@ public class IntMapNodes {
         return Iterators.EMPTY;
       }
 
-      return new Iterator<IMap.IEntry<Long, V>>() {
+      return new Iterator<IEntry<Long, V>>() {
 
         Node<V>[] stack = new Node[16];
         byte[] cursors = new byte[32];
@@ -369,7 +365,7 @@ public class IntMapNodes {
         }
 
         @Override
-        public IMap.IEntry<Long, V> next() {
+        public IEntry<Long, V> next() {
           Node<V> n = stack[depth];
           int mask = 1 << cursors[depth << 1];
           int idx = n.entryIndex(mask);

@@ -13,12 +13,6 @@ import static io.lacuna.bifurcan.Graphs.MERGE_LAST_WRITE_WINS;
  */
 public interface IGraph<V, E> extends ILinearizable<IGraph<V, E>>, IForkable<IGraph<V, E>> {
 
-  interface IEdge<V, E> {
-    V from();
-    V to();
-    E value();
-  }
-
   /**
    * @return the set of all vertices in the graph
    */

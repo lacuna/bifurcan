@@ -12,21 +12,11 @@ import java.util.stream.StreamSupport;
  */
 @SuppressWarnings("unchecked")
 public interface IMap<K, V> extends
-        Iterable<IMap.IEntry<K, V>>,
+        Iterable<IEntry<K, V>>,
         ISplittable<IMap<K, V>>,
         ILinearizable<IMap<K, V>>,
         IForkable<IMap<K, V>>,
         Function<K, V> {
-
-  interface IEntry<K, V> {
-    K key();
-
-    V value();
-
-    default boolean equals(IEntry<K, V> o, BiPredicate<K, K> keyEquals, BiPredicate<V, V> valEquals) {
-      return keyEquals.test(key(), o.key()) && valEquals.test(value(), o.value());
-    }
-  }
 
   /**
    * @return the hash function used by the map
@@ -115,9 +105,7 @@ public interface IMap<K, V> extends
    */
   default <U> IMap<K, U> mapValues(BiFunction<K, V, U> f) {
     Map<K, U> m = new Map<K, U>(keyHash(), keyEquality()).linear();
-    for (IEntry<K, V> e : entries()) {
-      m.put(e.key(), f.apply(e.key(), e.value()));
-    }
+    this.forEach(e -> m.put(e.key(), f.apply(e.key(), e.value())));
     return isLinear() ? m : m.forked();
   }
 

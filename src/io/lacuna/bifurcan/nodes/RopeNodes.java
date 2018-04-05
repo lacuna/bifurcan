@@ -88,7 +88,7 @@ public class RopeNodes {
     // lookup
 
     private int indexFor(int idx, int[] offsets) {
-      int estimate = (idx >> shift) & (MAX_BRANCHES - 1);
+      int estimate = shift > 30 ? 0 : (idx >> shift) & (MAX_BRANCHES - 1);
       for (int i = estimate; i < numNodes; i++) {
         if (idx < offsets[i]) {
           return i;

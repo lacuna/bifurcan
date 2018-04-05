@@ -1,13 +1,12 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.IMap.IEntry;
 import io.lacuna.bifurcan.utils.Iterators;
 
-import java.util.Collection;
 import java.util.Iterator;
 import java.util.Objects;
 import java.util.function.BiPredicate;
 import java.util.function.BinaryOperator;
+import java.util.function.Function;
 import java.util.function.ToIntFunction;
 
 /**
@@ -149,6 +148,11 @@ public class Set<V> implements ISet<V>, Cloneable {
   @Override
   public Iterator<V> iterator() {
     return Iterators.map(map.iterator(), IEntry::key);
+  }
+
+  @Override
+  public <U> Map<V, U> zip(Function<V, U> f) {
+    return map.mapValues((k, v) -> f.apply(k)).forked();
   }
 
   @Override

@@ -1,7 +1,5 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.IGraph.IEdge;
-
 import java.util.Iterator;
 import java.util.Objects;
 import java.util.function.BinaryOperator;
@@ -82,7 +80,7 @@ public class Graphs {
       }
 
       for (V w : aOut) {
-        if (Objects.equals(a.edge(v, w), b.edge(v, w))) {
+        if (!Objects.equals(a.edge(v, w), b.edge(v, w))) {
           return false;
         }
       }

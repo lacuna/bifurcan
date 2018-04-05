@@ -295,7 +295,10 @@ public class Rope implements Comparable<Rope>, ILinearizable<Rope>, IForkable<Ro
 
   @Override
   public int hashCode() {
-    return PerlHash.hash(0, bytes());
+    if (hash == -1) {
+      hash = PerlHash.hash(0, bytes());
+    }
+    return hash;
   }
 
   @Override

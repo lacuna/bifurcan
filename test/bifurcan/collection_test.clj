@@ -28,13 +28,12 @@
     Set
     Sets
     IMap
-    IMap$IEntry
+    IEntry
     IList
     ISet
     LinearList
     LinearMap
-    LinearSet
-    IMap$IEntry]))
+    LinearSet]))
 
 (set! *warn-on-reflection* false)
 
@@ -45,7 +44,7 @@
     .entries
     .iterator
     iterator-seq
-    (map (fn [^IMap$IEntry e] [(.key e) (.value e)]))
+    (map (fn [^IEntry e] [(.key e) (.value e)]))
     (into {})))
 
 (defn ->set [^ISet s]

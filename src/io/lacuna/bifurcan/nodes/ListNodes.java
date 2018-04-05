@@ -141,7 +141,7 @@ public class ListNodes {
     }
 
     private int indexOf(int idx) {
-      int estimate = (idx >>> shift) & BRANCH_MASK;
+      int estimate = shift > 60 ? 0 : (idx >>> shift) & BRANCH_MASK;
       if (isStrict) {
         return estimate;
       } else {

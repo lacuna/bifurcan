@@ -6,6 +6,7 @@ import java.util.Objects;
 import java.util.Spliterator;
 import java.util.Spliterators;
 import java.util.function.BiPredicate;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.ToIntFunction;
 import java.util.stream.IntStream;
@@ -60,6 +61,15 @@ public interface ISet<V> extends
    */
   default IList<V> elements() {
     return Lists.from(size(), this::nth, this::iterator);
+  }
+
+  /**
+   * @return an {@code IMap} which has a corresponding value, computed by {@code f}, for each element in the set
+   */
+  default <U> IMap<V, U> zip(Function<V, U> f) {
+    Map<V, U> m = new Map<V, U>(valueHash(), valueEquality()).linear();
+    this.forEach(e -> m.put(e, f.apply(e)));
+    return m.forked();
   }
 
   /**

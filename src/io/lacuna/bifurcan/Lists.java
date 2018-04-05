@@ -1,6 +1,5 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.IMap.IEntry;
 import io.lacuna.bifurcan.utils.Iterators;
 
 import java.lang.reflect.Array;
