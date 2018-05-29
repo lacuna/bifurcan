@@ -148,7 +148,7 @@ public class Graphs {
     return result.forked();
   }
 
-  private static class ArticulationPointState<V>  {
+  private static class ArticulationPointState<V> {
     final V node;
     final int depth;
     int lowlink;
@@ -168,9 +168,9 @@ public class Graphs {
 
     // algorithmic state
     IMap<V, ArticulationPointState<V>> state = new LinearMap<>(
-            (int) graph.vertices().size(),
-            graph.vertexHash(),
-            graph.vertexEquality());
+      (int) graph.vertices().size(),
+      graph.vertexHash(),
+      graph.vertexEquality());
 
     // call-stack state
     LinearList<ArticulationPointState<V>> path = new LinearList<>();
@@ -217,7 +217,7 @@ public class Graphs {
             vs.lowlink = min(ws.lowlink, vs.lowlink);
 
             if ((path.size() > 1 && ws.lowlink >= vs.depth)
-                    || (path.size() == 1 && vs.childCount > 1)) {
+              || (path.size() == 1 && vs.childCount > 1)) {
               result.add(vs.node);
             }
           }
@@ -256,9 +256,9 @@ public class Graphs {
 
     // algorithmic state
     IMap<V, TarjanState> state = new LinearMap<>(
-            (int) graph.vertices().size(),
-            graph.vertexHash(),
-            graph.vertexEquality());
+      (int) graph.vertices().size(),
+      graph.vertexHash(),
+      graph.vertexEquality());
     LinearList<V> stack = new LinearList<>();
 
     // call-stack state

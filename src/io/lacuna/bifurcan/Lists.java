@@ -347,18 +347,18 @@ public class Lists {
     @Override
     public int indexOf(Object o) {
       return IntStream.range(0, size())
-              .filter(idx -> Objects.equals(get(idx), o))
-              .findFirst()
-              .orElse(-1);
+        .filter(idx -> Objects.equals(get(idx), o))
+        .findFirst()
+        .orElse(-1);
     }
 
     @Override
     public int lastIndexOf(Object o) {
       return size() -
-              IntStream.range(0, size())
-                      .filter(idx -> Objects.equals(get(size() - (idx + 1)), o))
-                      .findFirst()
-                      .orElse(size() + 1);
+        IntStream.range(0, size())
+          .filter(idx -> Objects.equals(get(size() - (idx + 1)), o))
+          .findFirst()
+          .orElse(size() + 1);
     }
 
     @Override
@@ -474,6 +474,15 @@ public class Lists {
     }
 
     @Override
+    public Iterator<V> iterator() {
+      if (prefix == Lists.EMPTY && suffix == Lists.EMPTY) {
+        return base.iterator();
+      } else {
+        return Lists.iterator(this);
+      }
+    }
+
+    @Override
     public long size() {
       return prefix.size() + base.size() + suffix.size();
     }
@@ -547,9 +556,9 @@ public class Lists {
       } else if (idx < (prefixSize + baseSize)) {
         idx -= prefixSize;
         IList<V> basePrime = Lists.concat(
-                base.slice(0, idx),
-                new LinearList(1).addLast(value),
-                base.slice(idx + 1, base.size()));
+          base.slice(0, idx),
+          new LinearList(1).addLast(value),
+          base.slice(idx + 1, base.size()));
         return new VirtualList<V>(prefix, basePrime, suffix, linear);
       } else {
         idx -= prefixSize + baseSize;
@@ -893,6 +902,12 @@ public class Lists {
       result = new Concat<V>(a, b);
     }
     return a.isLinear() ? result.linear() : result;
+  }
+
+  public static <V> IList<V> sort(IList<V> l, Comparator<V> comparator) {
+    Object[] array = l.toArray();
+    Arrays.sort(array, (a, b) -> comparator.compare((V) a, (V) b));
+    return (IList<V>) Lists.from(array);
   }
 
   /**

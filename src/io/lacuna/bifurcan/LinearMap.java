@@ -45,17 +45,6 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
 
   /// Constructors
 
-  public LinearMap() {
-    this(16);
-  }
-
-  /**
-   * @param initialCapacity the initial capacity of the map
-   */
-  public LinearMap(int initialCapacity) {
-    this(initialCapacity, Objects::hashCode, Objects::equals);
-  }
-
   /**
    * @param map a {@code java.util.Map}
    * @return a copy of the map
@@ -102,6 +91,17 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
    */
   public static <K, V> LinearMap<K, V> from(Collection<Map.Entry<K, V>> entries) {
     return entries.stream().collect(Maps.linearCollector(Map.Entry::getKey, Map.Entry::getValue, entries.size()));
+  }
+
+  public LinearMap() {
+    this(16);
+  }
+
+  /**
+   * @param initialCapacity the initial capacity of the map
+   */
+  public LinearMap(int initialCapacity) {
+    this(initialCapacity, Objects::hashCode, Objects::equals);
   }
 
   /**
@@ -181,6 +181,14 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
     return this;
   }
 
+  public LinearMap<K, V> clear() {
+    Arrays.fill(entries, null);
+    Arrays.fill(table, 0);
+    size = 0;
+
+    return this;
+  }
+
   @Override
   public <U> LinearMap<K, U> mapValues(BiFunction<K, V, U> f) {
     LinearMap m = clone();
@@ -237,10 +245,10 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
   @Override
   public Iterator<IEntry<K, V>> iterator() {
     return Iterators.range(size,
-            i -> {
-              int idx = (int) (i << 1);
-              return new Maps.Entry<>((K) entries[idx], (V) entries[idx + 1]);
-            });
+      i -> {
+        int idx = (int) (i << 1);
+        return new Maps.Entry<>((K) entries[idx], (V) entries[idx + 1]);
+      });
   }
 
   @Override
@@ -255,7 +263,7 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
 
   @Override
   public IMap<K, V> forked() {
-    throw new IllegalStateException("a LinearMap cannot be efficiently transformed into a forked representation");
+    return new Maps.VirtualMap<>(this);
   }
 
   @Override

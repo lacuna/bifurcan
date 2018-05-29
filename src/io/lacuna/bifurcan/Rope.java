@@ -33,11 +33,6 @@ public class Rope implements Comparable<Rope>, ILinearizable<Rope>, IForkable<Ro
   private Node root;
   private int hash = -1;
 
-  Rope(Node node, boolean linear) {
-    this.editor = linear ? new Object() : null;
-    this.root = node;
-  }
-
   /**
    * @param cs a Java-style {@code CharSequence}
    * @return a corresponding {@code Rope} representation
@@ -57,6 +52,13 @@ public class Rope implements Comparable<Rope>, ILinearizable<Rope>, IForkable<Ro
     return new Rope(root, false);
 
   }
+
+  Rope(Node node, boolean linear) {
+    this.editor = linear ? new Object() : null;
+    this.root = node;
+  }
+
+  ///
 
   /**
    * @param rope another {@code Rope}
@@ -104,8 +106,8 @@ public class Rope implements Comparable<Rope>, ILinearizable<Rope>, IForkable<Ro
 
       if (end < offset + len) {
         return UnicodeChunk.concat(
-                UnicodeChunk.slice(chunk, 0, start - offset),
-                UnicodeChunk.slice(chunk, end - offset, len));
+          UnicodeChunk.slice(chunk, 0, start - offset),
+          UnicodeChunk.slice(chunk, end - offset, len));
       } else {
         return null;
       }

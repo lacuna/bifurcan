@@ -61,7 +61,7 @@ public class IntMapNodes {
 
     public Object get(long k, Object defaultVal) {
       Node<V> n = this;
-      for (;;) {
+      for (; ; ) {
         int mask = n.mask(k);
         if (n.isEntry(mask)) {
           int idx = n.entryIndex(mask);
@@ -101,7 +101,7 @@ public class IntMapNodes {
       Node<V> n = this;
       long idx = 0;
 
-      for (;;) {
+      for (; ; ) {
         int mask = n.mask(key);
         if (n.isEntry(mask) || n.isNode(mask)) {
           PrimitiveIterator.OfInt masks = n.masks();
@@ -442,7 +442,7 @@ public class IntMapNodes {
       return size;
     }
 
-    public boolean equals(Node<V> n, BiPredicate<V, V> equalsFn)  {
+    public boolean equals(Node<V> n, BiPredicate<V, V> equalsFn) {
 
       if (n == this) {
         return true;
@@ -652,8 +652,8 @@ public class IntMapNodes {
           Node<V> child = node.node(mask);
           if (child.size() >= (targetSize << 1)) {
             split(editor, child, targetSize).stream()
-                .map(n -> new Node<V>(editor, node.prefix, node.offset).putNode(mask, n))
-                .forEach(result::addLast);
+              .map(n -> new Node<V>(editor, node.prefix, node.offset).putNode(mask, n))
+              .forEach(result::addLast);
           } else {
             acc = acc.putNode(mask, child);
           }
@@ -732,14 +732,14 @@ public class IntMapNodes {
           case NODE_ENTRY:
             idx = b.entryIndex(mask);
             result = result
-                .putNode(mask, a.node(mask))
-                .put(editor, b.keys[idx], (V) b.content[idx], mergeFn);
+              .putNode(mask, a.node(mask))
+              .put(editor, b.keys[idx], (V) b.content[idx], mergeFn);
             break;
           case ENTRY_NODE:
             idx = a.entryIndex(mask);
             result = result
-                .putNode(mask, b.node(mask))
-                .put(editor, a.keys[idx], (V) a.content[idx], (x, y) -> mergeFn.apply(y, x));
+              .putNode(mask, b.node(mask))
+              .put(editor, a.keys[idx], (V) a.content[idx], (x, y) -> mergeFn.apply(y, x));
             break;
           case NONE_NONE:
             break;
@@ -842,8 +842,8 @@ public class IntMapNodes {
       int mask = a.mask(b.prefix);
       if (a.isEntry(mask)) {
         return b.get(a.key(mask), DEFAULT_VALUE) == DEFAULT_VALUE
-            ? null
-            : transferEntry(mask, a, new Node<V>(editor, a.key(mask), 0));
+          ? null
+          : transferEntry(mask, a, new Node<V>(editor, a.key(mask), 0));
       } else if (a.isNode(mask)) {
         return a.node(mask).intersection(editor, b);
       } else {
@@ -857,8 +857,8 @@ public class IntMapNodes {
         long key = b.key(mask);
         Object val = a.get(key, DEFAULT_VALUE);
         return val == DEFAULT_VALUE
-            ? null
-            : new Node<V>(editor, b.key(mask), 0).put(editor, key, (V) val, null);
+          ? null
+          : new Node<V>(editor, b.key(mask), 0).put(editor, key, (V) val, null);
       } else if (b.isNode(mask)) {
         return a.intersection(editor, b.node(mask));
       } else {

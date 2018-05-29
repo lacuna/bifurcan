@@ -16,24 +16,8 @@ import java.util.function.ToIntFunction;
  */
 public class Set<V> implements ISet<V>, Cloneable {
 
-  public Map<V, Void> map;
+  Map<V, Void> map;
   private int hash = -1;
-
-  public Set() {
-    this(Objects::hashCode, Objects::equals);
-  }
-
-  /**
-   * @param hashFn the hash function used by the set
-   * @param equalsFn the equality semantics used by the set
-   */
-  public Set(ToIntFunction<V> hashFn, BiPredicate<V, V> equalsFn) {
-    map = new Map<>(hashFn, equalsFn);
-  }
-
-  Set(Map<V, Void> map) {
-    this.map = map;
-  }
 
   /**
    * @param s a set
@@ -75,6 +59,22 @@ public class Set<V> implements ISet<V>, Cloneable {
     return set.forked();
   }
 
+  public Set() {
+    this(Objects::hashCode, Objects::equals);
+  }
+
+  /**
+   * @param hashFn   the hash function used by the set
+   * @param equalsFn the equality semantics used by the set
+   */
+  public Set(ToIntFunction<V> hashFn, BiPredicate<V, V> equalsFn) {
+    map = new Map<>(hashFn, equalsFn);
+  }
+
+  Set(Map<V, Void> map) {
+    this.map = map;
+  }
+
   ///
 
   @Override
@@ -114,30 +114,34 @@ public class Set<V> implements ISet<V>, Cloneable {
 
   @Override
   public Set<V> add(V value) {
-    return add(value, map.editor);
+    return add(value, isLinear() ? map.editor : new Object());
   }
 
   public Set<V> add(V value, Object editor) {
     Map<V, Void> mapPrime = map.put(value, null, (BinaryOperator<Void>) Maps.MERGE_LAST_WRITE_WINS, editor);
-    if (isLinear() || editor != map.editor) {
-      hash = -1;
-    }
 
-    return map == mapPrime ? this : new Set<>(mapPrime);
+    if (map == mapPrime) {
+      hash = -1;
+      return this;
+    } else {
+      return new Set<>(mapPrime);
+    }
   }
 
   @Override
   public Set<V> remove(V value) {
-    return remove(value, map.editor);
+    return remove(value, isLinear() ? map.editor : new Object());
   }
 
   public Set<V> remove(V value, Object editor) {
     Map<V, Void> mapPrime = map.remove(value, editor);
-    if (isLinear() || editor != map.editor) {
-      hash = -1;
-    }
 
-    return map == mapPrime ? this : new Set<>(mapPrime);
+    if (map == mapPrime) {
+      hash = -1;
+      return this;
+    } else {
+      return new Set<>(mapPrime);
+    }
   }
 
   @Override

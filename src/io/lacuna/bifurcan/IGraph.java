@@ -46,9 +46,9 @@ public interface IGraph<V, E> extends ILinearizable<IGraph<V, E>>, IForkable<IGr
   ISet<V> out(V vertex);
 
   /**
-   * @param from the source of the edge
-   * @param to the destination of the edge
-   * @param edge the value of the edge
+   * @param from  the source of the edge
+   * @param to    the destination of the edge
+   * @param edge  the value of the edge
    * @param merge the merge function for the edge values, if an edge already exists
    * @return a graph containing the new edge
    */
@@ -94,12 +94,18 @@ public interface IGraph<V, E> extends ILinearizable<IGraph<V, E>>, IForkable<IGr
    * @return
    */
   default IGraph<V, E> replace(V a, V b, BinaryOperator<E> merge) {
-    if (vertexEquality().test(a, b)) {
+    if (vertexEquality().test(a, b) || !vertices().contains(a)) {
       return this;
     }
 
     IGraph<V, E> g = this.linear();
-    this.in(a).forEach(v -> g.link(v, b, this.edge(v, a), merge));
+    for (V v : this.out(a)) {
+      g = g.link(b, v, this.edge(a, v));
+    }
+
+    for (V v : this.in(a)) {
+      g = g.link(v, b, this.edge(v, a), merge);
+    }
     g.remove(a);
 
     return this.isLinear() ? this : g.forked();

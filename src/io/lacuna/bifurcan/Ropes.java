@@ -10,7 +10,8 @@ import java.util.Iterator;
  */
 public class Ropes {
 
-  private Ropes() {}
+  private Ropes() {
+  }
 
   /**
    * lexicographically compares two UTF-8 binary streams by code points, assumes both are of equal length
@@ -20,7 +21,7 @@ public class Ropes {
     ByteBuffer x = a.next();
     ByteBuffer y = b.next();
 
-    for (;;) {
+    for (; ; ) {
 
       int len = Math.min(x.remaining(), y.remaining());
       for (int k = 0; k < len; k++) {

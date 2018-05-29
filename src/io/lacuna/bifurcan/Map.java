@@ -34,20 +34,6 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
   ///
 
   /**
-   * Creates a map.
-   *
-   * @param hashFn   a function which yields the hash value of keys
-   * @param equalsFn a function which checks equality of keys
-   */
-  public Map(ToIntFunction<K> hashFn, BiPredicate<K, K> equalsFn) {
-    this(Node.EMPTY, hashFn, equalsFn, false);
-  }
-
-  public Map() {
-    this(Node.EMPTY, Objects::hashCode, Objects::equals, false);
-  }
-
-  /**
    * @param map another map
    * @return an equivalent forked map, with the same equality semantics
    */
@@ -103,6 +89,20 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
     return entries.stream().collect(Maps.collector(java.util.Map.Entry::getKey, java.util.Map.Entry::getValue));
   }
 
+  /**
+   * Creates a map.
+   *
+   * @param hashFn   a function which yields the hash value of keys
+   * @param equalsFn a function which checks equality of keys
+   */
+  public Map(ToIntFunction<K> hashFn, BiPredicate<K, K> equalsFn) {
+    this(Node.EMPTY, hashFn, equalsFn, false);
+  }
+
+  public Map() {
+    this(Node.EMPTY, Objects::hashCode, Objects::equals, false);
+  }
+
   private Map(Node<K, V> root, ToIntFunction<K> hashFn, BiPredicate<K, K> equalsFn, boolean linear) {
     this.root = root;
     this.hashFn = hashFn;
@@ -140,18 +140,15 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
 
   @Override
   public Map<K, V> put(K key, V value, BinaryOperator<V> merge) {
-    return put(key, value, merge, editor);
+    return put(key, value, merge, isLinear() ? editor : new Object());
   }
 
   public Map<K, V> put(K key, V value, BinaryOperator<V> merge, Object editor) {
     Node<K, V> rootPrime = root.put(0, editor, keyHash(key), key, value, equalsFn, merge);
 
-    if (isLinear() || editor != this.editor) {
-      hash = -1;
-    }
-
     if (isLinear() && editor == this.editor) {
       root = rootPrime;
+      hash = -1;
       return this;
     } else {
       return new Map<K, V>(rootPrime, hashFn, equalsFn, false);
@@ -160,7 +157,7 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
 
   @Override
   public Map<K, V> update(K key, UnaryOperator<V> update) {
-    return update(key, update, editor);
+    return update(key, update, isLinear() ? editor : new Object());
   }
 
   public Map<K, V> update(K key, UnaryOperator<V> update, Object editor) {
@@ -169,18 +166,15 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
 
   @Override
   public Map<K, V> remove(K key) {
-    return remove(key, editor);
+    return remove(key, isLinear() ? editor : new Object());
   }
 
   public Map<K, V> remove(K key, Object editor) {
     Node<K, V> rootPrime = (Node<K, V>) root.remove(0, editor, keyHash(key), key, equalsFn);
 
-    if (isLinear() || editor != this.editor) {
-      hash = -1;
-    }
-
     if (isLinear() && editor == this.editor) {
       root = rootPrime;
+      hash = -1;
       return this;
     } else {
       return new Map<K, V>(rootPrime, hashFn, equalsFn, false);
@@ -232,9 +226,9 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
   public List<Map<K, V>> split(int parts) {
     List<Map<K, V>> list = new List<Map<K, V>>().linear();
     MapNodes.split(new Object(), root, (int) Math.ceil(size() / (float) parts))
-            .stream()
-            .map(n -> new Map<K, V>(n, hashFn, equalsFn, false))
-            .forEach(list::addLast);
+      .stream()
+      .map(n -> new Map<K, V>(n, hashFn, equalsFn, false))
+      .forEach(list::addLast);
     return list.forked();
   }
 

@@ -5,7 +5,8 @@
    [clojure.test.check.properties :as prop]
    [clojure.test.check.clojure-test :as ct :refer (defspec)]
    [bifurcan.test-utils :as u]
-   [clojure.set :as set])
+   [clojure.set :as set]
+   [proteus :refer [let-mutable]])
   (:import
    [java.util
     HashMap
@@ -14,6 +15,7 @@
     ArrayDeque
     Collection]
    [io.lacuna.bifurcan.utils
+    Encodings
     BitVector
     Bits
     Iterators]
@@ -21,6 +23,7 @@
     ListNodes$Node]
    [io.lacuna.bifurcan
     IntMap
+    FloatMap
     Map
     Maps
     List
@@ -200,6 +203,17 @@
       (= b c)
       (map= a b)
       (map= a c))))
+
+(defspec test-linear-forked-map iterations
+  (prop/for-all [actions (u/actions->generator map-actions)]
+    (let [n  (count actions)
+          a  (u/apply-actions (take n actions) (.linear (Map.)) bifurcan-map)
+          b  (u/apply-actions (drop n actions) (.forked a) bifurcan-map)
+          a' (persistent! (u/apply-actions (take n actions) (transient {}) clj-map))
+          b' (persistent! (u/apply-actions actions (transient {}) clj-map))]
+      (and
+        (map= a' a)
+        (map= b' b)))))
 
 (u/def-collection-check test-int-map iterations map-actions
   [a (transient {}) clj-map
@@ -511,3 +525,17 @@
                  b (set-gen #(LinearSet.))]
     (= (set/intersection (->set a) (->set b))
       (->set (.intersection ^ISet a ^ISet b)))))
+
+;; FloatMap operations
+
+(defspec test-long-double-roundtrip iterations
+  (prop/for-all [n gen/double]
+    (.equals n (-> n Encodings/doubleToLong Encodings/longToDouble))))
+
+(defspec test-long-double-compare iterations
+  (prop/for-all [a gen/double
+                 b gen/double]
+    (= (Double/compare a b)
+      (Long/compare
+        (Encodings/doubleToLong a)
+        (Encodings/doubleToLong b)))))

@@ -17,10 +17,10 @@ import java.util.stream.StreamSupport;
  */
 @SuppressWarnings("unchecked")
 public interface IList<V> extends
-        ISplittable<IList<V>>,
-        Iterable<V>,
-        IForkable<IList<V>>,
-        ILinearizable<IList<V>> {
+  ISplittable<IList<V>>,
+  Iterable<V>,
+  IForkable<IList<V>>,
+  ILinearizable<IList<V>> {
 
   /**
    * @return the element at {@code idx}

@@ -19,38 +19,6 @@ public class LinearSet<V> implements ISet<V>, Cloneable {
 
   ///
 
-  public LinearSet() {
-    this(8);
-  }
-
-  /**
-   * @param initialCapacity the initial capacity of the set
-   */
-  public LinearSet(int initialCapacity) {
-    this(initialCapacity, Objects::hashCode, Objects::equals);
-  }
-
-  /**
-   * @param initialCapacity the initial capacity of the set
-   * @param hashFn the hash function used by the set
-   * @param equalsFn the equality semantics used by the set
-   */
-  public LinearSet(int initialCapacity, ToIntFunction<V> hashFn, BiPredicate<V, V> equalsFn) {
-    map = new LinearMap<>(initialCapacity, hashFn, equalsFn);
-  }
-
-  /**
-   * @param hashFn the hash function used by the set
-   * @param equalsFn the equality semantics used by the set
-   */
-  public LinearSet(ToIntFunction<V> hashFn, BiPredicate<V, V> equalsFn) {
-    map = new LinearMap<>(8, hashFn, equalsFn);
-  }
-
-  private LinearSet(LinearMap<V, Void> map) {
-    this.map = map;
-  }
-
   /**
    * @param elements a list of elements
    * @return a {@code LinearSet} containing the elements in the list
@@ -107,6 +75,38 @@ public class LinearSet<V> implements ISet<V>, Cloneable {
     return set;
   }
 
+  public LinearSet() {
+    this(8);
+  }
+
+  /**
+   * @param initialCapacity the initial capacity of the set
+   */
+  public LinearSet(int initialCapacity) {
+    this(initialCapacity, Objects::hashCode, Objects::equals);
+  }
+
+  /**
+   * @param initialCapacity the initial capacity of the set
+   * @param hashFn          the hash function used by the set
+   * @param equalsFn        the equality semantics used by the set
+   */
+  public LinearSet(int initialCapacity, ToIntFunction<V> hashFn, BiPredicate<V, V> equalsFn) {
+    map = new LinearMap<>(initialCapacity, hashFn, equalsFn);
+  }
+
+  /**
+   * @param hashFn   the hash function used by the set
+   * @param equalsFn the equality semantics used by the set
+   */
+  public LinearSet(ToIntFunction<V> hashFn, BiPredicate<V, V> equalsFn) {
+    map = new LinearMap<>(8, hashFn, equalsFn);
+  }
+
+  private LinearSet(LinearMap<V, Void> map) {
+    this.map = map;
+  }
+
   ///
 
   @Override
@@ -133,6 +133,12 @@ public class LinearSet<V> implements ISet<V>, Cloneable {
   @Override
   public LinearSet<V> remove(V value) {
     map.remove(value);
+    return this;
+  }
+
+  public LinearSet<V> clear() {
+    map.clear();
+
     return this;
   }
 
@@ -206,7 +212,7 @@ public class LinearSet<V> implements ISet<V>, Cloneable {
 
   @Override
   public ISet<V> forked() {
-    throw new UnsupportedOperationException("A LinearSet cannot be efficiently transformed into a forked representation");
+    return new Sets.VirtualSet<>(this);
   }
 
   @Override

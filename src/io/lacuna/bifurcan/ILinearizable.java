@@ -19,4 +19,10 @@ public interface ILinearizable<T> {
    * @return a linear form of this data structure
    */
   T linear();
+
+  /**
+   *
+   * @return true, if the collection is linear
+   */
+  boolean isLinear();
 }

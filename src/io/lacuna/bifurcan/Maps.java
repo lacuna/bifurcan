@@ -250,8 +250,8 @@ public class Maps {
         return Iterators.concat(added.iterator(), base.iterator());
       } else {
         return Iterators.concat(
-            added.iterator(),
-            Iterators.filter(base.iterator(), e -> !shadowed.contains(e.key()) && !removed.contains(e.key())));
+          added.iterator(),
+          Iterators.filter(base.iterator(), e -> !shadowed.contains(e.key()) && !removed.contains(e.key())));
       }
     }
 
@@ -288,8 +288,8 @@ public class Maps {
     @Override
     public synchronized long size() {
       return canonical != null
-          ? canonical.size()
-          : base.size() + (added.size() - shadowed.size()) - removed.size();
+        ? canonical.size()
+        : base.size() + (added.size() - shadowed.size()) - removed.size();
     }
 
     @Override
@@ -486,8 +486,8 @@ public class Maps {
       @Override
       public java.util.Set<K> keySet() {
         return Sets.toSet(
-            lazyMap(map.entries(), IEntry::key),
-            k -> map.get(k).isPresent());
+          lazyMap(map.entries(), IEntry::key),
+          k -> map.get(k).isPresent());
       }
 
       @Override
@@ -498,8 +498,8 @@ public class Maps {
       @Override
       public java.util.Set<Entry<K, V>> entrySet() {
         return Sets.toSet(
-            lazyMap(map.entries(), Maps::toEntry),
-            e -> map.get(e.getKey()).map(v -> Objects.equals(v, e.getValue())).orElse(false));
+          lazyMap(map.entries(), Maps::toEntry),
+          e -> map.get(e.getKey()).map(v -> Objects.equals(v, e.getValue())).orElse(false));
       }
 
       @Override
@@ -594,10 +594,10 @@ public class Maps {
   }
 
   public static <T, K, V> Collector<T, LinearMap<K, V>, LinearMap<K, V>> linearCollector(
-      Function<T, K> keyFn,
-      Function<T, V> valFn,
-      BinaryOperator<V> mergeFn,
-      int capacity) {
+    Function<T, K> keyFn,
+    Function<T, V> valFn,
+    BinaryOperator<V> mergeFn,
+    int capacity) {
     return new Collector<T, LinearMap<K, V>, LinearMap<K, V>>() {
       @Override
       public Supplier<LinearMap<K, V>> supplier() {

@@ -2,10 +2,7 @@ package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.utils.Bits;
 
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.NoSuchElementException;
-import java.util.Optional;
+import java.util.*;
 
 import static io.lacuna.bifurcan.utils.Bits.log2Ceil;
 
@@ -27,29 +24,6 @@ public class LinearList<V> implements IList<V>, Cloneable {
   private Object[] elements;
   private int mask;
   private int size, offset;
-
-  /**
-   * Creates a new {@code LinearList}.
-   */
-  public LinearList() {
-    this(DEFAULT_CAPACITY);
-  }
-
-  /**
-   * Creates a new {@code LinearList}.
-   *
-   * @param capacity the initial capacity of the list
-   */
-  public LinearList(int capacity) {
-    this(0, new Object[Math.max(1, 1 << log2Ceil(capacity))]);
-  }
-
-  private LinearList(int size, Object[] elements) {
-    this.size = size;
-    this.offset = 0;
-    this.mask = elements.length - 1;
-    this.elements = elements;
-  }
 
   public static <V> LinearList<V> of(V... elements) {
     LinearList<V> list = new LinearList<V>(elements.length);
@@ -98,6 +72,31 @@ public class LinearList<V> implements IList<V>, Cloneable {
       return list.stream().collect(Lists.linearCollector((int) list.size()));
     }
   }
+
+  /**
+   * Creates a new {@code LinearList}.
+   */
+  public LinearList() {
+    this(DEFAULT_CAPACITY);
+  }
+
+  /**
+   * Creates a new {@code LinearList}.
+   *
+   * @param capacity the initial capacity of the list
+   */
+  public LinearList(int capacity) {
+    this(0, new Object[Math.max(1, 1 << log2Ceil(capacity))]);
+  }
+
+  private LinearList(int size, Object[] elements) {
+    this.size = size;
+    this.offset = 0;
+    this.mask = elements.length - 1;
+    this.elements = elements;
+  }
+
+  ///
 
   private void resize(int newCapacity) {
 
@@ -155,6 +154,14 @@ public class LinearList<V> implements IList<V>, Cloneable {
       return this;
     }
     elements[(offset + --size) & mask] = null;
+    return this;
+  }
+
+  public LinearList<V> clear() {
+    Arrays.fill(elements, null);
+    offset = 0;
+    size = 0;
+
     return this;
   }
 
@@ -262,7 +269,7 @@ public class LinearList<V> implements IList<V>, Cloneable {
 
   @Override
   public IList<V> forked() {
-    throw new UnsupportedOperationException("a LinearList cannot be efficiently transformed into a forked representation");
+    return new Lists.VirtualList<>(this);
   }
 
   @Override

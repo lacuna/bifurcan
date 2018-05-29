@@ -14,6 +14,8 @@ import java.util.function.ToIntFunction;
  */
 public class Graph<V, E> implements IGraph<V, E> {
 
+  private static final Object DEFAULT = new Object();
+
   private static class VertexSet<V> {
     final V v, w;
 
@@ -61,7 +63,12 @@ public class Graph<V, E> implements IGraph<V, E> {
 
   @Override
   public E edge(V from, V to) {
-    return edges.get(new VertexSet<>(from, to)).orElseThrow(() -> new IllegalArgumentException("no such edge"));
+    Object e = ((Map) edges).get(new VertexSet<>(from, to), DEFAULT);
+    if (e == DEFAULT) {
+      throw new IllegalArgumentException("no such edge");
+    } else {
+      return (E) e;
+    }
   }
 
   @Override
@@ -79,8 +86,8 @@ public class Graph<V, E> implements IGraph<V, E> {
     Object editor = isLinear() ? this.editor : new Object();
 
     Map<V, Set<V>> adjacentPrime = adjacent
-            .update(from, s -> (s == null ? new Set<V>() : s).add(to, editor), editor)
-            .update(to, s -> (s == null ? new Set<V>() : s).add(from, editor), editor);
+      .update(from, s -> (s == null ? new Set<V>() : s).add(to, editor), editor)
+      .update(to, s -> (s == null ? new Set<V>() : s).add(from, editor), editor);
 
     Map<VertexSet<V>, E> edgesPrime = edges.put(new VertexSet<>(from, to), edge, merge, editor);
 
@@ -162,9 +169,9 @@ public class Graph<V, E> implements IGraph<V, E> {
   @Override
   public <U> Graph<V, U> mapEdges(Function<IEdge<V, E>, U> f) {
     return new Graph<>(
-            isLinear(),
-            adjacent,
-            edges.mapValues((k, v) -> f.apply(new Graphs.Edge<V, E>(v, k.v, k.w))));
+      isLinear(),
+      adjacent,
+      edges.mapValues((k, v) -> f.apply(new Graphs.Edge<V, E>(v, k.v, k.w))));
   }
 
   @Override
@@ -197,9 +204,9 @@ public class Graph<V, E> implements IGraph<V, E> {
     if (graph instanceof Graph) {
       Graph<V, E> g = (Graph<V, E>) graph;
       return new Graph<>(
-              isLinear(),
-              adjacent.merge(g.adjacent, Set::union),
-              edges.merge(g.edges, merge));
+        isLinear(),
+        adjacent.merge(g.adjacent, Set::union),
+        edges.merge(g.edges, merge));
     } else {
       return (Graph<V, E>) Graphs.merge(this, graph, merge);
     }

@@ -25,4 +25,12 @@ public interface ISortedMap<K, V> extends IMap<K, V> {
    * @return a map representing all entries within [{@code} min, {@code} max]
    */
   ISortedMap<K, V> slice(K min, K max);
+
+  default IEntry<K, V> first() {
+    return nth(0);
+  }
+
+  default IEntry<K, V> last() {
+    return nth(size() - 1);
+  }
 }

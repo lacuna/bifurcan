@@ -40,9 +40,9 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
       throw new CycleException("graph contains a cycle");
     }
     return new DirectedAcyclicGraph<>(
-            graph,
-            graph.vertices().stream().filter(v -> graph.in(v).size() == 0).collect(Sets.collector()),
-            graph.vertices().stream().filter(v -> graph.out(v).size() == 0).collect(Sets.collector()));
+      graph,
+      graph.vertices().stream().filter(v -> graph.in(v).size() == 0).collect(Sets.collector()),
+      graph.vertices().stream().filter(v -> graph.out(v).size() == 0).collect(Sets.collector()));
   }
 
   public Set<V> top() {
@@ -79,9 +79,9 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
   }
 
   /**
-   * @param from the source of the edge
-   * @param to the destination of the edge
-   * @param edge the value of the edge
+   * @param from  the source of the edge
+   * @param to    the destination of the edge
+   * @param edge  the value of the edge
    * @param merge the merge function for the edge values, if an edge already exists
    * @return a graph containing the new edge
    * @throws CycleException if the new edge creates a cycle
@@ -132,9 +132,9 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
   @Override
   public DirectedAcyclicGraph<V, E> select(ISet<V> vertices) {
     return new DirectedAcyclicGraph<>(
-            graph.select(vertices),
-            top.intersection(vertices),
-            bottom.intersection(vertices));
+      graph.select(vertices),
+      top.intersection(vertices),
+      bottom.intersection(vertices));
   }
 
   @Override
@@ -161,9 +161,9 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
   @Override
   public DirectedAcyclicGraph<V, E> remove(V vertex) {
     if (graph.vertices().contains(vertex)) {
-      DirectedGraph<V, E> graphPrime = graph.remove(vertex);
       Set<V> topPrime = top.union(graph.out(vertex).stream().filter(v -> graph.in(v).size() == 1).collect(Sets.collector()));
       Set<V> bottomPrime = bottom.union(graph.in(vertex).stream().filter(v -> graph.out(v).size() == 1).collect(Sets.collector()));
+      DirectedGraph<V, E> graphPrime = graph.remove(vertex);
 
       if (isLinear()) {
         graph = graphPrime;
@@ -180,12 +180,12 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
 
   @Override
   public DirectedAcyclicGraph<V, E> forked() {
-    return graph.isLinear() ? new DirectedAcyclicGraph<>(graph.linear(), top.linear(), bottom.linear()) : this;
+    return graph.isLinear() ? new DirectedAcyclicGraph<>(graph.forked(), top.forked(), bottom.forked()) : this;
   }
 
   @Override
   public DirectedAcyclicGraph<V, E> linear() {
-    return graph.isLinear() ? this : new DirectedAcyclicGraph<>(graph.forked(), top.forked(), bottom.linear());
+    return graph.isLinear() ? this : new DirectedAcyclicGraph<>(graph.linear(), top.linear(), bottom.linear());
   }
 
   @Override

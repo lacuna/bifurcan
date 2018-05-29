@@ -22,24 +22,12 @@ import java.util.function.*;
  */
 public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
 
-  private static final ToIntFunction<Long> HASH = n -> (int) (n ^ (n >>> 32));
+  static final ToIntFunction<Long> HASH = n -> (int) (n ^ (n >>> 32));
   private static final Object DEFAULT_VALUE = new Object();
 
   private final Object editor = new Object();
   private final boolean linear;
   private Node<V> neg, pos;
-
-  public IntMap() {
-    this.neg = Node.NEG_EMPTY;
-    this.pos = Node.POS_EMPTY;
-    this.linear = false;
-  }
-
-  private IntMap(Node<V> neg, Node<V> pos, boolean linear) {
-    this.neg = neg;
-    this.pos = pos;
-    this.linear = linear;
-  }
 
   /**
    * @param m another map
@@ -85,6 +73,18 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
     return map.forked();
   }
 
+  public IntMap() {
+    this.neg = Node.NEG_EMPTY;
+    this.pos = Node.POS_EMPTY;
+    this.linear = false;
+  }
+
+  private IntMap(Node<V> neg, Node<V> pos, boolean linear) {
+    this.neg = neg;
+    this.pos = pos;
+    this.linear = linear;
+  }
+
   ///
 
   @Override
@@ -94,7 +94,7 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
 
   @Override
   public BiPredicate<Long, Long> keyEquality() {
-    return Objects::equals;
+    return Long::equals;
   }
 
   /**
@@ -106,9 +106,9 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
     Node<V> negPrime = neg.slice(editor, min, max);
     Node<V> posPrime = pos.slice(editor, min, max);
     return new IntMap<V>(
-        negPrime == null ? Node.NEG_EMPTY : negPrime,
-        posPrime == null ? Node.POS_EMPTY : posPrime,
-        linear);
+      negPrime == null ? Node.NEG_EMPTY : negPrime,
+      posPrime == null ? Node.POS_EMPTY : posPrime,
+      linear);
   }
 
   @Override
@@ -160,6 +160,10 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
     return put(key, value, (BinaryOperator<V>) Maps.MERGE_LAST_WRITE_WINS);
   }
 
+  public IntMap<V> put(long key, V value, Object editor) {
+    return put(key, value, (BinaryOperator<V>) Maps.MERGE_LAST_WRITE_WINS, editor);
+  }
+
   /**
    * @param key   a primitive {@code long} key
    * @param value a value
@@ -168,6 +172,10 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
    * @return an updated map
    */
   public IntMap<V> put(long key, V value, BinaryOperator<V> merge) {
+    return put(key, value, merge, isLinear() ? editor : new Object());
+  }
+
+  public IntMap<V> put(long key, V value, BinaryOperator<V> merge, Object editor) {
     if (key < 0) {
       Node<V> negPrime = neg.put(editor, key, value, merge);
       if (neg == negPrime) {
@@ -205,6 +213,10 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
    * @return an updated map that does not contain {@code key}
    */
   public IntMap<V> remove(long key) {
+    return remove(key, isLinear() ? editor : new Object());
+  }
+
+  public IntMap<V> remove(long key, Object editor) {
     if (key < 0) {
       Node<V> negPrime = neg.remove(editor, key);
       if (neg == negPrime) {
@@ -239,6 +251,11 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
     return new IntMap<>(neg.mapVals(editor, f), pos.mapVals(editor, f), isLinear());
   }
 
+  public Optional<V> get(long key) {
+    Object o = (key < 0 ? neg : pos).get(key, DEFAULT_VALUE);
+    return o == DEFAULT_VALUE ? Optional.empty() : Optional.of((V) o);
+  }
+
   public V get(long key, V defaultValue) {
     return (V) (key < 0 ? neg : pos).get(key, defaultValue);
   }
@@ -246,6 +263,19 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
   @Override
   public V get(Long key, V defaultValue) {
     return get((long) key, defaultValue);
+  }
+
+  @Override
+  public IMap<Long, V> update(Long key, UnaryOperator<V> update) {
+    return update((long) key, update);
+  }
+
+  public IntMap<V> update(long key, UnaryOperator<V> update) {
+    return put(key, update.apply(get(key, null)), isLinear() ? editor : new Object());
+  }
+
+  public IntMap<V> update(long key, UnaryOperator<V> update, Object editor) {
+    return put(key, update.apply(get(key, null)), editor);
   }
 
   public boolean contains(long key) {
@@ -355,16 +385,16 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
 
     if (negParts > 0) {
       IntMapNodes.split(new Object(), neg, neg.size() / negParts)
-          .stream()
-          .map(n -> new IntMap<V>(n, Node.POS_EMPTY, linear))
-          .forEach(m -> result.addLast((IntMap<V>) m));
+        .stream()
+        .map(n -> new IntMap<V>(n, Node.POS_EMPTY, linear))
+        .forEach(m -> result.addLast((IntMap<V>) m));
     }
 
     if (posParts > 0) {
       IntMapNodes.split(new Object(), pos, pos.size() / posParts)
-          .stream()
-          .map(n -> new IntMap<V>(Node.NEG_EMPTY, n, false))
-          .forEach(m -> result.addLast((IntMap<V>) m));
+        .stream()
+        .map(n -> new IntMap<V>(Node.NEG_EMPTY, n, false))
+        .forEach(m -> result.addLast((IntMap<V>) m));
     }
 
     return result.forked();

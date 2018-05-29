@@ -270,8 +270,8 @@ public class ListNodes {
       // we need to grow a parent
       if (stack[stack.length - 1].numNodes == MAX_BRANCHES) {
         return numNodes == MAX_BRANCHES
-                ? new Node(editor, shift + SHIFT_INCREMENT).pushLast(this, editor).pushLast(chunk, editor)
-                : pushLast(new Node(editor, SHIFT_INCREMENT).pushLast(chunk, editor), editor);
+          ? new Node(editor, shift + SHIFT_INCREMENT).pushLast(this, editor).pushLast(chunk, editor)
+          : pushLast(new Node(editor, SHIFT_INCREMENT).pushLast(chunk, editor), editor);
       }
 
       for (int i = 0; i < stack.length; i++) {
@@ -314,8 +314,8 @@ public class ListNodes {
       // we need to grow a parent
       if (stack[stack.length - 1].numNodes == MAX_BRANCHES) {
         return numNodes == MAX_BRANCHES
-                ? new Node(editor, shift + SHIFT_INCREMENT).pushLast(chunk, editor).pushLast(this, editor)
-                : pushFirst(new Node(editor, SHIFT_INCREMENT).pushLast(chunk, editor), editor);
+          ? new Node(editor, shift + SHIFT_INCREMENT).pushLast(chunk, editor).pushLast(this, editor)
+          : pushFirst(new Node(editor, SHIFT_INCREMENT).pushLast(chunk, editor), editor);
       }
 
       for (int i = 0; i < stack.length; i++) {

@@ -17,11 +17,11 @@ import java.util.stream.StreamSupport;
  * @author ztellman
  */
 public interface ISet<V> extends
-        Iterable<V>,
-        ISplittable<ISet<V>>,
-        ILinearizable<ISet<V>>,
-        IForkable<ISet<V>>,
-        Predicate<V> {
+  Iterable<V>,
+  ISplittable<ISet<V>>,
+  ILinearizable<ISet<V>>,
+  IForkable<ISet<V>>,
+  Predicate<V> {
 
   /**
    * @return the hash function used by the set
@@ -50,13 +50,6 @@ public interface ISet<V> extends
   long size();
 
   /**
-   * @return true, if the set is linear
-   */
-  default boolean isLinear() {
-    return false;
-  }
-
-  /**
    * @return an {@code IList} containing all the elements in the set
    */
   default IList<V> elements() {
@@ -81,6 +74,14 @@ public interface ISet<V> extends
    * @return the nth element in the set
    */
   V nth(long index);
+
+  default V nth(long index, V defaultValue) {
+    if (0 <= index && index < size()) {
+      return nth(index);
+    } else {
+      return defaultValue;
+    }
+  }
 
   /**
    * @return true if this set contains every element in {@code set}
@@ -201,14 +202,22 @@ public interface ISet<V> extends
     return ary;
   }
 
+  /**
+   * @return true, if the set is linear
+   */
+  @Override
+  default boolean isLinear() {
+    return false;
+  }
+
   @Override
   default ISet<V> forked() {
-    return null;
+    return this;
   }
 
   @Override
   default ISet<V> linear() {
-    return null;
+    return new Sets.VirtualSet<>(this).linear();
   }
 
   @Override
@@ -221,5 +230,4 @@ public interface ISet<V> extends
   default boolean test(V v) {
     return contains(v);
   }
-
 }

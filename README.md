@@ -67,7 +67,7 @@ for (int i = 0; i < 1000; i++) {
 }
 ```
 
-If we call `forked()` on this collection, it simply will throw an exception.  All variants share the same API, however, allowing us to tweak the performance/safety tradeoffs of our code by changing only a few lines.
+If we call `forked()` on this collection, it will be wrapped in an immutable facade which tracks changes without touching the underlying collection.  This facade provides fast reads, marginally slower writes, and does not support efficient set operations.  All variants share the same API, allowing us to tweak the performance/safety tradeoffs of our code by changing only a few lines.
 
 ### no lazy collections
 
