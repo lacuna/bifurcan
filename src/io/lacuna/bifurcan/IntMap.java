@@ -26,7 +26,7 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
   private static final Object DEFAULT_VALUE = new Object();
 
   final Object editor;
-  public Node<V> neg, pos;
+  private Node<V> neg, pos;
 
   /**
    * @param m another map
