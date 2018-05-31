@@ -9,6 +9,11 @@ import static io.lacuna.bifurcan.utils.Encodings.doubleToLong;
 import static io.lacuna.bifurcan.utils.Encodings.longToDouble;
 
 /**
+ * A map which has floating-point keys, built atop {@code IntMap}, with which it shares performance characteristics.
+ *
+ * Since this is intended foremost as a sorted data structure, it does not allow {@code NaN} and treats {@code -0.0} as
+ * equivalent to {@code 0.0}.  Anyone looking for identity-based semantics should use a normal {@code Map} instead.
+ *
  * @author ztellman
  */
 public class FloatMap<V> implements ISortedMap<Double, V>, Cloneable {
