@@ -25,9 +25,8 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
   static final ToIntFunction<Long> HASH = n -> (int) (n ^ (n >>> 32));
   private static final Object DEFAULT_VALUE = new Object();
 
-  private final Object editor = new Object();
-  private final boolean linear;
-  private Node<V> neg, pos;
+  final Object editor;
+  public Node<V> neg, pos;
 
   /**
    * @param m another map
@@ -76,13 +75,13 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
   public IntMap() {
     this.neg = Node.NEG_EMPTY;
     this.pos = Node.POS_EMPTY;
-    this.linear = false;
+    this.editor = null;
   }
 
   private IntMap(Node<V> neg, Node<V> pos, boolean linear) {
     this.neg = neg;
     this.pos = pos;
-    this.linear = linear;
+    this.editor = linear ? new Object() : null;
   }
 
   ///
@@ -108,7 +107,7 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
     return new IntMap<V>(
       negPrime == null ? Node.NEG_EMPTY : negPrime,
       posPrime == null ? Node.POS_EMPTY : posPrime,
-      linear);
+      isLinear());
   }
 
   @Override
@@ -120,7 +119,10 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
   public IntMap<V> merge(IMap<Long, V> b, BinaryOperator<V> mergeFn) {
     if (b instanceof IntMap) {
       IntMap<V> m = (IntMap<V>) b;
-      return new IntMap<V>(neg.merge(new Object(), m.neg, mergeFn), pos.merge(new Object(), m.pos, mergeFn), linear);
+      return new IntMap<V>(
+        IntMapNodes.merge(new Object(), neg, m.neg, mergeFn),
+        IntMapNodes.merge(new Object(), pos, m.pos, mergeFn),
+        isLinear());
     } else {
       return (IntMap<V>) Maps.merge(this.clone(), b, mergeFn);
     }
@@ -130,9 +132,9 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
   public IntMap<V> difference(IMap<Long, ?> b) {
     if (b instanceof IntMap) {
       IntMap<V> m = (IntMap<V>) b;
-      Node<V> negPrime = neg.difference(new Object(), m.neg);
-      Node<V> posPrime = pos.difference(new Object(), m.pos);
-      return new IntMap<V>(negPrime == null ? Node.NEG_EMPTY : negPrime, posPrime == null ? Node.POS_EMPTY : posPrime, linear);
+      Node<V> negPrime = IntMapNodes.difference(new Object(), neg, m.neg);
+      Node<V> posPrime = IntMapNodes.difference(new Object(), pos, m.pos);
+      return new IntMap<V>(negPrime == null ? Node.NEG_EMPTY : negPrime, posPrime == null ? Node.POS_EMPTY : posPrime, isLinear());
     } else {
       return (IntMap<V>) Maps.difference(this.clone(), b.keys());
     }
@@ -142,12 +144,12 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
   public IntMap<V> intersection(IMap<Long, ?> b) {
     if (b instanceof IntMap) {
       IntMap<V> m = (IntMap<V>) b;
-      Node<V> negPrime = neg.intersection(new Object(), m.neg);
-      Node<V> posPrime = pos.intersection(new Object(), m.pos);
-      return new IntMap<V>(negPrime == null ? Node.NEG_EMPTY : negPrime, posPrime == null ? Node.POS_EMPTY : posPrime, linear);
+      Node<V> negPrime = IntMapNodes.intersection(new Object(), neg, m.neg);
+      Node<V> posPrime = IntMapNodes.intersection(new Object(), pos, m.pos);
+      return new IntMap<V>(negPrime == null ? Node.NEG_EMPTY : negPrime, posPrime == null ? Node.POS_EMPTY : posPrime, isLinear());
     } else {
       IntMap<V> result = (IntMap<V>) Maps.intersection(new IntMap<V>().linear(), this, b.keys());
-      return linear ? result : result.forked();
+      return isLinear() ? result : result.forked();
     }
   }
 
@@ -180,7 +182,7 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
       Node<V> negPrime = neg.put(editor, key, value, merge);
       if (neg == negPrime) {
         return this;
-      } else if (linear) {
+      } else if (isLinear()) {
         neg = negPrime;
         return this;
       } else {
@@ -190,7 +192,7 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
       Node<V> posPrime = pos.put(editor, key, value, merge);
       if (pos == posPrime) {
         return this;
-      } else if (linear) {
+      } else if (isLinear()) {
         pos = posPrime;
         return this;
       } else {
@@ -221,7 +223,7 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
       Node<V> negPrime = neg.remove(editor, key);
       if (neg == negPrime) {
         return this;
-      } else if (linear) {
+      } else if (isLinear()) {
         neg = negPrime;
         return this;
       } else {
@@ -231,7 +233,7 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
       Node<V> posPrime = pos.remove(editor, key);
       if (pos == posPrime) {
         return this;
-      } else if (linear) {
+      } else if (isLinear()) {
         pos = posPrime;
         return this;
       } else {
@@ -357,17 +359,17 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
 
   @Override
   public boolean isLinear() {
-    return linear;
+    return editor != null;
   }
 
   @Override
   public IntMap<V> forked() {
-    return linear ? new IntMap<V>(neg, pos, false) : this;
+    return isLinear() ? new IntMap<V>(neg, pos, false) : this;
   }
 
   @Override
   public IntMap<V> linear() {
-    return linear ? this : new IntMap<V>(neg, pos, true);
+    return isLinear() ? this : new IntMap<V>(neg, pos, true);
   }
 
   @Override
@@ -386,7 +388,7 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
     if (negParts > 0) {
       IntMapNodes.split(new Object(), neg, neg.size() / negParts)
         .stream()
-        .map(n -> new IntMap<V>(n, Node.POS_EMPTY, linear))
+        .map(n -> new IntMap<V>(n, Node.POS_EMPTY, isLinear()))
         .forEach(m -> result.addLast((IntMap<V>) m));
     }
 
@@ -431,6 +433,6 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
 
   @Override
   public IntMap<V> clone() {
-    return linear ? forked().linear() : this;
+    return isLinear() ? forked().linear() : this;
   }
 }

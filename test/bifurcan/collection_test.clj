@@ -91,6 +91,11 @@
 
 (def gen-element (gen/elements [0 1]))
 
+(def gen-double
+  (->> gen/double
+    (gen/such-that #(not (Double/isNaN %)))
+    (gen/fmap #(if (== -0.0 %) 0.0 %))))
+
 (def list-actions
   {:add-first    [gen-element]
    :add-last     [gen-element]
@@ -101,8 +106,18 @@
    :remove-last  []})
 
 (def map-actions
-  {:put    [gen/large-integer gen-element]
-   :remove [gen/large-integer]})
+  {:put          [gen/large-integer gen-element]
+   :remove       [gen/large-integer]
+   :union        [(gen/vector gen/large-integer 0 32)]
+   :intersection [(gen/vector gen/large-integer 0 32)]
+   :difference   [(gen/vector gen/large-integer 0 32)]})
+
+(def float-map-actions
+  {:put          [gen-double gen-element]
+   :remove       [gen-double]
+   :union        [(gen/vector gen-double 0 32)]
+   :intersection [(gen/vector gen-double 0 32)]
+   :difference   [(gen/vector gen-double 0 32)]})
 
 (def set-actions
   {:add          [gen/large-integer]
@@ -135,19 +150,39 @@
    :remove-last  #(.removeLast ^IList %)})
 
 (def clj-map
-  {:put    assoc!
-   :remove dissoc!})
+  {:put          assoc
+   :remove       dissoc
+   :union        #(merge %1 (zipmap %2 %2))
+   :intersection #(select-keys %1 %2)
+   :difference   #(apply dissoc %1 %2)})
 
 (def bifurcan-map
-  {:put    #(.put ^IMap %1 %2 %3)
-   :remove #(.remove ^IMap %1 %2)})
+  {:put          #(.put ^IMap %1 %2 %3)
+   :remove       #(.remove ^IMap %1 %2)
+   :union        #(.union ^IMap %1 (Map/from ^java.util.Map (zipmap %2 %2)))
+   :intersection #(.intersection ^IMap %1 (Map/from ^java.util.Map (zipmap %2 %2)))
+   :difference   #(.difference ^IMap %1 (Map/from ^java.util.Map (zipmap %2 %2)))})
+
+(def int-map
+  {:put          #(.put ^IMap %1 %2 %3)
+   :remove       #(.remove ^IMap %1 %2)
+   :union        #(.union ^IMap %1 (IntMap/from (zipmap %2 %2)))
+   :intersection #(.intersection ^IMap %1 (IntMap/from (zipmap %2 %2)))
+   :difference   #(.difference ^IMap %1 (IntMap/from (zipmap %2 %2)))})
+
+(def float-map
+  {:put          #(.put ^IMap %1 %2 %3)
+   :remove       #(.remove ^IMap %1 %2)
+   :union        #(.union ^IMap %1 (FloatMap/from (zipmap %2 %2)))
+   :intersection #(.intersection ^IMap %1 (FloatMap/from (zipmap %2 %2)))
+   :difference   #(.difference ^IMap %1 (FloatMap/from (zipmap %2 %2)))})
 
 (def clj-set
-  {:add          conj!
-   :remove       disj!
-   :union        #(reduce conj! %1 %2)
-   :difference   #(reduce disj! %1 %2)
-   :intersection #(-> % persistent! (set/intersection (set %2)) transient)})
+  {:add          conj
+   :remove       disj
+   :union        #(reduce conj %1 %2)
+   :difference   #(reduce disj %1 %2)
+   :intersection #(set/intersection %1 (set %2))})
 
 (defn construct-set [template elements]
   (if (instance? Set template)
@@ -170,6 +205,12 @@
 (defn map-gen [init]
   (->> map-actions u/actions->generator (gen/fmap #(u/apply-actions %1 (init) bifurcan-map))))
 
+(defn int-map-gen [init]
+  (->> map-actions u/actions->generator (gen/fmap #(u/apply-actions %1 (init) int-map))))
+
+(defn float-map-gen [init]
+  (->> float-map-actions u/actions->generator (gen/fmap #(u/apply-actions %1 (init) float-map))))
+
 (defn set-gen [init]
   (->> set-actions u/actions->generator (gen/fmap #(u/apply-actions %1 (init) bifurcan-set))))
 
@@ -190,77 +231,85 @@
 ;; Maps
 
 (u/def-collection-check test-linear-map iterations map-actions
-  [a (transient {}) clj-map
+  [a {} clj-map
    b (LinearMap.) bifurcan-map]
-  (map= (persistent! a) b))
+  (map= a b))
 
 (u/def-collection-check test-map iterations map-actions
-  [a (transient {}) clj-map
+  [a {} clj-map
    b (Map.) bifurcan-map
    c (.linear (Map.)) bifurcan-map]
-  (let [a (persistent! a)]
-    (and
-      (= b c)
-      (map= a b)
-      (map= a c))))
+  (and
+    (= b c)
+    (map= a b)
+    (map= a c)))
 
 (defspec test-linear-forked-map iterations
   (prop/for-all [actions (u/actions->generator map-actions)]
     (let [n  (count actions)
           a  (u/apply-actions (take n actions) (.linear (Map.)) bifurcan-map)
           b  (u/apply-actions (drop n actions) (.forked a) bifurcan-map)
-          a' (persistent! (u/apply-actions (take n actions) (transient {}) clj-map))
-          b' (persistent! (u/apply-actions actions (transient {}) clj-map))]
+          a' (u/apply-actions (take n actions) {} clj-map)
+          b' (u/apply-actions actions {} clj-map)]
       (and
         (map= a' a)
         (map= b' b)))))
 
 (u/def-collection-check test-int-map iterations map-actions
-  [a (transient {}) clj-map
-   b (IntMap.) bifurcan-map
-   c (.linear (IntMap.)) bifurcan-map]
-  (let [a (persistent! a)]
-    (and
-      (= b c)
-      (map= a b)
-      (map= a c))))
+  [a {} clj-map
+   b (IntMap.) int-map
+   c (.linear (IntMap.)) int-map]
+  (and
+    (= b c)
+    (map= a b)
+    (map= a c)))
+
+(u/def-collection-check test-float-map iterations float-map-actions
+  [a {} clj-map
+   b (FloatMap.) float-map
+   c (.linear (FloatMap.)) float-map]
+  (and
+    (= b c)
+    (map= a b)
+    (map= a c)))
 
 (u/def-collection-check test-virtual-map iterations map-actions
-  [a (transient {}) clj-map
+  [a {} clj-map
    b Maps/EMPTY bifurcan-map]
-  (let [a (persistent! a)]
-    (map= a b)))
+  (map= a b))
 
 (u/def-collection-check test-map-indices iterations map-actions
   [a (Map.) bifurcan-map]
   (valid-map-indices? a))
 
 (u/def-collection-check test-int-map-indices iterations map-actions
-  [a (IntMap.) bifurcan-map]
+  [a (IntMap.) int-map]
+  (valid-map-indices? a))
+
+(u/def-collection-check test-int-map-indices iterations float-map-actions
+  [a (FloatMap.) float-map]
   (valid-map-indices? a))
 
 ;; Sets
 
 (u/def-collection-check test-linear-set iterations set-actions
-  [a (transient #{}) clj-set
+  [a #{} clj-set
    b (LinearSet.) bifurcan-set]
-  (set= (persistent! a) b))
+  (set= a b))
 
 (u/def-collection-check test-set iterations set-actions
-  [a (transient #{}) clj-set
+  [a #{} clj-set
    b (Set.) bifurcan-set
    c (.linear (Set.)) bifurcan-set]
-  (let [a (persistent! a)]
-    (and
-      (= b c)
-      (set= a b)
-      (set= a c))))
+  (and
+    (= b c)
+    (set= a b)
+    (set= a c)))
 
 (u/def-collection-check test-virtual-set iterations set-actions
-  [a (transient #{}) clj-set
+  [a #{} clj-set
    b Sets/EMPTY bifurcan-set]
-  (let [a (persistent! a)]
-    (set= a b)))
+  (set= a b))
 
 (u/def-collection-check test-set-indices iterations set-actions
   [a (Set.) bifurcan-set]
@@ -322,21 +371,51 @@
   (prop/for-all [start (gen/choose 1 1e4)
                  end (gen/choose 1 1e4)]
     (let [start (min start end)
-          end (max start end)
-          s (range (* 2 end))]
+          end   (max start end)
+          s     (range (* 2 end))]
       (map=
         (->> s (drop start) (take (inc (- end start))) (map #(vector % %)) (into {}))
         (-> (->> s (map #(vector % %)) (into {})) IntMap/from (.slice start end))))))
 
 (defspec test-int-map-floor iterations
-  (prop/for-all [m (map-gen #(IntMap.))
+  (prop/for-all [m (int-map-gen #(IntMap.))
                  k gen/pos-int]
     (= (->> m .keys .toSet (take-while #(<= % k)) last)
       (some-> m (.floor k) .key))))
 
 (defspec test-int-map-ceil iterations
-  (prop/for-all [m (map-gen #(IntMap.))
+  (prop/for-all [m (int-map-gen #(IntMap.))
                  k gen/pos-int]
+    (= (->> m .keys .toSet (drop-while #(< % k)) first)
+      (some-> m (.ceil k) .key))))
+
+;;; FloatMap
+
+(defspec test-float-map-slice iterations
+  (prop/for-all [start (gen/choose 1 1e4)
+                 end (gen/choose 1 1e4)]
+    (let [start (min start end)
+          end   (max start end)
+          s     (map double (range (* 2 end)))]
+      (map=
+        (->> s
+          (drop start)
+          (take (inc (- end start)))
+          (map #(vector % %))
+          (into {}))
+        (-> (->> s (map #(vector % %)) (into {}))
+          FloatMap/from
+          (.slice (double start) (double end)))))))
+
+(defspec test-float-map-floor iterations
+  (prop/for-all [m (float-map-gen #(FloatMap.))
+                 k gen-double]
+    (= (->> m .keys .toSet (take-while #(<= % k)) last)
+      (some-> m (.floor k) .key))))
+
+(defspec test-float-map-ceil iterations
+  (prop/for-all [m (float-map-gen #(FloatMap.))
+                 k gen-double]
     (= (->> m .keys .toSet (drop-while #(< % k)) first)
       (some-> m (.ceil k) .key))))
 
@@ -357,8 +436,12 @@
     (-> m (.split 2) (map-union (Map.)))))
 
 (defspec test-int-map-split iterations
-  (prop/for-all [m (map-gen #(IntMap.))]
+  (prop/for-all [m (int-map-gen #(IntMap.))]
     (-> m (.split 2) (map-union (IntMap.)))))
+
+(defspec test-int-map-split iterations
+  (prop/for-all [m (float-map-gen #(FloatMap.))]
+    (-> m (.split 2) (map-union (FloatMap.)))))
 
 (defspec test-linear-list-split iterations
   (prop/for-all [l (list-gen #(LinearList.))]
@@ -466,26 +549,6 @@
     (= (apply dissoc (->map a) (keys (->map b)))
       (->map (.difference ^IMap a ^IMap b)))))
 
-;; IntMap set operations
-
-(defspec test-int-map-merge iterations
-  (prop/for-all [a (map-gen #(IntMap.))
-                 b (map-gen #(IntMap.))]
-    (= (merge (->map a) (->map b))
-      (->map (.union ^IMap a b)))))
-
-(defspec test-int-map-intersection iterations
-  (prop/for-all [a (map-gen #(IntMap.))
-                 b (map-gen #(IntMap.))]
-    (= (select-keys (->map a) (keys (->map b)))
-      (->map (.intersection ^IMap a ^IMap b)))))
-
-(defspec test-int-map-difference iterations
-  (prop/for-all [a (map-gen #(IntMap.))
-                 b (map-gen #(IntMap.))]
-    (= (apply dissoc (->map a) (keys (->map b)))
-      (->map (.difference ^IMap a ^IMap b)))))
-
 ;; Set operations
 
 (defspec test-set-union iterations
@@ -529,12 +592,12 @@
 ;; FloatMap operations
 
 (defspec test-long-double-roundtrip iterations
-  (prop/for-all [n gen/double]
-    (.equals n (-> n Encodings/doubleToLong Encodings/longToDouble))))
+  (prop/for-all [n gen-double]
+    (== n (-> n Encodings/doubleToLong Encodings/longToDouble))))
 
 (defspec test-long-double-compare iterations
-  (prop/for-all [a gen/double
-                 b gen/double]
+  (prop/for-all [a gen-double
+                 b gen-double]
     (= (Double/compare a b)
       (Long/compare
         (Encodings/doubleToLong a)

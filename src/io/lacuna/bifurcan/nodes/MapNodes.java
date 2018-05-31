@@ -428,7 +428,10 @@ public class MapNodes {
     }
 
     private INode<K, V> collapse(int shift) {
-      return (shift > 0 && datamap == 0 && Bits.isPowerOfTwo(nodemap) && node(nodemap) instanceof Collision)
+      return (shift > 0
+        && datamap == 0
+        && Bits.isPowerOfTwo(nodemap)
+        && node(nodemap) instanceof Collision)
         ? node(nodemap)
         : this;
     }
@@ -763,7 +766,7 @@ public class MapNodes {
       na = (Node<K, V>) a;
       cb = (Collision<K, V>) b;
       for (IEntry<K, V> e : cb.entries()) {
-        na = (Node<K, V>) na.put(shift, editor, cb.hash, e.key(), e.value(), equals, merge);
+        na = na.put(shift, editor, cb.hash, e.key(), e.value(), equals, merge);
       }
       return na;
 
@@ -773,7 +776,7 @@ public class MapNodes {
       ca = (Collision<K, V>) a;
       nb = (Node<K, V>) b;
       for (IEntry<K, V> e : ca.entries()) {
-        nb = (Node<K, V>) nb.put(shift, editor, ca.hash, e.key(), e.value(), equals, inverted);
+        nb = nb.put(shift, editor, ca.hash, e.key(), e.value(), equals, inverted);
       }
       return nb;
 

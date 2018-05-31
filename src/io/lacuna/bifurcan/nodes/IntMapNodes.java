@@ -16,6 +16,7 @@ import java.util.function.Function;
 import static io.lacuna.bifurcan.nodes.Util.*;
 import static io.lacuna.bifurcan.utils.Bits.bitOffset;
 import static io.lacuna.bifurcan.utils.Bits.highestBit;
+import static io.lacuna.bifurcan.utils.Bits.isPowerOfTwo;
 import static java.lang.Integer.MAX_VALUE;
 import static java.lang.Integer.bitCount;
 import static java.lang.System.arraycopy;
@@ -126,23 +127,9 @@ public class IntMapNodes {
 
     public IEntry<Long, V> floor(long key) {
 
-      // all possible values are higher than the key
       if (min() > key) {
         return null;
 
-        // all possible values are lower than the key
-      } else if (max() < key) {
-        int mask = Bits.highestBit(nodemap | datamap);
-        if (isEntry(mask)) {
-          int idx = entryIndex(mask);
-          return new Maps.Entry<>(keys[idx], (V) content[idx]);
-        } else if (isNode(mask)) {
-          return node(mask).floor(key);
-        } else {
-          return null;
-        }
-
-        // somewhere in between
       } else {
         PrimitiveIterator.OfInt masks = reverseMasks();
         while (masks.hasNext()) {
@@ -166,21 +153,9 @@ public class IntMapNodes {
 
     public IEntry<Long, V> ceil(long key) {
 
-      // all possible values are lower than the key
       if (max() < key) {
         return null;
 
-        // all possible values are higher than the key
-      } else if (min() > key) {
-        int mask = Bits.lowestBit(nodemap | datamap);
-        if (isEntry(mask)) {
-          int idx = entryIndex(mask);
-          return new Maps.Entry<>(keys[idx], (V) content[idx]);
-        } else {
-          return node(mask).ceil(key);
-        }
-
-        // somewhere in between
       } else {
         PrimitiveIterator.OfInt masks = masks();
         while (masks.hasNext()) {
@@ -251,7 +226,9 @@ public class IntMapNodes {
             return this;
           } else {
             Node<V> n = new Node<V>(editor, k, offset(k, keys[idx]));
-            n = n.putEntry(n.mask(keys[idx]), keys[idx], (V) content[idx]).putEntry(n.mask(k), k, v);
+            n = n
+              .putEntry(n.mask(keys[idx]), keys[idx], (V) content[idx])
+              .putEntry(n.mask(k), k, v);
             return removeEntry(mask).putNode(mask, n);
           }
         } else if (isNode(mask)) {
@@ -277,27 +254,33 @@ public class IntMapNodes {
         return clone(editor).remove(editor, k);
       }
 
+      Node<V> result = null;
+
       if (isEntry(mask)) {
         int idx = entryIndex(mask);
-        return keys[idx] == k ? removeEntry(mask) : this;
+        result = keys[idx] == k ? removeEntry(mask) : this;
       } else if (isNode(mask)) {
         Node<V> n = node(mask);
         int prevSize = n.size();
+        boolean isLinear = n.editor == editor;
         Node<V> nPrime = n.remove(editor, k);
-        if (n == nPrime) {
+        if (isLinear) {
           size -= prevSize - nPrime.size();
         }
+
         switch (nPrime.size()) {
           case 0:
-            return removeNode(mask);
+            result = removeNode(mask);
+            break;
           case 1:
-            return removeNode(mask).putEntry(mask, nPrime.keys[0], (V) nPrime.content[0]);
+            result = removeNode(mask).putEntry(mask, nPrime.keys[0], (V) nPrime.content[0]);
+            break;
           default:
-            return setNode(mask, nPrime);
+            result = setNode(mask, nPrime);
         }
       }
 
-      return this;
+      return result.collapse();
     }
 
 
@@ -410,32 +393,6 @@ public class IntMapNodes {
       return n;
     }
 
-    public Node<V> merge(Object editor, Node<V> node, BinaryOperator<V> mergeFn) {
-      if (editor != this.editor) {
-        return clone(editor).merge(editor, node, mergeFn);
-      }
-
-      return IntMapNodes.merge(editor, this, node, mergeFn);
-    }
-
-    public Node<V> difference(Object editor, Node<V> node) {
-      if (editor != this.editor) {
-        return clone(editor).difference(editor, node);
-      }
-
-      Node<V> nPrime = IntMapNodes.difference(editor, this, node);
-      return nPrime != null && nPrime.size() > 0 ? nPrime : null;
-    }
-
-    public Node<V> intersection(Object editor, Node<V> node) {
-      if (editor != this.editor) {
-        return clone(editor).intersection(editor, node);
-      }
-
-      Node<V> nPrime = IntMapNodes.intersection(editor, this, node);
-      return nPrime != null && nPrime.size() > 0 ? nPrime : null;
-    }
-
     // misc
 
     public int size() {
@@ -496,11 +453,19 @@ public class IntMapNodes {
     }
 
     private long min() {
-      return prefix & ~(offset == 60 ? -1 : ((1L << (offset + 4)) - 1));
+      long mask = prefix;
+      mask &= ~(offset == 60 ? -1 : ((1L << (offset + 4)) - 1));
+      mask |= prefix & ~Long.MAX_VALUE;
+
+      return mask;
     }
 
     private long max() {
-      return prefix | (offset == 60 ? (prefix < 0 ? -1 : Long.MAX_VALUE) : ((1L << (offset + 4)) - 1));
+      long mask = prefix;
+      mask |= offset == 60 ? (prefix < 0 ? -1 : Long.MAX_VALUE) : ((1L << (offset + 4)) - 1);
+      mask |= prefix & ~Long.MAX_VALUE;
+
+      return mask;
     }
 
     private boolean overlap(long min, long max) {
@@ -540,7 +505,22 @@ public class IntMapNodes {
       this.content = c;
     }
 
+    private Node<V> collapse() {
+      if (datamap == 0 && nodemap > 0 && Bits.isPowerOfTwo(nodemap)) {
+        return node(nodemap);
+      } else if (size() == 1) {
+        long key = keys[0];
+        Node<V> n = new Node<V>(editor, key, 0);
+        return n.putEntry(n.mask(key), key, (V) content[0]);
+      } else {
+        return this;
+      }
+    }
+
     Node<V> putEntry(int mask, long key, V value) {
+
+      assert ((datamap | nodemap) & mask) == 0;
+
       int numEntries = bitCount(datamap);
       int count = numEntries + bitCount(nodemap);
       if ((count + 1) > content.length) {
@@ -562,6 +542,9 @@ public class IntMapNodes {
     }
 
     Node<V> removeEntry(final int mask) {
+
+      assert (mask & datamap) > 0;
+
       // shrink?
 
       final int idx = entryIndex(mask);
@@ -580,6 +563,9 @@ public class IntMapNodes {
     }
 
     Node<V> setNode(int mask, Node<V> node) {
+
+      assert (nodemap & mask) > 0;
+
       int idx = content.length - 1 - nodeIndex(mask);
       size += node.size() - ((Node<V>) content[idx]).size();
       content[idx] = node;
@@ -588,6 +574,14 @@ public class IntMapNodes {
     }
 
     Node<V> putNode(final int mask, Node<V> node) {
+
+      assert ((nodemap | datamap) & mask) == 0;
+      assert node.offset < this.offset;
+
+      if (node.size() == 1) {
+        return putEntry(mask, node.keys[0], (V) node.content[0]);
+      }
+
       int numNodes = bitCount(nodemap);
       int count = bitCount(datamap) + numNodes;
       if ((count + 1) > content.length) {
@@ -651,9 +645,7 @@ public class IntMapNodes {
         } else if (node.isNode(mask)) {
           Node<V> child = node.node(mask);
           if (child.size() >= (targetSize << 1)) {
-            split(editor, child, targetSize).stream()
-              .map(n -> new Node<V>(editor, node.prefix, node.offset).putNode(mask, n))
-              .forEach(result::addLast);
+            split(editor, child, targetSize).forEach(result::addLast);
           } else {
             acc = acc.putNode(mask, child);
           }
@@ -681,28 +673,35 @@ public class IntMapNodes {
     // don't overlap, share a common parent
     if (offsetPrime > a.offset && offsetPrime > b.offset) {
       Node<V> n = new Node<V>(editor, a.prefix, offsetPrime);
-      return n.putNode(n.mask(a.prefix), a).merge(editor, b, mergeFn);
+      return merge(editor, n.putNode(n.mask(a.prefix), a), b, mergeFn);
     }
 
-    // we contain the other node
+    // a contains b
     if (a.offset > b.offset) {
       int mask = a.mask(b.prefix);
       if (a.isEntry(mask)) {
         int idx = a.entryIndex(mask);
         long key = a.keys[idx];
         V val = (V) a.content[idx];
-        return a.removeEntry(mask).putNode(mask, b.put(editor, key, val, (x, y) -> mergeFn.apply(y, x)));
+        return a.clone(editor)
+          .removeEntry(mask)
+          .putNode(mask, b)
+          .put(editor, key, val, (x, y) -> mergeFn.apply(y, x));
+
       } else if (a.isNode(mask)) {
-        return a.setNode(mask, a.node(mask).merge(editor, b, mergeFn));
+        return a.clone(editor)
+          .setNode(mask, merge(editor, a.node(mask), b, mergeFn));
+
       } else {
-        return a.putNode(mask, b);
+        return a.clone(editor)
+          .putNode(mask, b);
       }
 
-      // it contains us
+      // b contains a
     } else if (a.offset < b.offset) {
-      return b.merge(editor, a, (x, y) -> mergeFn.apply(y, x));
+      return merge(editor, b, a, (x, y) -> mergeFn.apply(y, x));
 
-      // we're on the same level
+      // a and b are siblings
     } else {
       Node<V> result = new Node<V>(editor, a.prefix, a.offset);
 
@@ -727,7 +726,7 @@ public class IntMapNodes {
             result = result.put(editor, b.keys[idx], (V) b.content[idx], mergeFn);
             break;
           case NODE_NODE:
-            result = result.putNode(mask, a.node(mask).merge(editor, b.node(mask), mergeFn));
+            result = result.putNode(mask, merge(editor, a.node(mask), b.node(mask), mergeFn));
             break;
           case NODE_ENTRY:
             idx = b.entryIndex(mask);
@@ -759,32 +758,43 @@ public class IntMapNodes {
       return a;
     }
 
-    // we contain the other node
+    Node<V> result = null;
+
+    // a contains b
     if (a.offset > b.offset) {
       int mask = a.mask(b.prefix);
       if (a.isEntry(mask)) {
-        return b.get(a.key(mask), DEFAULT_VALUE) == DEFAULT_VALUE ? a : a.removeEntry(mask);
+        long key = a.key(mask);
+        Node<V> nPrime = b.get(key, DEFAULT_VALUE) == DEFAULT_VALUE
+          ? a
+          : a.clone(editor).remove(editor, key);
+        result = nPrime.size() == 0 ? null : nPrime;
       } else if (a.isNode(mask)) {
-        Node<V> nPrime = a.node(mask).difference(editor, b);
-        return nPrime == null ? a.removeNode(mask) : a.setNode(mask, nPrime);
+        Node<V> nPrime = difference(editor, a.node(mask), b);
+        result = nPrime == null
+          ? a.clone(editor).removeNode(mask).collapse()
+          : a.clone(editor).setNode(mask, nPrime);
+
       } else {
-        return a;
+        result = a;
       }
 
-      // it contains us
+      // b contains a
     } else if (a.offset < b.offset) {
       int mask = b.mask(a.prefix);
       if (b.isEntry(mask)) {
-        return a.remove(editor, b.key(mask));
+        Node<V> nPrime = a.remove(editor, b.key(mask));
+
+        result = nPrime.size() == 0 ? null : nPrime;
       } else if (b.isNode(mask)) {
-        return a.difference(editor, b.node(mask));
+        result = difference(editor, a, b.node(mask));
       } else {
-        return a;
+        result = a;
       }
 
-      // we're on the same level
+      // a and b are siblings
     } else {
-      Node<V> result = new Node<V>(editor, a.prefix, a.offset);
+      result = new Node<V>(editor, a.prefix, a.offset);
 
       PrimitiveIterator.OfInt masks = Util.masks(a.datamap | a.nodemap | b.datamap | b.nodemap);
       while (masks.hasNext()) {
@@ -804,7 +814,7 @@ public class IntMapNodes {
             }
             break;
           case NODE_NODE:
-            Node<V> nPrime = a.node(mask).difference(editor, b.node(mask));
+            Node<V> nPrime = difference(editor, a.node(mask), b.node(mask));
             if (nPrime != null) {
               result = result.putNode(mask, nPrime);
             }
@@ -823,9 +833,9 @@ public class IntMapNodes {
             break;
         }
       }
-
-      return result.size() > 0 ? result : null;
     }
+
+    return result == null || result.size() == 0 ? null : result.collapse();
   }
 
   public static <V> Node<V> intersection(Object editor, Node<V> a, Node<V> b) {
@@ -837,37 +847,39 @@ public class IntMapNodes {
       return null;
     }
 
-    // we contain the other node
+    Node<V> result  = null;
+
+    // a contains b
     if (a.offset > b.offset) {
       int mask = a.mask(b.prefix);
       if (a.isEntry(mask)) {
-        return b.get(a.key(mask), DEFAULT_VALUE) == DEFAULT_VALUE
+        result = b.get(a.key(mask), DEFAULT_VALUE) == DEFAULT_VALUE
           ? null
-          : transferEntry(mask, a, new Node<V>(editor, a.key(mask), 0));
+          : transferEntry(mask, a, new Node<V>(editor, a.prefix, a.offset));
       } else if (a.isNode(mask)) {
-        return a.node(mask).intersection(editor, b);
+        result = intersection(editor, a.node(mask), b);
       } else {
-        return null;
+        result = null;
       }
 
-      // it contains us
+      // b contains a
     } else if (a.offset < b.offset) {
       int mask = b.mask(a.prefix);
       if (b.isEntry(mask)) {
         long key = b.key(mask);
-        Object val = a.get(key, DEFAULT_VALUE);
-        return val == DEFAULT_VALUE
+        Object value = a.get(key, DEFAULT_VALUE);
+        result = value == DEFAULT_VALUE
           ? null
-          : new Node<V>(editor, b.key(mask), 0).put(editor, key, (V) val, null);
+          : new Node<V>(editor, a.prefix, a.offset).putEntry(a.mask(key), key, (V) value);
       } else if (b.isNode(mask)) {
-        return a.intersection(editor, b.node(mask));
+        result = intersection(editor, a, b.node(mask));
       } else {
-        return null;
+        result = null;
       }
 
-      // we're on the same level
+      // a and b are siblings
     } else {
-      Node<V> result = new Node<V>(editor, a.prefix, a.offset);
+      result = new Node<V>(editor, a.prefix, a.offset);
 
       PrimitiveIterator.OfInt masks = Util.masks(a.datamap | a.nodemap | b.datamap | b.nodemap);
       while (masks.hasNext()) {
@@ -881,7 +893,7 @@ public class IntMapNodes {
             }
             break;
           case NODE_NODE:
-            Node<V> n = a.node(mask).intersection(editor, b.node(mask));
+            Node<V> n = intersection(editor, a.node(mask), b.node(mask));
             if (n != null) {
               result = result.putNode(mask, n);
             }
@@ -906,9 +918,9 @@ public class IntMapNodes {
             break;
         }
       }
-
-      return result.size() > 0 ? result : null;
     }
+
+    return (result == null || result.size() == 0) ? null : result.collapse();
   }
 
   private static <V> Node<V> transferNode(int mask, Node<V> src, Node<V> dst) {

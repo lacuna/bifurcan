@@ -17,15 +17,18 @@
              :dev    {:dependencies [[org.clojure/clojure "1.8.0"]
                                      [org.clojure/test.check "0.9.0"]
                                      [criterium "0.4.4"]
-                                     [potemkin "0.4.4"]
+                                     [potemkin "0.4.5"]
                                      [proteus "0.1.6"]
                                      [byte-streams "0.2.3"]
-                                     [eftest "0.4.1"]
-                                     [virgil "0.1.7"]
+                                     [eftest "0.5.2"]
+                                     [virgil "0.1.8"]
                                      [io.usethesource/capsule "0.6.1"]]}}
   :aliases {"partest"   ["run" "-m" "bifurcan.run-tests"]
             "benchmark" ["with-profile" "bench,dev" "run" "-m" "bifurcan.benchmark-test" "benchmark"]}
-  :jvm-opts ^:replace ["-server" "-XX:+UseG1GC" "-XX:-OmitStackTraceInFastThrow"]
+  :jvm-opts ^:replace ["-server"
+                       "-XX:+UseG1GC"
+                       "-XX:-OmitStackTraceInFastThrow"
+                       "-ea:io.lacuna..."]
 
   :repositories {"usethesource" "http://nexus.usethesource.io/content/repositories/public/"}
 
