@@ -252,6 +252,10 @@ public class Iterators {
     }
   }
 
+  public static <V> Stream<V> toStream(Iterator<V> it) {
+    return toStream(it, 0);
+  }
+
   public static <V> Stream<V> toStream(Iterator<V> it, long estimatedSize) {
     return StreamSupport.stream(Spliterators.spliterator(it, estimatedSize, Spliterator.ORDERED), false);
   }

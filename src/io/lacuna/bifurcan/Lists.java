@@ -904,6 +904,10 @@ public class Lists {
     return a.isLinear() ? result.linear() : result;
   }
 
+  public static <V> IList<V> reverse(IList<V> l) {
+    return Lists.from(l.size(), i -> l.nth(l.size() - (i + 1)));
+  }
+
   public static <V> IList<V> sort(IList<V> l, Comparator<V> comparator) {
     Object[] array = l.toArray();
     Arrays.sort(array, (a, b) -> comparator.compare((V) a, (V) b));

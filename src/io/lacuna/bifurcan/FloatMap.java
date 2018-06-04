@@ -139,7 +139,7 @@ public class FloatMap<V> implements ISortedMap<Double, V>, Cloneable {
   }
 
   @Override
-  public ISortedMap<Double, V> slice(Double min, Double max) {
+  public FloatMap<V> slice(Double min, Double max) {
     return slice((double) min, (double) max);
   }
 

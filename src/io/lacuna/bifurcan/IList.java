@@ -7,6 +7,7 @@ import java.util.Iterator;
 import java.util.Spliterator;
 import java.util.Spliterators;
 import java.util.function.BiPredicate;
+import java.util.function.Function;
 import java.util.function.LongFunction;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -42,6 +43,10 @@ public interface IList<V> extends
    * @return the length of the list
    */
   long size();
+
+  default IList<V> update(long idx, Function<V, V> updateFn) {
+    return set(idx, updateFn.apply(nth(idx)));
+  }
 
   /**
    * @return true, if the list is linear
@@ -117,7 +122,9 @@ public interface IList<V> extends
    */
   default V[] toArray(Class<V> klass) {
     V[] ary = (V[]) Array.newInstance(klass, (int) size());
-    IntStream.range(0, ary.length).forEach(i -> ary[i] = nth(i));
+    for (int i = 0; i < ary.length; i++) {
+      ary[i] = nth(i);
+    }
     return ary;
   }
 
