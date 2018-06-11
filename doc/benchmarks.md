@@ -6,7 +6,7 @@ With that said, this is still as useful as pretty much any other data structure 
 
 ---
 
-Unlike Java's `HashMap` and `HashSet`, Bifurcan's `LinearMap` and `LinearSet` store their entries contiguously, which means that they can be cloned using `System.arraycopy()`.  This makes iteration over thes data structures significantly faster, as seen below.
+Unlike Java's `HashMap` and `HashSet`, Bifurcan's `LinearMap` and `LinearSet` store their entries contiguously, which means that they can be cloned using `System.arraycopy()`.  This makes iteration over these data structures significantly faster, as seen below.
 
 ![](../benchmarks/images/clone.png)
 
@@ -40,7 +40,7 @@ The difference between the immutable data structures is largely due to Clojure's
 
 ---
 
-These set operations are performed on two data structures of the same type, whose entries half overlap.  Both `Map` and `IntMap` perform these operations structurally, meaning that the more dissimilar the two collections are, the faster the operation.  Even if the two collections overlap completely, these are still expected to be significantly than the Clojure and CHAMP equivalents, which modify the collections one element at a time.
+These set operations are performed on two data structures of the same type, whose entries half overlap.  Both `Map` and `IntMap` perform these operations structurally, meaning that the more dissimilar the two collections are, the faster the operation.  Even if the two collections overlap completely, these are still expected to be significantly faster than the Clojure and CHAMP equivalents, which modify the collections one element at a time.
 
 ![](../benchmarks/images/map_difference.png)
 
