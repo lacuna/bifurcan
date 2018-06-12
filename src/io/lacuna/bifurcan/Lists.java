@@ -279,7 +279,7 @@ public class Lists {
     @Override
     @SuppressWarnings("unchecked")
     public <T> T[] toArray(T[] a) {
-      T[] ary = (T[]) Array.newInstance(a.getClass().getComponentType(), size());
+      T[] ary = a.length < size() ? (T[]) Array.newInstance(a.getClass().getComponentType(), size()) : a;
       IntStream.range(0, size()).forEach(i -> ary[i] = (T) get(i));
       return ary;
     }

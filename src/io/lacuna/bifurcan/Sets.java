@@ -295,7 +295,7 @@ public class Sets {
 
       @Override
       public <T> T[] toArray(T[] a) {
-        T[] ary = (T[]) Array.newInstance(a.getClass().getComponentType(), size());
+        T[] ary = a.length < size() ? (T[]) Array.newInstance(a.getClass().getComponentType(), size()) : a;
         IntStream.range(0, size()).forEach(i -> ary[i] = (T) elements.nth(i));
         return ary;
       }

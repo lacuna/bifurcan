@@ -79,7 +79,7 @@ public class MapNodes {
       int mask = hashMask(hash, shift);
       if (isEntry(mask)) {
         int idx = entryIndex(mask);
-        return hash == hashes[idx] && equals.test(key, (K) content[idx << 1]) ? idx : -1;
+        return /*hash == hashes[idx] &&*/ equals.test(key, (K) content[idx << 1]) ? idx : -1;
 
       } else if (isNode(mask)) {
         long idx = node(mask).indexOf(shift + SHIFT_INCREMENT, hash, key, equals);
@@ -731,9 +731,9 @@ public class MapNodes {
 
       // there's a potential matching entry
       if (n.isEntry(mask)) {
-        int idx = n.entryIndex(mask);
-        return n.hashes[idx] == hash && equals.test(key, (K) n.content[idx << 1])
-          ? n.content[(idx << 1) + 1]
+        int idx = n.entryIndex(mask) << 1;
+        return /*n.hashes[idx] == hash &&*/ equals.test(key, (K) n.content[idx])
+          ? n.content[idx + 1]
           : defaultValue;
 
         // we must go deeper

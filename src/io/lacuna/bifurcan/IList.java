@@ -8,6 +8,7 @@ import java.util.Spliterator;
 import java.util.Spliterators;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
+import java.util.function.IntFunction;
 import java.util.function.LongFunction;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -117,11 +118,11 @@ public interface IList<V> extends
   }
 
   /**
-   * @param klass the component class of the list, which must be specified due to Java's impoverished type system
+   * @param allocator a function which creates an array of the specified size
    * @return the elements of the list, in a typed array
    */
-  default V[] toArray(Class<V> klass) {
-    V[] ary = (V[]) Array.newInstance(klass, (int) size());
+  default V[] toArray(IntFunction<V[]> allocator) {
+    V[] ary = allocator.apply((int) size());
     for (int i = 0; i < ary.length; i++) {
       ary[i] = nth(i);
     }

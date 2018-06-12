@@ -5,10 +5,7 @@ import java.util.Iterator;
 import java.util.Objects;
 import java.util.Spliterator;
 import java.util.Spliterators;
-import java.util.function.BiPredicate;
-import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.function.ToIntFunction;
+import java.util.function.*;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -192,11 +189,11 @@ public interface ISet<V> extends
   }
 
   /**
-   * @param klass the component class of the list, which must be specified due to Java's impoverished type system
+   * @param allocator a function which creates an array of the specified size
    * @return the elements of the list, in a typed array
    */
-  default V[] toArray(Class<V> klass) {
-    V[] ary = (V[]) Array.newInstance(klass, (int) size());
+  default V[] toArray(IntFunction<V[]> allocator) {
+    V[] ary = allocator.apply((int) size());
     IList<V> es = elements();
     IntStream.range(0, ary.length).forEach(i -> ary[i] = es.nth(i));
     return ary;
