@@ -103,7 +103,7 @@ public class LinearSet<V> implements ISet<V>, Cloneable {
     map = new LinearMap<>(8, hashFn, equalsFn);
   }
 
-  private LinearSet(LinearMap<V, Void> map) {
+  LinearSet(LinearMap<V, Void> map) {
     this.map = map;
   }
 

@@ -78,7 +78,7 @@ public class Graph<V, E> implements IGraph<V, E> {
 
   @Override
   public Set<V> out(V vertex) {
-    return adjacent.get(vertex).orElseThrow(() -> new IllegalArgumentException("no such vertex"));
+    return adjacent.get(vertex).orElseThrow(() -> new IllegalArgumentException("no such vertex " + vertex));
   }
 
   @Override
@@ -111,12 +111,15 @@ public class Graph<V, E> implements IGraph<V, E> {
     Object editor = isLinear() ? this.editor : new Object();
 
     Map<VertexSet<V>, E> edgesPrime = edges.remove(t, editor);
+    Map<V, Set<V>> adjacentPrime = adjacent
+      .update(from, s -> s.remove(to, editor), editor)
+      .update(to, s -> s.remove(from, editor), editor);
 
     if (isLinear()) {
       edges = edgesPrime;
       return this;
     } else {
-      return new Graph<>(false, adjacent, edgesPrime);
+      return new Graph<>(false, adjacentPrime, edgesPrime);
     }
   }
 
@@ -225,6 +228,11 @@ public class Graph<V, E> implements IGraph<V, E> {
   @Override
   public int hashCode() {
     return adjacent.keys().hashCode() ^ edges.hashCode();
+  }
+
+  @Override
+  public Graph<V, E> clone() {
+    return new Graph<V, E>(isLinear(), adjacent.clone(), edges.clone());
   }
 
   @Override

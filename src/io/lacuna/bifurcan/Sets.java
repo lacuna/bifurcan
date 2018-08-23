@@ -75,6 +75,11 @@ public class Sets {
     }
 
     @Override
+    public ISet clone() {
+      return this;
+    }
+
+    @Override
     public String toString() {
       return Sets.toString(this);
     }
@@ -215,6 +220,11 @@ public class Sets {
         return Sets.equals(this, (ISet) obj);
       }
       return false;
+    }
+
+    @Override
+    public VirtualSet<V> clone() {
+      return new VirtualSet<V>(added.clone(), removed.clone(), base, isLinear());
     }
 
     @Override
@@ -384,6 +394,11 @@ public class Sets {
           return Sets.equals(this, (ISet<V>) obj);
         }
         return false;
+      }
+
+      @Override
+      public ISet<V> clone() {
+        return this;
       }
 
       @Override

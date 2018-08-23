@@ -262,12 +262,12 @@ public class List<V> implements IList<V>, Cloneable {
 
   @Override
   public List<V> forked() {
-    return isLinear() ? new List(false, root, prefixLen, prefix, suffixLen, suffix) : this;
+    return isLinear() ? new List(false, root, prefixLen, prefix, suffixLen, suffix).clone() : this;
   }
 
   @Override
   public List<V> linear() {
-    return isLinear() ? this : new List(true, root, prefixLen, prefix, suffixLen, suffix);
+    return isLinear() ? this : new List(true, root, prefixLen, prefix, suffixLen, suffix).clone();
   }
 
   @Override

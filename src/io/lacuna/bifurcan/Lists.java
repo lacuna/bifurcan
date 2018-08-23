@@ -90,6 +90,11 @@ public class Lists {
     }
 
     @Override
+    public IList clone() {
+      return this;
+    }
+
+    @Override
     public String toString() {
       return Lists.toString(this);
     }
@@ -188,6 +193,11 @@ public class Lists {
       }
       return new Concat<V>(m.forked(), nSize);
     }
+
+    @Override
+    public IList<V> clone() {
+      return this;
+    }
   }
 
   private static class Slice<V> implements IList<V> {
@@ -235,6 +245,11 @@ public class Lists {
         return Lists.equals(this, (IList<V>) obj);
       }
       return false;
+    }
+
+    @Override
+    public IList<V> clone() {
+      return this;
     }
 
     @Override
@@ -591,6 +606,11 @@ public class Lists {
     }
 
     @Override
+    public VirtualList<V> clone() {
+      return new VirtualList<V>(prefix.clone(), base, suffix.clone(), isLinear());
+    }
+
+    @Override
     public String toString() {
       return Lists.toString(this);
     }
@@ -622,10 +642,10 @@ public class Lists {
    * @return true if the two lists are equal, otherwise false
    */
   public static <V> boolean equals(IList<V> a, IList<V> b, BiPredicate<V, V> equals) {
-    if (a.size() != b.size()) {
-      return false;
-    } else if (a == b) {
+    if (a == b) {
       return true;
+    } else if (a.size() != b.size()) {
+      return false;
     }
 
     return Iterators.equals(a.iterator(), b.iterator(), equals);
@@ -750,6 +770,11 @@ public class Lists {
       }
 
       @Override
+      public IList<V> clone() {
+        return this;
+      }
+
+      @Override
       public long size() {
         return size;
       }
@@ -795,6 +820,11 @@ public class Lists {
       @Override
       public Iterator<V> iterator() {
         return iteratorFn.get();
+      }
+
+      @Override
+      public IList<V> clone() {
+        return this;
       }
 
       @Override
@@ -889,9 +919,9 @@ public class Lists {
   public static <V> IList<V> concat(IList<V> a, IList<V> b) {
     IList<V> result;
     if (a.size() == 0) {
-      result = b;
+      result = b.forked();
     } else if (b.size() == 0) {
-      result = a;
+      result = a.forked();
     } else if (a instanceof Concat && b instanceof Concat) {
       result = ((Concat<V>) a).concat((Concat<V>) b);
     } else if (a instanceof Concat) {

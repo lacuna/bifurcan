@@ -217,6 +217,8 @@ public interface ISet<V> extends
     return new Sets.VirtualSet<>(this).linear();
   }
 
+  ISet<V> clone();
+
   @Override
   default IList<? extends ISet<V>> split(int parts) {
     parts = Math.max(1, Math.min((int) size(), parts));

@@ -273,6 +273,8 @@ public interface IMap<K, V> extends
       .collect(Lists.collector());
   }
 
+  IMap<K, V> clone();
+
   /**
    * @param m      another map
    * @param equals a predicate which checks value equalities

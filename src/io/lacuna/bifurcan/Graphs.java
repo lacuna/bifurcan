@@ -1,9 +1,11 @@
 package io.lacuna.bifurcan;
 
-import java.util.Iterator;
-import java.util.Objects;
+import java.util.*;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.function.ToDoubleFunction;
+import java.util.stream.Collectors;
 
 import static java.lang.Math.min;
 
@@ -148,6 +150,32 @@ public class Graphs {
     return result.forked();
   }
 
+  public static <V> Set<Set<V>> biconnectedComponents(IGraph<V, ?> graph) {
+    Set<V> cuts = articulationPoints(graph);
+
+    Set<Set<V>> result = new Set<Set<V>>().linear();
+
+    for (Set<V> component : connectedComponents(graph.select(graph.vertices().difference(cuts)))) {
+      result.add(
+        component.union(
+          cuts.stream()
+            .filter(v -> graph.out(v).containsAny(component))
+            .collect(Sets.collector())));
+    }
+
+    for (int i = 0; i < cuts.size() - 1; i++) {
+      for (int j = i + 1; j < cuts.size(); j++) {
+        V a = cuts.nth(i);
+        V b = cuts.nth(i + 1);
+        if (graph.out(a).contains(b)) {
+          result.add(Set.of(a, b));
+        }
+      }
+    }
+
+    return result.forked();
+  }
+
   private static class ArticulationPointState<V> {
     final V node;
     final int depth;
@@ -228,6 +256,96 @@ public class Graphs {
     return result.forked();
   }
 
+  private static class ShortestPathState<V> {
+    public final V origin, node;
+    public final ShortestPathState<V> prev;
+    public final double distance;
+
+    private ShortestPathState(V origin) {
+      this.origin = origin;
+      this.prev = null;
+      this.node = origin;
+      this.distance = 0;
+    }
+
+    public ShortestPathState(V node, ShortestPathState<V> prev, double edge) {
+      this.origin = prev.origin;
+      this.node = node;
+      this.prev = prev;
+      this.distance = prev.distance + edge;
+    }
+
+    public IList<V> path() {
+      IList<V> result = new LinearList<>();
+
+      ShortestPathState<V> curr = this;
+      for (; ; ) {
+        result.addFirst(curr.node);
+        if (curr.node.equals(curr.origin)) {
+          break;
+        }
+        curr = curr.prev;
+      }
+
+      return result;
+    }
+  }
+
+  public static <V, E> Optional<IList<V>> shortestPath(IGraph<V, E> graph, V from, Predicate<V> accept, ToDoubleFunction<E> cost) {
+    return shortestPath(graph, LinearList.of(from), accept, cost);
+  }
+
+  /**
+   * @return the shortest path, if one exists, between a starting vertex and an accepted vertex, excluding trivial
+   * solutions where a starting vertex is accepted.
+   */
+  public static <V, E> Optional<IList<V>> shortestPath(IGraph<V, E> graph, Iterable<V> start, Predicate<V> accept, ToDoubleFunction<E> cost) {
+    IMap<V, IMap<V, ShortestPathState<V>>> originStates = new LinearMap<>();
+    PriorityQueue<ShortestPathState<V>> queue = new PriorityQueue<>(Comparator.comparingDouble(x -> x.distance));
+
+    for (V v : start) {
+      if (graph.vertices().contains(v)) {
+        ShortestPathState<V> init = new ShortestPathState<>(v);
+        originStates.getOrCreate(v, LinearMap::new).put(v, init);
+        queue.add(init);
+      }
+    }
+
+    ShortestPathState<V> curr;
+    for (; ; ) {
+      curr = queue.poll();
+      if (curr == null) {
+        return Optional.empty();
+      }
+
+      IMap<V, ShortestPathState<V>> states = originStates.get(curr.origin).get();
+      if (states.get(curr.node).get() != curr) {
+        continue;
+      } else if (curr.prev != null && accept.test(curr.node)) {
+        return Optional.of(List.from(curr.path()));
+      }
+
+      for (V v : graph.out(curr.node)) {
+        double edge = cost.applyAsDouble(graph.edge(curr.node, v));
+        if (edge < 0) {
+          throw new IllegalArgumentException("negative edge weights are unsupported");
+        }
+
+        ShortestPathState<V> next = states.get(v, null);
+        if (next == null) {
+          next = new ShortestPathState<V>(v, curr, edge);
+        } else if (curr.distance + edge < next.distance) {
+          next = new ShortestPathState<V>(v, curr, edge);
+        } else {
+          continue;
+        }
+
+        states.put(v, next);
+        queue.add(next);
+      }
+    }
+  }
+
   /// directed graphs
 
   private static class TarjanState {
@@ -243,12 +361,11 @@ public class Graphs {
   }
 
   /**
-   * An implementation of Tarjan's strongly connected components algorithm, which only returns sets of vertices which
-   * contain more than one vertex.  If an empty set is returned, then no cycles exist in {@code graph}.
-   *
-   * @return all strongly connected components in the graph containing more than one vertex
+   * @param graph             a directed graph
+   * @param includeSingletons if false, omits any singleton vertex sets
+   * @return a set of all strongly connected vertices in the graph
    */
-  public static <V> Set<Set<V>> stronglyConnectedComponents(IGraph<V, ?> graph) {
+  public static <V> Set<Set<V>> stronglyConnectedComponents(IGraph<V, ?> graph, boolean includeSingletons) {
 
     if (!graph.isDirected()) {
       throw new IllegalArgumentException("graph must be directed, try Graphs.connectedComponents instead");
@@ -306,9 +423,9 @@ public class Graphs {
             vs.lowlink = min(vs.lowlink, ws.lowlink);
           }
 
-          // create a new group, if it's larger than one vertex
+          // create a new group
           if (ws.lowlink == ws.index) {
-            if (stack.last() == w) {
+            if (!includeSingletons && stack.last() == w) {
               stack.popLast();
               state.get(w).get().onStack = false;
             } else {
@@ -329,6 +446,68 @@ public class Graphs {
     }
 
     return result.forked();
+  }
+
+  public static <V, E> List<IGraph<V, E>> stronglyConnectedSubgraphs(IGraph<V, E> graph, boolean includeSingletons) {
+    List<IGraph<V, E>> result = new List<IGraph<V, E>>().linear();
+    stronglyConnectedComponents(graph, includeSingletons).forEach(s -> result.addLast(graph.select(s)));
+    return result.forked();
+  }
+
+  public static <V, E> List<List<V>> cycles(IGraph<V, E> graph) {
+
+    if (!graph.isDirected()) {
+      throw new IllegalArgumentException("graph must be directed");
+    }
+
+    // traversal
+    LinearList<V> path = new LinearList<>();
+    IList<Iterator<V>> branches = new LinearList<>();
+
+    //state
+    LinearSet<V> blocked = new LinearSet<>(graph.vertexHash(), graph.vertexEquality());
+
+    // TODO: implement the rest of the Johnson algorithm, which has better asymptotic behavior
+    List<List<V>> result = new List<List<V>>().linear();
+    for (IGraph<V, E> subgraph : stronglyConnectedSubgraphs(graph, true)) {
+
+      blocked.clear();
+
+      for (V seed : subgraph.vertices()) {
+
+        long threshold = subgraph.indexOf(seed);
+
+        path.addLast(seed);
+        branches.addLast(subgraph.out(seed).iterator());
+
+        do {
+          // traverse deeper
+          if (branches.last().hasNext()) {
+            V x = branches.last().next();
+            if (subgraph.indexOf(x) < threshold) {
+              continue;
+            }
+
+            if (subgraph.vertexEquality().test(seed, x)) {
+              result.addLast(List.from(path).addLast(seed));
+            } else if (!blocked.contains(x)) {
+              path.addLast(x);
+              branches.addLast(subgraph.out(x).iterator());
+            }
+
+            blocked.add(x);
+
+            // return
+          } else {
+            branches.removeLast();
+            blocked.remove(path.popLast());
+          }
+        } while (path.size() > 0);
+      }
+    }
+
+    return result.forked();
+
   }
 
   /// traversal

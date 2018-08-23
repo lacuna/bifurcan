@@ -200,6 +200,8 @@ public interface IList<V> extends
     return new VirtualList<V>(this).linear();
   }
 
+  IList<V> clone();
+
   default boolean equals(Object o, BiPredicate<V, V> equals) {
     if (o instanceof IList) {
       return Lists.equals(this, (IList<V>) o, equals);

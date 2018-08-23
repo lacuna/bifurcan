@@ -24,6 +24,7 @@ public class LinearList<V> implements IList<V>, Cloneable {
   private Object[] elements;
   private int mask;
   private int size, offset;
+  private int hash = -1;
 
   public static <V> LinearList<V> of(V... elements) {
     LinearList<V> list = new LinearList<V>(elements.length);
@@ -124,6 +125,8 @@ public class LinearList<V> implements IList<V>, Cloneable {
       resize(size << 1);
     }
     elements[(offset + size++) & mask] = value;
+    hash = -1;
+
     return this;
   }
 
@@ -135,6 +138,8 @@ public class LinearList<V> implements IList<V>, Cloneable {
     offset = (offset - 1) & mask;
     elements[offset] = value;
     size++;
+    hash = -1;
+
     return this;
   }
 
@@ -145,6 +150,8 @@ public class LinearList<V> implements IList<V>, Cloneable {
     }
     offset = (offset + 1) & mask;
     size--;
+    hash = -1;
+
     return this;
   }
 
@@ -154,6 +161,8 @@ public class LinearList<V> implements IList<V>, Cloneable {
       return this;
     }
     elements[(offset + --size) & mask] = null;
+    hash = -1;
+
     return this;
   }
 
@@ -161,6 +170,7 @@ public class LinearList<V> implements IList<V>, Cloneable {
     Arrays.fill(elements, null);
     offset = 0;
     size = 0;
+    hash = -1;
 
     return this;
   }
@@ -174,6 +184,8 @@ public class LinearList<V> implements IList<V>, Cloneable {
     }
 
     elements[(int) (offset + (int) idx) & mask] = value;
+    hash = -1;
+
     return this;
   }
 
@@ -196,6 +208,8 @@ public class LinearList<V> implements IList<V>, Cloneable {
         System.arraycopy(list.elements, 0, elements, size + truncatedListSize, list.size - truncatedListSize);
       }
       size += list.size();
+      hash = -1;
+
     } else {
       for (V e : l) {
         addLast(e);
@@ -279,7 +293,10 @@ public class LinearList<V> implements IList<V>, Cloneable {
 
   @Override
   public int hashCode() {
-    return (int) Lists.hash(this);
+    if (hash == -1) {
+      hash = (int) Lists.hash(this);
+    }
+    return hash;
   }
 
   @Override

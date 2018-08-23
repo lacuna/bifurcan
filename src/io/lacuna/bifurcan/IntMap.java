@@ -433,6 +433,6 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
 
   @Override
   public IntMap<V> clone() {
-    return isLinear() ? forked().linear() : this;
+    return new IntMap<>(neg, pos, isLinear());
   }
 }

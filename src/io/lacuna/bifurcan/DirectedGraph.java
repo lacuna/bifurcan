@@ -265,8 +265,8 @@ public class DirectedGraph<V, E> implements IGraph<V, E> {
   }
 
   @Override
-  protected Object clone() {
-    return isLinear() ? forked().linear() : this;
+  public DirectedGraph<V, E> clone() {
+    return isLinear() ? new DirectedGraph<>(isLinear(), out.clone(), in.clone()) : this;
   }
 
   @Override

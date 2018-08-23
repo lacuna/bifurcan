@@ -71,13 +71,21 @@ public interface IGraph<V, E> extends ILinearizable<IGraph<V, E>>, IForkable<IGr
 
   <U> IGraph<V, U> mapEdges(Function<IEdge<V, E>, U> f);
 
+  default long indexOf(V vertex) {
+    return vertices().indexOf(vertex);
+  }
+
+  default V nth(long index) {
+    return vertices().nth(index);
+  }
+
   /**
    * @return a graph containing only the specified vertices and the edges between them
    */
   default IGraph<V, E> select(ISet<V> vertices) {
-    IGraph<V, E> g = this.linear();
+    IGraph<V, E> g = this.clone().linear();
     vertices().difference(vertices).forEach(g::remove);
-    return this.isLinear() ? this : g.forked();
+    return this.isLinear() ? g : g.forked();
   }
 
   /**
@@ -135,6 +143,8 @@ public interface IGraph<V, E> extends ILinearizable<IGraph<V, E>>, IForkable<IGr
    * @return
    */
   IGraph<V, E> transpose();
+
+  IGraph<V, E> clone();
 
   // polymorphic utility methods
 

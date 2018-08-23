@@ -36,7 +36,7 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
    * @throws CycleException if {@code graph} contains a cycle
    */
   public static <V, E> DirectedAcyclicGraph<V, E> from(DirectedGraph<V, E> graph) {
-    if (Graphs.stronglyConnectedComponents(graph).size() > 0) {
+    if (Graphs.stronglyConnectedComponents(graph, false).size() > 0) {
       throw new CycleException("graph contains a cycle");
     }
     return new DirectedAcyclicGraph<>(
@@ -231,6 +231,11 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
   @Override
   public String toString() {
     return graph.toString();
+  }
+
+  @Override
+  public DirectedAcyclicGraph<V, E> clone() {
+    return new DirectedAcyclicGraph<V, E>(graph.clone(), bottom.clone(), top.clone());
   }
 
   ///

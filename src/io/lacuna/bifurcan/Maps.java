@@ -85,6 +85,11 @@ public class Maps {
     }
 
     @Override
+    public IMap clone() {
+      return this;
+    }
+
+    @Override
     public String toString() {
       return Maps.toString(this);
     }
@@ -306,6 +311,11 @@ public class Maps {
     }
 
     @Override
+    public VirtualMap<K, V> clone() {
+      return new VirtualMap<K, V>(base, added.clone(), removed.clone(), shadowed.clone(), isLinear());
+    }
+
+    @Override
     public String toString() {
       return Maps.toString(this);
     }
@@ -426,6 +436,11 @@ public class Maps {
           return Maps.equals(this, (IMap<K, V>) obj);
         }
         return false;
+      }
+
+      @Override
+      public IMap<K, V> clone() {
+        return this;
       }
 
       @Override

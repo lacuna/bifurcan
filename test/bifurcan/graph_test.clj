@@ -7,7 +7,10 @@
    [bifurcan.test-utils :as u]
    [clojure.set :as set])
   (:import
+   [java.util.function
+    ToDoubleFunction]
    [io.lacuna.bifurcan
+    List
     Graph
     DirectedGraph
     DirectedAcyclicGraph
@@ -17,6 +20,11 @@
     ISet]))
 
 ;;;
+
+(def fixed-cost
+  (reify ToDoubleFunction
+    (applyAsDouble [_ x]
+      1.0)))
 
 (defn ->set [^Iterable x]
   (->> x .iterator iterator-seq set))
@@ -97,7 +105,7 @@
   (gen/fmap
     #(DirectedAcyclicGraph/from %)
     (gen/such-that
-      #(-> % Graphs/stronglyConnectedComponents .size zero?)
+      (fn [g] (-> g #(Graphs/stronglyConnectedComponents % false) .size zero?))
       gen-digraph)))
 
 ;;;
@@ -105,8 +113,7 @@
 (defspec test-strongly-connected-components 1e5
   (prop/for-all [digraph gen-digraph]
     (= (naive-strongly-connected-components digraph)
-      (->> digraph
-        Graphs/stronglyConnectedComponents
+      (->> (Graphs/stronglyConnectedComponents digraph false)
         ->set
         (map ->set)
         set))))

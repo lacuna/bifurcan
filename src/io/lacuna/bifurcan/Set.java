@@ -222,6 +222,6 @@ public class Set<V> implements ISet<V>, Cloneable {
 
   @Override
   public Set<V> clone() {
-    return map.isLinear() ? forked().linear() : this;
+    return new Set<>(map.clone());
   }
 }

@@ -298,8 +298,8 @@ public class FloatMap<V> implements ISortedMap<Double, V>, Cloneable {
   }
 
   @Override
-  protected FloatMap<V> clone() {
-    return isLinear() ? this.forked().linear() : this;
+  public FloatMap<V> clone() {
+    return new FloatMap<>(map.clone());
   }
 
   @Override
