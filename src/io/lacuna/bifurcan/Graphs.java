@@ -1,5 +1,7 @@
 package io.lacuna.bifurcan;
 
+import io.lacuna.bifurcan.utils.Iterators;
+
 import java.util.*;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
@@ -7,6 +9,7 @@ import java.util.function.Predicate;
 import java.util.function.ToDoubleFunction;
 import java.util.stream.Collectors;
 
+import static java.lang.Math.max;
 import static java.lang.Math.min;
 
 /**
@@ -466,12 +469,17 @@ public class Graphs {
 
     //state
     LinearSet<V> blocked = new LinearSet<>(graph.vertexHash(), graph.vertexEquality());
+    LinearMap<V, ISet<V>> blocking = new LinearMap<>();
 
-    // TODO: implement the rest of the Johnson algorithm, which has better asymptotic behavior
     List<List<V>> result = new List<List<V>>().linear();
     for (IGraph<V, E> subgraph : stronglyConnectedSubgraphs(graph, true)) {
 
-      blocked.clear();
+      // simple rings are a pathological input for this algorithm, and also very common
+      if (subgraph.vertices().stream().allMatch(v -> subgraph.out(v).size() == 1)) {
+        V seed = subgraph.vertices().nth(0);
+        result.addLast(List.from(bfsVertices(seed, subgraph::out)).addLast(seed));
+        continue;
+      }
 
       for (V seed : subgraph.vertices()) {
 
@@ -480,27 +488,50 @@ public class Graphs {
         path.addLast(seed);
         branches.addLast(subgraph.out(seed).iterator());
 
+        blocked.clear();
+        blocking.clear();
+        int depth = 1;
+
         do {
           // traverse deeper
           if (branches.last().hasNext()) {
-            V x = branches.last().next();
-            if (subgraph.indexOf(x) < threshold) {
+            V v = branches.last().next();
+            if (subgraph.indexOf(v) < threshold) {
               continue;
             }
 
-            if (subgraph.vertexEquality().test(seed, x)) {
+            if (subgraph.vertexEquality().test(seed, v)) {
               result.addLast(List.from(path).addLast(seed));
-            } else if (!blocked.contains(x)) {
-              path.addLast(x);
-              branches.addLast(subgraph.out(x).iterator());
+              depth = 0;
+            } else if (!blocked.contains(v)) {
+              path.addLast(v);
+              depth++;
+              branches.addLast(subgraph.out(v).iterator());
             }
 
-            blocked.add(x);
+            blocked.add(v);
 
             // return
           } else {
+            V v = path.popLast();
+            depth = max(-1, depth - 1);
+
+            if (depth < 0) {
+              LinearList<V> stack = new LinearList<V>().addFirst(v);
+              while (stack.size() > 0) {
+                V u = stack.popLast();
+                if (blocked.contains(u)) {
+                  blocked.remove(u);
+                  blocking.get(u, (ISet<V>) Sets.EMPTY).forEach(stack::addLast);
+                  blocking.remove(u);
+                }
+              }
+            } else {
+              graph.out(v).forEach(u -> blocking.getOrCreate(u, LinearSet::new).add(v));
+            }
+
             branches.removeLast();
-            blocked.remove(path.popLast());
+
           }
         } while (path.size() > 0);
       }
@@ -511,6 +542,10 @@ public class Graphs {
   }
 
   /// traversal
+
+  public static <V> Iterator<V> bfsVertices(V start, Function<V, Iterable<V>> adjacent) {
+    return bfsVertices(LinearList.of(start), adjacent);
+  }
 
   public static <V> Iterator<V> bfsVertices(Iterable<V> start, Function<V, Iterable<V>> adjacent) {
     LinearList<V> queue = new LinearList<>();

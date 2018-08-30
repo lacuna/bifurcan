@@ -21,7 +21,7 @@ public interface IGraph<V, E> extends ILinearizable<IGraph<V, E>>, IForkable<IGr
   /**
    * @return an iterator over every edge in the graph
    */
-  Iterator<IEdge<V, E>> edges();
+  Iterable<IEdge<V, E>> edges();
 
   /**
    * @return the value of the edge between {@code from} and {@code to}

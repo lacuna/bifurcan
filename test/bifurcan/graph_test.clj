@@ -29,6 +29,8 @@
 (defn ->set [^Iterable x]
   (->> x .iterator iterator-seq set))
 
+
+
 (defn construct [graph vertex->out]
   (reduce
     (fn [g [v out]]
@@ -84,6 +86,27 @@
       (filter #(not= n (-> g (.remove %) Graphs/connectedComponents .size)))
       set)))
 
+(defn extend-path [^IGraph g path pred]
+  (->> (.out g (last path))
+    (filter pred)
+    (remove (set (rest path)))
+    (map #(conj path %))))
+
+(defn naive-cycles [^IGraph g]
+  (let [acc (atom #{})]
+    (dotimes [i (-> g .vertices .size)]
+      (let [seed (-> g .vertices (.nth i))
+            pred (complement (disj (->> g .vertices (take i) set) seed))]
+        (loop [paths [[seed]]]
+          (when-not (empty? paths)
+            (let [paths' (mapcat #(extend-path g % pred) paths)]
+
+              (doseq [p (filter #(= seed (last %)) paths')]
+                (swap! acc conj p))
+
+              (recur (remove #(= seed (last %)) paths')))))))
+    @acc))
+
 ;;;
 
 (defn gen-sized-graph [init size]
@@ -109,6 +132,14 @@
       gen-digraph)))
 
 ;;;
+
+;; the `naive-cycles` is especially naive, so don't run too many iterations
+(defspec test-cycles 1e3
+  (prop/for-all [digraph gen-digraph]
+    (= (naive-cycles digraph)
+      (->> (Graphs/cycles digraph)
+        (map seq)
+        set))))
 
 (defspec test-strongly-connected-components 1e5
   (prop/for-all [digraph gen-digraph]

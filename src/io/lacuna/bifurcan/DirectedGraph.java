@@ -41,9 +41,11 @@ public class DirectedGraph<V, E> implements IGraph<V, E> {
   }
 
   @Override
-  public Iterator<IEdge<V, E>> edges() {
-    return out.entries().stream()
-      .flatMap(outer -> outer.value().entries().stream()
+  public Iterable<IEdge<V, E>> edges() {
+    return () -> out.entries().stream()
+      .flatMap(outer -> outer.value()
+        .entries()
+        .stream()
         .map(inner -> (IEdge<V, E>) new Graphs.Edge<V, E>(inner.value(), inner.key(), outer.key())))
       .iterator();
   }
@@ -234,7 +236,7 @@ public class DirectedGraph<V, E> implements IGraph<V, E> {
   public DirectedGraph<V, E> transpose() {
     return new DirectedGraph<>(
       isLinear(),
-      in.mapValues((u, s) -> s.map.mapValues((v, x) -> this.edge(u, v))),
+      out.mapValues((u, x) -> in.get(u, (Set<V>) EMPTY_SET).map.mapValues((v, y) -> this.edge(v, u))),
       out.mapValues((x, m) -> m.keys()));
   }
 

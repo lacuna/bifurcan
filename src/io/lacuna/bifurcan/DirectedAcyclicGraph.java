@@ -59,7 +59,7 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
   }
 
   @Override
-  public Iterator<IEdge<V, E>> edges() {
+  public Iterable<IEdge<V, E>> edges() {
     return graph.edges();
   }
 

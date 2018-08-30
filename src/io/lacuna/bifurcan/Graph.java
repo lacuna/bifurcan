@@ -57,8 +57,10 @@ public class Graph<V, E> implements IGraph<V, E> {
   }
 
   @Override
-  public Iterator<IEdge<V, E>> edges() {
-    return edges.stream().map(e -> (IEdge<V, E>) new Graphs.Edge<>(e.value(), e.key().v, e.key().w)).iterator();
+  public Iterable<IEdge<V, E>> edges() {
+    return () -> edges.stream()
+      .map(e -> (IEdge<V, E>) new Graphs.Edge<>(e.value(), e.key().v, e.key().w))
+      .iterator();
   }
 
   @Override

@@ -268,7 +268,7 @@ public class MapNodes {
       }
 
       for (int i = content.length - bitCount(n.nodemap); i < content.length; i++) {
-        n.content[i] = ((Node<K, V>) n.content[i]).mapVals(editor, f);
+        n.content[i] = ((INode<K, V>) n.content[i]).mapVals(editor, f);
       }
 
       return n;
