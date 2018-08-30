@@ -131,6 +131,98 @@ public class Graphs {
     return result.forked();
   }
 
+  /// search
+
+  private static class ShortestPathState<V> {
+    public final V origin, node;
+    public final ShortestPathState<V> prev;
+    public final double distance;
+
+    private ShortestPathState(V origin) {
+      this.origin = origin;
+      this.prev = null;
+      this.node = origin;
+      this.distance = 0;
+    }
+
+    public ShortestPathState(V node, ShortestPathState<V> prev, double edge) {
+      this.origin = prev.origin;
+      this.node = node;
+      this.prev = prev;
+      this.distance = prev.distance + edge;
+    }
+
+    public IList<V> path() {
+      IList<V> result = new LinearList<>();
+
+      ShortestPathState<V> curr = this;
+      for (; ; ) {
+        result.addFirst(curr.node);
+        if (curr.node.equals(curr.origin)) {
+          break;
+        }
+        curr = curr.prev;
+      }
+
+      return result;
+    }
+  }
+
+  public static <V, E> Optional<IList<V>> shortestPath(IGraph<V, E> graph, V from, Predicate<V> accept, ToDoubleFunction<IEdge<V, E>> cost) {
+    return shortestPath(graph, LinearList.of(from), accept, cost);
+  }
+
+  /**
+   * @return the shortest path, if one exists, between a starting vertex and an accepted vertex, excluding trivial
+   * solutions where a starting vertex is accepted.
+   */
+  public static <V, E> Optional<IList<V>> shortestPath(IGraph<V, E> graph, Iterable<V> start, Predicate<V> accept, ToDoubleFunction<IEdge<V, E>> cost) {
+    IMap<V, IMap<V, ShortestPathState<V>>> originStates = new LinearMap<>();
+    PriorityQueue<ShortestPathState<V>> queue = new PriorityQueue<>(Comparator.comparingDouble(x -> x.distance));
+
+    for (V v : start) {
+      if (graph.vertices().contains(v)) {
+        ShortestPathState<V> init = new ShortestPathState<>(v);
+        originStates.getOrCreate(v, LinearMap::new).put(v, init);
+        queue.add(init);
+      }
+    }
+
+    ShortestPathState<V> curr;
+    for (; ; ) {
+      curr = queue.poll();
+      if (curr == null) {
+        return Optional.empty();
+      }
+
+      IMap<V, ShortestPathState<V>> states = originStates.get(curr.origin).get();
+      if (states.get(curr.node).get() != curr) {
+        continue;
+      } else if (curr.prev != null && accept.test(curr.node)) {
+        return Optional.of(List.from(curr.path()));
+      }
+
+      for (V v : graph.out(curr.node)) {
+        double edge = cost.applyAsDouble(new Edge<V, E>(graph.edge(curr.node, v), curr.node, v));
+        if (edge < 0) {
+          throw new IllegalArgumentException("negative edge weights are unsupported");
+        }
+
+        ShortestPathState<V> next = states.get(v, null);
+        if (next == null) {
+          next = new ShortestPathState<V>(v, curr, edge);
+        } else if (curr.distance + edge < next.distance) {
+          next = new ShortestPathState<V>(v, curr, edge);
+        } else {
+          continue;
+        }
+
+        states.put(v, next);
+        queue.add(next);
+      }
+    }
+  }
+
   /// undirected graphs
 
   public static <V> Set<Set<V>> connectedComponents(IGraph<V, ?> graph) {
@@ -257,96 +349,6 @@ public class Graphs {
     }
 
     return result.forked();
-  }
-
-  private static class ShortestPathState<V> {
-    public final V origin, node;
-    public final ShortestPathState<V> prev;
-    public final double distance;
-
-    private ShortestPathState(V origin) {
-      this.origin = origin;
-      this.prev = null;
-      this.node = origin;
-      this.distance = 0;
-    }
-
-    public ShortestPathState(V node, ShortestPathState<V> prev, double edge) {
-      this.origin = prev.origin;
-      this.node = node;
-      this.prev = prev;
-      this.distance = prev.distance + edge;
-    }
-
-    public IList<V> path() {
-      IList<V> result = new LinearList<>();
-
-      ShortestPathState<V> curr = this;
-      for (; ; ) {
-        result.addFirst(curr.node);
-        if (curr.node.equals(curr.origin)) {
-          break;
-        }
-        curr = curr.prev;
-      }
-
-      return result;
-    }
-  }
-
-  public static <V, E> Optional<IList<V>> shortestPath(IGraph<V, E> graph, V from, Predicate<V> accept, ToDoubleFunction<E> cost) {
-    return shortestPath(graph, LinearList.of(from), accept, cost);
-  }
-
-  /**
-   * @return the shortest path, if one exists, between a starting vertex and an accepted vertex, excluding trivial
-   * solutions where a starting vertex is accepted.
-   */
-  public static <V, E> Optional<IList<V>> shortestPath(IGraph<V, E> graph, Iterable<V> start, Predicate<V> accept, ToDoubleFunction<E> cost) {
-    IMap<V, IMap<V, ShortestPathState<V>>> originStates = new LinearMap<>();
-    PriorityQueue<ShortestPathState<V>> queue = new PriorityQueue<>(Comparator.comparingDouble(x -> x.distance));
-
-    for (V v : start) {
-      if (graph.vertices().contains(v)) {
-        ShortestPathState<V> init = new ShortestPathState<>(v);
-        originStates.getOrCreate(v, LinearMap::new).put(v, init);
-        queue.add(init);
-      }
-    }
-
-    ShortestPathState<V> curr;
-    for (; ; ) {
-      curr = queue.poll();
-      if (curr == null) {
-        return Optional.empty();
-      }
-
-      IMap<V, ShortestPathState<V>> states = originStates.get(curr.origin).get();
-      if (states.get(curr.node).get() != curr) {
-        continue;
-      } else if (curr.prev != null && accept.test(curr.node)) {
-        return Optional.of(List.from(curr.path()));
-      }
-
-      for (V v : graph.out(curr.node)) {
-        double edge = cost.applyAsDouble(graph.edge(curr.node, v));
-        if (edge < 0) {
-          throw new IllegalArgumentException("negative edge weights are unsupported");
-        }
-
-        ShortestPathState<V> next = states.get(v, null);
-        if (next == null) {
-          next = new ShortestPathState<V>(v, curr, edge);
-        } else if (curr.distance + edge < next.distance) {
-          next = new ShortestPathState<V>(v, curr, edge);
-        } else {
-          continue;
-        }
-
-        states.put(v, next);
-        queue.add(next);
-      }
-    }
   }
 
   /// directed graphs
