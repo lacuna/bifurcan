@@ -6,14 +6,16 @@ import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.function.ToIntFunction;
 
+import static io.lacuna.bifurcan.Graphs.MERGE_LAST_WRITE_WINS;
+
 /**
  * @author ztellman
  */
 public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
 
   public static class CycleException extends IllegalArgumentException {
-    public CycleException(String message) {
-      super(message);
+    public CycleException() {
+      super("the graph contains a cycle");
     }
   }
 
@@ -37,8 +39,9 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
    */
   public static <V, E> DirectedAcyclicGraph<V, E> from(DirectedGraph<V, E> graph) {
     if (Graphs.stronglyConnectedComponents(graph, false).size() > 0) {
-      throw new CycleException("graph contains a cycle");
+      throw new CycleException();
     }
+
     return new DirectedAcyclicGraph<>(
       graph,
       graph.vertices().stream().filter(v -> graph.in(v).size() == 0).collect(Sets.collector()),
@@ -51,6 +54,30 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
 
   public Set<V> bottom() {
     return bottom;
+  }
+
+  public DirectedGraph<V, E> directedGraph() {
+    return graph.clone();
+  }
+
+  @Override
+  public DirectedAcyclicGraph<V, E> add(IEdge<V, E> edge) {
+    return link(edge.from(), edge.to(), edge.value());
+  }
+
+  @Override
+  public DirectedAcyclicGraph<V, E> remove(IEdge<V, E> edge) {
+    return unlink(edge.from(), edge.to());
+  }
+
+  @Override
+  public DirectedAcyclicGraph<V, E> link(V from, V to, E edge) {
+    return link(from, to, edge, (BinaryOperator<E>) MERGE_LAST_WRITE_WINS);
+  }
+
+  @Override
+  public DirectedAcyclicGraph<V, E> link(V from, V to) {
+    return link(from, to, null, (BinaryOperator<E>) MERGE_LAST_WRITE_WINS);
   }
 
   @Override
@@ -88,14 +115,25 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
    */
   @Override
   public DirectedAcyclicGraph<V, E> link(V from, V to, E edge, BinaryOperator<E> merge) {
+    boolean
+      newFrom = !vertices().contains(from),
+      newTo = !vertices().contains(to);
 
-    if (vertices().contains(from) && vertices().contains(to) && createsCycle(from, to)) {
-      throw new CycleException("new edge creates a cycle");
+    if (!newFrom && !newTo && !out(from).contains(to) && createsCycle(from, to)) {
+      throw new CycleException();
     }
 
     DirectedGraph<V, E> graphPrime = graph.link(from, to, edge, merge);
     Set<V> topPrime = top.remove(to);
     Set<V> bottomPrime = bottom.remove(from);
+
+    if (newFrom) {
+      topPrime = top.add(from);
+    }
+
+    if (newTo) {
+      bottomPrime = bottom.add(to);
+    }
 
     if (isLinear()) {
       graph = graphPrime;
@@ -131,10 +169,7 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
 
   @Override
   public DirectedAcyclicGraph<V, E> select(ISet<V> vertices) {
-    return new DirectedAcyclicGraph<>(
-      graph.select(vertices),
-      top.intersection(vertices),
-      bottom.intersection(vertices));
+    return from(graph.select(vertices));
   }
 
   @Override
@@ -241,8 +276,8 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
   ///
 
   private boolean createsCycle(V from, V to) {
-    Iterator<V> upstreamIterator = Graphs.bfsVertices(LinearList.of(from), this::in);
-    Iterator<V> downstreamIterator = Graphs.bfsVertices(LinearList.of(to), this::out);
+    Iterator<V> upstreamIterator = Graphs.bfsVertices(LinearList.of(from), this::in).iterator();
+    Iterator<V> downstreamIterator = Graphs.bfsVertices(LinearList.of(to), this::out).iterator();
 
     if (!upstreamIterator.hasNext() || !downstreamIterator.hasNext()) {
       return false;

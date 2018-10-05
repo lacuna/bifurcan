@@ -82,11 +82,7 @@ public interface IGraph<V, E> extends ILinearizable<IGraph<V, E>>, IForkable<IGr
   /**
    * @return a graph containing only the specified vertices and the edges between them
    */
-  default IGraph<V, E> select(ISet<V> vertices) {
-    IGraph<V, E> g = this.clone().linear();
-    vertices().difference(vertices).forEach(g::remove);
-    return this.isLinear() ? g : g.forked();
-  }
+  IGraph<V, E> select(ISet<V> vertices);
 
   /**
    * @return

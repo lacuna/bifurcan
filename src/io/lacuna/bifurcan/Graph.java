@@ -8,6 +8,7 @@ import java.util.function.BiPredicate;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.function.ToIntFunction;
+import java.util.stream.Collectors;
 
 /**
  * @author ztellman
@@ -81,6 +82,19 @@ public class Graph<V, E> implements IGraph<V, E> {
   @Override
   public Set<V> out(V vertex) {
     return adjacent.get(vertex).orElseThrow(() -> new IllegalArgumentException("no such vertex " + vertex));
+  }
+
+  @Override
+  public Graph<V, E> select(ISet<V> vertices) {
+    Set<VertexSet<V>> es = edges.keys()
+      .stream()
+      .filter(s -> vertices.contains(s.v) && vertices.contains(s.w))
+      .collect(Sets.collector());
+
+    return new Graph<>(
+      isLinear(),
+      adjacent.intersection(vertices).mapValues((k, v) -> v.intersection(vertices)),
+      edges.intersection(es));
   }
 
   @Override

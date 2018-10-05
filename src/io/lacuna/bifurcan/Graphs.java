@@ -237,7 +237,7 @@ public class Graphs {
       if (!traversed.contains(seed)) {
         traversed.add(seed);
         Set<V> group = new Set<>(graph.vertexHash(), graph.vertexEquality()).linear();
-        bfsVertices(LinearList.of(seed), graph::out).forEachRemaining(group::add);
+        bfsVertices(LinearList.of(seed), graph::out).forEach(group::add);
         result.add(group.forked());
       }
     }
@@ -370,7 +370,7 @@ public class Graphs {
    * @param includeSingletons if false, omits any singleton vertex sets
    * @return a set of all strongly connected vertices in the graph
    */
-  public static <V> Set<Set<V>> stronglyConnectedComponents(IGraph<V, ?> graph, boolean includeSingletons) {
+  public static <V, E> Set<Set<V>> stronglyConnectedComponents(IGraph<V, E> graph, boolean includeSingletons) {
 
     if (!graph.isDirected()) {
       throw new IllegalArgumentException("graph must be directed, try Graphs.connectedComponents instead");
@@ -545,17 +545,17 @@ public class Graphs {
 
   /// traversal
 
-  public static <V> Iterator<V> bfsVertices(V start, Function<V, Iterable<V>> adjacent) {
+  public static <V> Iterable<V> bfsVertices(V start, Function<V, Iterable<V>> adjacent) {
     return bfsVertices(LinearList.of(start), adjacent);
   }
 
-  public static <V> Iterator<V> bfsVertices(Iterable<V> start, Function<V, Iterable<V>> adjacent) {
+  public static <V> Iterable<V> bfsVertices(Iterable<V> start, Function<V, Iterable<V>> adjacent) {
     LinearList<V> queue = new LinearList<>();
     ISet<V> traversed = new LinearSet<>();
 
     start.forEach(queue::addLast);
 
-    return new Iterator<V>() {
+    return () -> new Iterator<V>() {
       @Override
       public boolean hasNext() {
         return queue.size() > 0;

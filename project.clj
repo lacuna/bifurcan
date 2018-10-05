@@ -3,7 +3,7 @@
 (cemerick.pomegranate.aether/register-wagon-factory!
   "http" #(org.apache.maven.wagon.providers.http.HttpWagon.))
 
-(defproject io.lacuna/bifurcan "0.1.0-alpha5"
+(defproject io.lacuna/bifurcan "0.1.0-alpha6"
   :java-source-paths ["src"]
   :dependencies []
   :test-selectors {:default   #(not
@@ -22,7 +22,15 @@
                                      [byte-streams "0.2.3"]
                                      [eftest "0.5.2"]
                                      [virgil "0.1.8"]
-                                     [io.usethesource/capsule "0.6.1"]]}}
+
+                                     ;; for benchmarks
+                                     [io.usethesource/capsule "0.6.2"]
+                                     [org.pcollections/pcollections "3.0.3"]
+                                     [io.javaslang/javaslang "2.1.0-alpha"]
+                                     [org.scala-lang/scala-library "2.12.7"]
+                                     [org.functionaljava/functionaljava "4.8"]
+                                     [org.eclipse.collections/eclipse-collections "9.2.0"]
+                                     [org.organicdesign/Paguro "3.1.0"]]}}
   :aliases {"partest"   ["run" "-m" "bifurcan.run-tests"]
             "benchmark" ["with-profile" "bench,dev" "run" "-m" "bifurcan.benchmark-test" "benchmark"]}
   :jvm-opts ^:replace ["-server"

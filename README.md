@@ -2,6 +2,14 @@
 
 __This library is still alpha quality, use with caution__
 
+```xml
+<dependency>
+  <groupId>io.lacuna</groupId>
+  <artifactId>bifurcan</artifactId>
+  <version>0.1.0-alpha6</version>
+</dependency>
+```
+
 This library provides high-quality Java implementations of mutable and immutable data structures, each sharing a common API and these design principles:
 
 * efficient random access
@@ -19,7 +27,7 @@ This library builds only on the primitives provided by the Java 8 standard libra
 ### collections
 
 * [LinearMap](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/LinearMap.html) is a mutable hash-map, which allows for custom hash and equality semantics.  It stores entries contiguously in memory, which means that iteration over the entries can be [20x faster](https://github.com/lacuna/bifurcan/raw/master/benchmarks/images/map_iterate.png) than `java.util.HashMap` for larger collections.
-* [Map](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/Map.html) is an immutable hash-map, which also allows for custom hash and equality semantics.  It ensures that all equivalent collections have an equivalent layout in memory, which makes checking for equality and performing set operations (`merge`, `union`, `difference`, `intersection`) significantly faster.  
+* [Map](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/Map.html) is an immutable hash-map, which also allows for custom hash and equality semantics.  It ensures that all equivalent collections have an equivalent layout in memory, which makes checking for equality and performing set operations (`merge`, `union`, `difference`, `intersection`) significantly faster.
 * [LinearSet](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/LinearSet.html) and [Set](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/Set.html) are built atop their respective map implementations, and have similar properties.
 * [LinearList](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/LinearList.html) is a mutable list, which allows for elements to be added or removed from both ends of the collection, and allows random reads and writes within the list.
 * [List](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/List.html) is an immutable list, which also allows for modification at both ends, as well as random reads and writes.  Due to its [relaxed radix structure](https://infoscience.epfl.ch/record/169879/files/RMTrees.pdf), it also allows for near constant-time slices and concatenation.
@@ -75,7 +83,7 @@ Most libraries for "functional programming" provide a lazy list or stream constr
 
 ### splitting and merging
 
-Many modern data structure libraries also provide "parallel" collections, which make it easy to use multiple cores to process a single data structure.  However, these collections are simply normal data structures with an execution model bolted on, without any obvious way to disentangle the two.  
+Many modern data structure libraries also provide "parallel" collections, which make it easy to use multiple cores to process a single data structure.  However, these collections are simply normal data structures with an execution model bolted on, without any obvious way to disentangle the two.
 
 Rather than provide its own execution model, Bifurcan allows any collection to split into sub-collections using `split(k)`, which will return 1 to `k` pieces depending on its size.  The sub-collections can be processed and then merged using methods such as `concat`, `merge`, `union`, `intersection`, or `difference`.
 

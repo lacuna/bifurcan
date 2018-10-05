@@ -742,43 +742,7 @@ public class Lists {
    * @return a list
    */
   public static <V> IList<V> from(long size, LongFunction<V> elementFn) {
-    return new IList<V>() {
-      @Override
-      public int hashCode() {
-        return (int) Lists.hash(this);
-      }
-
-      @Override
-      public boolean equals(Object obj) {
-        if (obj instanceof IList) {
-          return Lists.equals(this, (IList<V>) obj);
-        }
-        return false;
-      }
-
-      @Override
-      public String toString() {
-        return Lists.toString(this);
-      }
-
-      @Override
-      public V nth(long idx) {
-        if (idx < 0 || size <= idx) {
-          throw new IndexOutOfBoundsException(idx + " must be within [0," + size + ")");
-        }
-        return elementFn.apply(idx);
-      }
-
-      @Override
-      public IList<V> clone() {
-        return this;
-      }
-
-      @Override
-      public long size() {
-        return size;
-      }
-    };
+    return from(size, elementFn, () -> Iterators.range(size, elementFn));
   }
 
   /**

@@ -9,6 +9,8 @@ import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.function.ToIntFunction;
 
+import static io.lacuna.bifurcan.Graphs.MERGE_LAST_WRITE_WINS;
+
 /**
  * @author ztellman
  */
@@ -126,6 +128,16 @@ public class DirectedGraph<V, E> implements IGraph<V, E> {
   }
 
   @Override
+  public DirectedGraph<V, E> link(V from, V to, E edge) {
+    return link(from, to, edge, (BinaryOperator<E>) MERGE_LAST_WRITE_WINS);
+  }
+
+  @Override
+  public DirectedGraph<V, E> link(V from, V to) {
+    return link(from, to, null, (BinaryOperator<E>) MERGE_LAST_WRITE_WINS);
+  }
+
+  @Override
   public DirectedGraph<V, E> unlink(V from, V to) {
     if (out.get(from).map(m -> m.contains(to)).orElse(false)) {
       Object editor = isLinear() ? this.editor : new Object();
@@ -210,6 +222,16 @@ public class DirectedGraph<V, E> implements IGraph<V, E> {
       isLinear(),
       out.intersection(vertices).mapValues((x, m) -> m.intersection(vertices)),
       in.intersection(vertices).mapValues((x, s) -> s.intersection(vertices)));
+  }
+
+  @Override
+  public DirectedGraph<V, E> replace(V a, V b) {
+    return replace(a, b, Graphs.MERGE_LAST_WRITE_WINS);
+  }
+
+  @Override
+  public DirectedGraph<V, E> replace(V a, V b, BinaryOperator<E> merge) {
+    return (DirectedGraph<V, E>) IGraph.super.replace(a, b, merge);
   }
 
   @Override
