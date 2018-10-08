@@ -18,7 +18,7 @@ This library provides high-quality Java implementations of mutable and immutable
 
 Rather than using the existing collection interfaces in `java.util` such as `List` or `Map`, it provides its own interfaces (`IList`, `IMap`, `ISet`) that provide functional semantics - each update to a collection returns a reference to a new collection.  Each interface provides a method (`toList`, `toMap`, `toSet`) for coercing the collection to a read-only version of the standard Java interfaces.
 
-[An in-depth comparison of Bifurcan to similar libraries on the JVM can be found here.](https://github.com/lacuna/bifurcan/blob/master/doc/benchmarks.md).
+An in-depth comparison of Bifurcan to similar libraries on the JVM can be [found here](https://github.com/lacuna/bifurcan/blob/master/doc/benchmarks.md).
 
 ### collections
 
@@ -32,7 +32,7 @@ Rather than using the existing collection interfaces in `java.util` such as `Lis
 * [Rope](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/Rope.html) is an immutable tree-based sequence of Unicode characters.  Unlike Java's `String`, it uses UTF-8 encoding and can efficiently index via both full code points and Java's preferred UTF-16 code units.
 * [Graph](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/Graph.html), [DirectedGraph](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/DirectedGraph.html), and [DirectedAcyclicGraph](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/DirectedAcyclicGraph.html) implementations, which provide immutable graph data structures.
 
-[Full documentation can be found here.](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/package-summary.html)
+Full documentation can be [found here](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/package-summary.html).
 
 ### "linear" and "forked" collections
 
