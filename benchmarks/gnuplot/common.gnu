@@ -1,4 +1,4 @@
-set terminal pngcairo enhanced font 'arial,16' fontscale 1.0 size 1500, 1000 linewidth 2
+set terminal pngcairo enhanced font 'arial,22' fontscale 1.0 size 1500, 1000 linewidth 2
 set xtics nomirror 
 set key autotitle columnhead outside right
 set style data linespoints 
