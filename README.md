@@ -18,7 +18,7 @@ This library provides high-quality Java implementations of mutable and immutable
 
 Rather than using the existing collection interfaces in `java.util` such as `List` or `Map`, it provides its own interfaces (`IList`, `IMap`, `ISet`) that provide functional semantics - each update to a collection returns a reference to a new collection.  Each interface provides a method (`toList`, `toMap`, `toSet`) for coercing the collection to a read-only version of the standard Java interfaces.
 
-An in-depth comparison of Bifurcan to similar libraries on the JVM can be [found here](https://github.com/lacuna/bifurcan/blob/master/doc/benchmarks.md).
+An in-depth comparison of Bifurcan to similar libraries on the JVM can be [found here](https://github.com/lacuna/bifurcan/blob/master/doc/comparison.md).
 
 ### collections
 
