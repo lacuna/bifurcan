@@ -23,12 +23,14 @@
     Map$Entry
     HashMap
     HashSet
+    TreeMap
     ArrayList
     ArrayDeque
     Collection
     Iterator
     PrimitiveIterator$OfInt]
    [org.organicdesign.fp.collections
+    PersistentTreeMap
     PersistentHashMap
     PersistentHashMap$MutableHashMap
     PersistentHashSet
@@ -55,6 +57,7 @@
    [io.lacuna.bifurcan
     IntMap
     Map
+    SortedMap
     List
     IMap
     IList
@@ -88,6 +91,11 @@
   (reify Predicate
     (test [_ x]
       (f x))))
+
+(let [method (doto (.getDeclaredMethod Object "clone" (into-array Class []))
+               (.setAccessible true))]
+  (defn clone [x]
+    (.invoke method x (object-array 0))))
 
 (defmacro doary-int
   "An array-specific version of doseq."
@@ -182,6 +190,47 @@
       (recur (or (.key ^IEntry (.next it)) x))
       x)))
 
+;;; Java
+
+(defn construct-java-list [^java.util.List l vs]
+  (doary [v vs]
+    (.add l v))
+  l)
+
+(defn construct-java-map [^java.util.Map m vs]
+  (doary [v vs]
+    (.put m v nil))
+  m)
+
+(defn union-java-maps [^java.util.Map a ^java.util.Map b]
+  (let [^java.util.Map a (clone a)]
+    (.putAll a b)
+    a))
+
+(defn diff-java-maps [^java.util.Map a ^java.util.Map b]
+  (let [^java.util.Map a (clone a)]
+    (.removeAll (.keySet a) (.keySet b))
+    a))
+
+(defn intersect-java-maps [^java.util.Map a ^java.util.Map b]
+  (let [^java.util.Map m (clone a)]
+    (doit [k (.keySet a)]
+      (when-not (.containsKey b k)
+        (.remove m k)))
+    m))
+
+(defn lookup-java-set [^java.util.Set s vs]
+  (doary [v vs]
+    (.contains s v)))
+
+(defn lookup-java-list [^java.util.List l ks]
+  (doary [k ks]
+    (.get l k)))
+
+(defn lookup-java-map [^java.util.Map m ks]
+  (doary [k ks]
+    (.get m k)))
+
 (defn consume-java-entry-iterator [^Iterator it]
   (loop [x nil]
     (if (.hasNext it)
@@ -200,47 +249,6 @@
         (.remove m x)))
     m))
 
-;;; Java
-
-(defn construct-java-list [^java.util.List l vs]
-  (doary [v vs]
-    (.add l v))
-  l)
-
-(defn construct-hash-map [^HashMap m vs]
-  (doary [v vs]
-    (.put m v nil))
-  m)
-
-(defn union-hash-maps [^HashMap a ^HashMap b]
-  (let [^HashMap a (.clone a)]
-    (.putAll a b)
-    a))
-
-(defn diff-hash-maps [^HashMap a ^HashMap b]
-  (let [^HashMap a (.clone a)]
-    (.removeAll (.keySet a) (.keySet b))
-    a))
-
-(defn intersect-hash-maps [^HashMap a ^HashMap b]
-  (let [^HashMap m (.clone a)]
-    (doit [k (.keySet a)]
-      (when-not (.containsKey b k)
-        (.remove m k)))
-    m))
-
-(defn lookup-java-set [^java.util.Set s vs]
-  (doary [v vs]
-    (.contains s v)))
-
-(defn lookup-java-list [^java.util.List l ks]
-  (doary [k ks]
-    (.get l k)))
-
-(defn lookup-java-map [^java.util.Map m ks]
-  (doary [k ks]
-    (.get m k)))
-
 ;;; Clojure
 
 (defn construct-clojure-map [m vs]
@@ -248,6 +256,12 @@
     (doary [v vs]
       (set! m (assoc! m v nil)))
     (persistent! m)))
+
+(defn construct-clojure-sorted-map [m vs]
+  (let-mutable [m m]
+    (doary [v vs]
+      (set! m (assoc m v nil)))
+    m))
 
 (defn construct-clojure-set [s vs]
   (let-mutable [s (transient s)]
@@ -338,6 +352,13 @@
         (set! m (.assoc ^PersistentHashMap$MutableHashMap m k val)))
       (.immutable ^PersistentHashMap$MutableHashMap m))))
 
+(defn construct-paguro-sorted-map [^PersistentTreeMap m ks]
+  (let [val ""]
+    (let-mutable [m m]
+      (doary [k ks]
+        (set! m (.assoc ^PersistentTreeMap m k val)))
+      m)))
+
 (defn construct-paguro-set [^PersistentHashSet s vs]
   (let-mutable [s (.mutable s)]
     (doary [v vs]
@@ -355,12 +376,25 @@
     (doit [k (.keySet b)]
       (when-not (.containsKey ^PersistentHashMap$MutableHashMap a k)
         (set! a (.without ^PersistentHashMap$MutableHashMap a k))))
+    (.immutable ^PersistentHashMap$MutableHashMap a)))
+
+(defn intersect-paguro-sorted-map [^PersistentTreeMap a ^PersistentTreeMap b]
+  (let-mutable [a a]
+    (doit [k (.keySet b)]
+      (when-not (.containsKey ^PersistentTreeMap a k)
+        (set! a (.without ^PersistentTreeMap a k))))
     a))
 
 (defn difference-paguro-map [^PersistentHashMap a ^PersistentHashMap b]
   (let-mutable [a (.mutable a)]
     (doit [k (.keySet b)]
       (set! a (.without ^PersistentHashMap$MutableHashMap a k)))
+    (.immutable ^PersistentHashMap$MutableHashMap a)))
+
+(defn difference-paguro-sorted-map [^PersistentTreeMap a ^PersistentTreeMap b]
+  (let-mutable [a a]
+    (doit [k (.keySet b)]
+      (set! a (.without ^PersistentTreeMap a k)))
     a))
 
 (defn union-paguro-map [^PersistentHashMap a ^PersistentHashMap b]
@@ -370,6 +404,12 @@
         (.assoc ^PersistentHashMap$MutableHashMap a
           (.getKey ^java.util.Map$Entry e)
           (.getValue ^java.util.Map$Entry e))))
+    (.immutable ^PersistentHashMap$MutableHashMap a)))
+
+(defn union-paguro-sorted-map [^PersistentTreeMap a ^PersistentTreeMap b]
+  (let-mutable [a a]
+    (doit [^java.util.Map$Entry e (.entrySet b)]
+      (set! a (.assoc ^PersistentTreeMap a (.getKey e) (.getValue e))))
     a))
 
 (defn intersect-paguro-set [^PersistentHashSet a ^PersistentHashSet b]
@@ -437,7 +477,7 @@
 
 (defn insert-string [^String a ^String b ^long idx]
   (let [idx (.offsetByCodePoints a 0 idx)]
-    (.concat
+a    (.concat
       (.concat
         (.substring a 0 idx)
         b)
@@ -488,7 +528,8 @@
 
 (defn base-collection [label class]
   {:label label
-   :base (eval `(fn [] (new ~class)))})
+   :base (eval `(fn [] (new ~class)))
+   :clone clone})
 
 (defn base-map [label class]
   (merge
@@ -531,23 +572,11 @@
      :concat #(.concat ^IList %1 %2)
      :split split}))
 
-(def linear-map
-  (merge
-    (base-map "bifurcan.LinearMap" LinearMap)
-    {:clone #(.clone ^LinearMap %)}))
+;;; maps
 
-(def bifurcan-map
-  (merge
-    (base-map "bifurcan.Map" Map)
-    {:clone #(.clone ^Map %)}))
+(def linear-map (base-map "bifurcan.LinearMap" LinearMap))
 
-(def int-map
-  (merge
-    (base-map "bifurcan.IntMap" IntMap)
-    {:construct construct-int-map
-     :lookup    lookup-int-map
-     :entries   generate-numbers
-     :clone     #(.clone ^IntMap %)}))
+(def bifurcan-map (base-map "bifurcan.Map" Map))
 
 (def scala-map
   {:label        "scala.HashMap"
@@ -559,15 +588,9 @@
    :consume      consume-scala-iterator
    :union        #(.$plus$plus ^scala.collection.immutable.Map %1 ^scala.collection.immutable.Map %2)
    :difference   #(.$minus$minus ^scala.collection.immutable.Map %1 (.keySet ^scala.collection.immutable.Map %2))
-   :intersection (fn [a b] (.filterKeys ^scala.collection.immutable.Map a ^scala.Function1 (scala-fn1 #(.contains ^scala.collection.immutable.Map b %))))
+   :intersection (fn [a b] (.filter ^scala.collection.immutable.Map a ^scala.Function1 (scala-fn1 #(.contains ^scala.collection.immutable.Map b (._1 ^scala.Tuple2 %)))))
    :add          #(.$plus ^scala.collection.immutable.Map %1 (scala.Tuple2. %2 ""))
    :remove       #(.$minus ^scala.collection.immutable.Map %1 %2)})
-
-(def scala-int-map
-  (merge scala-map
-    {:label   "scala.LongMap"
-     :base    #(.apply (scala.collection.immutable.LongMap/canBuildFrom))
-     :entries generate-numbers}))
 
 (def pcollections-map
   {:label        "pcollections.HashTreePMap"
@@ -628,16 +651,15 @@
 (def java-hash-map
   (merge (base-collection "java.HashMap" HashMap)
     {:entries      generate-entries
-     :construct    construct-hash-map
+     :construct    construct-java-map
      :lookup       lookup-java-map
-     :clone        #(.clone ^HashMap %)
      :iterator     #(-> ^java.util.Map % .entrySet .iterator)
      :consume      consume-java-entry-iterator
-     :union        union-hash-maps
-     :difference   diff-hash-maps
-     :intersection intersect-hash-maps
-     :add          #(doto ^HashMap %1 (.put %2 nil))
-     :remove       #(doto ^HashMap %1 (.remove %2))}))
+     :union        union-java-maps
+     :difference   diff-java-maps
+     :intersection intersect-java-maps
+     :add          #(doto ^java.util.Map %1 (.put %2 nil))
+     :remove       #(doto ^java.util.Map %1 (.remove %2))}))
 
 (def clojure-map
   {:label        "clojure.PersistentHashMap"
@@ -653,15 +675,73 @@
    :add          #(assoc %1 %2 nil)
    :remove       dissoc})
 
-(def linear-set
-  (merge
-    (base-set "bifurcan.LinearSet" LinearSet)
-    {:clone #(.clone ^LinearSet %)}))
+;;; sorted maps
 
-(def bifurcan-set
+(def bifurcan-sorted-map
   (merge
-    (base-set "bifurcan.Set" Set)
-    {:clone #(.clone ^Set %)}))
+    (base-map "bifurcan.SortedMap" SortedMap)
+    {:entries generate-numbers}))
+
+(def int-map
+  (merge
+    (base-map "bifurcan.IntMap" IntMap)
+    {:construct construct-int-map
+     :lookup    lookup-int-map
+     :entries   generate-numbers}))
+
+(def scala-int-map
+  (merge scala-map
+    {:label   "scala.LongMap"
+     :base    #(.apply (scala.collection.immutable.LongMap/canBuildFrom))
+     :entries generate-numbers}))
+
+(def scala-sorted-map
+  (merge scala-int-map
+    {:label "scala.TreeMap"
+     :base  #(.apply
+               (scala.collection.immutable.TreeMap/canBuildFrom
+                 (reify scala.math.Ordering
+                   (compare [_ a b]
+                     (compare a b)))))}))
+
+(def javaslang-sorted-map
+  (merge javaslang-map
+    {:label   "slang.TreeMap"
+     :base    #(javaslang.collection.TreeMap/empty)
+     :entries generate-numbers}))
+
+(def paguro-sorted-map
+  (merge paguro-map
+    {:label        "paguro.PersistentTreeMap"
+     :construct    construct-paguro-sorted-map
+     :base         #(PersistentTreeMap/empty)
+     :lookup       #(doary [k %2] (.entry ^PersistentTreeMap %1 k))
+     :entries      generate-numbers
+     :union        union-paguro-sorted-map
+     :difference   difference-paguro-sorted-map
+     :intersection intersect-paguro-sorted-map
+     :add          #(.assoc ^PersistentTreeMap %1 %2 "")
+     :remove       #(.without ^PersistentTreeMap %1 %2)}))
+
+(def java-sorted-map
+  (merge java-hash-map
+    {:label   "java.TreeMap"
+     :entries generate-numbers
+     :base    #(TreeMap.)}))
+
+(def clojure-sorted-map
+  (merge clojure-map
+    {:label      "clojure.PersistentTreeMap"
+     :base       sorted-map
+     :construct  construct-clojure-sorted-map
+     :entries    generate-numbers
+     :difference #(apply dissoc %1 (keys %2))}))
+
+;; set
+
+(def linear-set (base-set "bifurcan.LinearSet" LinearSet))
+
+(def bifurcan-set (base-set "bifurcan.Set" Set))
 
 (def java-hash-set
   (merge (base-collection "java.HashSet" HashSet)
@@ -670,7 +750,6 @@
      :entries      generate-entries
      :iterator     iterator
      :consume      consume-iterator
-     :clone        #(.clone ^HashSet %)
      :union        #(doto ^HashSet (.clone ^HashSet %1) (.addAll %2))
      :difference   #(doto ^HashSet (.clone ^HashSet %1) (.removeAll %2))
      :intersection intersect-hash-sets
@@ -767,6 +846,8 @@
    :add          conj
    :remove       disj})
 
+;; lists
+
 (def linear-list (base-list "bifurcan.LinearList" LinearList))
 
 (def bifurcan-list (base-list "bifurcan.List" List))
@@ -779,7 +860,6 @@
    :lookup    lookup-java-list
    :iterator  iterator
    :consume   consume-iterator
-   :clone     #(.clone ^ArrayList %)
    :concat    #(doto ^ArrayList (.clone ^ArrayList %) (.addAll %2))})
 
 (def pcollections-vector
@@ -832,6 +912,8 @@
    :lookup    #(doary [i %2] (nth %1 i))
    :concat    #(into %1 %2)})
 
+;; strings
+
 (def java-string
   {:label     "java.String"
    :base      (constantly "")
@@ -868,7 +950,7 @@
   (binding [c/*final-gc-problem-threshold* 0.1]
     (-> (c/quick-benchmark* f
           (merge
-            {:samples               40
+            {:samples               10
              :target-execution-time 1e8}
             (if *warmup*
               {:samples               6
@@ -946,7 +1028,7 @@
   (let [s-a (entries n)
         s-b (into-array
               (concat
-                (->> s-a (take (/ n 2)) shuffle)
+                (->> s-a (take (/ n 2)))
                 (->> (entries (* n 1.5)) (drop n))))
         a   (construct (base) s-a)
         b   (construct (base) s-b)]
@@ -974,7 +1056,9 @@
 
 ;;;
 
-(def maps [linear-map bifurcan-map java-hash-map clojure-map int-map capsule-map #_pcollections-map javaslang-map scala-map paguro-map scala-int-map])
+(def maps [linear-map bifurcan-map java-hash-map clojure-map capsule-map #_pcollections-map javaslang-map scala-map paguro-map])
+
+(def sorted-maps [scala-int-map int-map clojure-sorted-map bifurcan-sorted-map paguro-sorted-map java-sorted-map javaslang-sorted-map scala-sorted-map])
 
 (def sets [linear-set bifurcan-set java-hash-set clojure-set capsule-set #_pcollections-set javaslang-set scala-set paguro-set])
 
@@ -982,7 +1066,7 @@
 
 (def strings [java-string rope])
 
-(def all-colls (concat maps sets lists strings))
+(def all-colls [clojure-set] #_(concat maps sorted-maps sets lists strings))
 
 (def bench->types
   {:construct    [benchmark-construct
@@ -990,19 +1074,19 @@
    :lookup       [benchmark-lookup
                   all-colls]
    :clone        [benchmark-clone
-                  [linear-map java-hash-map linear-set java-hash-set]]
+                  [linear-map java-hash-map linear-set java-hash-set java-sorted-map]]
    :iteration    [benchmark-iteration
                   all-colls]
    :concat       [benchmark-concat
                   (concat lists strings)]
    :union        [benchmark-union
-                  (concat maps sets)]
+                  (concat maps sets sorted-maps)]
    :difference   [benchmark-difference
-                  (concat maps sets)]
+                  (concat maps sets sorted-maps)]
    :intersection [benchmark-intersection
-                  (concat maps sets)]
+                  (concat maps sets sorted-maps)]
    :equals       [benchmark-equals
-                  (concat maps sets)]
+                  (concat maps sets sorted-maps)]
    :insert       [benchmark-insert
                   strings]
    :remove       [benchmark-remove
@@ -1066,17 +1150,17 @@
 (def benchmark-csv
   {"clone" [:clone [linear-map linear-set java-hash-map java-hash-set]]
 
+   "sorted_map_construct" [:construct sorted-maps]
    "map_construct" [:construct maps]
    "list_construct" [:construct lists]
-   "set_construct" [:construct sets]
 
+   "sorted_map_lookup" [:lookup sorted-maps]
    "map_lookup" [:lookup maps]
    "list_lookup" [:lookup lists]
-   "set_lookup" [:lookup sets]
 
+   "sorted_map_iterate" [:iteration sorted-maps]
    "map_iterate" [:iteration maps]
    "list_iterate" [:iteration lists]
-   "set_iterate" [:iteration sets]
 
    "string_construct" [:construct strings]
    "string_lookup" [:lookup strings]
@@ -1087,15 +1171,19 @@
 
    "concat" [:concat lists]
 
-   "map_union" [:union maps]
    "set_union" [:union sets]
-
-   "map_difference" [:difference maps]
    "set_difference" [:difference sets]
-
-   "map_intersection" [:intersection maps]
    "set_intersection" [:intersection sets]
 
+   "map_union" [:union maps]
+   "map_difference" [:difference maps]
+   "map_intersection" [:intersection maps]
+
+   "sorted_map_union" [:union sorted-maps]
+   "sorted_map_difference" [:difference sorted-maps]
+   "sorted_map_intersection" [:intersection sorted-maps]
+
+   "sorted_map_equals" [:equals sorted-maps]
    "map_equals" [:equals maps]
    "set_equals" [:equals sets]
 
@@ -1111,7 +1199,7 @@
 
 (defn benchmark-collection [n step idx]
   (let [result (-> (sh/sh "sh" "-c"
-                     (str "lein run -m bifurcan.benchmark-test benchmark-collection " n " " step " " idx))
+                     (str "lein with-profile dev,bench run -m bifurcan.benchmark-test benchmark-collection " n " " step " " idx))
                  :out
                  bs/to-string)]
     (try
@@ -1119,28 +1207,32 @@
                 bs/to-line-seq
                 last
                 read-string)]
-        (when (map? x)
-          x))
+        (if (map? x)
+          x
+          (do
+            (println "invalid benchmark for" (-> all-colls (nth idx) :label))
+            (println result))))
       (catch Throwable e
-        (println result)
         (throw e)))))
 
 (defn -main [task & args]
   (case task
     "benchmark-collection"
     (let [[n step idx] args]
-      (prn
-        (run-benchmark-suite
-          (read-string n)
-          (read-string step)
-          (nth all-colls (read-string idx)))))
+      (try
+        (prn
+          (run-benchmark-suite
+            (read-string n)
+            (read-string step)
+            (nth all-colls (read-string idx))))
+        (catch Throwable e
+          (.printStackTrace e System/out))))
 
     "benchmark"
     (let [[n step]   args
           descriptor (->> (range (count all-colls))
                        (map (fn [idx]
                               (when ((constantly true)
-                                     #_#{paguro-vector}
                                       (nth all-colls idx))
                                 (let [coll (-> all-colls (nth idx) :label)]
                                   (println "benchmarking" coll)

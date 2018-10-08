@@ -1,6 +1,7 @@
 package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.Maps.VirtualMap;
+import io.lacuna.bifurcan.utils.Iterators;
 
 import java.util.*;
 import java.util.function.*;
@@ -157,7 +158,7 @@ public interface IMap<K, V> extends
    * @return an iterator over all entries in the map
    */
   default Iterator<IEntry<K, V>> iterator() {
-    return entries().iterator();
+    return Iterators.range(size(), this::nth);
   }
 
   /**

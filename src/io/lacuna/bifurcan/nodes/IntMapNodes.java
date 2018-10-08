@@ -302,8 +302,8 @@ public class IntMapNodes {
 
       return new Iterator<IEntry<Long, V>>() {
 
-        Node<V>[] stack = new Node[16];
-        byte[] cursors = new byte[32];
+        final Node<V>[] stack = new Node[16];
+        final byte[] cursors = new byte[32];
         int depth = 0;
 
         {

@@ -13,8 +13,9 @@
                    :stress    :stress
                    :all       (constantly true)}
   :profiles {:travis {:jvm-opts ^:replace ["-server" "-Xmx1g"]}
-             :bench  {:jvm-opts ^:replace ["-server" "-Xmx20g" "-XX:+UseParallelGC"]}
-             :dev    {:dependencies [[org.clojure/clojure "1.8.0"]
+             :bench  {:jvm-opts ^:replace ["-server" "-Xmx10g" #_"-XX:+UseParallelGC"]}
+             :dev    {:dependencies [;; for tests
+                                     [org.clojure/clojure "1.8.0"]
                                      [org.clojure/test.check "0.9.0"]
                                      [criterium "0.4.4"]
                                      [potemkin "0.4.5"]
@@ -23,7 +24,7 @@
                                      [eftest "0.5.2"]
                                      [virgil "0.1.8"]
 
-                                     ;; for benchmarks
+                                     ;; for comparative benchmarks
                                      [io.usethesource/capsule "0.6.2"]
                                      [org.pcollections/pcollections "3.0.3"]
                                      [io.javaslang/javaslang "2.1.0-alpha"]
@@ -32,7 +33,7 @@
                                      [org.eclipse.collections/eclipse-collections "9.2.0"]
                                      [org.organicdesign/Paguro "3.1.0"]]}}
   :aliases {"partest"   ["run" "-m" "bifurcan.run-tests"]
-            "benchmark" ["with-profile" "bench,dev" "run" "-m" "bifurcan.benchmark-test" "benchmark"]}
+            "benchmark" ["run" "-m" "bifurcan.benchmark-test" "benchmark"]}
   :jvm-opts ^:replace ["-server"
                        "-XX:+UseG1GC"
                        "-XX:-OmitStackTraceInFastThrow"

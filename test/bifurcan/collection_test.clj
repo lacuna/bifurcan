@@ -4,6 +4,7 @@
    [clojure.test.check.generators :as gen]
    [clojure.test.check.properties :as prop]
    [clojure.test.check.clojure-test :as ct :refer (defspec)]
+   [clojure.pprint :refer [pprint]]
    [bifurcan.test-utils :as u]
    [clojure.set :as set]
    [proteus :refer [let-mutable]])
@@ -24,6 +25,7 @@
    [io.lacuna.bifurcan
     IntMap
     FloatMap
+    SortedMap
     Map
     Maps
     List
@@ -39,6 +41,19 @@
     LinearSet]))
 
 (set! *warn-on-reflection* false)
+
+;;;
+
+(defn walk-sorted-nodes [^io.lacuna.bifurcan.nodes.SortedMapNodes$Node n]
+  (when n
+    {:color (str (.c n))
+     :size (.size n)
+     :entry [(.k n) (.v n)]
+     :children [(walk-sorted-nodes (.l n))
+                (walk-sorted-nodes (.r n))]}))
+
+(defn pprint-sorted-map [^SortedMap m]
+  (pprint (walk-sorted-nodes (.root m))))
 
 ;;;
 
@@ -154,7 +169,8 @@
    :remove       dissoc
    :union        #(merge %1 (zipmap %2 %2))
    :intersection #(select-keys %1 %2)
-   :difference   #(apply dissoc %1 %2)})
+   :difference   #(apply dissoc %1 %2)
+   })
 
 (def bifurcan-map
   {:put          #(.put ^IMap %1 %2 %3)
@@ -162,6 +178,14 @@
    :union        #(.union ^IMap %1 (Map/from ^java.util.Map (zipmap %2 %2)))
    :intersection #(.intersection ^IMap %1 (Map/from ^java.util.Map (zipmap %2 %2)))
    :difference   #(.difference ^IMap %1 (Map/from ^java.util.Map (zipmap %2 %2)))})
+
+(def bifurcan-sorted-map
+  {:put          #(.put ^IMap %1 %2 %3)
+   :remove       #(.remove ^IMap %1 %2)
+   :union        #(.union ^IMap %1 (SortedMap/from ^java.util.Map (zipmap %2 %2)))
+   :intersection #(.intersection ^IMap %1 (SortedMap/from ^java.util.Map (zipmap %2 %2)))
+   :difference   #(.difference ^IMap %1 (SortedMap/from ^java.util.Map (zipmap %2 %2)))
+   })
 
 (def int-map
   {:put          #(.put ^IMap %1 %2 %3)
@@ -208,6 +232,9 @@
 (defn int-map-gen [init]
   (->> map-actions u/actions->generator (gen/fmap #(u/apply-actions %1 (init) int-map))))
 
+(defn sorted-map-gen [init]
+  (->> map-actions u/actions->generator (gen/fmap #(u/apply-actions %1 (init) bifurcan-sorted-map))))
+
 (defn float-map-gen [init]
   (->> float-map-actions u/actions->generator (gen/fmap #(u/apply-actions %1 (init) float-map))))
 
@@ -239,6 +266,15 @@
   [a {} clj-map
    b (Map.) bifurcan-map
    c (.linear (Map.)) bifurcan-map]
+  (and
+    (= b c)
+    (map= a b)
+    (map= a c)))
+
+(u/def-collection-check test-sorted-map iterations map-actions
+  [a {} clj-map
+   b (SortedMap.) bifurcan-sorted-map
+   c (.linear (SortedMap.)) bifurcan-sorted-map]
   (and
     (= b c)
     (map= a b)
@@ -280,6 +316,10 @@
 
 (u/def-collection-check test-map-indices iterations map-actions
   [a (Map.) bifurcan-map]
+  (valid-map-indices? a))
+
+(u/def-collection-check test-sorted-map-indices iterations map-actions
+  [a (SortedMap.) bifurcan-sorted-map]
   (valid-map-indices? a))
 
 (u/def-collection-check test-int-map-indices iterations map-actions
@@ -435,11 +475,15 @@
   (prop/for-all [m (map-gen #(Map.))]
     (-> m (.split 2) (map-union (Map.)))))
 
+(defspec test-sorted-map-split iterations
+  (prop/for-all [m (sorted-map-gen #(SortedMap.))]
+    (-> m (.split 2) (map-union (SortedMap.)))))
+
 (defspec test-int-map-split iterations
   (prop/for-all [m (int-map-gen #(IntMap.))]
     (-> m (.split 2) (map-union (IntMap.)))))
 
-(defspec test-int-map-split iterations
+(defspec test-float-map-split iterations
   (prop/for-all [m (float-map-gen #(FloatMap.))]
     (-> m (.split 2) (map-union (FloatMap.)))))
 
@@ -488,106 +532,6 @@
                  b (list-gen #(Lists/from []))]
     (= (concat (->vec a) (->vec b))
       (->vec (.concat ^IList a b)))))
-
-;; LinearSet set operations
-
-(defspec test-linear-set-union iterations
-  (prop/for-all [a (set-gen #(LinearSet.))
-                 b (set-gen #(LinearSet.))]
-    (= (set/union (->set a) (->set b))
-      (->set (.union ^ISet (.clone a) b)))))
-
-(defspec test-linear-set-intersection iterations
-  (prop/for-all [a (set-gen #(LinearSet.))
-                 b (set-gen #(LinearSet.))]
-    (= (set/intersection (->set a) (->set b))
-      (->set (.intersection ^ISet (.clone a) ^ISet b)))))
-
-(defspec test-linear-set-difference iterations
-  (prop/for-all [a (set-gen #(LinearSet.))
-                 b (set-gen #(LinearSet.))]
-    (= (set/difference (->set a) (->set b))
-      (->set (.difference ^ISet (.clone a) ^ISet b)))))
-
-;; Map set operations
-
-(defspec test-map-merge iterations
-  (prop/for-all [a (map-gen #(Map.))
-                 b (map-gen #(Map.))]
-    (= (merge (->map a) (->map b))
-      (->map (.union ^IMap a b)))))
-
-(defspec test-map-intersection iterations
-  (prop/for-all [a (map-gen #(Map.))
-                 b (map-gen #(Map.))]
-    (= (select-keys (->map a) (keys (->map b)))
-      (->map (.intersection ^IMap a ^IMap b)))))
-
-(defspec test-map-difference iterations
-  (prop/for-all [a (map-gen #(Map.))
-                 b (map-gen #(Map.))]
-    (= (apply dissoc (->map a) (keys (->map b)))
-      (->map (.difference ^IMap a ^IMap b)))))
-
-;; LinearMap set operations
-
-(defspec test-linear-map-merge iterations
-  (prop/for-all [a (map-gen #(LinearMap.))
-                 b (map-gen #(LinearMap.))]
-    (= (merge (->map a) (->map b))
-      (->map (.union ^IMap a b)))))
-
-(defspec test-linear-map-intersection iterations
-  (prop/for-all [a (map-gen #(LinearMap.))
-                 b (map-gen #(LinearMap.))]
-    (= (select-keys (->map a) (keys (->map b)))
-      (->map (.intersection ^IMap a ^IMap b)))))
-
-(defspec test-linear-map-difference iterations
-  (prop/for-all [a (map-gen #(LinearMap.))
-                 b (map-gen #(LinearMap.))]
-    (= (apply dissoc (->map a) (keys (->map b)))
-      (->map (.difference ^IMap a ^IMap b)))))
-
-;; Set operations
-
-(defspec test-set-union iterations
-  (prop/for-all [a (set-gen #(Set.))
-                 b (set-gen #(Set.))]
-    (= (set/union (->set a) (->set b))
-      (->set (.union ^ISet a ^ISet b)))))
-
-(defspec test-set-difference iterations
-  (prop/for-all [a (set-gen #(Set.))
-                 b (set-gen #(Set.))]
-    (= (set/difference (->set a) (->set b))
-      (->set (.difference ^ISet a ^ISet b)))))
-
-(defspec test-set-intersection iterations
-  (prop/for-all [a (set-gen #(Set.))
-                 b (set-gen #(Set.))]
-    (= (set/intersection (->set a) (->set b))
-      (->set (.intersection ^ISet a ^ISet b)))))
-
-;; LinearSet operations
-
-(defspec test-linear-set-union iterations
-  (prop/for-all [a (set-gen #(LinearSet.))
-                 b (set-gen #(LinearSet.))]
-    (= (set/union (->set a) (->set b))
-      (->set (.union ^ISet a ^ISet b)))))
-
-(defspec test-linear-set-difference iterations
-  (prop/for-all [a (set-gen #(LinearSet.))
-                 b (set-gen #(LinearSet.))]
-    (= (set/difference (->set a) (->set b))
-      (->set (.difference ^ISet a ^ISet b)))))
-
-(defspec test-linear-set-intersection iterations
-  (prop/for-all [a (set-gen #(LinearSet.))
-                 b (set-gen #(LinearSet.))]
-    (= (set/intersection (->set a) (->set b))
-      (->set (.intersection ^ISet a ^ISet b)))))
 
 ;; FloatMap operations
 

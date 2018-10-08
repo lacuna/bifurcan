@@ -1,7 +1,5 @@
 ![](doc/labyrinth.jpg)
 
-__This library is still alpha quality, use with caution__
-
 ```xml
 <dependency>
   <groupId>io.lacuna</groupId>
@@ -18,11 +16,9 @@ This library provides high-quality Java implementations of mutable and immutable
 * contiguous memory used wherever possible
 * performance equivalent to, or better than, existing alternatives
 
-Some of these properties, such as uniformly efficient random access and splits, are simply not available elsewhere.  Even if these are not required, other JVM libraries in this space tend to bring a large amount of tangential code along for the ride.  For instance, the collections in the [Functional Java](https://github.com/functionaljava/functionaljava) library assume and encourage the use of all the surrounding abstractions.  Clojure's data structures, while implemented in Java, are hard-coded to use Clojure's equality semantics.
+Rather than using the existing collection interfaces in `java.util` such as `List` or `Map`, it provides its own interfaces (`IList`, `IMap`, `ISet`) that provide functional semantics - each update to a collection returns a reference to a new collection.  Each interface provides a method (`toList`, `toMap`, `toSet`) for coercing the collection to a read-only version of the standard Java interfaces.
 
-These libraries are all-or-nothing propositions: they work great as long as you also adopt the surrounding ecosystem.  Historically, given the lack of functional primitives in Java's standard library, this made a lot of sense.  With the introduction of lambdas, streams, et al in Java 8, however, this is no longer true.
-
-This library builds only on the primitives provided by the Java 8 standard library.  Rather than using the existing collection interfaces in `java.util` such as `List` or `Map`, it provides its own interfaces (`IList`, `IMap`, `ISet`) that provide functional semantics - each update to a collection returns a reference to a new collection.  Each interface provides a method (`toList`, `toMap`, `toSet`) for coercing the collection to a read-only version of the standard Java interfaces.
+[An in-depth comparison of Bifurcan to similar libraries on the JVM can be found here.](https://github.com/lacuna/bifurcan/blob/master/doc/benchmarks.md).
 
 ### collections
 
@@ -31,11 +27,12 @@ This library builds only on the primitives provided by the Java 8 standard libra
 * [LinearSet](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/LinearSet.html) and [Set](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/Set.html) are built atop their respective map implementations, and have similar properties.
 * [LinearList](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/LinearList.html) is a mutable list, which allows for elements to be added or removed from both ends of the collection, and allows random reads and writes within the list.
 * [List](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/List.html) is an immutable list, which also allows for modification at both ends, as well as random reads and writes.  Due to its [relaxed radix structure](https://infoscience.epfl.ch/record/169879/files/RMTrees.pdf), it also allows for near constant-time slices and concatenation.
+* [SortedMap](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/SortedMap.html) is an immutable sorted map, built with a red-black tree.
 * [IntMap](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/IntMap.html) is an immutable sorted map of integers onto arbitrary values, and can be used as an efficient sparse vector.  [FloatMap](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/FloatMap.html) provides similar functionality for floating-point keys.
 * [Rope](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/Rope.html) is an immutable tree-based sequence of Unicode characters.  Unlike Java's `String`, it uses UTF-8 encoding and can efficiently index via both full code points and Java's preferred UTF-16 code units.
 * [Graph](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/Graph.html), [DirectedGraph](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/DirectedGraph.html), and [DirectedAcyclicGraph](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/DirectedAcyclicGraph.html) implementations, which provide immutable graph data structures.
 
-Full benchmarks for these collections [can be found here](https://github.com/lacuna/bifurcan/blob/master/doc/benchmarks.md).  Full documentation [can be found here](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/package-summary.html).
+[Full documentation can be found here.](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/package-summary.html)
 
 ### "linear" and "forked" collections
 
