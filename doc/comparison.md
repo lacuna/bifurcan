@@ -90,7 +90,7 @@ Every library here is largely the same, other than Clojure which again pays a co
 
 ![](../benchmarks/images/map_equals.png)
 
-This compares two maps which differ by a single element.  Capsule is effectively `O(1)` by computing an incremental hash as elements are added and removed (these benchmarks use objects with inexpensive hashes, and therefore do not capture the potential drawbacks of this approach).  Bifurcan is moderately faster than the mutable collections, Slang is equivalent, and the rest are slower.
+This compares two maps which differ by a single element.  Capsule and Scala are effectively `O(1)` by computing an incremental hash as elements are added and removed.  Bifurcan is moderately faster than the mutable collections, and the rest are slower.
 
 ---
 
