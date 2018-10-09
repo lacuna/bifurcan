@@ -98,7 +98,7 @@ This compares two maps which differ by a single element.  Capsule and Scala are 
 ![](../benchmarks/images/map_intersection.png)
 ![](../benchmarks/images/map_difference.png)
 
-This compares set operations on maps whose keys half-overlap.  Using its canonical structure, Bifurcan is significantly faster than the rest, though Scala is competitive on intersections.
+This compares set operations on maps whose keys half-overlap.  Using its canonical structure, Bifurcan is significantly faster than the rest.
 
 ## hash sets
 
