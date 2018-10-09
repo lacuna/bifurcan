@@ -1,6 +1,6 @@
 # a comparison of functional data structures on the JVM
 
-There are a number of implementations of functional data structures (also called "persistent" or "immutable" data structures) on the JVM, but to date there has been no serious attempt to compare them.  Since I am obviously biased with respect to facets such as API design, this document will limit itself to more objective properties: implementation details and performance.
+There are a number of implementations of functional data structures (also called "persistent" or "immutable" data structures) on the JVM, but to date there has been no serious attempt to compare them.  This document will ignore subjective qualities such as API design, and focus on more objective properties such as implementation details and performance.
 
 ## important concepts
 
