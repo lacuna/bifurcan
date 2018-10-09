@@ -102,13 +102,11 @@ This compares set operations on maps whose keys half-overlap.  Using its canonic
 
 ## hash sets
 
-Since every hash set shared an implementation with their respective hash map, they demonstrate the same performance as shown above.
+Since every hash set shares an implementation with their respective hash map, they have similar performance characteristics to those shown above.  Some libraries, however, provide special paths for set operations on hash sets:
 
-Scala, however, has clearly optimized for set operations on their hash sets specifically, as they are comparable to Bifurcan across the board:
-
-![](../benchmarks/images/sorted_map_union.png)
-![](../benchmarks/images/sorted_map_intersection.png)
-![](../benchmarks/images/sorted_map_difference.png)
+![](../benchmarks/images/set_union.png)
+![](../benchmarks/images/set_intersection.png)
+![](../benchmarks/images/set_difference.png)
 
 ## sorted maps
 

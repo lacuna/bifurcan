@@ -380,8 +380,8 @@
 
 (defn intersect-paguro-sorted-map [^PersistentTreeMap a ^PersistentTreeMap b]
   (let-mutable [a a]
-    (doit [k (.keySet b)]
-      (when-not (.containsKey ^PersistentTreeMap a k)
+    (doit [k (.keySet ^PersistentTreeMap a)]
+      (when-not (.containsKey ^PersistentTreeMap b k)
         (set! a (.without ^PersistentTreeMap a k))))
     a))
 
@@ -414,8 +414,8 @@
 
 (defn intersect-paguro-set [^PersistentHashSet a ^PersistentHashSet b]
   (let-mutable [a (.mutable a)]
-    (doit [k b]
-      (when-not (.contains ^PersistentHashSet$MutableHashSet a k)
+    (doit [k a]
+      (when-not (.contains b k)
         (set! a (.without ^PersistentHashSet$MutableHashSet a k))))
     a))
 
@@ -477,7 +477,7 @@
 
 (defn insert-string [^String a ^String b ^long idx]
   (let [idx (.offsetByCodePoints a 0 idx)]
-a    (.concat
+    (.concat
       (.concat
         (.substring a 0 idx)
         b)
