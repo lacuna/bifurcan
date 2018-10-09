@@ -56,7 +56,7 @@ For comparison, I've included Java's mutable `HashMap`, `HashSet`, `TreeMap`, an
 
 [My own library](https://github.com/lacuna/bifurcan), which uses RRB trees for its `List`, red-black trees for its `SortedMap`, and CHAMP trees for its `Map`, `IntMap`, and `Set`.  Also included are `LinearMap` and `LinearSet`, which are mutable data structures that share the same API as their immutable counterparts.
 
-## methdology
+## methodology
 
 These benchmarks are generated using [Criterium](https://github.com/hugoduncan/criterium), which provides a median value based on repeated trials.  These measurements are isolated from the effects of JIT or GC.
 
