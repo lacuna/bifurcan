@@ -1,6 +1,6 @@
 # a comparison of functional data structures on the JVM
 
-There are a number of implementations of functional data structures (also called "persistent" or "immutable" data structures), but to date there has been no serious attempt to compare them.  Since I am obviously biased with respect to facets like API design, this document will limit itself to more objective properties: implementation details and performance.
+There are a number of implementations of functional data structures (also called "persistent" or "immutable" data structures) on the JVM, but to date there has been no serious attempt to compare them.  Since I am obviously biased with respect to facets such as API design, this document will limit itself to more objective properties: implementation details and performance.
 
 ## important concepts
 
@@ -24,37 +24,37 @@ If a given set of data has a predictable tree structure, we can speed up operati
 
 ### clojure
 
-Clojure uses Bagwell's HAMTs for its `PersistentHashMap` and `PersistentHashSet`, a closely related data structure for its `Persistent Vector`, and Red-Black Trees for its `PersistentTreeMap`.  Its performance is undercut by its custom equality semantics, which make hash calculation and equality checks more expensive than their Java equivalents.  
-
-### scala
-
-Scala uses its own implementations of the same data structures as Clojure.  We also include its `LongMap`, which is a special case sorted map structure based on Okasaki's [Fast Mergeable Int Maps](http://ittc.ku.edu/~andygill/papers/IntMap98.pdf).  Its performance is undercut by a lack of temporary mutability.
+[Clojure](https://github.com/clojure/clojure) uses Bagwell's HAMTs for its `PersistentHashMap` and `PersistentHashSet`, a closely related data structure for its `PersistentVector`, and [red-black trees](https://en.wikipedia.org/wiki/Red%E2%80%93black_tree) for its `PersistentTreeMap`.  Its performance is undercut by its custom equality semantics, which make hash calculation and equality checks more expensive than their Java counterparts.
 
 ### paguro
 
-Paguro is a port of Clojure's data structures, which cleans up the API and reverts back to Java's equality semantics.  It also provides an implementation of an [RRB Vector](https://infoscience.epfl.ch/record/169879/files/RMTrees.pdf), which provides `O(log N)` slices and concatenation.
-
+[Paguro](https://github.com/GlenKPeterson/Paguro) is a port of Clojure's data structures, which cleans up the API and reverts back to Java's equality semantics.  It also provides an implementation of an [RRB tree](https://infoscience.epfl.ch/record/169879/files/RMTrees.pdf), which provides `O(log N)` slices and concatenation.
+  
 ### capsule
 
-This is the reference implementation for [CHAMP maps](https://michael.steindorfer.name/publications/oopsla15.pdf), introduced by Steindorfer in 2015.  Unfortunately, the performance gains described in the paper are greatly exaggerated, as it is compared to Clojure's maps without accounting for the different equality semantics.  It does, however, provide meaningful improvements in interation and equality checks.
+[Capsule](https://github.com/usethesource/capsule) is the reference implementation for [CHAMP trees](https://michael.steindorfer.name/publications/oopsla15.pdf), introduced by Steindorfer in 2015.  Unfortunately, the performance gains described in the paper are exaggerated, as it is compared to Clojure's maps without accounting for the different equality semantics.  It does, however, provide a canonical structure and meaningful improvements in iteration performance.
 
-Unlike the other libraries included here, this library does not provide implementations of sorted maps or lists.
+Unlike the other libraries included here, this library only provides implementations of hash maps and sets.  
 
-### javaslang
+### scala
 
-This library is part of [Vavr](https://github.com/vavr-io/vavr), "an object-functional language extension to Java 11, which aims to increase code quality and readability."  It provides its own implementation of the same data structures used in Clojure, Scala, et al, but does not support temporary mutability.
+[Scala](https://github.com/scala/scala) uses CHAMP trees for its hash maps and sets, and otherwise uses similar data structures to Clojure.  We also include its `LongMap`, which is a special case sorted map structure based on Okasaki's [Fast Mergeable Int Maps](http://ittc.ku.edu/~andygill/papers/IntMap98.pdf).  Its performance is undercut by a lack of temporary mutability.
+
+### vavr
+
+[Vavr](https://github.com/vavr-io/vavr) is "an object-functional language extension to Java 11, which aims to increase code quality and readability."  It provides its own implementation of the same data structures used in Clojure, but does not support temporary mutability.
 
 ### pcollections
 
-This is the most venerable of all the functional data structure libraries.  Unfortunately, it is also by far the slowest, so much so that it could not be included in the graphs below.
+[PCollections](https://github.com/hrldcpr/pcollections) is the most venerable of all the functional data structure libraries.  Unfortunately, it is also by far the slowest, so much so that it is omitted from the graphs below.
 
 ### java
 
-For comparison, we include Java's mutable `HashMap`, `HashSet`, `TreeMap`, and `ArrayList` as a baseline for the performance of the other libraries.
+For comparison, I've included Java's mutable `HashMap`, `HashSet`, `TreeMap`, and `ArrayList` as a baseline for the performance of the other libraries.
 
 ### bifurcan
 
-My own library, which uses RRB vectors for its `List`, Red-Black trees for its `SortedMap`, and CHAMP trees for its `Map`, `IntMap`, and `Set`.  Also included are `LinearMap` and `LinearSet`, which are mutable data structures that share the same API as their immutable counterparts.
+[My own library](https://github.com/lacuna/bifurcan), which uses RRB trees for its `List`, red-black trees for its `SortedMap`, and CHAMP trees for its `Map`, `IntMap`, and `Set`.  Also included are `LinearMap` and `LinearSet`, which are mutable data structures that share the same API as their immutable counterparts.
 
 ## methdology
 
@@ -70,7 +70,7 @@ I have attempted to use the fastest code paths that each library provides, but c
 
 ![](../benchmarks/images/map_construct.png)
 
-The two mutable collections are significantly faster, while for smaller collections Clojure pays the cost of its equality semantics.  Javaslang and Scala are both a constant factor slower, due to their lack of temporary mutability.
+The two mutable collections are significantly faster, while for smaller collections Clojure pays the cost of its equality semantics.  Vavr and Scala are both a constant factor slower, due to their lack of temporary mutability.
 
 ---
 
@@ -90,7 +90,7 @@ Every library here is largely the same, other than Clojure which again pays a co
 
 ![](../benchmarks/images/map_equals.png)
 
-This compares two maps which differ by a single element.  Here Capsule is near-constant time, as it computes an incremental hash as elements are added and removed.  Bifurcan is moderately faster than the mutable collections, Slang is equivalent, and the rest are slower.
+This compares two maps which differ by a single element.  Capsule is effectively `O(1)` by computing an incremental hash as elements are added and removed (these benchmarks use objects with inexpensive hashes, and therefore do not capture the potential drawbacks of this approach).  Bifurcan is moderately faster than the mutable collections, Slang is equivalent, and the rest are slower.
 
 ---
 
@@ -104,7 +104,7 @@ This compares set operations on maps whose keys half-overlap.  Using its canonic
 
 Since every hash set shared an implementation with their respective hash map, they demonstrate the same performance as shown above.
 
-However, Scala has clearly optimized for set operations on their hash sets specifically, as they are comparable to Bifurcan across the above:
+Scala, however, has clearly optimized for set operations on their hash sets specifically, as they are comparable to Bifurcan across the board:
 
 ![](../benchmarks/images/sorted_map_union.png)
 ![](../benchmarks/images/sorted_map_intersection.png)
@@ -114,7 +114,7 @@ However, Scala has clearly optimized for set operations on their hash sets speci
 
 ![](../benchmarks/images/sorted_map_construct.png)
 
-With the exception of Scala's `LongMap` and Bifurcan's `IntMap`, every map shown here is implemented as a [red-black tree](https://en.wikipedia.org/wiki/Red%E2%80%93black_tree).  Because of their need for constant rebalancing, they don't lend themselves to temporary mutability, there's less performance disparities betewen the libraries.
+With the exception of Scala's `LongMap` and Bifurcan's `IntMap`, every map shown here is implemented as a red-black tree.  Because of their need for constant rebalancing, they don't lend themselves to temporary mutability, leading to fewer performance disparities than the hash maps above.
 
 ---
 
@@ -126,7 +126,7 @@ Iteration time is more or less constant across the board, with Scala faster than
 
 ![](../benchmarks/images/sorted_map_lookup.png)
 
-Since everything is a binary tree, everyone's peformance is comparable with the exception of Bifurcan's `IntMap`, which has adapted Okasaki's original binary tree into a 16-wide CHAMP tree.  
+Since everything is a binary tree, everyone's performance is comparable; the only exception is Bifurcan's `IntMap`, which has adapted Okasaki's original binary tree into a 16-wide CHAMP tree.  
 
 ---
 
@@ -140,13 +140,13 @@ There are few outliers here, other than Clojure due to its equality semantics, a
 ![](../benchmarks/images/sorted_map_intersection.png)
 ![](../benchmarks/images/sorted_map_difference.png)
 
-Here again we see that canonical structure makes set operations on Bifurcan's `IntMap` significantly faster.  Other than that, the only real surprise is that Paguro's union operation is much slower than Clojure's, for reasons I can't determine.
+Here again we see that canonical structure makes set operations on Bifurcan's `IntMap` significantly faster.  The only real surprise is that Paguro's union operation is much slower than Clojure's, despite an almost identical implementation.
 
 ## lists
 
 ![](../benchmarks/images/list_construct.png)
 
-List construction is fairly consistent across every collection, with the exception of Javaslang's which is significantly slower.
+List construction is fairly consistent across every collection, with the exception of Vavr's which is significantly slower.
 
 ---
 
@@ -158,7 +158,7 @@ The mutable collections, which are stored contiguously, are only moderately fast
 
 ![](../benchmarks/images/list_lookup.png)
 
-Unsurprisingly, the mutable collections are `O(1)` while their immutable counterparts are unmistakably `O(log N)`.
+The mutable collections are `O(1)` while their immutable counterparts are unmistakably `O(log N)`.
 
 ---
 

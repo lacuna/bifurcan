@@ -27,8 +27,8 @@
                                      ;; for comparative benchmarks
                                      [io.usethesource/capsule "0.6.2"]
                                      [org.pcollections/pcollections "3.0.3"]
-                                     [io.javaslang/javaslang "2.1.0-alpha"]
-                                     [org.scala-lang/scala-library "2.12.7"]
+                                     [io.vavr/vavr "0.9.2"]
+                                     [org.scala-lang/scala-library "2.13.0-M4"]
                                      [org.functionaljava/functionaljava "4.8"]
                                      [org.eclipse.collections/eclipse-collections "9.2.0"]
                                      [org.organicdesign/Paguro "3.1.0"]]}}

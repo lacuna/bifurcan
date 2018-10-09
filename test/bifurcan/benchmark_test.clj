@@ -452,25 +452,25 @@
       (recur (or (.next it) x))
       x)))
 
-;;; Javaslang
+;;; Vavr
 
-(defn construct-javaslang-map [^javaslang.collection.Map m ks]
+(defn construct-vavr-map [^io.vavr.collection.Map m ks]
   (let [val ""]
     (let-mutable [m m]
       (doary [k ks]
-        (set! m (.put ^javaslang.collection.Map m ^Object k val)))
+        (set! m (.put ^io.vavr.collection.Map m ^Object k val)))
       m)))
 
-(defn construct-javaslang-set [^javaslang.collection.Set s vs]
+(defn construct-vavr-set [^io.vavr.collection.Set s vs]
   (let-mutable [s s]
     (doary [v vs]
-      (set! s (.add ^javaslang.collection.Set s v)))
+      (set! s (.add ^io.vavr.collection.Set s v)))
     s))
 
-(defn construct-javaslang-vector [^javaslang.collection.Vector v vs]
+(defn construct-vavr-vector [^io.vavr.collection.Vector v vs]
   (let-mutable [v v]
     (doary [x vs]
-      (set! v (.append ^javaslang.collection.Vector v x)))
+      (set! v (.append ^io.vavr.collection.Vector v x)))
     v))
 
 ;;; Strings / Ropes
@@ -579,9 +579,9 @@ a    (.concat
 (def bifurcan-map (base-map "bifurcan.Map" Map))
 
 (def scala-map
-  {:label        "scala.HashMap"
+  {:label        "scala.ChampHashMap"
    :construct    construct-scala-map
-   :base         #(.apply (scala.collection.immutable.HashMap/canBuildFrom))
+   :base         #(.newBuilder (scala.collection.immutable.ChampHashMap$/MODULE$))
    :entries      generate-entries
    :lookup       #(doary [k %2] (.get ^scala.collection.immutable.Map %1 k))
    :iterator     #(.iterator ^scala.collection.immutable.Map %)
@@ -634,19 +634,19 @@ a    (.concat
    :add          #(.__put ^Map$Immutable %1 %2 "")
    :remove       #(.__remove ^Map$Immutable %1 %2)})
 
-(def javaslang-map
-  {:label        "slang.HashMap"
-   :construct    construct-javaslang-map
-   :base         #(javaslang.collection.HashMap/empty)
+(def vavr-map
+  {:label        "vavr.HashMap"
+   :construct    construct-vavr-map
+   :base         #(io.vavr.collection.HashMap/empty)
    :entries      generate-entries
-   :lookup       #(doary [k %2] (.get ^javaslang.collection.Map %1 k))
+   :lookup       #(doary [k %2] (.get ^io.vavr.collection.Map %1 k))
    :iterator     iterator
    :consume      consume-iterator
-   :union        #(.merge ^javaslang.collection.Map %1 %2)
-   :difference   (fn [a b] (.removeKeys ^javaslang.collection.Map a (predicate #(.containsKey ^javaslang.collection.Map b %))))
-   :intersection (fn [a b] (.removeKeys ^javaslang.collection.Map a (predicate #(not (.containsKey ^javaslang.collection.Map b %)))))
-   :add          #(.put ^javaslang.collection.Map %1 %2 "")
-   :remove       #(.remove ^javaslang.collection.Map %1 %2)})
+   :union        #(.merge ^io.vavr.collection.Map %1 %2)
+   :difference   (fn [a b] (.removeKeys ^io.vavr.collection.Map a (predicate #(.containsKey ^io.vavr.collection.Map b %))))
+   :intersection (fn [a b] (.removeKeys ^io.vavr.collection.Map a (predicate #(not (.containsKey ^io.vavr.collection.Map b %)))))
+   :add          #(.put ^io.vavr.collection.Map %1 %2 "")
+   :remove       #(.remove ^io.vavr.collection.Map %1 %2)})
 
 (def java-hash-map
   (merge (base-collection "java.HashMap" HashMap)
@@ -692,22 +692,22 @@ a    (.concat
 (def scala-int-map
   (merge scala-map
     {:label   "scala.LongMap"
-     :base    #(.apply (scala.collection.immutable.LongMap/canBuildFrom))
+     :base    #(.newBuilder (scala.collection.immutable.LongMap$/MODULE$))
      :entries generate-numbers}))
 
 (def scala-sorted-map
   (merge scala-int-map
     {:label "scala.TreeMap"
-     :base  #(.apply
-               (scala.collection.immutable.TreeMap/canBuildFrom
-                 (reify scala.math.Ordering
-                   (compare [_ a b]
-                     (compare a b)))))}))
+     :base  #(.newBuilder
+               (scala.collection.immutable.TreeMap$/MODULE$)
+               (reify scala.math.Ordering
+                 (compare [_ a b]
+                   (compare a b))))}))
 
-(def javaslang-sorted-map
-  (merge javaslang-map
-    {:label   "slang.TreeMap"
-     :base    #(javaslang.collection.TreeMap/empty)
+(def vavr-sorted-map
+  (merge vavr-map
+    {:label   "vavr.TreeMap"
+     :base    #(io.vavr.collection.TreeMap/empty)
      :entries generate-numbers}))
 
 (def paguro-sorted-map
@@ -770,24 +770,24 @@ a    (.concat
    :add          #(.plus ^PSet %1 %2)
    :remove       #(.minus ^PSet %1 %2)})
 
-(def javaslang-set
-  {:label        "slang.HashSet"
-   :construct    construct-javaslang-set
-   :base         #(javaslang.collection.HashSet/empty)
+(def vavr-set
+  {:label        "vavr.HashSet"
+   :construct    construct-vavr-set
+   :base         #(io.vavr.collection.HashSet/empty)
    :entries      generate-entries
-   :lookup       #(doary [k %2] (.contains ^javaslang.collection.Set %1 k))
+   :lookup       #(doary [k %2] (.contains ^io.vavr.collection.Set %1 k))
    :iterator     #(.iterator ^Iterable %)
    :consume      consume-iterator
-   :union        #(.union ^javaslang.collection.Set %1 %2)
-   :difference   #(.diff ^javaslang.collection.Set %1 %2)
-   :intersection #(.intersect ^javaslang.collection.Set %1 %2)
-   :add          #(.add ^javaslang.collection.Set %1 %2)
-   :remove       #(.remove ^javaslang.collection.Set %1 %2)})
+   :union        #(.union ^io.vavr.collection.Set %1 %2)
+   :difference   #(.diff ^io.vavr.collection.Set %1 %2)
+   :intersection #(.intersect ^io.vavr.collection.Set %1 %2)
+   :add          #(.add ^io.vavr.collection.Set %1 %2)
+   :remove       #(.remove ^io.vavr.collection.Set %1 %2)})
 
 (def scala-set
-  {:label        "scala.HashSet"
+  {:label        "scala.ChampHashSet"
    :construct    construct-scala-collection
-   :base         #(.apply (scala.collection.immutable.HashSet/canBuildFrom))
+   :base         #(.newBuilder (scala.collection.immutable.ChampHashSet$/MODULE$))
    :entries      generate-entries
    :lookup       #(doary [k %2] (.contains ^scala.collection.immutable.Set %1 k))
    :iterator     #(.iterator ^scala.collection.immutable.Set %)
@@ -884,23 +884,23 @@ a    (.concat
 
 (def scala-vector
   {:label     "scala.Vector"
-   :base      #(.apply (scala.collection.immutable.Vector/canBuildFrom))
+   :base      #(.newBuilder (scala.collection.immutable.Vector$/MODULE$))
    :entries   generate-numbers
    :construct construct-scala-collection
    :iterator  #(.iterator ^scala.collection.immutable.Vector %)
    :consume   consume-scala-iterator
    :lookup    #(doary [k %2] (.apply ^scala.collection.immutable.Vector %1 k))
-   :concat    #(.$plus$plus ^scala.collection.immutable.Vector %1 %2 (scala.collection.immutable.Vector/canBuildFrom))})
+   :concat    #(.$plus$plus ^scala.collection.immutable.Vector %1 %2)})
 
-(def javaslang-vector
-  {:label     "slang.Vector"
-   :base      #(javaslang.collection.Vector/empty)
+(def vavr-vector
+  {:label     "vavr.Vector"
+   :base      #(io.vavr.collection.Vector/empty)
    :entries   generate-numbers
-   :construct construct-javaslang-vector
+   :construct construct-vavr-vector
    :iterator  iterator
    :consume   consume-iterator
-   :lookup    #(doary [k %2] (.get ^javaslang.collection.Vector %1 k))
-   :concat    #(.appendAll ^javaslang.collection.Vector %1 ^Iterable %2)})
+   :lookup    #(doary [k %2] (.get ^io.vavr.collection.Vector %1 k))
+   :concat    #(.appendAll ^io.vavr.collection.Vector %1 ^Iterable %2)})
 
 (def clojure-vector
   {:label     "clojure.PersistentVector"
@@ -1025,48 +1025,42 @@ a    (.concat
          nil))))
 
 (defn benchmark-union [n {:keys [base entries construct union clone]}]
-  (let [s-a (entries n)
-        s-b (into-array
-              (concat
-                (->> s-a (take (/ n 2)))
-                (->> (entries (* n 1.5)) (drop n))))
+  (let [e (entries (Math/ceil (* n 1.5)))
+        s-a (->> e (take n) into-array)
+        s-b (->> e (drop (/ n 2)) (take n) into-array)
         a   (construct (base) s-a)
         b   (construct (base) s-b)]
     (benchmark n #(do (union a b) nil))))
 
 (defn benchmark-difference [n {:keys [base entries construct difference clone]}]
-  (let [s-a (entries n)
-        s-b (into-array
-              (concat
-                (->> s-a (take (/ n 2)) shuffle)
-                (->> (entries (* n 1.5)) (drop n))))
+  (let [e (entries (Math/ceil (* n 1.5)))
+        s-a (->> e (take n) into-array)
+        s-b (->> e (drop (/ n 2)) (take n) into-array)
         a (construct (base) s-a)
         b (construct (base) s-b)]
     (benchmark n #(do (difference a b) nil))))
 
 (defn benchmark-intersection [n {:keys [base entries construct intersection clone]}]
-  (let [s-a (entries n)
-        s-b (into-array
-              (concat
-                (->> s-a (take (/ n 2)) shuffle)
-                (->> (entries (* n 1.5)) (drop n))))
+  (let [e (entries (Math/ceil (* n 1.5)))
+        s-a (->> e (take n) into-array)
+        s-b (->> e (drop (/ n 2)) (take n) into-array)
         a (construct (base) s-a)
         b (construct (base) s-b)]
     (benchmark n #(do (intersection a b) nil))))
 
 ;;;
 
-(def maps [linear-map bifurcan-map java-hash-map clojure-map capsule-map #_pcollections-map javaslang-map scala-map paguro-map])
+(def maps [bifurcan-map java-hash-map clojure-map vavr-map scala-map paguro-map linear-map capsule-map #_pcollections-map])
 
-(def sorted-maps [scala-int-map int-map clojure-sorted-map bifurcan-sorted-map paguro-sorted-map java-sorted-map javaslang-sorted-map scala-sorted-map])
+(def sets [bifurcan-set java-hash-set clojure-set vavr-set scala-set paguro-set linear-set capsule-set #_pcollections-set])
 
-(def sets [linear-set bifurcan-set java-hash-set clojure-set capsule-set #_pcollections-set javaslang-set scala-set paguro-set])
+(def sorted-maps [bifurcan-sorted-map java-sorted-map clojure-sorted-map vavr-sorted-map scala-sorted-map paguro-sorted-map int-map scala-int-map])
 
-(def lists [linear-list bifurcan-list java-array-list clojure-vector #_pcollections-vector javaslang-vector scala-vector paguro-vector])
+(def lists [bifurcan-list java-array-list clojure-vector vavr-vector scala-vector paguro-vector linear-list #_pcollections-vector])
 
 (def strings [java-string rope])
 
-(def all-colls [clojure-set] #_(concat maps sorted-maps sets lists strings))
+(def all-colls (concat maps sorted-maps sets lists strings))
 
 (def bench->types
   {:construct    [benchmark-construct
