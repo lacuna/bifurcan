@@ -981,7 +981,7 @@ public class MapNodes {
   public static <K, V> Node<K, V> intersection(int shift, Object editor, Node<K, V> a, Node<K, V> b, BiPredicate<K, K> equals) {
     Node<K, V> result = new Node<K, V>(editor);
 
-    PrimitiveIterator.OfInt masks = Util.masks(a.nodemap | a.datamap | b.nodemap | b.datamap);
+    PrimitiveIterator.OfInt masks = Util.masks((a.nodemap | a.datamap) & (b.nodemap | b.datamap));
     while (masks.hasNext()) {
       int mask = masks.nextInt();
       int state = mergeState(mask, a.nodemap, a.datamap, b.nodemap, b.datamap);
@@ -1014,12 +1014,6 @@ public class MapNodes {
           if (get(b, shift, a.hashes[idx], (K) a.content[idx << 1], equals, DEFAULT_VALUE) != DEFAULT_VALUE) {
             result = transferEntry(mask, a, result);
           }
-          break;
-        case ENTRY_NONE:
-        case NODE_NONE:
-        case NONE_ENTRY:
-        case NONE_NODE:
-        case NONE_NONE:
           break;
       }
     }
