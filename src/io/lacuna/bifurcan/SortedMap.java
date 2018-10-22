@@ -5,7 +5,9 @@ import io.lacuna.bifurcan.nodes.SortedMapNodes.Node;
 
 import java.util.Comparator;
 import java.util.Iterator;
+import java.util.function.BiPredicate;
 import java.util.function.BinaryOperator;
+import java.util.function.ToIntFunction;
 
 /**
  * A red-black tree based on Germane 2004 (http://matt.might.net/papers/germane2014deletion.pdf)
@@ -15,6 +17,7 @@ public class SortedMap<K, V> implements ISortedMap<K, V> {
   private final Comparator<K> comparator;
   public Node<K, V> root;
   private final Object editor;
+  private int hash = -1;
 
   public SortedMap() {
     this.root = SortedMapNodes.EMPTY_NODE;
@@ -36,7 +39,7 @@ public class SortedMap<K, V> implements ISortedMap<K, V> {
 
   @Override
   public IEntry<K, V> floor(K key) {
-    Node<K, V> n = SortedMapNodes.floor(root, key, comparator);
+    Node<K, V> n = root.floor(key, comparator);
     return n == null
       ? null
       : new Maps.Entry<>(n.k, n.v);
@@ -44,15 +47,47 @@ public class SortedMap<K, V> implements ISortedMap<K, V> {
 
   @Override
   public IEntry<K, V> ceil(K key) {
-    Node<K, V> n = SortedMapNodes.ceil(root, key, comparator);
+    Node<K, V> n = root.ceil(key, comparator);
     return n == null
       ? null
       : new Maps.Entry<>(n.k, n.v);
   }
 
   @Override
+  public SortedMap<K, V> difference(ISet<K> keys) {
+    SortedMap<K, V> result = clone().linear();
+    keys.forEach(result::remove);
+    return isLinear() ? result : result.forked();
+  }
+
+  @Override
+  public SortedMap<K, V> intersection(ISet<K> keys) {
+    SortedMap<K, V> result = (SortedMap<K, V>) Maps.intersection(new SortedMap<K, V>().linear(), this, keys);
+    return isLinear() ? result : result.forked();
+  }
+
+  @Override
+  public SortedMap<K, V> union(IMap<K, V> m) {
+    SortedMap<K, V> result = clone().linear();
+    m.forEach(e -> result.put(e.key(), e.value()));
+    return isLinear() ? result : result.forked();
+  }
+
+  @Override
+  public SortedMap<K, V> difference(IMap<K, ?> m) {
+    SortedMap<K, V> result = clone().linear();
+    m.keys().forEach(result::remove);
+    return isLinear() ? result : result.forked();
+  }
+
+  @Override
+  public SortedMap<K, V> intersection(IMap<K, ?> m) {
+    return intersection(m.keys());
+  }
+
+  @Override
   public SortedMap<K, V> slice(K min, K max) {
-    return new SortedMap<>(SortedMapNodes.slice(root, min, max, comparator), isLinear(), comparator);
+    return new SortedMap<>(root.slice(min, max, comparator), isLinear(), comparator);
   }
 
   @Override
@@ -70,6 +105,7 @@ public class SortedMap<K, V> implements ISortedMap<K, V> {
     Node<K, V> rootPrime = root.put(key, value, merge, comparator);
     //rootPrime.checkInvariant();
     if (isLinear()) {
+      hash = -1;
       root = rootPrime;
       return this;
     } else {
@@ -82,6 +118,7 @@ public class SortedMap<K, V> implements ISortedMap<K, V> {
     Node<K, V> rootPrime = root.remove(key, comparator);
     //rootPrime.checkInvariant();
     if (isLinear()) {
+      hash = -1;
       root = rootPrime;
       return this;
     } else {
@@ -125,8 +162,8 @@ public class SortedMap<K, V> implements ISortedMap<K, V> {
   }
 
   @Override
-  public IMap<K, V> clone() {
-    return this;
+  public SortedMap<K, V> clone() {
+    return isLinear() ? forked().linear() : this;
   }
 
   @Override
@@ -145,8 +182,21 @@ public class SortedMap<K, V> implements ISortedMap<K, V> {
   }
 
   @Override
+  public ToIntFunction<K> keyHash() {
+    return Maps.DEFAULT_HASH_CODE;
+  }
+
+  @Override
+  public BiPredicate<K, K> keyEquality() {
+    return Maps.DEFAULT_EQUALS;
+  }
+
+  @Override
   public int hashCode() {
-    return (int) Maps.hash(this);
+    if (hash == -1) {
+      hash = (int) Maps.hash(this);
+    }
+    return hash;
   }
 
   @Override

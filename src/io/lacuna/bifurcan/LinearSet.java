@@ -83,7 +83,7 @@ public class LinearSet<V> implements ISet<V>, Cloneable {
    * @param initialCapacity the initial capacity of the set
    */
   public LinearSet(int initialCapacity) {
-    this(initialCapacity, Objects::hashCode, Objects::equals);
+    this(initialCapacity, Maps.DEFAULT_HASH_CODE, Maps.DEFAULT_EQUALS);
   }
 
   /**

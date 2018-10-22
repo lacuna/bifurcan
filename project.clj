@@ -37,7 +37,13 @@
   :jvm-opts ^:replace ["-server"
                        "-XX:+UseG1GC"
                        "-XX:-OmitStackTraceInFastThrow"
-                       "-ea:io.lacuna..."]
+                       "-ea:io.lacuna..."
+
+                       #_"-XX:+UnlockDiagnosticVMOptions"
+                       #_"-XX:+PrintAssembly"
+                       #_"-XX:CompileCommand=print,io.lacuna.bifurcan.nodes.Util::mergeState"
+                       #_"-XX:CompileCommand=dontinline,io.lacuna.bifurcan.nodes.Util::mergeState"
+                       ]
 
   :repositories {"usethesource" "http://nexus.usethesource.io/content/repositories/public/"}
 

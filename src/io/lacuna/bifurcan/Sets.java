@@ -75,6 +75,16 @@ public class Sets {
     }
 
     @Override
+    public ToIntFunction valueHash() {
+      return Maps.DEFAULT_HASH_CODE;
+    }
+
+    @Override
+    public BiPredicate valueEquality() {
+      return Maps.DEFAULT_EQUALS;
+    }
+
+    @Override
     public ISet clone() {
       return this;
     }
@@ -92,7 +102,11 @@ public class Sets {
     private boolean linear;
 
     public VirtualSet(ISet<V> base) {
-      this(base, Sets.EMPTY, Sets.EMPTY, false);
+      this(
+        base,
+        new Set<>(base.valueHash(), base.valueEquality()),
+        new Set<>(base.valueHash(), base.valueEquality()),
+        false);
     }
 
     private VirtualSet(ISet<V> base, ISet<V> added, ISet<V> removed, boolean linear) {
@@ -210,6 +224,16 @@ public class Sets {
     }
 
     @Override
+    public ToIntFunction<V> valueHash() {
+      return base.valueHash();
+    }
+
+    @Override
+    public BiPredicate<V, V> valueEquality() {
+      return base.valueEquality();
+    }
+
+    @Override
     public int hashCode() {
       return (int) Sets.hash(this);
     }
@@ -234,7 +258,7 @@ public class Sets {
   }
 
   public static <V> long hash(ISet<V> s) {
-    return hash(s, Objects::hashCode, (a, b) -> a + b);
+    return hash(s, x -> s.valueHash().applyAsInt(x), (a, b) -> a + b);
   }
 
   public static <V> long hash(ISet<V> set, ToLongFunction<V> hash, LongBinaryOperator combiner) {
@@ -386,6 +410,16 @@ public class Sets {
       @Override
       public int hashCode() {
         return (int) Sets.hash(this);
+      }
+
+      @Override
+      public ToIntFunction<V> valueHash() {
+        return Maps.DEFAULT_HASH_CODE;
+      }
+
+      @Override
+      public BiPredicate<V, V> valueEquality() {
+        return Maps.DEFAULT_EQUALS;
       }
 
       @Override

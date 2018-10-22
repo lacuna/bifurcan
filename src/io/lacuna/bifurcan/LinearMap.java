@@ -102,7 +102,7 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
    * @param initialCapacity the initial capacity of the map
    */
   public LinearMap(int initialCapacity) {
-    this(initialCapacity, Objects::hashCode, Objects::equals);
+    this(initialCapacity, Maps.DEFAULT_HASH_CODE, Maps.DEFAULT_EQUALS);
   }
 
   /**
@@ -368,14 +368,14 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
   }
 
   @Override
-  public LinearMap<K, V> merge(IMap<K, V> o, BinaryOperator<V> mergeFn) {
-    if (o.size() == 0) {
+  public LinearMap<K, V> merge(IMap<K, V> m, BinaryOperator<V> mergeFn) {
+    if (m.size() == 0) {
       return this.clone();
-    } else if (o instanceof LinearMap) {
-      return merge((LinearMap<K, V>) o, mergeFn);
+    } else if (m instanceof LinearMap && Maps.equivEquality(this, m)) {
+      return merge((LinearMap<K, V>) m, mergeFn);
     } else {
       LinearMap<K, V> result = this.clone();
-      for (IEntry<K, V> e : o.entries()) {
+      for (IEntry<K, V> e : m.entries()) {
         result.put(e.key(), e.value(), mergeFn);
       }
       return result;
@@ -384,7 +384,7 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
 
   @Override
   public LinearMap<K, V> difference(IMap<K, ?> m) {
-    if (m instanceof LinearMap) {
+    if (m instanceof LinearMap && Maps.equivEquality(this, m)) {
       return difference((LinearMap<K, ?>) m);
     } else {
       return (LinearMap<K, V>) Maps.difference(this.clone(), m.keys());
@@ -392,8 +392,17 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
   }
 
   @Override
+  public IMap<K, V> difference(ISet<K> keys) {
+    if (keys instanceof LinearSet && Maps.equivEquality(this, keys)) {
+      return difference(((LinearSet<K>) keys).map);
+    } else {
+      return Maps.difference(this.clone(), keys);
+    }
+  }
+
+  @Override
   public LinearMap<K, V> intersection(IMap<K, ?> m) {
-    if (m instanceof LinearMap) {
+    if (m instanceof LinearMap && Maps.equivEquality(this, m)) {
       return intersection((LinearMap<K, ?>) m);
     } else {
       return (LinearMap<K, V>) Maps.intersection(new LinearMap<>(), this, m.keys());
@@ -402,7 +411,7 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
 
   @Override
   public LinearMap<K, V> intersection(ISet<K> keys) {
-    if (keys instanceof LinearSet) {
+    if (keys instanceof LinearSet && Maps.equivEquality(this, keys)) {
       return intersection(((LinearSet<K>) keys).map);
     } else {
       return (LinearMap<K, V>) Maps.intersection(new LinearMap<>(), this, keys);

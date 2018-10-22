@@ -100,8 +100,15 @@ public class SortedMapNodes {
 
     public void split(int targetSize, IList<Node<K, V>> acc) {
       if (size >= targetSize * 2) {
+        long offset = acc.size();
         l.split(targetSize, acc);
-        r.split(targetSize, acc);
+        if (acc.size() > offset) {
+          acc.set(offset, node(c, acc.nth(offset), k, v, EMPTY_NODE));
+          r.split(targetSize, acc);
+        } else {
+          r.split(targetSize, acc);
+          acc.set(offset, node(c, EMPTY_NODE, k, v, acc.nth(offset)));
+        }
       } else if (size > 0) {
         acc.addLast(this);
       }
@@ -236,6 +243,54 @@ public class SortedMapNodes {
       return node(c, l.removeMin(), k, v, r).rotate();
     }
 
+    public Node<K, V> floor(K key, Comparator<K> comparator) {
+      if (size == 0) {
+        return null;
+      }
+
+      int cmp = comparator.compare(key, k);
+      if (cmp > 0) {
+        Node<K, V> n = r.floor(key, comparator);
+        return n != null ? n : this;
+      } else if (cmp < 0) {
+        return l.floor(key, comparator);
+      } else {
+        return this;
+      }
+    }
+
+    public Node<K, V> ceil(K key, Comparator<K> comparator) {
+      if (size == 0) {
+        return null;
+      }
+
+      int cmp = comparator.compare(key, k);
+      if (cmp > 0) {
+        return r.ceil(key, comparator);
+      } else if (cmp < 0) {
+        Node<K, V> n = l.ceil(key, comparator);
+        return n != null ? n : this;
+      } else {
+        return this;
+      }
+    }
+
+    public Node<K, V> slice(K min, K max, Comparator<K> comparator) {
+      if (size == 0) {
+        return this;
+      }
+
+      if (comparator.compare(k, min) < 0) {
+        return r.slice(min, max, comparator);
+      }
+
+      if (comparator.compare(k, max) > 0) {
+        return l.slice(min, max, comparator);
+      }
+
+      return node(c, l.slice(min, max, comparator), k, v, r.slice(min, max, comparator)).rotate();
+    }
+
     public int checkInvariant() {
       if (c == DOUBLE_BLACK) {
         throw new IllegalStateException();
@@ -275,7 +330,7 @@ public class SortedMapNodes {
     }
   }
 
-  static <K, V> Node<K, V> red(Node<K, V> l, K k, V v, Node<K, V> r) {
+ static <K, V> Node<K, V> red(Node<K, V> l, K k, V v, Node<K, V> r) {
     return new Node<>(RED, l, k, v, r);
   }
 
@@ -285,16 +340,6 @@ public class SortedMapNodes {
 
   static <K, V> Node<K, V> node(Color c, Node<K, V> l, K k, V v, Node<K, V> r) {
     return new Node<>(c, l, k, v, r);
-  }
-
-  public static <K, V> Node<K, V> floor(Node<K, V> n, K key, Comparator<K> comparator) {
-    Node<K, V> candidate = null;
-    return null;
-  }
-
-  public static <K, V> Node<K, V> ceil(Node<K, V> n, K key, Comparator<K> comparator) {
-    Node<K, V> candidate = null;
-    return null;
   }
 
   public static <K, V> Node<K, V> slice(Node<K, V> n, K min, K max, Comparator<K> comparator) {

@@ -60,7 +60,7 @@ public class Set<V> implements ISet<V>, Cloneable {
   }
 
   public Set() {
-    this(Objects::hashCode, Objects::equals);
+    this(Maps.DEFAULT_HASH_CODE, Maps.DEFAULT_EQUALS);
   }
 
   /**

@@ -76,7 +76,7 @@ The two mutable collections are significantly faster, while for smaller collecti
 
 ![](../benchmarks/images/map_iterate.png)
 
-Unlike Java's `HashMap` and `HashSet`, Bifurcan's `LinearMap` and `LinearSet` store their entries contiguously, which means that they can be cloned using `System.arraycopy()`.  This makes iteration over these data structures significantly faster.
+Unlike Java's `HashMap` and `HashSet`, Bifurcan's `LinearMap` and `LinearSet` store their entries contiguously, which makes both iteration and cloning significantly faster.
 
 Bifurcan, Capsule, and Scala are all comparable to Java's `HashMap`, while the others are constant factor slower.
 

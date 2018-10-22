@@ -1,23 +1,21 @@
 package io.lacuna.bifurcan.nodes;
 
-import io.lacuna.bifurcan.*;
+import io.lacuna.bifurcan.IEntry;
+import io.lacuna.bifurcan.IList;
+import io.lacuna.bifurcan.LinearList;
+import io.lacuna.bifurcan.Maps;
 import io.lacuna.bifurcan.utils.Bits;
 import io.lacuna.bifurcan.utils.Iterators;
 
-import java.util.Arrays;
 import java.util.Iterator;
-import java.util.NoSuchElementException;
 import java.util.PrimitiveIterator;
 import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
 import java.util.function.BinaryOperator;
-import java.util.function.Function;
 
 import static io.lacuna.bifurcan.nodes.Util.*;
 import static io.lacuna.bifurcan.utils.Bits.bitOffset;
 import static io.lacuna.bifurcan.utils.Bits.highestBit;
-import static io.lacuna.bifurcan.utils.Bits.isPowerOfTwo;
-import static java.lang.Integer.MAX_VALUE;
 import static java.lang.Integer.bitCount;
 import static java.lang.System.arraycopy;
 
@@ -196,6 +194,9 @@ public class IntMapNodes {
 
       if (editor != this.editor) {
         return clone(editor).put(editor, k, v, mergeFn);
+      } else if (size == 0) {
+        Node<V> n = new Node<V>(editor, k, 0);
+        return n.putEntry(n.mask(k), k, v);
       }
 
       int offsetPrime = offset(k, prefix);
@@ -385,12 +386,12 @@ public class IntMapNodes {
         } else if (isNode(mask)) {
           Node<V> child = node(mask).slice(editor, min, max);
           if (child != null) {
-            n = n.putNode(mask, child);
+            n = merge(editor, n, child, null);
           }
         }
       }
 
-      return n;
+      return n.collapse();
     }
 
     // misc
@@ -423,6 +424,7 @@ public class IntMapNodes {
 
         return true;
       }
+
       return false;
     }
 
@@ -432,7 +434,7 @@ public class IntMapNodes {
       return 1 << ((key & (0xFL << offset)) >>> offset);
     }
 
-    private long key(int mask) {
+    public long key(int mask) {
       return keys[entryIndex(mask)];
     }
 
@@ -472,7 +474,7 @@ public class IntMapNodes {
       return IntMapNodes.overlap(min, max, min(), max());
     }
 
-    private Node<V> node(int mask) {
+    public Node<V> node(int mask) {
       return (Node<V>) content[content.length - 1 - nodeIndex(mask)];
     }
 
@@ -770,11 +772,11 @@ public class IntMapNodes {
           : a.clone(editor).remove(editor, key);
         result = nPrime.size() == 0 ? null : nPrime;
       } else if (a.isNode(mask)) {
+        result = a.clone(editor).removeNode(mask);
         Node<V> nPrime = difference(editor, a.node(mask), b);
-        result = nPrime == null
-          ? a.clone(editor).removeNode(mask).collapse()
-          : a.clone(editor).setNode(mask, nPrime);
-
+        if (nPrime != null) {
+          result = result.putNode(mask, nPrime);
+        }
       } else {
         result = a;
       }
@@ -796,7 +798,7 @@ public class IntMapNodes {
     } else {
       result = new Node<V>(editor, a.prefix, a.offset);
 
-      PrimitiveIterator.OfInt masks = Util.masks(a.datamap | a.nodemap | b.datamap | b.nodemap);
+      PrimitiveIterator.OfInt masks = Util.masks(a.datamap | a.nodemap);
       while (masks.hasNext()) {
 
         int mask = masks.nextInt();
@@ -820,17 +822,18 @@ public class IntMapNodes {
             }
             break;
           case NODE_ENTRY:
-            result = result.putNode(mask, a.node(mask).remove(editor, b.key(mask)));
+            nPrime = a.node(mask).remove(editor, b.key(mask));
+            if (nPrime.size > 0) {
+              result = result.putNode(mask, nPrime);
+            }
             break;
           case ENTRY_NODE:
             if (b.get(a.key(mask), DEFAULT_VALUE) == DEFAULT_VALUE) {
               result = transferEntry(mask, a, result);
             }
             break;
-          case NONE_ENTRY:
-          case NONE_NODE:
-          case NONE_NONE:
-            break;
+          default:
+            throw new IllegalStateException();
         }
       }
     }
@@ -881,7 +884,7 @@ public class IntMapNodes {
     } else {
       result = new Node<V>(editor, a.prefix, a.offset);
 
-      PrimitiveIterator.OfInt masks = Util.masks(a.datamap | a.nodemap | b.datamap | b.nodemap);
+      PrimitiveIterator.OfInt masks = Util.masks((a.datamap | a.nodemap) & (b.datamap | b.nodemap));
       while (masks.hasNext()) {
 
         int mask = masks.nextInt();
@@ -910,12 +913,8 @@ public class IntMapNodes {
               result = transferEntry(mask, a, result);
             }
             break;
-          case ENTRY_NONE:
-          case NODE_NONE:
-          case NONE_ENTRY:
-          case NONE_NODE:
-          case NONE_NONE:
-            break;
+          default:
+            throw new IllegalStateException();
         }
       }
     }

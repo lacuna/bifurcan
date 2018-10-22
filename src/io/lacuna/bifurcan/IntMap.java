@@ -27,6 +27,7 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
 
   final Object editor;
   private Node<V> neg, pos;
+  private int hash = -1;
 
   /**
    * @param m another map
@@ -183,6 +184,7 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
       if (neg == negPrime) {
         return this;
       } else if (isLinear()) {
+        hash = -1;
         neg = negPrime;
         return this;
       } else {
@@ -193,6 +195,7 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
       if (pos == posPrime) {
         return this;
       } else if (isLinear()) {
+        hash = -1;
         pos = posPrime;
         return this;
       } else {
@@ -224,6 +227,7 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
       if (neg == negPrime) {
         return this;
       } else if (isLinear()) {
+        hash = -1;
         neg = negPrime;
         return this;
       } else {
@@ -234,6 +238,7 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
       if (pos == posPrime) {
         return this;
       } else if (isLinear()) {
+        hash = -1;
         pos = posPrime;
         return this;
       } else {
@@ -402,9 +407,14 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
     return result.forked();
   }
 
+
+
   @Override
   public int hashCode() {
-    return (int) Maps.hash(this);
+    if (hash == -1) {
+      hash = (int) Maps.hash(this);
+    }
+    return hash;
   }
 
   @Override

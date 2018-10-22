@@ -37,12 +37,14 @@ public class Util {
   static final int ENTRY_ENTRY = ENTRY_NONE | NONE_ENTRY;
   static final int NODE_NODE = NODE_NONE | NONE_NODE;
 
-  static int mergeState(int mask, int nodeA, int dataA, int nodeB, int dataB) {
+  public static int mergeState(int mask, int nodeA, int dataA, int nodeB, int dataB) {
     int state = 0;
-    state |= (mask & nodeA) != 0 ? 0x1 : 0;
-    state |= (mask & dataA) != 0 ? 0x2 : 0;
-    state |= (mask & nodeB) != 0 ? 0x4 : 0;
-    state |= (mask & dataB) != 0 ? 0x8 : 0;
+
+    // this compiles down to no branches, apparently
+    state |= ((mask & nodeA) != 0 ? 1 : 0);
+    state |= ((mask & dataA) != 0 ? 1 : 0) << 1;
+    state |= ((mask & nodeB) != 0 ? 1 : 0) << 2;
+    state |= ((mask & dataB) != 0 ? 1 : 0) << 3;
 
     return state;
   }
@@ -59,7 +61,7 @@ public class Util {
     return bitOffset(highestBit(bitmap & 0xFFFFFFFFL));
   }
 
-  static PrimitiveIterator.OfInt masks(int bitmap) {
+  public static PrimitiveIterator.OfInt masks(int bitmap) {
     return new PrimitiveIterator.OfInt() {
       int b = bitmap;
 

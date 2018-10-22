@@ -20,7 +20,7 @@ public class FloatMap<V> implements ISortedMap<Double, V>, Cloneable {
 
   private static final ToIntFunction<Double> HASH = n -> IntMap.HASH.applyAsInt(Encodings.doubleToLong(n));
 
-  private IntMap<V> map;
+  public IntMap<V> map;
 
   public static <V> FloatMap<V> from(IMap<Number, V> m) {
     if (m instanceof FloatMap) {

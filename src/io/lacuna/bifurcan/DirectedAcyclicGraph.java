@@ -33,6 +33,10 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
     this(new DirectedGraph<>(), new Set<>(), new Set<>());
   }
 
+  public DirectedAcyclicGraph(ToIntFunction<V> hashFn, BiPredicate<V, V> equalsFn) {
+    this(new DirectedGraph<>(hashFn, equalsFn), new Set<>(hashFn, equalsFn), new Set<>(hashFn, equalsFn));
+  }
+
   /**
    * @return a directed acyclic graph equivalent to {@code graph}
    * @throws CycleException if {@code graph} contains a cycle
@@ -42,10 +46,13 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
       throw new CycleException();
     }
 
-    return new DirectedAcyclicGraph<>(
-      graph,
-      graph.vertices().stream().filter(v -> graph.in(v).size() == 0).collect(Sets.collector()),
-      graph.vertices().stream().filter(v -> graph.out(v).size() == 0).collect(Sets.collector()));
+    Set<V> top = new Set<>(graph.vertexHash(), graph.vertexEquality()).linear();
+    Set<V> bottom = new Set<>(graph.vertexHash(), graph.vertexEquality()).linear();
+
+    graph.vertices().stream().filter(v -> graph.in(v).size() == 0).forEach(top::add);
+    graph.vertices().stream().filter(v -> graph.out(v).size() == 0).forEach(bottom::add);
+
+    return new DirectedAcyclicGraph<>(graph, top.forked(), bottom.forked());
   }
 
   public Set<V> top() {

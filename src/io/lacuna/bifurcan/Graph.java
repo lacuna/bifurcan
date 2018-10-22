@@ -39,7 +39,7 @@ public class Graph<V, E> implements IGraph<V, E> {
   private Map<VertexSet<V>, E> edges;
 
   public Graph() {
-    this(Objects::hash, Objects::equals);
+    this(Maps.DEFAULT_HASH_CODE, Maps.DEFAULT_EQUALS);
   }
 
   public Graph(ToIntFunction<V> hashFn, BiPredicate<V, V> equalsFn) {

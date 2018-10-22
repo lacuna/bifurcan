@@ -22,16 +22,12 @@ public interface IMap<K, V> extends
   /**
    * @return the hash function used by the map
    */
-  default ToIntFunction<K> keyHash() {
-    return Objects::hashCode;
-  }
+  ToIntFunction<K> keyHash();
 
   /**
    * @return the key equality semantics used by the map
    */
-  default BiPredicate<K, K> keyEquality() {
-    return Objects::equals;
-  }
+  BiPredicate<K, K> keyEquality();
 
   /**
    * @return the value under {@code key}, or {@code defaultValue} if there is no such key

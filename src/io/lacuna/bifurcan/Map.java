@@ -27,7 +27,7 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
 
   private final BiPredicate<K, K> equalsFn;
   private final ToIntFunction<K> hashFn;
-  public Node<K, V> root;
+  private Node<K, V> root;
   private int hash = -1;
   final Object editor;
 
@@ -52,7 +52,7 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
    * @return a forked map with the same entries
    */
   public static <K, V> Map<K, V> from(java.util.Map<K, V> map) {
-    return from(map.entrySet());
+    return map.entrySet().stream().collect(Maps.collector(java.util.Map.Entry::getKey, java.util.Map.Entry::getValue));
   }
 
   /**
@@ -82,14 +82,6 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
   }
 
   /**
-   * @param entries a collection of {@code java.util.Map.Entry} objects
-   * @return a forked map containing these entries
-   */
-  public static <K, V> Map<K, V> from(Collection<java.util.Map.Entry<K, V>> entries) {
-    return entries.stream().collect(Maps.collector(java.util.Map.Entry::getKey, java.util.Map.Entry::getValue));
-  }
-
-  /**
    * Creates a map.
    *
    * @param hashFn   a function which yields the hash value of keys
@@ -100,7 +92,7 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
   }
 
   public Map() {
-    this(Node.EMPTY, Objects::hashCode, Objects::equals, false);
+    this(Node.EMPTY, Maps.DEFAULT_HASH_CODE, Maps.DEFAULT_EQUALS, false);
   }
 
   private Map(Node<K, V> root, ToIntFunction<K> hashFn, BiPredicate<K, K> equalsFn, boolean linear) {
@@ -238,18 +230,18 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
   }
 
   @Override
-  public Map<K, V> merge(IMap<K, V> b, BinaryOperator<V> mergeFn) {
-    if (b instanceof Map) {
-      Node<K, V> rootPrime = MapNodes.merge(0, editor, root, ((Map) b).root, equalsFn, mergeFn);
+  public Map<K, V> merge(IMap<K, V> m, BinaryOperator<V> mergeFn) {
+    if (m instanceof Map && Maps.equivEquality(this, m)) {
+      Node<K, V> rootPrime = MapNodes.merge(0, editor, root, ((Map) m).root, equalsFn, mergeFn);
       return new Map<>(rootPrime, hashFn, equalsFn, isLinear());
     } else {
-      return (Map<K, V>) Maps.merge(this.clone(), b, mergeFn);
+      return (Map<K, V>) Maps.merge(this.clone(), m, mergeFn);
     }
   }
 
   @Override
   public Map<K, V> difference(ISet<K> keys) {
-    if (keys instanceof Set) {
+    if (keys instanceof Set && Maps.equivEquality(this, keys)) {
       return difference(((Set<K>) keys).map);
     } else {
       return (Map<K, V>) Maps.difference(this.clone(), keys);
@@ -258,7 +250,7 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
 
   @Override
   public Map<K, V> intersection(ISet<K> keys) {
-    if (keys instanceof Set) {
+    if (keys instanceof Set && Maps.equivEquality(this, keys)) {
       return intersection(((Set<K>) keys).map);
     } else {
       Map<K, V> map = (Map<K, V>) Maps.intersection(new Map<K, V>().linear(), this, keys);
@@ -268,7 +260,7 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
 
   @Override
   public Map<K, V> difference(IMap<K, ?> m) {
-    if (m instanceof Map) {
+    if (m instanceof Map && Maps.equivEquality(this, m)) {
       Node<K, V> rootPrime = MapNodes.difference(0, editor, root, ((Map) m).root, equalsFn);
       return new Map<>(rootPrime == null ? Node.EMPTY : rootPrime, hashFn, equalsFn, isLinear());
     } else {
@@ -278,7 +270,7 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
 
   @Override
   public Map<K, V> intersection(IMap<K, ?> m) {
-    if (m instanceof Map) {
+    if (m instanceof Map && Maps.equivEquality(this, m)) {
       Node<K, V> rootPrime = MapNodes.intersection(0, editor, root, ((Map) m).root, equalsFn);
       return new Map<>(rootPrime == null ? Node.EMPTY : rootPrime, hashFn, equalsFn, isLinear());
     } else {
@@ -311,7 +303,7 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
 
   @Override
   public boolean equals(IMap<K, V> m, BiPredicate<V, V> valEquals) {
-    if (m instanceof Map) {
+    if (m instanceof Map && keyHash() == m.keyHash()) {
       return root.equals(((Map<K, V>) m).root, equalsFn, valEquals);
     } else {
       return Maps.equals(this, m, valEquals);

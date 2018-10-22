@@ -23,16 +23,12 @@ public interface ISet<V> extends
   /**
    * @return the hash function used by the set
    */
-  default ToIntFunction<V> valueHash() {
-    return Objects::hashCode;
-  }
+  ToIntFunction<V> valueHash();
 
   /**
    * @return the equality semantics used by the set
    */
-  default BiPredicate<V, V> valueEquality() {
-    return Objects::equals;
-  }
+  BiPredicate<V, V> valueEquality();
 
   /**
    * @return true, if the set contains {@code value}

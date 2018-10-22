@@ -2,6 +2,9 @@ package io.lacuna.bifurcan.hash;
 
 import java.nio.ByteBuffer;
 import java.util.Iterator;
+import java.util.PrimitiveIterator;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.ToIntFunction;
 
 /**
  * @author ztellman
@@ -16,6 +19,18 @@ public class PerlHash {
     return hash(seed, buf, buf.position(), buf.remaining());
   }
 
+  public static int hash(int seed, PrimitiveIterator.OfInt values) {
+    int key = seed;
+
+    while (values.hasNext()) {
+      key += values.nextInt();
+      key += key << 10;
+      key ^= key >>> 6;
+    }
+
+    return finalize(key);
+  }
+
   public static int hash(int seed, ByteBuffer buf, int offset, int len) {
     int key = seed;
 
@@ -25,11 +40,8 @@ public class PerlHash {
       key += key << 10;
       key ^= key >>> 6;
     }
-    key += key << 3;
-    key ^= key >>> 11;
-    key += key << 15;
 
-    return key;
+    return finalize(key);
   }
 
   public static int hash(int seed, Iterator<ByteBuffer> buffers) {
@@ -43,10 +55,14 @@ public class PerlHash {
         key ^= key >>> 6;
       }
     }
+
+    return finalize(key);
+  }
+  
+  private static int finalize(int key) {
     key += key << 3;
     key ^= key >>> 11;
     key += key << 15;
-
     return key;
   }
 }

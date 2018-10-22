@@ -880,7 +880,7 @@ public class MapNodes {
 
     INode<K, V> n;
     int idx;
-    PrimitiveIterator.OfInt masks = Util.masks(a.nodemap | a.datamap | b.nodemap | b.datamap);
+    PrimitiveIterator.OfInt masks = Util.masks(a.nodemap | a.datamap);
     while (masks.hasNext()) {
       int mask = masks.nextInt();
       int state = mergeState(mask, a.nodemap, a.datamap, b.nodemap, b.datamap);
@@ -917,10 +917,8 @@ public class MapNodes {
             result = transferEntry(mask, a, result);
           }
           break;
-        case NONE_ENTRY:
-        case NONE_NODE:
-        case NONE_NONE:
-          break;
+        default:
+          throw new IllegalStateException();
       }
     }
 
@@ -1015,6 +1013,8 @@ public class MapNodes {
             result = transferEntry(mask, a, result);
           }
           break;
+        default:
+          throw new IllegalStateException();
       }
     }
 

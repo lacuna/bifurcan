@@ -44,6 +44,28 @@
 
 ;;;
 
+(defn walk-int-nodes [^io.lacuna.bifurcan.nodes.IntMapNodes$Node n]
+  (when n
+    {:size (.size n)
+     :prefix (.prefix n)
+     :offset (.offset n)
+     :entries (->> n
+                .datamap
+                io.lacuna.bifurcan.nodes.Util/masks
+                iterator-seq
+                (map #(.key n %)))
+     :children (->> n
+                 .nodemap
+                 io.lacuna.bifurcan.nodes.Util/masks
+                iterator-seq
+                (map #(.node n %))
+                (map walk-int-nodes))}))
+
+(defn pprint-int-map [m]
+  (pprint
+    [(walk-int-nodes (.neg m))
+     (walk-int-nodes (.pos m))]))
+
 (defn walk-sorted-nodes [^io.lacuna.bifurcan.nodes.SortedMapNodes$Node n]
   (when n
     {:color (str (.c n))
@@ -429,6 +451,30 @@
     (= (->> m .keys .toSet (drop-while #(< % k)) first)
       (some-> m (.ceil k) .key))))
 
+;;; SortedMap
+
+(defspec test-sorted-map-slice iterations
+  (prop/for-all [start (gen/choose 1 1e4)
+                 end (gen/choose 1 1e4)]
+    (let [start (min start end)
+          end   (max start end)
+          s     (range (* 2 end))]
+      (map=
+        (->> s (drop start) (take (inc (- end start))) (map #(vector % %)) (into {}))
+        (-> (->> s (map #(vector % %)) (into {})) SortedMap/from (.slice start end))))))
+
+(defspec test-sorted-map-floor iterations
+  (prop/for-all [m (sorted-map-gen #(SortedMap.))
+                 k gen/pos-int]
+    (= (->> m .keys .toSet (take-while #(<= % k)) last)
+      (some-> m (.floor k) .key))))
+
+(defspec test-sorted-map-ceil iterations
+  (prop/for-all [m (sorted-map-gen #(SortedMap.))
+                 k gen/pos-int]
+    (= (->> m .keys .toSet (drop-while #(< % k)) first)
+      (some-> m (.ceil k) .key))))
+
 ;;; FloatMap
 
 (defspec test-float-map-slice iterations
@@ -467,45 +513,45 @@
 (defn set-union [sets init]
   (reduce #(.union ^ISet %1 %2) init sets))
 
-(defspec test-linear-map-split iterations
-  (prop/for-all [m (map-gen #(LinearMap.))]
-    (-> m (.split 2) (map-union (LinearMap.)))))
+(u/def-collection-check test-linear-map-split iterations map-actions
+  [m (LinearMap.) bifurcan-map]
+  (= m (-> m (.split 2) (map-union (LinearMap.)))))
 
-(defspec test-map-split iterations
-  (prop/for-all [m (map-gen #(Map.))]
-    (-> m (.split 2) (map-union (Map.)))))
+(u/def-collection-check test-map-split iterations map-actions
+  [m (Map.) bifurcan-map]
+  (= m (-> m (.split 2) (map-union (Map.)))))
 
-(defspec test-sorted-map-split iterations
-  (prop/for-all [m (sorted-map-gen #(SortedMap.))]
-    (-> m (.split 2) (map-union (SortedMap.)))))
+(u/def-collection-check test-sorted-map-split iterations map-actions
+  [m (SortedMap.) bifurcan-sorted-map]
+  (= m (-> m (.split 2) (map-union (SortedMap.)))))
 
-(defspec test-int-map-split iterations
-  (prop/for-all [m (int-map-gen #(IntMap.))]
-    (-> m (.split 2) (map-union (IntMap.)))))
+(u/def-collection-check test-int-map-split iterations map-actions
+  [m (IntMap.) int-map]
+  (= m (-> m (.split 2) (map-union (IntMap.)))))
 
-(defspec test-float-map-split iterations
-  (prop/for-all [m (float-map-gen #(FloatMap.))]
-    (-> m (.split 2) (map-union (FloatMap.)))))
+(u/def-collection-check test-float-map-split iterations float-map-actions
+  [m (FloatMap.) float-map]
+  (= m (-> m (.split 2) (map-union (FloatMap.)))))
 
-(defspec test-linear-list-split iterations
-  (prop/for-all [l (list-gen #(LinearList.))]
-    (-> l (.split 2) into-array Lists/concat)))
+(u/def-collection-check test-linear-list-split iterations list-actions
+  [l (LinearList.) bifurcan-list]
+  (= l (-> l (.split 2) into-array Lists/concat)))
 
-(defspec test-list-split iterations
-  (prop/for-all [l (list-gen #(List.))]
-    (-> l (.split 2) into-array Lists/concat)))
+(u/def-collection-check test-list-split iterations list-actions
+  [l (List.) bifurcan-list]
+  (= l (-> l (.split 2) into-array Lists/concat)))
 
-(defspec test-virtual-list-split iterations
-  (prop/for-all [l (list-gen #(Lists/from []))]
-    (-> l (.split 2) into-array Lists/concat)))
+(u/def-collection-check test-list-split iterations list-actions
+  [l (Lists/from []) bifurcan-list]
+  (= l (-> l (.split 2) into-array Lists/concat)))
 
-(defspec test-linear-set-split iterations
-  (prop/for-all [s (set-gen #(LinearSet.))]
-    (-> s (.split 2) (set-union (LinearSet.)))))
+(u/def-collection-check test-linear-set-split iterations set-actions
+  [s (LinearSet.) bifurcan-set]
+  (= s (-> s (.split 2) (set-union (LinearSet.)))))
 
-(defspec test-set-split iterations
-  (prop/for-all [s (set-gen #(Set.))]
-    (-> s (.split 2) (set-union (Set.)))))
+(u/def-collection-check test-linear-set-split iterations set-actions
+  [s (Set.) bifurcan-set]
+  (= s (-> s (.split 2) (set-union (Set.)))))
 
 ;; IList concat
 

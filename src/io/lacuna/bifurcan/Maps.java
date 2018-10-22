@@ -20,6 +20,10 @@ public class Maps {
 
   public static BinaryOperator MERGE_LAST_WRITE_WINS = (a, b) -> b;
 
+  public static ToIntFunction DEFAULT_HASH_CODE = Objects::hashCode;
+
+  public static BiPredicate DEFAULT_EQUALS = Objects::equals;
+
   public static final IMap EMPTY = new IMap() {
     @Override
     public Object get(Object key, Object defaultValue) {
@@ -64,6 +68,16 @@ public class Maps {
     @Override
     public IMap forked() {
       return this;
+    }
+
+    @Override
+    public ToIntFunction keyHash() {
+      return Maps.DEFAULT_HASH_CODE;
+    }
+
+    @Override
+    public BiPredicate keyEquality() {
+      return Maps.DEFAULT_EQUALS;
     }
 
     @Override
@@ -141,7 +155,12 @@ public class Maps {
     private final boolean linear;
 
     public VirtualMap(IMap<K, V> base) {
-      this(base, Maps.EMPTY, Sets.EMPTY, Sets.EMPTY, false);
+      this(
+        base,
+        new Map<>(base.keyHash(), base.keyEquality()),
+        new Set<>(base.keyHash(), base.keyEquality()),
+        new Set<>(base.keyHash(), base.keyEquality()),
+        false);
     }
 
     private VirtualMap(IMap<K, V> base, IMap<K, V> added, ISet<K> removed, ISet<K> shadowed, boolean linear) {
@@ -298,6 +317,16 @@ public class Maps {
     }
 
     @Override
+    public ToIntFunction<K> keyHash() {
+      return base.keyHash();
+    }
+
+    @Override
+    public BiPredicate<K, K> keyEquality() {
+      return base.keyEquality();
+    }
+
+    @Override
     public int hashCode() {
       return (int) Maps.hash(this);
     }
@@ -345,7 +374,8 @@ public class Maps {
   }
 
   public static <K, V> long hash(IMap<K, V> m) {
-    return hash(m, e -> (Objects.hash(e.key()) * 31) ^ Objects.hash(e.value()), (a, b) -> a + b);
+    ToIntFunction hashFn = m.keyHash();
+    return hash(m, e -> (hashFn.applyAsInt(e.key()) * 31) ^ Objects.hashCode(e.value()), (a, b) -> a + b);
   }
 
   public static <K, V> long hash(IMap<K, V> m, ToLongFunction<IEntry<K, V>> hash, LongBinaryOperator combiner) {
@@ -423,6 +453,16 @@ public class Maps {
       @Override
       public long size() {
         return keys.size();
+      }
+
+      @Override
+      public ToIntFunction<K> keyHash() {
+        return keys.valueHash();
+      }
+
+      @Override
+      public BiPredicate<K, K> keyEquality() {
+        return keys.valueEquality();
       }
 
       @Override
@@ -576,6 +616,7 @@ public class Maps {
   }
 
   static <K, V> IMap<K, V> intersection(IMap<K, V> accumulator, IMap<K, V> map, ISet<K> keys) {
+    System.out.println("sup");
     if (map.size() < keys.size()) {
       for (IEntry<K, V> entry : map.entries()) {
         if (keys.contains(entry.key())) {
@@ -591,6 +632,14 @@ public class Maps {
       }
     }
     return accumulator;
+  }
+
+  public static <K, V> boolean equivEquality(IMap<K, ?> a, IMap<K, ?> b) {
+    return a.keyHash() == b.keyHash() && a.keyEquality() == b.keyEquality();
+  }
+
+  public static <K, V> boolean equivEquality(IMap<K, ?> a, ISet<K> b) {
+    return a.keyHash() == b.valueHash() && a.keyEquality() == b.valueEquality();
   }
 
   static <K, V> IMap<K, V> merge(IMap<K, V> a, IMap<K, V> b, BinaryOperator<V> mergeFn) {
