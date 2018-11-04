@@ -3,7 +3,7 @@
 (cemerick.pomegranate.aether/register-wagon-factory!
   "http" #(org.apache.maven.wagon.providers.http.HttpWagon.))
 
-(defproject io.lacuna/bifurcan "0.1.0-alpha6"
+(defproject io.lacuna/bifurcan "0.1.0"
   :java-source-paths ["src"]
   :dependencies []
   :test-selectors {:default   #(not
@@ -38,6 +38,7 @@
                        "-XX:+UseG1GC"
                        "-XX:-OmitStackTraceInFastThrow"
                        "-ea:io.lacuna..."
+                       "-Xmx4g"
 
                        #_"-XX:+UnlockDiagnosticVMOptions"
                        #_"-XX:+PrintAssembly"

@@ -226,19 +226,15 @@ public class Graphs {
   /// undirected graphs
 
   public static <V> Set<Set<V>> connectedComponents(IGraph<V, ?> graph) {
-    if (graph.isDirected()) {
-      throw new IllegalArgumentException("graph must be undirected, try Graphs.stronglyConnectedComponents instead");
-    }
-
     LinearSet<V> traversed = new LinearSet<>((int) graph.vertices().size(), graph.vertexHash(), graph.vertexEquality());
     Set<Set<V>> result = new Set<Set<V>>().linear();
 
     for (V seed : graph.vertices()) {
       if (!traversed.contains(seed)) {
-        traversed.add(seed);
         Set<V> group = new Set<>(graph.vertexHash(), graph.vertexEquality()).linear();
         bfsVertices(LinearList.of(seed), graph::out).forEach(group::add);
         result.add(group.forked());
+        group.forEach(traversed::add);
       }
     }
 

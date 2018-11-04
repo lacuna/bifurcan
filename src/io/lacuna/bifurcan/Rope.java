@@ -15,7 +15,6 @@ import java.util.stream.IntStream;
 
 import static io.lacuna.bifurcan.nodes.RopeNodes.MAX_CHUNK_CODE_UNITS;
 import static java.lang.Character.isHighSurrogate;
-import static java.lang.Character.isLowSurrogate;
 
 /**
  * A tree-based immutable string representation, indexed on both full Unicode code points and Java's UTF-16 code
@@ -25,7 +24,7 @@ import static java.lang.Character.isLowSurrogate;
  *
  * @author ztellman
  */
-public class Rope implements Comparable<Rope>, ILinearizable<Rope>, IForkable<Rope> {
+public class Rope implements Comparable<Rope> {
 
   public static final Rope EMPTY = Rope.from("");
 
@@ -203,12 +202,10 @@ public class Rope implements Comparable<Rope>, ILinearizable<Rope>, IForkable<Ro
     return editor != null;
   }
 
-  @Override
   public Rope forked() {
     return isLinear() ? new Rope(root, false) : this;
   }
 
-  @Override
   public Rope linear() {
     return isLinear() ? this : new Rope(root, true);
   }

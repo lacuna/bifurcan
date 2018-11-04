@@ -11,7 +11,7 @@ import static io.lacuna.bifurcan.Graphs.MERGE_LAST_WRITE_WINS;
 /**
  * @author ztellman
  */
-public interface IGraph<V, E> extends ILinearizable<IGraph<V, E>>, IForkable<IGraph<V, E>> {
+public interface IGraph<V, E> extends ICollection<IGraph<V, E>, V> {
 
   /**
    * @return the set of all vertices in the graph
@@ -79,6 +79,14 @@ public interface IGraph<V, E> extends ILinearizable<IGraph<V, E>>, IForkable<IGr
     return vertices().nth(index);
   }
 
+  default Iterator<V> iterator() {
+    return vertices().iterator();
+  }
+
+  default long size() {
+    return vertices().size();
+  }
+
   /**
    * @return a graph containing only the specified vertices and the edges between them
    */
@@ -116,31 +124,31 @@ public interface IGraph<V, E> extends ILinearizable<IGraph<V, E>>, IForkable<IGr
   }
 
   /**
-   * @return
-   */
-  boolean isLinear();
-
-  /**
-   * @return
+   * @return whether the graph is directed
    */
   boolean isDirected();
 
   /**
-   * @return
+   * @return the hash function for vertices
    */
   ToIntFunction<V> vertexHash();
 
   /**
-   * @return
+   * @return the equality check for vertices
    */
   BiPredicate<V, V> vertexEquality();
 
   /**
-   * @return
+   * @return a transposed version of the graph
    */
   IGraph<V, E> transpose();
 
-  IGraph<V, E> clone();
+  /**
+   * @return a singleton list of the graph, unsplit.  The graph can be split into separate pieces in linear time using {@code Graphs.connectedComponents()}.
+   */
+  default IList<? extends IGraph<V, E>> split(int parts) {
+    return List.of(this);
+  }
 
   // polymorphic utility methods
 

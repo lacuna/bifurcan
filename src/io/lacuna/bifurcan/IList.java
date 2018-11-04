@@ -2,14 +2,12 @@ package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.Lists.VirtualList;
 
-import java.lang.reflect.Array;
 import java.util.Iterator;
 import java.util.Spliterator;
 import java.util.Spliterators;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.IntFunction;
-import java.util.function.LongFunction;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -19,31 +17,8 @@ import java.util.stream.StreamSupport;
  */
 @SuppressWarnings("unchecked")
 public interface IList<V> extends
-  ISplittable<IList<V>>,
-  Iterable<V>,
-  IForkable<IList<V>>,
-  ILinearizable<IList<V>> {
-
-  /**
-   * @return the element at {@code idx}
-   * @throws IndexOutOfBoundsException when {@code idx} is not within {@code [0, size-1]}
-   */
-  V nth(long idx);
-
-  /**
-   * @return the element at {@code idx}, or {@code defaultValue} if it is not within {@code [0, size-1]}
-   */
-  default V nth(long idx, V defaultValue) {
-    if (idx < 0 || idx >= size()) {
-      return defaultValue;
-    }
-    return nth(idx);
-  }
-
-  /**
-   * @return the length of the list
-   */
-  long size();
+  ICollection<IList<V>, V>,
+  Iterable<V> {
 
   default IList<V> update(long idx, Function<V, V> updateFn) {
     return set(idx, updateFn.apply(nth(idx)));
@@ -199,8 +174,6 @@ public interface IList<V> extends
   default IList<V> linear() {
     return new VirtualList<V>(this).linear();
   }
-
-  IList<V> clone();
 
   default boolean equals(Object o, BiPredicate<V, V> equals) {
     if (o instanceof IList) {

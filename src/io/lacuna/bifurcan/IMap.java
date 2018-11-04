@@ -13,10 +13,7 @@ import java.util.stream.StreamSupport;
  */
 @SuppressWarnings("unchecked")
 public interface IMap<K, V> extends
-  Iterable<IEntry<K, V>>,
-  ISplittable<IMap<K, V>>,
-  ILinearizable<IMap<K, V>>,
-  IForkable<IMap<K, V>>,
+  ICollection<IMap<K, V>, IEntry<K, V>>,
   Function<K, V> {
 
   /**
@@ -72,11 +69,6 @@ public interface IMap<K, V> extends
   long indexOf(K key);
 
   /**
-   * @return the nth entry in the map
-   */
-  IEntry<K, V> nth(long index);
-
-  /**
    * @return a set representing all keys in the map
    */
   default ISet<K> keys() {
@@ -89,11 +81,6 @@ public interface IMap<K, V> extends
   default IList<V> values() {
     return Lists.lazyMap(entries(), IEntry::value);
   }
-
-  /**
-   * @return the number of entries in the map
-   */
-  long size();
 
   /**
    * @param f   a function which transforms the values
@@ -269,8 +256,6 @@ public interface IMap<K, V> extends
       .map(ks -> Maps.from(ks, k -> get(k, null)))
       .collect(Lists.collector());
   }
-
-  IMap<K, V> clone();
 
   /**
    * @param m      another map

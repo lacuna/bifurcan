@@ -63,7 +63,7 @@
     IList
     ISet
     Set
-    ISplittable
+    ICollection
     LinearList
     LinearMap
     LinearSet
@@ -169,7 +169,7 @@
 (defn set-difference [^ISet a ^ISet b]
   (.difference a b))
 
-(defn split [^ISplittable c ^long parts]
+(defn split [^ICollection c ^long parts]
   (.split c parts))
 
 (defn consume-iterator [^Iterator it]

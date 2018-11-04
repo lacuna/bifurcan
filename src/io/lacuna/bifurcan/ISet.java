@@ -1,8 +1,6 @@
 package io.lacuna.bifurcan;
 
-import java.lang.reflect.Array;
 import java.util.Iterator;
-import java.util.Objects;
 import java.util.Spliterator;
 import java.util.Spliterators;
 import java.util.function.*;
@@ -14,10 +12,7 @@ import java.util.stream.StreamSupport;
  * @author ztellman
  */
 public interface ISet<V> extends
-  Iterable<V>,
-  ISplittable<ISet<V>>,
-  ILinearizable<ISet<V>>,
-  IForkable<ISet<V>>,
+  ICollection<ISet<V>, V>,
   Predicate<V> {
 
   /**
@@ -34,13 +29,6 @@ public interface ISet<V> extends
    * @return true, if the set contains {@code value}
    */
   boolean contains(V value);
-
-  /**
-   * s
-   *
-   * @return the number of elements in the set
-   */
-  long size();
 
   /**
    * @return an {@code IList} containing all the elements in the set
@@ -62,19 +50,6 @@ public interface ISet<V> extends
    * @return the position of {@code element} in {@code nth()}, or -1 if it is not present
    */
   long indexOf(V element);
-
-  /**
-   * @return the nth element in the set
-   */
-  V nth(long index);
-
-  default V nth(long index, V defaultValue) {
-    if (0 <= index && index < size()) {
-      return nth(index);
-    } else {
-      return defaultValue;
-    }
-  }
 
   /**
    * @return true if this set contains every element in {@code set}
@@ -212,8 +187,6 @@ public interface ISet<V> extends
   default ISet<V> linear() {
     return new Sets.VirtualSet<>(this).linear();
   }
-
-  ISet<V> clone();
 
   @Override
   default IList<? extends ISet<V>> split(int parts) {
