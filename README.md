@@ -82,7 +82,7 @@ Most libraries for "functional programming" provide a lazy list or stream constr
 
 Many modern data structure libraries also provide "parallel" collections, which make it easy to use multiple cores to process a single data structure.  However, these collections are simply normal data structures with an execution model bolted on, without any obvious way to disentangle the two.
 
-Rather than provide its own execution model, Bifurcan allows any collection to split into sub-collections using `split(k)`, which will return 1 to `k` pieces depending on its size.  The sub-collections can be processed and then merged using methods such as `concat`, `merge`, `union`, `intersection`, or `difference`.
+Rather than provide its own execution model, Bifurcan allows any collection to split into sub-collections using `split(k)`, which will return approximately `k` pieces, depending on its size.  The sub-collections can be processed and then merged using methods such as `concat`, `merge`, `union`, `intersection`, or `difference`.
 
 This separation of concerns provides greater flexibility, but also requires more work to get up and running.
 

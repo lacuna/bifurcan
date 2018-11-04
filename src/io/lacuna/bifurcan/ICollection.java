@@ -6,14 +6,12 @@ package io.lacuna.bifurcan;
 public interface ICollection<C, V> extends Iterable<V> {
 
   /**
-   * This returns a data structure which is <i>linear</i>, which is equivalent to Clojure's <i>transient</i>
-   * data structures: only the most recent reference to the data structure should be used.  If a linear data structure
-   * is modified (for instance, calling {@code addLast()} on an {@code IList}), we should only refer to the object returned
-   * by that method; anything else has undefined results.
-   * <p>
-   * The term "linear", as used here, does not completely align with the formal definition of <a href="https://en.wikipedia.org/wiki/Substructural_type_system#Linear_type_systems">linear types</a>
+   * This returns a data structure which is <i>linear</i>, or temporarily mutable.  The term "linear", as used here, does
+   * not completely align with the formal definition of <a href="https://en.wikipedia.org/wiki/Substructural_type_system#Linear_type_systems">linear types</a>
    * as used in type theory.  It is meant to describe the linear dataflow of the method calls, and as a converse to
    * "forked" data structures.
+   * <p>
+   * If {@code forked()} is called on a linear collection, all references to that linear collection should be discarded.
    * <p>
    * If the data structure is already linear, it will simply return itself.
    *
