@@ -52,7 +52,7 @@ public class Graphs {
     @Override
     public int hashCode() {
       if (hash == -1) {
-        hash = from.hashCode() ^ to.hashCode() ^ value.hashCode();
+        hash = Objects.hashCode(from) ^ Objects.hashCode(to) ^ Objects.hashCode(value);
       }
       return hash;
     }
