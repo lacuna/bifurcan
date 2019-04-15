@@ -18,7 +18,11 @@ This library provides high-quality Java implementations of mutable and immutable
 
 Rather than using the existing collection interfaces in `java.util` such as `List` or `Map`, it provides its own interfaces (`IList`, `IMap`, `ISet`) that provide functional semantics - each update to a collection returns a reference to a new collection.  Each interface provides a method (`toList`, `toMap`, `toSet`) for coercing the collection to a read-only version of the standard Java interfaces.
 
-An in-depth comparison of Bifurcan to similar libraries on the JVM can be [found here](https://github.com/lacuna/bifurcan/blob/master/doc/comparison.md).
+### what makes this better?
+
+There are many existing implementations of "functional" (aka persistent, immutable) data structures on the JVM.  As shown in [these in-depth comparisons](https://github.com/lacuna/bifurcan/blob/master/doc/comparison.md), Bifurcan's performance is equivalent to the best existing implementations for basic operations, and significantly better for batch operations such as `union`, `intersection`, and `difference`.
+
+These optimized batch operations are [have a high degree of complexity](https://github.com/lacuna/bifurcan/blob/29cb1efa4e561312ed7678a03c5ccedafc56e47d/src/io/lacuna/bifurcan/nodes/IntMapNodes.java#L665-L923) and are difficult to test, so it's understandable other library authors haven't bothered.  Bifurcan relies on [extensive generative tests](https://github.com/lacuna/bifurcan/blob/29cb1efa4e561312ed7678a03c5ccedafc56e47d/test/bifurcan/collection_test.clj) to validate its implementation, which makes this additional complexity easier to manage.
 
 ### collections
 
@@ -34,7 +38,7 @@ An in-depth comparison of Bifurcan to similar libraries on the JVM can be [found
 
 Full documentation can be [found here](http://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/package-summary.html).
 
-### "linear" and "forked" collections
+### 'linear' and 'forked' collections
 
 If we pass a mutable data structure into a function, we have to know what that function intends to do with it.  If it updates the data structure, we cannot safely read from it afterwards.  If it stores the data structure, we cannot safely write to it afterwards.  In other words, to use a mutable data structure safely we must ensure it has a single owner.  Enforcing this may require us to hold a large amount of code in our head at once.
 
@@ -42,7 +46,7 @@ Immutable data structures free us from having to care.  Functions can update or 
 
 This freedom, however, comes at a cost.  Updates to immutable data structures require a subset of the structure to be copied, which is much more expensive than simply overwriting existing memory.
 
-If a data structure is referenced in multiple places, this is usually a cost worth paying.  However, in this case it's just wasteful:
+If a data structure is referenced in multiple places, this is usually a cost worth paying.  In this case, however, it's just wasteful:
 
 ```java
 Set<Long> set = new Set<>();
@@ -76,11 +80,11 @@ If we call `forked()` on this collection, it will be wrapped in an immutable fac
 
 ### no lazy collections
 
-Most libraries for "functional programming" provide a lazy list or stream construct.  However, this is less a data structure than a mechanism for control flow.  While useful, such a mechanism is out of scope for this library.
+Most libraries for "functional programming" provide a lazy list or stream construct, but this is less a data structure than a mechanism for control flow.  While useful, such a mechanism is out of scope for this library.
 
 ### splitting and merging
 
-Many modern data structure libraries also provide "parallel" collections, which make it easy to use multiple cores to process a single data structure.  However, these collections are simply normal data structures with an execution model bolted on, without any obvious way to disentangle the two.
+Many modern data structure libraries also provide "parallel" collections, which make it easy to use multiple cores to process a single data structure.  These collections, however, are simply normal data structures with an execution model bolted on, without any obvious way to disentangle the two.
 
 Rather than provide its own execution model, Bifurcan allows any collection to split into sub-collections using `split(k)`, which will return approximately `k` pieces, depending on its size.  The sub-collections can be processed and then merged using methods such as `concat`, `merge`, `union`, `intersection`, or `difference`.
 
