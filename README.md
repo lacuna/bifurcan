@@ -22,7 +22,7 @@ Rather than using the existing collection interfaces in `java.util` such as `Lis
 
 There are many existing implementations of "functional" (aka persistent, immutable) data structures on the JVM.  As shown in [these in-depth comparisons](https://github.com/lacuna/bifurcan/blob/master/doc/comparison.md), Bifurcan's performance is equivalent to the best existing implementations for basic operations, and significantly better for batch operations such as `union`, `intersection`, and `difference`.
 
-These optimized batch operations are [have a high degree of complexity](https://github.com/lacuna/bifurcan/blob/29cb1efa4e561312ed7678a03c5ccedafc56e47d/src/io/lacuna/bifurcan/nodes/IntMapNodes.java#L665-L923) and are difficult to test, so it's understandable other library authors haven't bothered.  Bifurcan relies on [extensive generative tests](https://github.com/lacuna/bifurcan/blob/29cb1efa4e561312ed7678a03c5ccedafc56e47d/test/bifurcan/collection_test.clj) to validate its implementation, which makes this additional complexity easier to manage.
+These optimized batch operations [require a high degree of complexity](https://github.com/lacuna/bifurcan/blob/29cb1efa4e561312ed7678a03c5ccedafc56e47d/src/io/lacuna/bifurcan/nodes/IntMapNodes.java#L665-L923) and are difficult to test, so it's understandable other library authors haven't bothered.  Bifurcan relies on [extensive generative tests](https://github.com/lacuna/bifurcan/blob/29cb1efa4e561312ed7678a03c5ccedafc56e47d/test/bifurcan/collection_test.clj) to validate its implementation, which makes this additional complexity easier to manage.
 
 ### collections
 
