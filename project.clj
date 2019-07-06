@@ -17,21 +17,21 @@
              :dev    {:dependencies [;; for tests
                                      [org.clojure/clojure "1.8.0"]
                                      [org.clojure/test.check "0.9.0"]
-                                     [criterium "0.4.4"]
+                                     [criterium "0.4.5"]
                                      [potemkin "0.4.5"]
                                      [proteus "0.1.6"]
-                                     [byte-streams "0.2.3"]
-                                     [eftest "0.5.2"]
-                                     [virgil "0.1.8"]
+                                     [byte-streams "0.2.4"]
+                                     [eftest "0.5.8"]
+                                     [virgil "0.1.9"]
 
                                      ;; for comparative benchmarks
-                                     [io.usethesource/capsule "0.6.2"]
+                                     [io.usethesource/capsule "0.6.3"]
                                      [org.pcollections/pcollections "3.0.3"]
-                                     [io.vavr/vavr "0.9.2"]
-                                     [org.scala-lang/scala-library "2.13.0-M4"]
-                                     [org.functionaljava/functionaljava "4.8"]
+                                     [io.vavr/vavr "0.10.0"]
+                                     [org.scala-lang/scala-library "2.13.0"]
+                                     [org.functionaljava/functionaljava "4.8.1"]
                                      [org.eclipse.collections/eclipse-collections "9.2.0"]
-                                     [org.organicdesign/Paguro "3.1.0"]]}}
+                                     [org.organicdesign/Paguro "3.1.2"]]}}
   :aliases {"partest"   ["run" "-m" "bifurcan.run-tests"]
             "benchmark" ["run" "-m" "bifurcan.benchmark-test" "benchmark"]}
   :jvm-opts ^:replace ["-server"

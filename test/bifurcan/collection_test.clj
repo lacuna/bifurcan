@@ -3,9 +3,9 @@
    [clojure.test :refer :all]
    [clojure.test.check.generators :as gen]
    [clojure.test.check.properties :as prop]
-   [clojure.test.check.clojure-test :as ct :refer (defspec)]
+   [clojure.test.check.clojure-test :as ct :refer [defspec]]
    [clojure.pprint :refer [pprint]]
-   [bifurcan.test-utils :as u]
+   [bifurcan.test-utils :as u :refer [iterations]]
    [clojure.set :as set]
    [proteus :refer [let-mutable]])
   (:import
@@ -241,10 +241,6 @@
    :union        #(.union ^ISet %1 (construct-set %1 %2))
    :intersection #(.intersection ^ISet %1 (construct-set %1 %2))
    :difference   #(.difference ^ISet %1 (construct-set %1 %2))})
-
-;;;
-
-(def iterations 1e4)
 
 ;; Generators
 

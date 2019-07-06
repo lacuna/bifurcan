@@ -6,6 +6,8 @@
    [clojure.test.check.properties :as prop]
    [clojure.test.check.clojure-test :as ct :refer (defspec)]))
 
+(def iterations 1e4)
+
 (defn actions->generator [actions]
   (->> actions
     (map

@@ -10,7 +10,7 @@ import java.util.function.BinaryOperator;
 import java.util.function.ToIntFunction;
 
 /**
- * A red-black tree based on Germane 2004 (http://matt.might.net/papers/germane2014deletion.pdf)
+ * A red-black tree based on <a href="http://matt.might.net/papers/germane2014deletion.pdf">Germane 2014</a>.
  */
 public class SortedMap<K, V> implements ISortedMap<K, V> {
 
@@ -20,9 +20,11 @@ public class SortedMap<K, V> implements ISortedMap<K, V> {
   private int hash = -1;
 
   public SortedMap() {
-    this.root = SortedMapNodes.EMPTY_NODE;
-    this.comparator = (Comparator<K>) Comparator.naturalOrder();
-    this.editor = null;
+    this(SortedMapNodes.EMPTY_NODE, false, (Comparator<K>) Comparator.naturalOrder());
+  }
+
+  public SortedMap(Comparator<K> comparator) {
+    this(SortedMapNodes.EMPTY_NODE, false, comparator);
   }
 
   public static <K, V> SortedMap<K, V> from(java.util.Map<K, V> m) {
@@ -91,7 +93,7 @@ public class SortedMap<K, V> implements ISortedMap<K, V> {
   }
 
   @Override
-  public IList<? extends IMap<K, V>> split(int parts) {
+  public List<SortedMap<K, V>> split(int parts) {
     IList<Node<K, V>> acc = new LinearList<>();
     root.split(Math.max(1, (int) Math.ceil((double) root.size / parts)), acc);
 
@@ -101,7 +103,7 @@ public class SortedMap<K, V> implements ISortedMap<K, V> {
   }
 
   @Override
-  public IMap<K, V> put(K key, V value, BinaryOperator<V> merge) {
+  public SortedMap<K, V> put(K key, V value, BinaryOperator<V> merge) {
     Node<K, V> rootPrime = root.put(key, value, merge, comparator);
     //rootPrime.checkInvariant();
     if (isLinear()) {
@@ -114,7 +116,7 @@ public class SortedMap<K, V> implements ISortedMap<K, V> {
   }
 
   @Override
-  public IMap<K, V> remove(K key) {
+  public SortedMap<K, V> remove(K key) {
     Node<K, V> rootPrime = root.remove(key, comparator);
     //rootPrime.checkInvariant();
     if (isLinear()) {

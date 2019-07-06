@@ -1,14 +1,9 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.utils.Functions;
-
-import java.util.Iterator;
-import java.util.Objects;
 import java.util.function.BiPredicate;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.function.ToIntFunction;
-import java.util.stream.Collectors;
 
 /**
  * @author ztellman
@@ -60,7 +55,7 @@ public class Graph<V, E> implements IGraph<V, E> {
   @Override
   public Iterable<IEdge<V, E>> edges() {
     return () -> edges.stream()
-      .map(e -> (IEdge<V, E>) new Graphs.Edge<>(e.value(), e.key().v, e.key().w))
+      .map(e -> (IEdge<V, E>) new Graphs.UndirectedEdge<>(e.value(), e.key().v, e.key().w))
       .iterator();
   }
 
@@ -190,7 +185,7 @@ public class Graph<V, E> implements IGraph<V, E> {
     return new Graph<>(
       isLinear(),
       adjacent,
-      edges.mapValues((k, v) -> f.apply(new Graphs.Edge<V, E>(v, k.v, k.w))));
+      edges.mapValues((k, v) -> f.apply(new Graphs.DirectedEdge<V, E>(v, k.v, k.w))));
   }
 
   @Override

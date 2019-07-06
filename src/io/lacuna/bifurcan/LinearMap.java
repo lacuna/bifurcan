@@ -591,6 +591,8 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
 
   private void putTable(int hash, int keyIndex, int tableIndex) {
     int tombstoneIdx = -1;
+
+    // TODO: remove abs
     for (int idx = tableIndex, dist = probeDistance(hash, tableIndex), abs = 0; ; idx = nextIndex(idx), dist++, abs++) {
       long row = table[idx];
       int currHash = Row.hash(row);

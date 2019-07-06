@@ -10,4 +10,6 @@ public interface IEdge<V, E> {
   V to();
 
   E value();
+
+  boolean isDirected();
 }

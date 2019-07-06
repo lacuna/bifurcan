@@ -1,11 +1,11 @@
 (ns bifurcan.run-tests
   (:require
-   [bifurcan.collection-test :as ct]
+   [bifurcan.test-utils :as utils]
    [eftest.runner :as e]))
 
 (defn -main [& [iterations]]
   (when iterations
-    (alter-var-root #'ct/iterations (constantly (read-string iterations))))
+    (alter-var-root #'utils/iterations (constantly (read-string iterations))))
   (->> "test"
     e/find-tests
     (remove #(-> % meta (contains? :benchmark)))

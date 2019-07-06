@@ -1,9 +1,5 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.utils.Functions;
-import io.lacuna.bifurcan.utils.Iterators;
-
-import java.util.Iterator;
 import java.util.function.BiPredicate;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
@@ -48,7 +44,7 @@ public class DirectedGraph<V, E> implements IGraph<V, E> {
       .flatMap(outer -> outer.value()
         .entries()
         .stream()
-        .map(inner -> (IEdge<V, E>) new Graphs.Edge<V, E>(inner.value(), inner.key(), outer.key())))
+        .map(inner -> (IEdge<V, E>) new Graphs.DirectedEdge<V, E>(inner.value(), outer.key(), inner.key())))
       .iterator();
   }
 
@@ -88,7 +84,7 @@ public class DirectedGraph<V, E> implements IGraph<V, E> {
   public <U> DirectedGraph<V, U> mapEdges(Function<IEdge<V, E>, U> f) {
     return new DirectedGraph<>(
       isLinear(),
-      out.mapValues((u, m) -> m.mapValues((v, e) -> f.apply(new Graphs.Edge<>(e, u, v)))),
+      out.mapValues((u, m) -> m.mapValues((v, e) -> f.apply(new Graphs.DirectedEdge<>(e, u, v)))),
       in);
   }
 

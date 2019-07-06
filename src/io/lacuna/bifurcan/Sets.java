@@ -371,6 +371,73 @@ public class Sets {
     };
   }
 
+  /**
+   * @param set a Java set
+   * @return a Bifurcan {@code ISet} which does not support {@code nth()} or {@code indexOf()}
+   */
+  public static <V> ISet<V> from(java.util.Set<V> set) {
+    return new ISet<V>() {
+
+      @Override
+      public boolean contains(V value) {
+        return set.contains(value);
+      }
+
+      @Override
+      public long indexOf(V element) {
+        throw new UnsupportedOperationException();
+      }
+
+      @Override
+      public Iterator<V> iterator() {
+        return set.iterator();
+      }
+
+      @Override
+      public long size() {
+        return set.size();
+      }
+
+      @Override
+      public V nth(long idx) {
+        throw new UnsupportedOperationException();
+      }
+
+      @Override
+      public ISet<V> clone() {
+        return this;
+      }
+
+      @Override
+      public int hashCode() {
+        return (int) Sets.hash(this);
+      }
+
+      @Override
+      public ToIntFunction<V> valueHash() {
+        return Maps.DEFAULT_HASH_CODE;
+      }
+
+      @Override
+      public BiPredicate<V, V> valueEquality() {
+        return Maps.DEFAULT_EQUALS;
+      }
+
+      @Override
+      public boolean equals(Object obj) {
+        if (obj instanceof ISet) {
+          return Sets.equals(this, (ISet<V>) obj);
+        }
+        return false;
+      }
+
+      @Override
+      public String toString() {
+        return Sets.toString(this);
+      }
+    };
+  }
+
   public static <V> ISet<V> from(IList<V> elements, Predicate<V> contains) {
     return from(elements, contains, elements::iterator);
   }

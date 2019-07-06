@@ -3,8 +3,8 @@
    [clojure.test :refer :all]
    [clojure.test.check.generators :as gen]
    [clojure.test.check.properties :as prop]
-   [clojure.test.check.clojure-test :as ct :refer (defspec)]
-   [bifurcan.test-utils :as u]
+   [clojure.test.check.clojure-test :as ct :refer [defspec]]
+   [bifurcan.test-utils :as u :refer [iterations]]
    [clojure.set :as set])
   (:import
    [java.util.function
@@ -141,7 +141,7 @@
         (map seq)
         set))))
 
-(defspec test-strongly-connected-components 1e5
+(defspec test-strongly-connected-components iterations
   (prop/for-all [digraph gen-digraph]
     (= (naive-strongly-connected-components digraph)
       (->> (Graphs/stronglyConnectedComponents digraph false)
@@ -149,7 +149,7 @@
         (map ->set)
         set))))
 
-(defspec test-articulation-points 1e5
+(defspec test-articulation-points iterations
   (prop/for-all [graph gen-graph]
     (= (naive-articulation-points graph)
       (->> graph

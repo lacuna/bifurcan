@@ -1,13 +1,10 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.utils.Iterators;
-
 import java.util.*;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.ToDoubleFunction;
-import java.util.stream.Collectors;
 
 import static java.lang.Math.max;
 import static java.lang.Math.min;
@@ -19,19 +16,19 @@ public class Graphs {
 
   static final BinaryOperator MERGE_LAST_WRITE_WINS = (a, b) -> b;
 
-  public static class Edge<V, E> implements IEdge<V, E> {
+  public static class DirectedEdge<V, E> implements IEdge<V, E> {
     public final E value;
     public final V from, to;
     private int hash = -1;
 
-    public Edge(E value, V from, V to) {
+    public DirectedEdge(E value, V from, V to) {
       this.value = value;
       this.from = from;
       this.to = to;
     }
 
-    public static <V, E> Edge<V, E> create(IGraph<V, E> graph, V from, V to) {
-      return new Edge<>(graph.edge(from, to), from, to);
+    public static <V, E> DirectedEdge<V, E> create(IGraph<V, E> graph, V from, V to) {
+      return new DirectedEdge<>(graph.edge(from, to), from, to);
     }
 
     @Override
@@ -50,6 +47,66 @@ public class Graphs {
     }
 
     @Override
+    public boolean isDirected() {
+      return true;
+    }
+
+    @Override
+    public int hashCode() {
+      if (hash == -1) {
+        hash = Objects.hash(from, to, value);
+      }
+      return hash;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (obj == this) {
+        return true;
+      } else if (obj instanceof IEdge && ((IEdge) obj).isDirected()) {
+        IEdge<V, E> e = (IEdge<V, E>) obj;
+        return Objects.equals(from, e.from()) && Objects.equals(to, e.to()) && Objects.equals(value, e.value());
+      }
+      return false;
+    }
+  }
+
+  public static class UndirectedEdge<V, E> implements IEdge<V, E> {
+    public final E value;
+    public final V from, to;
+    private int hash = -1;
+
+    public UndirectedEdge(E value, V from, V to) {
+      this.value = value;
+      this.from = from;
+      this.to = to;
+    }
+
+    public static <V, E> UndirectedEdge<V, E> create(IGraph<V, E> graph, V from, V to) {
+      return new UndirectedEdge<>(graph.edge(from, to), from, to);
+    }
+
+    @Override
+    public V from() {
+      return from;
+    }
+
+    @Override
+    public V to() {
+      return to;
+    }
+
+    @Override
+    public E value() {
+      return value;
+    }
+
+    @Override
+    public boolean isDirected() {
+      return true;
+    }
+
+    @Override
     public int hashCode() {
       if (hash == -1) {
         hash = Objects.hashCode(from) ^ Objects.hashCode(to) ^ Objects.hashCode(value);
@@ -61,9 +118,10 @@ public class Graphs {
     public boolean equals(Object obj) {
       if (obj == this) {
         return true;
-      } else if (obj instanceof Edge) {
-        Edge<V, E> e = (Edge<V, E>) obj;
-        return Objects.equals(from, e.from) && Objects.equals(to, e.to) && Objects.equals(value, e.value);
+      } else if (obj instanceof IEdge && !((IEdge) obj).isDirected()) {
+        IEdge<V, E> e = (IEdge<V, E>) obj;
+        return ((Objects.equals(from, e.from()) && Objects.equals(to, e.to())) || (Objects.equals(from, e.to()) && Objects.equals(to, e.from())))
+          && Objects.equals(value, e.value());
       }
       return false;
     }
@@ -168,13 +226,25 @@ public class Graphs {
     }
   }
 
-  public static <V, E> Optional<IList<V>> shortestPath(IGraph<V, E> graph, V from, Predicate<V> accept, ToDoubleFunction<IEdge<V, E>> cost) {
-    return shortestPath(graph, LinearList.of(from), accept, cost);
+  /**
+   * @param graph a graph
+   * @param start the starting vertex
+   * @param accept a predicate for whether a vertex represents a search end state
+   * @param cost the cost associated with each edge
+   * @return the shortest path, if one exists, between the starting vertex and an accepted vertex, excluding trivial
+   * solutions where a starting vertex is accepted
+   */
+  public static <V, E> Optional<IList<V>> shortestPath(IGraph<V, E> graph, V start, Predicate<V> accept, ToDoubleFunction<IEdge<V, E>> cost) {
+    return shortestPath(graph, LinearList.of(start), accept, cost);
   }
 
   /**
+   * @param graph a graph
+   * @param start a list of starting vertices
+   * @param accept a predicate for whether a vertex represents a search end state
+   * @param cost the cost associated with each edge
    * @return the shortest path, if one exists, between a starting vertex and an accepted vertex, excluding trivial
-   * solutions where a starting vertex is accepted.
+   * solutions where a starting vertex is accepted
    */
   public static <V, E> Optional<IList<V>> shortestPath(IGraph<V, E> graph, Iterable<V> start, Predicate<V> accept, ToDoubleFunction<IEdge<V, E>> cost) {
     IMap<V, IMap<V, ShortestPathState<V>>> originStates = new LinearMap<>();
@@ -203,7 +273,7 @@ public class Graphs {
       }
 
       for (V v : graph.out(curr.node)) {
-        double edge = cost.applyAsDouble(new Edge<V, E>(graph.edge(curr.node, v), curr.node, v));
+        double edge = cost.applyAsDouble(new DirectedEdge<V, E>(graph.edge(curr.node, v), curr.node, v));
         if (edge < 0) {
           throw new IllegalArgumentException("negative edge weights are unsupported");
         }
@@ -225,7 +295,14 @@ public class Graphs {
 
   /// undirected graphs
 
+  /**
+   * @return sets of vertices, where each vertex can reach every other vertex within the set
+   */
   public static <V> Set<Set<V>> connectedComponents(IGraph<V, ?> graph) {
+    if (graph.isDirected()) {
+      throw new IllegalArgumentException("graph must be undirected");
+    }
+
     LinearSet<V> traversed = new LinearSet<>((int) graph.vertices().size(), graph.vertexHash(), graph.vertexEquality());
     Set<Set<V>> result = new Set<Set<V>>().linear();
 
@@ -241,6 +318,9 @@ public class Graphs {
     return result.forked();
   }
 
+  /**
+   * @return sets of vertices, where each vertex can reach every other vertex within the set, even if a single vertex is removed
+   */
   public static <V> Set<Set<V>> biconnectedComponents(IGraph<V, ?> graph) {
     Set<V> cuts = articulationPoints(graph);
 
@@ -280,6 +360,9 @@ public class Graphs {
     }
   }
 
+  /**
+   * @return all articulation or "cut" vertices, where the removal of that vertex will partition the graph
+   */
   public static <V> Set<V> articulationPoints(IGraph<V, ?> graph) {
     if (graph.isDirected()) {
       throw new IllegalArgumentException("graph must be undirected");
@@ -364,7 +447,7 @@ public class Graphs {
   /**
    * @param graph             a directed graph
    * @param includeSingletons if false, omits any singleton vertex sets
-   * @return a set of all strongly connected vertices in the graph
+   * @return sets of vertices, where each vertex can reach every other vertex within the set
    */
   public static <V, E> Set<Set<V>> stronglyConnectedComponents(IGraph<V, E> graph, boolean includeSingletons) {
 
@@ -449,12 +532,22 @@ public class Graphs {
     return result.forked();
   }
 
+  /**
+   *
+   * @param graph a directed graph
+   * @param includeSingletons if false, omits any subgraphs containing a single vertex
+   * @return a list of subgraphs, where all vertices within each subgraph can reach every other vertex
+   */
   public static <V, E> List<IGraph<V, E>> stronglyConnectedSubgraphs(IGraph<V, E> graph, boolean includeSingletons) {
     List<IGraph<V, E>> result = new List<IGraph<V, E>>().linear();
     stronglyConnectedComponents(graph, includeSingletons).forEach(s -> result.addLast(graph.select(s)));
     return result.forked();
   }
 
+  /**
+   * @param graph a directed graph
+   * @return a list of all cyclical paths through the graph
+   */
   public static <V, E> List<List<V>> cycles(IGraph<V, E> graph) {
 
     if (!graph.isDirected()) {

@@ -4,9 +4,8 @@
    [clojure.test :refer :all]
    [clojure.test.check.generators :as gen]
    [clojure.test.check.properties :as prop]
-   [clojure.test.check.clojure-test :as ct :refer (defspec)]
-   [bifurcan.test-utils :as u]
-   [bifurcan.collection-test :refer [iterations]])
+   [clojure.test.check.clojure-test :as ct :refer [defspec]]
+   [bifurcan.test-utils :as u :refer [iterations]])
   (:import
    [io.lacuna.bifurcan
     Rope]
@@ -31,16 +30,16 @@
        (and (Character/isBmpCodePoint %) (not (Character/isHighSurrogate (char %)))))
     (gen/choose 0 Character/MAX_CODE_POINT)))
 
-(defspec test-ascii-roundtrip 1e4
+(defspec test-ascii-roundtrip iterations
   (prop/for-all [s gen/string-ascii]
     (= s (-> s str->chunk chunk->str))))
 
-(defspec test-unicode-roundtrip 1e4
+(defspec test-unicode-roundtrip iterations
   (prop/for-all [s (gen/vector gen-code-point 0 32)]
     (let [s (codepoints->str s)]
       (= s (-> s str->chunk chunk->str)))))
 
-(defspec test-concat 1e4
+(defspec test-concat iterations
   (prop/for-all [a (gen/vector gen-code-point 0 32)
                  b (gen/vector gen-code-point 0 32)]
     (let [a (codepoints->str a)

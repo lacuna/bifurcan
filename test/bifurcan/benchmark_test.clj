@@ -579,9 +579,9 @@
 (def bifurcan-map (base-map "bifurcan.Map" Map))
 
 (def scala-map
-  {:label        "scala.ChampHashMap"
+  {:label        "scala.HashMap"
    :construct    construct-scala-map
-   :base         #(.newBuilder (scala.collection.immutable.ChampHashMap$/MODULE$))
+   :base         #(.newBuilder (scala.collection.immutable.HashMap$/MODULE$))
    :entries      generate-entries
    :lookup       #(doary [k %2] (.get ^scala.collection.immutable.Map %1 k))
    :iterator     #(.iterator ^scala.collection.immutable.Map %)
@@ -785,9 +785,9 @@
    :remove       #(.remove ^io.vavr.collection.Set %1 %2)})
 
 (def scala-set
-  {:label        "scala.ChampHashSet"
+  {:label        "scala.HashSet"
    :construct    construct-scala-collection
-   :base         #(.newBuilder (scala.collection.immutable.ChampHashSet$/MODULE$))
+   :base         #(.newBuilder (scala.collection.immutable.HashSet$/MODULE$))
    :entries      generate-entries
    :lookup       #(doary [k %2] (.contains ^scala.collection.immutable.Set %1 k))
    :iterator     #(.iterator ^scala.collection.immutable.Set %)
