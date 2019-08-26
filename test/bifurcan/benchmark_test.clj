@@ -1211,6 +1211,32 @@
 
 (defn -main [task & args]
   (case task
+    "help"
+    (let []
+      (println "lein benchmark")
+      (println "lein benchmark <n>")
+      (println "lein benchmark <n> <step>")
+      (println
+"    Runs benchmarks on all collections, and records performance data in
+    files in the directory benchmarks/data.  See below for a
+    description of <n> and <step>.")
+      (println)
+      (println "lein run -m bifurcan.benchmark-test benchmark-collection <n> <step> <collection-idx>")
+      (println
+"    Run benchmarks on the one kind of collection specified by
+    <collection-idx> (see the table below), and print the performance
+    data as a Clojure map to the standard output.  <n> is the maximum
+    collection size, e.g. 1000, and <step> >= 1 an integer specifying
+    how many sizes to run per power of 10, e.g. <step>=1 means 10,
+    100, 1000, <step>=4 means 10, 17, 31, 56, 100, 177, 316, 562,
+    1000.  The intermediate values between powers of 10 are equally
+    spaced on a logarithmic scale.")
+      (println)
+      (println "Table of <collection-idx> values:")
+      (dorun (map-indexed (fn [idx coll]
+                            (println (format "%3d %s" idx (:label coll))))
+                          all-colls)))
+
     "benchmark-collection"
     (let [[n step idx] args]
       (try

@@ -33,7 +33,8 @@
                                      [org.eclipse.collections/eclipse-collections "9.2.0"]
                                      [org.organicdesign/Paguro "3.1.2"]]}}
   :aliases {"partest"   ["run" "-m" "bifurcan.run-tests"]
-            "benchmark" ["run" "-m" "bifurcan.benchmark-test" "benchmark"]}
+            "benchmark" ["run" "-m" "bifurcan.benchmark-test" "benchmark"]
+            "help-benchmark" ["run" "-m" "bifurcan.benchmark-test" "help"]}
   :jvm-opts ^:replace ["-server"
                        "-XX:+UseG1GC"
                        "-XX:-OmitStackTraceInFastThrow"
