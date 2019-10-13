@@ -15,7 +15,6 @@ public class TieredDurableOutput implements DurableOutput {
 
   private final DurableOutput out;
   private final BufferDurableOutput buffer;
-  private final DurableConfig config;
 
   private final BlockType type;
   private final boolean checksum;
@@ -31,7 +30,6 @@ public class TieredDurableOutput implements DurableOutput {
 
     this.type = type;
     this.checksum = checksum;
-    this.config = config;
   }
 
   @Override

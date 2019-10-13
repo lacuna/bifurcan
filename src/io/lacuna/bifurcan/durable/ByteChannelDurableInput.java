@@ -61,8 +61,6 @@ public class ByteChannelDurableInput implements DurableInput {
       channel.position(offset + position);
       remaining = size - position;
     }
-
-    assert(position == position());
   }
 
   @Override

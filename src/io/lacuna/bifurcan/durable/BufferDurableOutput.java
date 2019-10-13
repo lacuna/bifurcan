@@ -43,7 +43,7 @@ public class BufferDurableOutput implements DurableOutput {
   }
 
   public Iterable<ByteBuffer> buffers() {
-    return buffers.stream().map(b -> b.duplicate().flip()).collect(Lists.linearCollector());
+    return buffers.stream().map(b -> (ByteBuffer) b.duplicate().flip()).collect(Lists.linearCollector());
   }
 
   @Override
