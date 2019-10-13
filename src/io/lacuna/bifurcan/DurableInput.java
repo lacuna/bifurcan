@@ -1,11 +1,11 @@
 package io.lacuna.bifurcan;
 
+import io.lacuna.bifurcan.durable.BlockPrefix;
 import io.lacuna.bifurcan.durable.Util;
 
 import java.io.Closeable;
 import java.io.DataInput;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.ByteBuffer;
 
 public interface DurableInput extends DataInput, Closeable, AutoCloseable {
@@ -15,6 +15,10 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
   }
 
   void seek(long position) throws IOException;
+
+  default void skip(long bytes) throws IOException {
+    seek(position() + bytes);
+  }
 
   long remaining();
 
@@ -46,5 +50,9 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
     byte[] encoded = new byte[readUnsignedShort()];
     readFully(encoded);
     return new String(encoded, Util.UTF_8);
+  }
+
+  default BlockPrefix readPrefix() throws IOException {
+    return BlockPrefix.read(this);
   }
 }

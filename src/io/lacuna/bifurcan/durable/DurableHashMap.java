@@ -25,27 +25,28 @@ public class DurableHashMap {
     }
   }
 
-  private static class Chunk<K, V> {
+  private static class Chunk<T, K, V> {
 
-    private final DurableConfig config;
-    private final int seed;
+    private final DurableConfig<T> config;
+    private final T keyType, valueType;
 
     private final IntMap<LinearList<Entry>> entries;
     private int size;
 
-    public Chunk(int seed, DurableConfig config) {
+    public Chunk(IList<Object> path, DurableConfig<T> config) {
       this.config = config;
-      this.seed = seed;
+      this.keyType = config.keyType(path);
+      this.valueType = config.valueType(path);
 
       this.entries = new IntMap<LinearList<Entry>>().linear();
     }
 
     public void add(K key, V value) throws IOException {
-      Iterable<ByteBuffer> k = config.serialize(key);
-      Iterable<ByteBuffer> v = config.serialize(value);
+      Iterable<ByteBuffer> k = config.serializeKeys(keyType, LinearList.of(key));
+      Iterable<ByteBuffer> v = config.serializeValues(valueType, LinearList.of(value));
 
       size += Util.size(k) + Util.size(v);
-      int hash = config.hash(seed, k.iterator());
+      int hash = config.keyHash(keyType, key);
       entries.getOrCreate((long) hash, LinearList::new).addLast(new Entry(hash, k, v));
     }
 
@@ -54,22 +55,22 @@ public class DurableHashMap {
     }
 
     public DurableInput close() throws IOException {
-      ByteBufferWritableChannel acc = new ByteBufferWritableChannel(config.defaultBuffersize);
+      ByteBufferWritableChannel acc = new ByteBufferWritableChannel(config.defaultBufferSize);
 
-      ByteChannelDurableOutput out = new ByteChannelDurableOutput(acc, config.defaultBuffersize);
+      ByteChannelDurableOutput out = new ByteChannelDurableOutput(acc, config.defaultBufferSize);
       for (LinearList<Entry> l : entries.values()) {
         for (Entry e : l) {
           out.writeInt(e.hash);
-          out.enterBlock(DurableOutput.BlockType.UNCOMPRESSED, false, config,
-            () -> out.write(e.key),
-            () -> out.write(e.value));
+          out.write(e.key);
+          out.write(e.value);
+
           free(e.key);
           free(e.value);
         }
       }
       out.close();
 
-      return ByteChannelDurableInput.from(acc.buffers(), config.defaultBuffersize);
+      return ByteChannelDurableInput.from(acc.buffers(), config.defaultBufferSize);
     }
   }
 

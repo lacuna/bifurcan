@@ -1,6 +1,5 @@
 package io.lacuna.bifurcan.durable;
 
-import io.lacuna.bifurcan.DurableConfig;
 import io.lacuna.bifurcan.DurableInput;
 import io.lacuna.bifurcan.allocator.SlabAllocator;
 
@@ -17,18 +16,20 @@ import static io.lacuna.bifurcan.allocator.SlabAllocator.free;
 public class ByteChannelDurableInput implements DurableInput {
 
   final SeekableByteChannel channel;
+  private final long offset, size;
+
   private final ByteBuffer buffer;
-  private long remaining, offset, size;
+  private boolean dirty;
+  private long remaining;
 
   public ByteChannelDurableInput(SeekableByteChannel channel, long offset, long size, int bufferSize) throws IOException {
     this.channel = channel;
     this.buffer = SlabAllocator.allocate(bufferSize);
     this.offset = offset;
     this.remaining = this.size = size;
+    this.dirty = true;
 
     channel.position(offset);
-
-    buffer.position(buffer.limit());
   }
 
   public static ByteChannelDurableInput open(Path path, int bufferSize) throws IOException {
@@ -46,19 +47,27 @@ public class ByteChannelDurableInput implements DurableInput {
 
   @Override
   public void seek(long position) throws IOException {
-    long delta = position - position();
-    if ((delta > 0 && delta <= buffer.remaining())
-      || (delta < 0 && -delta <= buffer.position())) {
-      buffer.position(buffer.position() + (int) delta);
+    assert(position >= 0 && position < size);
+
+    long bufferStart = size - remaining;
+    long bufferEnd = bufferStart + buffer.limit();
+
+    if (!dirty
+        && position >= bufferStart
+        && position < bufferEnd) {
+      buffer.position((int)(position - bufferStart));
     } else {
+      dirty = true;
       channel.position(offset + position);
-      buffer.position(buffer.limit());
+      remaining = size - position;
     }
+
+    assert(position == position());
   }
 
   @Override
   public long position() {
-    return (size - remaining) + buffer.remaining();
+    return (size - remaining) + (dirty ? 0 : buffer.position());
   }
 
   @Override
@@ -94,7 +103,7 @@ public class ByteChannelDurableInput implements DurableInput {
 
   @Override
   public long remaining() {
-    return remaining + buffer.remaining();
+    return remaining + (dirty ? 0 : buffer.remaining());
   }
 
   @Override
@@ -155,7 +164,7 @@ public class ByteChannelDurableInput implements DurableInput {
   ///
 
   private void checkRemaining(int bytes) throws IOException {
-    if (buffer.remaining() < bytes) {
+    if (dirty || buffer.remaining() < bytes) {
       read();
       if (buffer.remaining() < bytes) {
         throw new EOFException();
@@ -164,7 +173,12 @@ public class ByteChannelDurableInput implements DurableInput {
   }
 
   private void read() throws IOException {
-    buffer.compact();
+    if (dirty) {
+      buffer.position(0).limit(buffer.capacity());
+      dirty = false;
+    } else {
+      buffer.compact().limit(buffer.capacity());
+    }
     remaining -= channel.read(buffer);
     buffer.flip();
   }

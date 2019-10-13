@@ -1,23 +1,22 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.durable.ByteBufferWritableChannel;
-import io.lacuna.bifurcan.durable.ByteChannelDurableOutput;
-import io.lacuna.bifurcan.hash.PerlHash;
+import io.lacuna.bifurcan.durable.BlockPrefix;
+import io.lacuna.bifurcan.durable.BufferDurableOutput;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
+import java.util.Objects;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.function.ToIntBiFunction;
 
-public class DurableConfig {
+public class DurableConfig<T> {
 
-  public interface Serializer {
-    void serialize(Object o, DurableOutput out) throws IOException;
-  }
+  public interface Codec {
+    void write(IList<Object> elements, DurableOutput output);
 
-  public interface Deserializer {
-    Object deserialize(DurableInput in) throws IOException;
+    Iterator<Supplier<Object>> read(DurableInput input);
   }
 
   public static Object defaultCoercion(Object o) {
@@ -32,149 +31,157 @@ public class DurableConfig {
     }
   }
 
-  public static class Builder {
+  public static <T> Builder<T> builder() {
+    return new Builder<>();
+  }
 
-    private int compressedBlockSize = 16 << 10;
+  public static Builder<Void> selfDescribing(Codec selfDescribingCodec) {
+    return new Builder<Void>()
+        .keyType((path) -> null)
+        .valueType((path) -> null)
+        .keyCodec((type) -> selfDescribingCodec)
+        .valueCodec((type) -> selfDescribingCodec);
+  }
+
+  public static class Builder<T> {
+
     private int sortedChunkSize = 10 << 20;
     private int defaultBufferSize = 1 << 20;
 
-    private Serializer serialize;
-    private Deserializer deserialize;
-
     private Function<Object, Object> coerce = DurableConfig::defaultCoercion;
+    private ToIntBiFunction<T, Object> keyHash = (type, obj) -> Objects.hashCode(obj);
 
-    private ToIntBiFunction<Integer, Iterator<ByteBuffer>> hash = PerlHash::hash;
-    private Function<Iterator<ByteBuffer>, Iterator<ByteBuffer>> compress, decompress;
+    private Function<IList<Object>, T> keyType = null, valueType = null;
+    private Function<T, Codec> keyCodec = null, valueCodec = null;
 
-    public Builder compressedBlockSize(int compressedBlockSize) {
-      this.compressedBlockSize = compressedBlockSize;
-      return this;
-    }
-
-    public Builder sortedChunkSize(int sortedChunkSize) {
+    public Builder<T> sortedChunkSize(int sortedChunkSize) {
       this.sortedChunkSize = sortedChunkSize;
       return this;
     }
 
-    public Builder defaultBufferSize(int defaultBufferSize) {
+    public Builder<T> defaultBufferSize(int defaultBufferSize) {
       this.defaultBufferSize = defaultBufferSize;
       return this;
     }
 
-    public Builder serialize(Serializer serialize) {
-      this.serialize = serialize;
-      return this;
-    }
-
-    public Builder deserialize(Deserializer deserialize) {
-      this.deserialize = deserialize;
-      return this;
-    }
-
-    public Builder coerce(Function<Object, Object> coerce) {
+    public Builder<T> coerce(Function<Object, Object> coerce) {
       this.coerce = coerce;
       return this;
     }
 
-    public Builder hash(ToIntBiFunction<Integer, Iterator<ByteBuffer>> hash) {
-      this.hash = hash;
+    public Builder<T> keyHash(ToIntBiFunction<T, Object> keyHash) {
+      this.keyHash = keyHash;
       return this;
     }
 
-    public Builder compress(Function<Iterator<ByteBuffer>, Iterator<ByteBuffer>> compress) {
-      this.compress = compress;
+    public Builder<T> keyType(Function<IList<Object>, T> keyType) {
+      this.keyType = keyType;
       return this;
     }
 
-    public Builder decompress(Function<Iterator<ByteBuffer>, Iterator<ByteBuffer>> decompress) {
-      this.decompress = decompress;
+    public Builder<T> valueType(Function<IList<Object>, T> valueType) {
+      this.valueType = valueType;
       return this;
     }
 
-    public DurableConfig build() {
-      return new DurableConfig(
-        compressedBlockSize,
-        sortedChunkSize,
-        defaultBufferSize,
-        coerce,
-        serialize,
-        deserialize,
-        hash,
-        compress,
-        decompress);
+    public Builder<T> keyCodec(Function<T, Codec> keyCodec) {
+      this.keyCodec = keyCodec;
+      return this;
     }
 
+    public Builder<T> valueCodec(Function<T, Codec> valueCodec) {
+      this.valueCodec = valueCodec;
+      return this;
+    }
 
+    public DurableConfig<T> build() {
+      return new DurableConfig<T>(
+          sortedChunkSize,
+          defaultBufferSize,
+          coerce,
+          keyHash,
+          keyType,
+          valueType,
+          keyCodec,
+          valueCodec
+      );
+    }
   }
-
-  public final int compressedBlockSize;
 
   public final int sortedChunkSize;
+  public final int defaultBufferSize;
 
-  public final int defaultBuffersize;
+  private final Function<Object, Object> coerce;
+  private final ToIntBiFunction<T, Object> keyHash;
 
-  private final Serializer serialize;
-  private final Deserializer deserialize;
-  public final Function<Object, Object> coerce;
-
-  private final ToIntBiFunction<Integer, Iterator<ByteBuffer>> hash;
-  private final Function<Iterator<ByteBuffer>, Iterator<ByteBuffer>> compress, decompress;
+  private final Function<IList<Object>, T> keyType, valueType;
+  private final Function<T, Codec> keyCodec, valueCodec;
 
   public DurableConfig(
-    int compressedBlockSize,
-    int sortedChunkSize,
-    int defaultBuffersize,
-    Function<Object, Object> coerce,
-    Serializer serialize,
-    Deserializer deserialize,
-    ToIntBiFunction<Integer, Iterator<ByteBuffer>> hash,
-    Function<Iterator<ByteBuffer>, Iterator<ByteBuffer>> compress,
-    Function<Iterator<ByteBuffer>, Iterator<ByteBuffer>> decompress) {
-
-    this.compressedBlockSize = compressedBlockSize;
+      int sortedChunkSize,
+      int defaultBufferSize,
+      Function<Object, Object> coerce,
+      ToIntBiFunction<T, Object> keyHash,
+      Function<IList<Object>, T> keyType,
+      Function<IList<Object>, T> valueType,
+      Function<T, Codec> keyCodec,
+      Function<T, Codec> valueCodec) {
     this.sortedChunkSize = sortedChunkSize;
-    this.defaultBuffersize = defaultBuffersize;
-
+    this.defaultBufferSize = defaultBufferSize;
     this.coerce = coerce;
-    this.serialize = serialize;
-    this.deserialize = deserialize;
-
-    this.hash = hash;
-    this.compress = compress;
-    this.decompress = decompress;
+    this.keyHash = keyHash;
+    this.keyType = keyType;
+    this.valueType = valueType;
+    this.keyCodec = keyCodec;
+    this.valueCodec = valueCodec;
   }
 
-  public void serialize(Object o, DurableOutput out) throws IOException {
-    serialize.serialize(o, out);
+  public int keyHash(T keyType, Object key) {
+    return keyHash.applyAsInt(keyType, key);
   }
 
-  public Iterable<ByteBuffer> serialize(Object o) throws IOException {
-    ByteBufferWritableChannel bufs = new ByteBufferWritableChannel(defaultBuffersize);
-    serialize.serialize(o, new ByteChannelDurableOutput(bufs, defaultBuffersize));
-    bufs.close();
-    return bufs.buffers();
+  public T keyType(IList<Object> path) {
+    return keyType.apply(path);
   }
 
-  public Object deserialize(DurableInput in) throws IOException {
-    return deserialize.deserialize(in);
+  public T valueType(IList<Object> path) {
+    return valueType.apply(path);
   }
 
-  public int hash(int seed, Iterator<ByteBuffer> bytes) {
-    return hash.applyAsInt(seed, bytes);
+  public Iterator<Supplier<Object>> readKeys(T keyType, DurableInput input) {
+    return keyCodec.apply(keyType).read(input);
   }
 
-  public boolean useCompression() {
-    return compress != null;
+  public Object readKey(T keyType, DurableInput input) {
+    return readKeys(keyType, input).next().get();
   }
 
-  public Iterator<ByteBuffer> compress(Iterator<ByteBuffer> bytes) {
-    if (compress == null) {
-      throw new IllegalStateException("no available compression mechanism");
-    }
-    return compress.apply(bytes);
+  public Iterator<Supplier<Object>> readValues(T keyType, DurableInput input) {
+    return valueCodec.apply(keyType).read(input);
   }
 
-  public Iterator<ByteBuffer> decompress(Iterator<ByteBuffer> bytes) {
-    return decompress.apply(bytes);
+  public void writeKeys(T keyType, DurableOutput output, IList<Object> keys) throws IOException {
+    DurableOutput block = output.enterBlock(BlockPrefix.BlockType.KEYS, false, this);
+    keyCodec.apply(keyType).write(keys, block);
+    block.exitBlock();
   }
+
+  public Iterable<ByteBuffer> serializeKeys(T keyType, IList<Object> keys) throws IOException {
+    BufferDurableOutput out = new BufferDurableOutput(defaultBufferSize);
+    writeKeys(keyType, out, keys);
+    return out.buffers();
+  }
+
+  public void writeValues(T valueType, DurableOutput output, IList<Object> keys) throws IOException {
+    DurableOutput block = output.enterBlock(BlockPrefix.BlockType.VALUES, true, this);
+    valueCodec.apply(valueType).write(keys, block);
+    block.exitBlock();
+  }
+
+  public Iterable<ByteBuffer> serializeValues(T valueType, IList<Object> keys) throws IOException {
+    BufferDurableOutput out = new BufferDurableOutput(defaultBufferSize);
+    writeValues(valueType, out, keys);
+    return out.buffers();
+  }
+
 }

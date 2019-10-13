@@ -52,10 +52,10 @@ public class DurableInputPool implements Closeable {
       throw new IllegalArgumentException("byte range not within [0, FILE_SIZE)");
     }
     if (size <= Integer.MAX_VALUE) {
-      return ByteChannelDurableInput.from(LinearList.of(acquireBuffer(position, size)), config.defaultBuffersize);
+      return ByteChannelDurableInput.from(LinearList.of(acquireBuffer(position, size)), config.defaultBufferSize);
     } else {
       SeekableByteChannel c = acquireChannel();
-      return new ByteChannelDurableInput(c, position, size, config.defaultBuffersize);
+      return new ByteChannelDurableInput(c, position, size, config.defaultBufferSize);
     }
   }
 

@@ -1,8 +1,5 @@
 package io.lacuna.bifurcan.durable;
 
-import io.lacuna.bifurcan.DurableOutput.BlockType;
-import io.lacuna.bifurcan.utils.Bits;
-
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
@@ -13,10 +10,20 @@ import static io.lacuna.bifurcan.durable.Util.readPrefixedVLQ;
 import static io.lacuna.bifurcan.durable.Util.writePrefixedVLQ;
 import static io.lacuna.bifurcan.utils.Bits.test;
 
-public class Prefix {
+public class BlockPrefix {
 
-  private static final BlockType[] TYPES =
-    new BlockType[]{
+  public enum BlockType {
+    KEYS,
+    VALUES,
+    HASH_MAP,
+    SORTED_MAP,
+    HASH_SET,
+    SORTED_SET,
+    LIST,
+    SEQUENCE
+  }
+
+  private static final BlockType[] TYPES = new BlockType[]{
       BlockType.HASH_MAP,
       BlockType.SORTED_MAP,
       BlockType.HASH_SET,
@@ -28,13 +35,13 @@ public class Prefix {
   public final BlockType type;
   public final OptionalInt checksum;
 
-  public Prefix(long length, BlockType type, int checksum) {
+  public BlockPrefix(long length, BlockType type, int checksum) {
     this.length = length;
     this.type = type;
     this.checksum = OptionalInt.of(checksum);
   }
 
-  public Prefix(long length, BlockType type) {
+  public BlockPrefix(long length, BlockType type) {
     this.length = length;
     this.type = type;
     this.checksum = OptionalInt.empty();
@@ -47,11 +54,11 @@ public class Prefix {
 
   @Override
   public boolean equals(Object obj) {
-    if (obj instanceof Prefix) {
-      Prefix p = (Prefix) obj;
+    if (obj instanceof BlockPrefix) {
+      BlockPrefix p = (BlockPrefix) obj;
       return length == p.length
-        && type == p.type
-        && checksum.equals(p.checksum);
+          && type == p.type
+          && checksum.equals(p.checksum);
     }
     return false;
   }
@@ -61,7 +68,7 @@ public class Prefix {
     return "[ length=" + length + ", type=" + type + (checksum.isPresent() ? ", checksum=" + checksum.getAsInt() : "") + " ]";
   }
 
-  public static Prefix read(DataInput in) throws IOException {
+  public static BlockPrefix read(DataInput in) throws IOException {
     byte firstByte = in.readByte();
 
     long length;
@@ -69,10 +76,10 @@ public class Prefix {
     boolean checksum = test(firstByte, 7);
 
     if (!test(firstByte, 6)) {
-      type = BlockType.UNCOMPRESSED;
+      type = BlockType.KEYS;
       length = readPrefixedVLQ(firstByte, 2, in);
     } else if (!test(firstByte, 5)) {
-      type = BlockType.COMPRESSED;
+      type = BlockType.VALUES;
       length = readPrefixedVLQ(firstByte, 3, in);
     } else {
       type = TYPES[(firstByte >> 2) & 0x7];
@@ -80,18 +87,18 @@ public class Prefix {
     }
 
     return checksum
-      ? new Prefix(length, type, in.readInt())
-      : new Prefix(length, type);
+        ? new BlockPrefix(length, type, in.readInt())
+        : new BlockPrefix(length, type);
   }
 
-  public static void write(Prefix prefix, DataOutput out) throws IOException {
+  public static void write(BlockPrefix prefix, DataOutput out) throws IOException {
     int checksum = prefix.checksum.isPresent() ? 1 : 0;
 
     switch (prefix.type) {
-      case UNCOMPRESSED:
+      case KEYS:
         writePrefixedVLQ(checksum << 1, 2, prefix.length, out);
         break;
-      case COMPRESSED:
+      case VALUES:
         writePrefixedVLQ(checksum << 2 | 0b10, 3, prefix.length, out);
         break;
       case HASH_MAP:
@@ -118,6 +125,4 @@ public class Prefix {
       out.writeInt(prefix.checksum.getAsInt());
     }
   }
-
-
 }

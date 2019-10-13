@@ -1,8 +1,9 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.durable.Prefix;
+import io.lacuna.bifurcan.durable.BlockPrefix;
 import io.lacuna.bifurcan.durable.TieredDurableOutput;
 import io.lacuna.bifurcan.durable.Util;
+import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
 
 import java.io.Closeable;
 import java.io.DataOutput;
@@ -14,17 +15,6 @@ public interface DurableOutput extends DataOutput, Flushable, Closeable, AutoClo
 
   interface WriteFunction {
     void write() throws IOException;
-  }
-
-  enum BlockType {
-    COMPRESSED,
-    UNCOMPRESSED,
-    HASH_MAP,
-    SORTED_MAP,
-    HASH_SET,
-    SORTED_SET,
-    LIST,
-    SEQUENCE
   }
 
   default void write(byte[] b) throws IOException {
@@ -89,10 +79,8 @@ public interface DurableOutput extends DataOutput, Flushable, Closeable, AutoClo
   void transferFrom(DurableInput in, long bytes) throws IOException;
 
   default void transferBlock(DurableInput in) throws IOException {
-    Prefix p = Prefix.read(in);
-    Prefix.write(p, this);
+    BlockPrefix p = in.readPrefix();
+    BlockPrefix.write(p, this);
     transferFrom(in, p.length);
   }
-
-
 }

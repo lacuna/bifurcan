@@ -18,7 +18,7 @@ public class SlabAllocator {
 
   static {
     try {
-      ADDRESS = Buffer.class.getField("address");
+      ADDRESS = Buffer.class.getDeclaredField("address");
       ADDRESS.setAccessible(true);
     } catch (NoSuchFieldException e) {
       throw new IllegalStateException(e);
@@ -53,7 +53,7 @@ public class SlabAllocator {
 
   ///
 
-  public static ByteBuffer allocate(int size) {
+  public static ByteBuffer allocate(int size) throws IOException {
     return ByteBuffer.allocateDirect(size);
   }
 

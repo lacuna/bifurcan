@@ -18,17 +18,17 @@
    [io.lacuna.bifurcan
     Map
     DurableInput
-    DurableOutput
-    DurableOutput$BlockType]
+    DurableOutput]
    [io.lacuna.bifurcan.hash
     PerlHash]
    [io.lacuna.bifurcan.durable
     Util
-    Prefix
+    BlockPrefix
+    BlockPrefix$BlockType
     HashTable
     HashTable$Entry
     HashTable$Writer
-    ByteBufferDurableInput
+    ByteChannelDurableInput
     #_DurableHashMap
     #_DurableHashMap$Entry]))
 
@@ -76,21 +76,21 @@
 
 (defspec test-prefix-roundtrip iterations
   (prop/for-all [n gen-pos-int
-                 type (->> (DurableOutput$BlockType/values)
+                 type (->> (BlockPrefix$BlockType/values)
                         (map gen/return)
                         gen/one-of)
                  checksum? gen/boolean
                  checksum (gen/fmap #(p/int %) gen/int)]
     (let [out (ByteArrayOutputStream. 12)
           p   (if checksum?
-                (Prefix. n type checksum)
-                (Prefix. n type))
-          _   (Prefix/write p (DataOutputStream. out))
+                (BlockPrefix. n type checksum)
+                (BlockPrefix. n type))
+          _   (BlockPrefix/write p (DataOutputStream. out))
           in  (->> out
                 .toByteArray
                 ByteArrayInputStream.
                 DataInputStream.)
-          p' (Prefix/read in)]
+          p' (BlockPrefix/read in)]
       #_(prn p p')
       (= p p'))))
 
@@ -107,26 +107,30 @@
 (defn put-entry! [^HashTable$Writer writer entry]
   (.put writer entry))
 
+(defn encode-table [entries]
+  (let [hash->offset (into {} entries)
+        writer       (table-writer (count hash->offset))]
+    (doseq [[hash offset] hash->offset]
+      (put-entry! writer (entry hash offset)))
+    (-> writer
+      .buffers
+      .iterator
+      iterator-seq
+      (ByteChannelDurableInput/from 1e3))))
+
 (defn get-entry [^DurableInput in hash]
   (.seek in 0)
   (HashTable/get in hash))
 
 (defspec test-durable-hashtable iterations
-  (prop/for-all [entries (gen/list (gen/tuple gen-pos-int gen-pos-int))]
-    (let [hash->offset (into {} entries)
-          writer       (table-writer (count hash->offset))]
-      (doseq [[hash offset] hash->offset]
-        (put-entry! writer (entry hash offset)))
-      (let [in (->> writer
-                 .buffers
-                 .iterator
-                 iterator-seq
-                 bs/to-byte-buffer
-                 ByteBufferDurableInput.)]
-       (every?
-         (fn [[hash offset]]
-           (= offset (.offset ^HashTable$Entry (get-entry in hash))))
-         hash->offset)))))
+  (prop/for-all [entries (gen/such-that
+                           (complement empty?)
+                           (gen/list (gen/tuple gen-pos-int gen-pos-int)))]
+    (let [in (encode-table entries)]
+      (every?
+        (fn [[hash offset]]
+          (= offset (.offset ^HashTable$Entry (get-entry in hash))))
+        (into {} entries)))))
 
 ;;; DurableHashMap
 

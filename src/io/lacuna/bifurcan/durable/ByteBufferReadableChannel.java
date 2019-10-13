@@ -50,10 +50,10 @@ public class ByteBufferReadableChannel implements SeekableByteChannel {
   public int read(ByteBuffer dst) throws IOException {
     int n = 0;
     while (dst.remaining() > 0 && position < size) {
-      n += Util.transfer(read(position + n), dst);
+      int bytes = Util.transfer(read(position), dst);
+      position += bytes;
+      n += bytes;
     }
-
-    position += n;
     return n;
   }
 

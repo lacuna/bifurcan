@@ -31,7 +31,7 @@ public class Util {
   
   public static int crc32(byte[] block) {
     CRC32 crc = new CRC32();
-    crc.update(block);
+    crc.update(block, 0, block.length);
     return (int) crc.getValue();
   }
 
@@ -132,36 +132,16 @@ public class Util {
   public static int transfer(ByteBuffer src, ByteBuffer dst) {
     int n;
     if (dst.remaining() < src.remaining()) {
-      n = src.position() + dst.remaining();
-      dst.put((ByteBuffer) src.duplicate().limit(n));
-      src.position(n);
-    } else {
       n = dst.remaining();
-      dst.put(src);
+      dst.put((ByteBuffer) src.duplicate().limit(n));
+      src.position(src.position() + n);
+    } else {
+      n = src.remaining();
+      dst.put(src.duplicate());
     }
 
     return n;
   }
 
-  public static boolean emit(
-    Object val,
-    DurableOutput out,
-    DurableConfig options) throws IOException {
 
-    val = options.coerce.apply(val);
-    if (val instanceof ISortedMap) {
-
-    } else if (val instanceof IMap) {
-
-    } else if (val instanceof ISet) {
-
-    } else if (val instanceof IList) {
-
-    } else {
-      options.serialize(val, out);
-      return false;
-    }
-
-    return true;
-  }
 }

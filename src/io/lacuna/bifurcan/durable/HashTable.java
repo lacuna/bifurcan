@@ -5,6 +5,8 @@ import io.lacuna.bifurcan.allocator.SlabAllocator;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.stream.IntStream;
+import java.util.stream.LongStream;
 
 /**
  * @author ztellman
@@ -27,6 +29,11 @@ public class HashTable {
 
     boolean isEmpty() {
       return hash == 0 & offset == 0;
+    }
+
+    @Override
+    public String toString() {
+      return "[hash=" + hash + ", offset=" + offset + "]";
     }
   }
 
@@ -54,7 +61,7 @@ public class HashTable {
 
     private ByteBuffer buffer(long idx) {
       IEntry<Long, ByteBuffer> e = buffers.floor(idx);
-      return e.value().duplicate().position((int) (idx - e.key()) * ENTRY_SIZE);
+      return (ByteBuffer) e.value().duplicate().position((int) (idx - e.key()) * ENTRY_SIZE);
     }
 
     public void put(int hash, long offset) {
@@ -119,6 +126,15 @@ public class HashTable {
   }
 
   ///
+
+  public static IList<Entry> entries(DurableInput in) throws IOException {
+    in.seek(0);
+    LinearList<Entry> entries = new LinearList<>();
+    while (in.remaining() > 0) {
+      entries.addLast(read(in));
+    }
+    return entries;
+  }
 
   private static Entry read(ByteBuffer buf) {
     int

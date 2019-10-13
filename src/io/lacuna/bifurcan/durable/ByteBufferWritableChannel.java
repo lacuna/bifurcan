@@ -13,7 +13,7 @@ public class ByteBufferWritableChannel implements WritableByteChannel {
   private final int blockSize;
   private boolean isOpen = true;
 
-  public ByteBufferWritableChannel(int blockSize) {
+  public ByteBufferWritableChannel(int blockSize) throws IOException {
     this.blockSize = blockSize;
     buffers.addLast(SlabAllocator.allocate(blockSize));
   }
