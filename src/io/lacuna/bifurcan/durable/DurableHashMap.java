@@ -1,22 +1,22 @@
 package io.lacuna.bifurcan.durable;
 
 import io.lacuna.bifurcan.*;
+import io.lacuna.bifurcan.utils.Iterators;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-
-import static io.lacuna.bifurcan.allocator.SlabAllocator.free;
+import java.util.Iterator;
+import java.util.function.ToIntFunction;
 
 public class DurableHashMap {
 
-  public static class Entry implements Comparable<Entry> {
+  private static class Entry implements Comparable<Entry> {
     public final int hash;
-    public final Iterable<ByteBuffer> key, value;
+    public final long index;
 
-    public Entry(int hash, Iterable<ByteBuffer> key, Iterable<ByteBuffer> value) {
+    public Entry(int hash, long index) {
       this.hash = hash;
-      this.key = key;
-      this.value = value;
+      this.index = index;
     }
 
     @Override
@@ -25,29 +25,21 @@ public class DurableHashMap {
     }
   }
 
-  private static class Chunk<T, K, V> {
+  private static class Chunk {
 
-    private final DurableConfig<T> config;
-    private final T keyType, valueType;
+    static final int BUFFER_SIZE = 1 << 20;
+    static final int MAX_SIZE = 1 << 16;
 
     private final IntMap<LinearList<Entry>> entries;
     private int size;
 
-    public Chunk(IList<Object> path, DurableConfig<T> config) {
-      this.config = config;
-      this.keyType = config.keyType(path);
-      this.valueType = config.valueType(path);
-
+    public Chunk() {
       this.entries = new IntMap<LinearList<Entry>>().linear();
     }
 
-    public void add(K key, V value) throws IOException {
-      Iterable<ByteBuffer> k = config.serializeKeys(keyType, LinearList.of(key));
-      Iterable<ByteBuffer> v = config.serializeValues(valueType, LinearList.of(value));
-
-      size += Util.size(k) + Util.size(v);
-      int hash = config.keyHash(keyType, key);
-      entries.getOrCreate((long) hash, LinearList::new).addLast(new Entry(hash, k, v));
+    public void add(int hash, long index) {
+      entries.getOrCreate((long) hash, LinearList::new).addLast(new Entry(hash, index));
+      size++;
     }
 
     public int size() {
@@ -55,26 +47,23 @@ public class DurableHashMap {
     }
 
     public DurableInput close() throws IOException {
-      ByteBufferWritableChannel acc = new ByteBufferWritableChannel(config.defaultBufferSize);
-
-      ByteChannelDurableOutput out = new ByteChannelDurableOutput(acc, config.defaultBufferSize);
-      for (LinearList<Entry> l : entries.values()) {
-        for (Entry e : l) {
-          out.writeInt(e.hash);
-          out.write(e.key);
-          out.write(e.value);
-
-          free(e.key);
-          free(e.value);
+      Iterable<ByteBuffer> buffers = DurableOutput.capture(BUFFER_SIZE, out -> {
+        for (LinearList<Entry> l : entries.values()) {
+          for (Entry e : l) {
+            out.writeInt(e.hash);
+            out.writeVLQ(e.index);
+          }
         }
-      }
-      out.close();
+      });
 
-      return ByteChannelDurableInput.from(acc.buffers(), config.defaultBufferSize);
+      return ByteChannelDurableInput.from(buffers, BUFFER_SIZE);
+    }
+
+    public Iterator<Entry> entries() {
+      return entries.values().stream().flatMap(IList::stream).iterator();
     }
   }
 
-  /*
   private static Iterator<Entry> spilledEntries(DurableInput in) throws IOException {
     return new Iterator<Entry>() {
       @Override
@@ -85,11 +74,10 @@ public class DurableHashMap {
       @Override
       public Entry next() {
         try {
-          Entry e = new Entry(in.readInt(), in.readBlock(), in.readBlock());
+          Entry e = new Entry(in.readInt(), in.readVLQ());
           if (in.remaining() == 0) {
             // once it's exhausted, we don't need it anymore
             in.close();
-            Files.delete(path);
           }
           return e;
         } catch (IOException e) {
@@ -99,25 +87,17 @@ public class DurableHashMap {
     };
   }
 
-  public static <K, V> Iterator<Entry> chunkSort(
-    IMap<K, V> m,
-    ToIntFunction<ByteBuffer> hashFn,
-    Function<K, ByteBuffer> keySerializer,
-    Function<V, ByteBuffer> valueSerializer,
-    int chunkSize,
-    int bufferSize) throws IOException {
 
+  public static <K, V> Iterator<IEntry<K, V>> sortEntries(IMap<K, V> m, ToIntFunction<K> hashFn) throws IOException {
     LinearList<Iterator<Entry>> iterators = new LinearList<>();
-    Chunk chunk = new Chunk(hashFn);
-    for (IEntry<K, V> e : m) {
-      ByteBuffer
-        key = keySerializer.apply(e.key()),
-        value = valueSerializer.apply(e.value());
+    Chunk chunk = new Chunk();
 
-      chunk.add(key, value);
-      if (chunk.size() >= chunkSize) {
-        iterators.addLast(spilledEntries(chunk.spill(bufferSize), bufferSize));
-        chunk = new Chunk(hashFn);
+    int idx = 0;
+    for (IEntry<K, V> e : m.entries()) {
+      chunk.add(hashFn.applyAsInt(e.key()), idx++);
+      if (chunk.size() >= Chunk.MAX_SIZE) {
+        iterators.addLast(spilledEntries(chunk.close()));
+        chunk = new Chunk();
       }
     }
 
@@ -125,40 +105,6 @@ public class DurableHashMap {
       iterators.addLast(chunk.entries());
     }
 
-    return Util.mergeSort(iterators);
+    return Iterators.map(Util.mergeSort(iterators), e -> m.nth(e.index));
   }
-
-  public static void writeDurableMap(
-    DurableOutput out,
-    HashTable.Writer table,
-    Function<ByteBuffer, ByteBuffer> compressor,
-    Iterator<Entry> entries,
-    int preferredBlockSize) throws IOException {
-
-    CompressedBlockDurableOutput compressedOut =
-      new CompressedBlockDurableOutput(out, compressor, preferredBlockSize);
-
-    Entry prev = null;
-    long offset = 0;
-    while (entries.hasNext()) {
-      Entry e = entries.next();
-
-      if (prev == null || prev.hash != e.hash) {
-        compressedOut.mark();
-        offset = out.written();
-      }
-      compressedOut.writeBlock(e.key);
-      compressedOut.writeBlock(e.value);
-
-      table.put(e.hash, offset);
-
-      prev = e;
-    }
-
-    compressedOut.flush();
-  }
-
-  */
-
-
 }

@@ -13,7 +13,7 @@ public class ByteBufferWritableChannel implements WritableByteChannel {
   private final int blockSize;
   private boolean isOpen = true;
 
-  public ByteBufferWritableChannel(int blockSize) throws IOException {
+  public ByteBufferWritableChannel(int blockSize) {
     this.blockSize = blockSize;
     buffers.addLast(SlabAllocator.allocate(blockSize));
   }
@@ -26,14 +26,14 @@ public class ByteBufferWritableChannel implements WritableByteChannel {
   }
 
   @Override
-  public int write(ByteBuffer src) throws IOException {
+  public int write(ByteBuffer src) {
     int n = src.remaining();
+
+    Util.transfer(src, buffers.last());
     while (src.remaining() > 0) {
+      buffers.last().flip();
+      buffers.addLast(SlabAllocator.allocate(Math.max(blockSize, src.remaining())));
       Util.transfer(src, buffers.last());
-      if (buffers.last().remaining() == 0) {
-        buffers.last().flip();
-        buffers.addLast(SlabAllocator.allocate(blockSize));
-      }
     }
 
     return n;
@@ -45,7 +45,7 @@ public class ByteBufferWritableChannel implements WritableByteChannel {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close() {
     buffers.last().flip();
     isOpen = false;
   }

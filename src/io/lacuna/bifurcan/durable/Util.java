@@ -42,6 +42,8 @@ public class Util {
   }
 
   public static void writeVLQ(long val, DataOutput out) throws IOException {
+    assert(val >= 0);
+
     int highestBit = Bits.bitOffset(Bits.highestBit(val));
 
     int shift = Math.floorDiv(highestBit, 7) * 7;
@@ -137,7 +139,7 @@ public class Util {
       src.position(src.position() + n);
     } else {
       n = src.remaining();
-      dst.put(src.duplicate());
+      dst.put(src);
     }
 
     return n;

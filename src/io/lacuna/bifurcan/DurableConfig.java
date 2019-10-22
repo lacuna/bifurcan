@@ -1,7 +1,6 @@
 package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.durable.BlockPrefix;
-import io.lacuna.bifurcan.durable.BufferDurableOutput;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -45,7 +44,6 @@ public class DurableConfig<T> {
 
   public static class Builder<T> {
 
-    private int sortedChunkSize = 10 << 20;
     private int defaultBufferSize = 1 << 20;
 
     private Function<Object, Object> coerce = DurableConfig::defaultCoercion;
@@ -53,11 +51,6 @@ public class DurableConfig<T> {
 
     private Function<IList<Object>, T> keyType = null, valueType = null;
     private Function<T, Codec> keyCodec = null, valueCodec = null;
-
-    public Builder<T> sortedChunkSize(int sortedChunkSize) {
-      this.sortedChunkSize = sortedChunkSize;
-      return this;
-    }
 
     public Builder<T> defaultBufferSize(int defaultBufferSize) {
       this.defaultBufferSize = defaultBufferSize;
@@ -96,7 +89,6 @@ public class DurableConfig<T> {
 
     public DurableConfig<T> build() {
       return new DurableConfig<T>(
-          sortedChunkSize,
           defaultBufferSize,
           coerce,
           keyHash,
@@ -108,7 +100,6 @@ public class DurableConfig<T> {
     }
   }
 
-  public final int sortedChunkSize;
   public final int defaultBufferSize;
 
   private final Function<Object, Object> coerce;
@@ -118,7 +109,6 @@ public class DurableConfig<T> {
   private final Function<T, Codec> keyCodec, valueCodec;
 
   public DurableConfig(
-      int sortedChunkSize,
       int defaultBufferSize,
       Function<Object, Object> coerce,
       ToIntBiFunction<T, Object> keyHash,
@@ -126,7 +116,6 @@ public class DurableConfig<T> {
       Function<IList<Object>, T> valueType,
       Function<T, Codec> keyCodec,
       Function<T, Codec> valueCodec) {
-    this.sortedChunkSize = sortedChunkSize;
     this.defaultBufferSize = defaultBufferSize;
     this.coerce = coerce;
     this.keyHash = keyHash;
@@ -134,6 +123,10 @@ public class DurableConfig<T> {
     this.valueType = valueType;
     this.keyCodec = keyCodec;
     this.valueCodec = valueCodec;
+  }
+
+  public Object coerce(Object o) {
+    return coerce.apply(o);
   }
 
   public int keyHash(T keyType, Object key) {
@@ -167,21 +160,17 @@ public class DurableConfig<T> {
   }
 
   public Iterable<ByteBuffer> serializeKeys(T keyType, IList<Object> keys) throws IOException {
-    BufferDurableOutput out = new BufferDurableOutput(defaultBufferSize);
-    writeKeys(keyType, out, keys);
-    return out.buffers();
+    return DurableOutput.capture(defaultBufferSize, out -> writeKeys(keyType, out, keys));
   }
 
-  public void writeValues(T valueType, DurableOutput output, IList<Object> keys) throws IOException {
-    DurableOutput block = output.enterBlock(BlockPrefix.BlockType.VALUES, true, this);
-    valueCodec.apply(valueType).write(keys, block);
+  public void writeValues(T valueType, DurableOutput output, IList<Object> values) throws IOException {
+    DurableOutput block = output.enterBlock(BlockPrefix.BlockType.VALUES, false, this);
+    valueCodec.apply(valueType).write(values, block);
     block.exitBlock();
   }
 
-  public Iterable<ByteBuffer> serializeValues(T valueType, IList<Object> keys) throws IOException {
-    BufferDurableOutput out = new BufferDurableOutput(defaultBufferSize);
-    writeValues(valueType, out, keys);
-    return out.buffers();
+  public Iterable<ByteBuffer> serializeValues(T valueType, IList<Object> values) throws IOException {
+    return DurableOutput.capture(defaultBufferSize, out -> writeValues(valueType, out, values));
   }
 
 }

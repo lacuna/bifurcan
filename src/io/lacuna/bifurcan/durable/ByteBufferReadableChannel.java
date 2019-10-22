@@ -13,6 +13,7 @@ public class ByteBufferReadableChannel implements SeekableByteChannel {
   private long position;
   private final IntMap<ByteBuffer> buffers;
   private final long size;
+  private boolean isOpen = true;
 
   public ByteBufferReadableChannel(Iterable<ByteBuffer> buffers) {
     IntMap<ByteBuffer> m = new IntMap<ByteBuffer>().linear();
@@ -38,12 +39,12 @@ public class ByteBufferReadableChannel implements SeekableByteChannel {
 
   @Override
   public boolean isOpen() {
-    return true;
+    return isOpen;
   }
 
   @Override
   public void close() throws IOException {
-    throw new UnsupportedOperationException();
+    isOpen = false;
   }
 
   @Override

@@ -53,7 +53,7 @@ public class SlabAllocator {
 
   ///
 
-  public static ByteBuffer allocate(int size) throws IOException {
+  public static ByteBuffer allocate(int size) {
     return ByteBuffer.allocateDirect(size);
   }
 

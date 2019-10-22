@@ -30,6 +30,10 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
 
   int read(ByteBuffer dst) throws IOException;
 
+  default long readVLQ() throws IOException {
+    return Util.readVLQ(this);
+  }
+
   default boolean readBoolean() throws IOException {
     return readByte() != 0;
   }
@@ -54,5 +58,9 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
 
   default BlockPrefix readPrefix() throws IOException {
     return BlockPrefix.read(this);
+  }
+
+  default Iterable<ByteBuffer> readBlock() throws IOException {
+    return DurableOutput.capture(out -> out.transferBlock(this));
   }
 }

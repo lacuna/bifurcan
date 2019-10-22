@@ -2,8 +2,6 @@ package io.lacuna.bifurcan.allocator;
 
 import io.lacuna.bifurcan.*;
 
-import java.util.Iterator;
-
 import static io.lacuna.bifurcan.utils.Bits.*;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
@@ -39,7 +37,7 @@ public class BuddyAllocator implements IAllocator {
   }
 
   @Override
-  public Range acquire(long capacity) {
+  public synchronized Range acquire(long capacity) {
 
     int idx = max(0, log2Ceil(capacity) - log2Min);
     ISet<Range> s = ranges.nth(idx);
@@ -58,7 +56,7 @@ public class BuddyAllocator implements IAllocator {
   }
 
   @Override
-  public void release(Range range) {
+  public synchronized void release(Range range) {
     for (; ; ) {
       int idx = bitOffset(range.end - range.start) - log2Min;
       Range sibling = sibling(range);
@@ -75,13 +73,13 @@ public class BuddyAllocator implements IAllocator {
   }
 
   @Override
-  public Iterator<Range> available() {
-    return ranges.stream().flatMap(s -> s.elements().stream()).iterator();
+  public synchronized Iterable<Range> available() {
+    return ranges.stream().flatMap(s -> s.elements().stream()).collect(Lists.linearCollector());
   }
 
   @Override
   public String toString() {
-    return List.from(available()).toString();
+    return available().toString();
   }
 
   ///

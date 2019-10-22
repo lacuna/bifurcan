@@ -1,8 +1,6 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.durable.BlockPrefix;
-import io.lacuna.bifurcan.durable.TieredDurableOutput;
-import io.lacuna.bifurcan.durable.Util;
+import io.lacuna.bifurcan.durable.*;
 import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
 
 import java.io.Closeable;
@@ -10,11 +8,28 @@ import java.io.DataOutput;
 import java.io.Flushable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.function.Consumer;
 
 public interface DurableOutput extends DataOutput, Flushable, Closeable, AutoCloseable {
 
   interface WriteFunction {
-    void write() throws IOException;
+    void write(DurableOutput out) throws IOException;
+  }
+
+  static Iterable<ByteBuffer> capture(WriteFunction body) {
+    return capture(1 << 16, body);
+  }
+
+  static Iterable<ByteBuffer> capture(int bufferSize, WriteFunction body) {
+    try {
+      ByteBufferWritableChannel acc = new ByteBufferWritableChannel(bufferSize);
+      ByteChannelDurableOutput out = new ByteChannelDurableOutput(acc, bufferSize);
+      body.write(out);
+      out.close();
+      return acc.buffers();
+    } catch (Exception e) {
+      throw new IllegalStateException(e);
+    }
   }
 
   default void write(byte[] b) throws IOException {
@@ -24,6 +39,10 @@ public interface DurableOutput extends DataOutput, Flushable, Closeable, AutoClo
   long written();
 
   int write(ByteBuffer src) throws IOException;
+
+  default void writeVLQ(long n) throws IOException {
+    Util.writeVLQ(n, this);
+  }
 
   default void write(Iterable<ByteBuffer> buffers) throws IOException {
     for (ByteBuffer b : buffers) {
@@ -61,15 +80,7 @@ public interface DurableOutput extends DataOutput, Flushable, Closeable, AutoClo
   }
 
   default DurableOutput enterBlock(BlockType type, boolean checksum, DurableConfig config) throws IOException {
-    return new TieredDurableOutput(this, type, checksum, config);
-  }
-
-  default void enterBlock(BlockType type, boolean checksum, DurableConfig config, WriteFunction... fns) throws IOException {
-    enterBlock(type, checksum, config);
-    for (WriteFunction f : fns) {
-      f.write();
-    }
-    exitBlock();
+    return new BlockDurableOutput(this, type, checksum, config);
   }
 
   default DurableOutput exitBlock() throws IOException {

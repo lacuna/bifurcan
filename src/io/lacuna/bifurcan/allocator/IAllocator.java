@@ -1,7 +1,5 @@
 package io.lacuna.bifurcan.allocator;
 
-import java.util.Iterator;
-
 /**
  * @author ztellman
  */
@@ -40,6 +38,6 @@ public interface IAllocator {
 
   void release(Range range);
 
-  Iterator<Range> available();
+  Iterable<Range> available();
 
 }

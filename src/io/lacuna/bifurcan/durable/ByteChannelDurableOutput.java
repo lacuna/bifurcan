@@ -23,7 +23,7 @@ public class ByteChannelDurableOutput implements DurableOutput, Closeable {
   private final ByteBuffer buffer;
   private long position;
 
-  public ByteChannelDurableOutput(WritableByteChannel channel, int blockSize) throws IOException {
+  public ByteChannelDurableOutput(WritableByteChannel channel, int blockSize) {
     this.channel = channel;
     this.buffer = allocate(blockSize);
   }
@@ -34,11 +34,7 @@ public class ByteChannelDurableOutput implements DurableOutput, Closeable {
   }
 
   public static ByteChannelDurableOutput create(int blockSize) {
-    try {
-      return new ByteChannelDurableOutput(new ByteBufferWritableChannel(blockSize), blockSize);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
+    return new ByteChannelDurableOutput(new ByteBufferWritableChannel(blockSize), blockSize);
   }
 
   ///
@@ -62,7 +58,7 @@ public class ByteChannelDurableOutput implements DurableOutput, Closeable {
   @Override
   public void flush() throws IOException {
     if (buffer.position() > 0) {
-      this.position = position + buffer.remaining();
+      this.position = position + buffer.position();
       buffer.flip();
       channel.write(buffer);
       buffer.clear();

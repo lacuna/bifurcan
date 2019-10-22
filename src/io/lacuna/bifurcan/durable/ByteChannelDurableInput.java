@@ -49,6 +49,10 @@ public class ByteChannelDurableInput implements DurableInput {
   public void seek(long position) throws IOException {
     assert(position >= 0 && position < size);
 
+    if (position == this.position()) {
+      return;
+    }
+
     long bufferStart = size - remaining;
     long bufferEnd = bufferStart + buffer.limit();
 
@@ -65,7 +69,7 @@ public class ByteChannelDurableInput implements DurableInput {
 
   @Override
   public long position() {
-    return (size - remaining) + (dirty ? 0 : buffer.position());
+    return (size - remaining) - (dirty ? 0 : buffer.remaining());
   }
 
   @Override

@@ -11,22 +11,25 @@ import java.util.zip.CRC32;
 
 import static io.lacuna.bifurcan.allocator.SlabAllocator.free;
 
-public class TieredDurableOutput implements DurableOutput {
+public class BlockDurableOutput implements DurableOutput {
 
   private final DurableOutput out;
-  private final BufferDurableOutput buffer;
+
+  private final ByteBufferWritableChannel channel;
+  private final ByteChannelDurableOutput accumulator;
 
   private final BlockType type;
   private final boolean checksum;
 
-  public TieredDurableOutput(
+  public BlockDurableOutput(
     DurableOutput out,
     BlockType type,
     boolean checksum,
-    DurableConfig config) throws IOException {
+    DurableConfig config) {
 
     this.out = out;
-    this.buffer = new BufferDurableOutput(config.defaultBufferSize);
+    this.channel = new ByteBufferWritableChannel(config.defaultBufferSize);
+    this.accumulator = new ByteChannelDurableOutput(channel, config.defaultBufferSize);
 
     this.type = type;
     this.checksum = checksum;
@@ -45,62 +48,62 @@ public class TieredDurableOutput implements DurableOutput {
 
   @Override
   public void write(byte[] b) throws IOException {
-    buffer.write(b);
+    accumulator.write(b);
   }
 
   @Override
   public long written() {
-    return buffer.written();
+    return accumulator.written();
   }
 
   @Override
   public int write(ByteBuffer src) throws IOException {
-    return buffer.write(src);
+    return accumulator.write(src);
   }
 
   @Override
   public void transferFrom(DurableInput in, long bytes) throws IOException {
-    buffer.transferFrom(in, bytes);
+    accumulator.transferFrom(in, bytes);
   }
 
   @Override
   public void write(byte[] b, int off, int len) throws IOException {
-    buffer.write(b, off, len);
+    accumulator.write(b, off, len);
   }
 
   @Override
   public void writeByte(int v) throws IOException {
-    buffer.writeByte(v);
+    accumulator.writeByte(v);
   }
 
   @Override
   public void writeShort(int v) throws IOException {
-    buffer.writeShort(v);
+    accumulator.writeShort(v);
   }
 
   @Override
   public void writeChar(int v) throws IOException {
-    buffer.writeChar(v);
+    accumulator.writeChar(v);
   }
 
   @Override
   public void writeInt(int v) throws IOException {
-    buffer.writeInt(v);
+    accumulator.writeInt(v);
   }
 
   @Override
   public void writeLong(long v) throws IOException {
-    buffer.writeLong(v);
+    accumulator.writeLong(v);
   }
 
   @Override
   public void writeFloat(float v) throws IOException {
-    buffer.writeFloat(v);
+    accumulator.writeFloat(v);
   }
 
   @Override
   public void writeDouble(double v) throws IOException {
-    buffer.writeDouble(v);
+    accumulator.writeDouble(v);
   }
 
   @Override
@@ -113,7 +116,8 @@ public class TieredDurableOutput implements DurableOutput {
 
   private void writeAndFlush() throws IOException {
 
-    Iterable<ByteBuffer> buffers = this.buffer.buffers();
+    accumulator.close();
+    Iterable<ByteBuffer> buffers = this.channel.buffers();
 
     long size = 0;
     for (ByteBuffer b : buffers) {

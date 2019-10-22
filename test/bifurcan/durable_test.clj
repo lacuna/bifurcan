@@ -17,8 +17,11 @@
     ByteBuffer]
    [io.lacuna.bifurcan
     Map
+    IEntry
     DurableInput
-    DurableOutput]
+    DurableOutput
+    DurableConfig
+    DurableConfig$Codec]
    [io.lacuna.bifurcan.hash
     PerlHash]
    [io.lacuna.bifurcan.durable
@@ -28,9 +31,11 @@
     HashTable
     HashTable$Entry
     HashTable$Writer
+    SkipTable
+    SkipTable$Writer
+    SkipTable$Entry
     ByteChannelDurableInput
-    #_DurableHashMap
-    #_DurableHashMap$Entry]))
+    DurableHashMap]))
 
 (defn ->to-int-fn [f]
   (reify java.util.function.ToIntFunction
@@ -48,6 +53,13 @@
     (gen/fmap
       #(Math/abs (p/int %))
       gen/large-integer)))
+
+(def gen-small-pos-int
+  (gen/such-that
+    #(not= 0 %)
+    (gen/fmap
+      #(Math/abs (p/int %))
+      gen/int)))
 
 ;;; Util
 
@@ -96,22 +108,19 @@
 
 ;;; HashTable
 
-(defn entry [hash offset]
-  (HashTable$Entry. hash offset))
-
-(defn table-writer [n]
+(defn hash-table-writer [n]
   (HashTable$Writer.
     [(ByteBuffer/allocate (HashTable/requiredBytes (Math/floor (/ n 2)) 0.95))
      (ByteBuffer/allocate (HashTable/requiredBytes (Math/ceil (/ n 2)) 0.95))]))
 
-(defn put-entry! [^HashTable$Writer writer entry]
-  (.put writer entry))
+(defn put-entry! [^HashTable$Writer writer hash offset]
+  (.put writer hash offset))
 
-(defn encode-table [entries]
+(defn encode-hash-table [entries]
   (let [hash->offset (into {} entries)
-        writer       (table-writer (count hash->offset))]
+        writer       (hash-table-writer (count hash->offset))]
     (doseq [[hash offset] hash->offset]
-      (put-entry! writer (entry hash offset)))
+      (put-entry! writer hash offset))
     (-> writer
       .buffers
       .iterator
@@ -122,41 +131,69 @@
   (.seek in 0)
   (HashTable/get in hash))
 
-(defspec test-durable-hashtable iterations
+(defspec test-durable-hash-table iterations
   (prop/for-all [entries (gen/such-that
                            (complement empty?)
                            (gen/list (gen/tuple gen-pos-int gen-pos-int)))]
-    (let [in (encode-table entries)]
+    (let [in (encode-hash-table entries)]
       (every?
         (fn [[hash offset]]
           (= offset (.offset ^HashTable$Entry (get-entry in hash))))
         (into {} entries)))))
 
+;; SkipTable
+
+(defn skip-table-writer []
+  (SkipTable$Writer.))
+
+(defn append-entry! [^SkipTable$Writer writer index offset]
+  (.append writer index offset))
+
+(defn encode-skip-table [entries]
+  (let [writer (skip-table-writer)
+        entries (reductions #(map + %1 %2) entries)]
+    (doseq [[index offset] entries]
+      (append-entry! writer index offset))
+    (-> writer
+      .buffers
+      .iterator
+      iterator-seq
+      (ByteChannelDurableInput/from 1e3))))
+
+(defn print-skip-table [^DurableInput in]
+  (->> (repeatedly #(when (pos? (.remaining in)) (.readVLQ in)))
+    (take-while identity)))
+
+(defn lookup-entry [^DurableInput in idx]
+  (.seek in 0)
+  (SkipTable/lookup in idx))
+
+(defspec test-durable-skip-table iterations
+  (prop/for-all [entries (gen/such-that
+                           (complement empty?)
+                           (gen/list (gen/tuple gen-small-pos-int gen-small-pos-int)))]
+    (let [in (encode-skip-table entries)]
+      (every?
+        (fn [[index offset]]
+          (let [^SkipTable$Entry e (lookup-entry in index)]
+            (and
+              (= index (.index e))
+              (= offset (.offset e)))))
+        (reductions #(map + %1 %2) entries)))))
+
 ;;; DurableHashMap
 
-(def serialize
-  (->fn #(-> % pr-str bs/to-byte-buffer)))
-
 (def hash-fn
-  (->to-int-fn #(PerlHash/hash %)))
+  (->to-int-fn hash))
 
-(defn deserialize [x]
-  (-> x bs/to-string read-string))
-
-#_(defspec test-chunk-sort 1e3
+(defspec test-sort-entries iterations
   (prop/for-all [entries (gen/list (gen/tuple gen-pos-int gen-pos-int))]
     (let [m (into {} entries)
-          m' (->> (DurableHashMap/chunkSort
+          m' (->> (DurableHashMap/sortEntries
                     (Map/from ^java.util.Map m)
-                    hash-fn
-                    serialize
-                    serialize
-                    1e2
-                    1e6)
+                    hash-fn)
                iterator-seq
                (map
-                 (fn [^DurableHashMap$Entry e]
-                   [(deserialize (.key e))
-                    (deserialize (.value e))]))
-               (into {}))]
-      (= m m'))))
+                 (fn [^IEntry e]
+                   [(.key e) (.value e)])))]
+      (= (sort-by #(hash (key %)) m) m'))))
