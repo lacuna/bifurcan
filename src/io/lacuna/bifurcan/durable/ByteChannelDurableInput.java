@@ -22,31 +22,22 @@ public class ByteChannelDurableInput implements DurableInput {
   private boolean dirty;
   private long remaining;
 
-  public ByteChannelDurableInput(SeekableByteChannel channel, long offset, long size, int bufferSize) throws IOException {
+  public ByteChannelDurableInput(SeekableByteChannel channel, long offset, long size, int bufferSize) {
     this.channel = channel;
     this.buffer = SlabAllocator.allocate(bufferSize);
     this.offset = offset;
     this.remaining = this.size = size;
     this.dirty = true;
 
-    channel.position(offset);
-  }
-
-  public static ByteChannelDurableInput open(Path path, int bufferSize) throws IOException {
-    FileChannel file = FileChannel.open(path, StandardOpenOption.READ);
-    return new ByteChannelDurableInput(file, 0, file.size(), bufferSize);
-  }
-
-  public static ByteChannelDurableInput from(Iterable<ByteBuffer> buffers, int bufferSize) throws IOException {
-    long size = 0;
-    for (ByteBuffer b : buffers) {
-      size += b.remaining();
+    try {
+      channel.position(offset);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     }
-    return new ByteChannelDurableInput(new ByteBufferReadableChannel(buffers), 0, size, bufferSize);
   }
 
   @Override
-  public void seek(long position) throws IOException {
+  public void seek(long position) {
     assert(position >= 0 && position < size);
 
     if (position == this.position()) {
@@ -61,9 +52,14 @@ public class ByteChannelDurableInput implements DurableInput {
         && position < bufferEnd) {
       buffer.position((int)(position - bufferStart));
     } else {
-      dirty = true;
-      channel.position(offset + position);
-      remaining = size - position;
+      try {
+        dirty = true;
+        channel.position(offset + position);
+        remaining = size - position;
+
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
     }
   }
 
@@ -73,13 +69,18 @@ public class ByteChannelDurableInput implements DurableInput {
   }
 
   @Override
-  public void close() throws IOException {
-    free(buffer);
-    channel.close();
+  public void close() {
+    try {
+      free(buffer);
+      channel.close();
+
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @Override
-  public void readFully(byte[] b, int off, int len) throws IOException {
+  public void readFully(byte[] b, int off, int len) {
     if (len <= buffer.remaining()) {
       buffer.get(b, off, len);
     } else {
@@ -87,18 +88,27 @@ public class ByteChannelDurableInput implements DurableInput {
       tmp.put(buffer);
 
       int remaining = tmp.remaining();
-      int read = channel.read(tmp);
-      if (read != remaining) {
-        throw new EOFException();
+      try {
+        int read = channel.read(tmp);
+        if (read != remaining) {
+          throw new EOFException();
+        }
+
+      } catch (IOException e) {
+        throw new RuntimeException(e);
       }
     }
   }
 
   @Override
-  public int read(ByteBuffer dst) throws IOException {
+  public int read(ByteBuffer dst) {
     int n = Util.transfer(buffer, dst);
     if (dst.remaining() > 0) {
-      n += channel.read(dst);
+      try {
+        n += channel.read(dst);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
     }
     return n;
   }
@@ -109,80 +119,85 @@ public class ByteChannelDurableInput implements DurableInput {
   }
 
   @Override
-  public int skipBytes(int n) throws IOException {
+  public long skipBytes(long n) {
     n = (int) Math.min(n, remaining);
     seek(position() + n);
     return n;
   }
 
   @Override
-  public boolean readBoolean() throws IOException {
+  public boolean readBoolean() {
     checkRemaining(1);
     return buffer.get() != 0;
   }
 
   @Override
-  public byte readByte() throws IOException {
+  public byte readByte() {
     checkRemaining(1);
     return buffer.get();
   }
 
   @Override
-  public short readShort() throws IOException {
+  public short readShort() {
     checkRemaining(2);
     return buffer.getShort();
   }
 
   @Override
-  public char readChar() throws IOException {
+  public char readChar() {
     checkRemaining(2);
     return buffer.getChar();
   }
 
   @Override
-  public int readInt() throws IOException {
+  public int readInt() {
     checkRemaining(4);
     return buffer.getInt();
   }
 
   @Override
-  public long readLong() throws IOException {
+  public long readLong() {
     checkRemaining(8);
     return buffer.getLong();
   }
 
   @Override
-  public float readFloat() throws IOException {
+  public float readFloat() {
     checkRemaining(4);
     return buffer.getFloat();
   }
 
   @Override
-  public double readDouble() throws IOException {
+  public double readDouble() {
     checkRemaining(8);
     return buffer.getDouble();
   }
 
   ///
 
-  private void checkRemaining(int bytes) throws IOException {
+  private void checkRemaining(int bytes) {
     if (dirty || buffer.remaining() < bytes) {
       read();
       if (buffer.remaining() < bytes) {
-        throw new EOFException();
+        throw new RuntimeException(new EOFException());
       }
     }
   }
 
-  private void read() throws IOException {
-    if (dirty) {
-      buffer.position(0).limit(buffer.capacity());
-      dirty = false;
-    } else {
-      buffer.compact().limit(buffer.capacity());
+  private void read() {
+    try {
+      if (dirty) {
+        buffer.position(0).limit(buffer.capacity());
+        dirty = false;
+      } else {
+        buffer.compact().limit(buffer.capacity());
+      }
+      remaining -= channel.read(buffer);
+      buffer.flip();
+
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     }
-    remaining -= channel.read(buffer);
-    buffer.flip();
   }
 
 

@@ -43,12 +43,12 @@ public class ByteBufferReadableChannel implements SeekableByteChannel {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close() {
     isOpen = false;
   }
 
   @Override
-  public int read(ByteBuffer dst) throws IOException {
+  public int read(ByteBuffer dst) {
     int n = 0;
     while (dst.remaining() > 0 && position < size) {
       int bytes = Util.transfer(read(position), dst);
@@ -59,28 +59,28 @@ public class ByteBufferReadableChannel implements SeekableByteChannel {
   }
 
   @Override
-  public int write(ByteBuffer src) throws IOException {
+  public int write(ByteBuffer src) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public long position() throws IOException {
+  public long position() {
     return position;
   }
 
   @Override
-  public SeekableByteChannel position(long newPosition) throws IOException {
+  public SeekableByteChannel position(long newPosition) {
     position = newPosition;
     return this;
   }
 
   @Override
-  public long size() throws IOException {
+  public long size() {
     return size;
   }
 
   @Override
-  public SeekableByteChannel truncate(long size) throws IOException {
+  public SeekableByteChannel truncate(long size) {
     throw new UnsupportedOperationException();
   }
 }

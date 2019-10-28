@@ -46,17 +46,17 @@ public class DurableHashMap {
       return size;
     }
 
-    public DurableInput close() throws IOException {
-      Iterable<ByteBuffer> buffers = DurableOutput.capture(BUFFER_SIZE, out -> {
-        for (LinearList<Entry> l : entries.values()) {
-          for (Entry e : l) {
-            out.writeInt(e.hash);
-            out.writeVLQ(e.index);
-          }
-        }
-      });
+    public DurableInput close() {
+      DurableAccumulator acc = new DurableAccumulator();
 
-      return ByteChannelDurableInput.from(buffers, BUFFER_SIZE);
+      for (LinearList<Entry> l : entries.values()) {
+        for (Entry e : l) {
+          acc.writeInt(e.hash);
+          acc.writeVLQ(e.index);
+        }
+      }
+
+      return DurableInput.from(acc.contents(), BUFFER_SIZE);
     }
 
     public Iterator<Entry> entries() {
@@ -64,7 +64,7 @@ public class DurableHashMap {
     }
   }
 
-  private static Iterator<Entry> spilledEntries(DurableInput in) throws IOException {
+  private static Iterator<Entry> spilledEntries(DurableInput in) {
     return new Iterator<Entry>() {
       @Override
       public boolean hasNext() {
@@ -73,16 +73,12 @@ public class DurableHashMap {
 
       @Override
       public Entry next() {
-        try {
-          Entry e = new Entry(in.readInt(), in.readVLQ());
-          if (in.remaining() == 0) {
-            // once it's exhausted, we don't need it anymore
-            in.close();
-          }
-          return e;
-        } catch (IOException e) {
-          throw new IllegalStateException(e);
+        Entry e = new Entry(in.readInt(), in.readVLQ());
+        if (in.remaining() == 0) {
+          // once it's exhausted, we don't need it anymore
+          in.close();
         }
+        return e;
       }
     };
   }

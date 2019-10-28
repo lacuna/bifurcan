@@ -55,7 +55,7 @@ public class HashTable {
       this.size = size;
     }
 
-    public IList<ByteBuffer> buffers() {
+    public IList<ByteBuffer> contents() {
       return buffers.values();
     }
 
@@ -95,11 +95,11 @@ public class HashTable {
     }
   }
 
-  public Writer create(long entries, double loadFactor) throws IOException {
+  public Writer create(long entries, double loadFactor) {
     return new Writer(SlabAllocator.allocate(requiredBytes(entries, loadFactor)));
   }
 
-  public static Entry get(DurableInput in, int hash) throws IOException {
+  public static Entry get(DurableInput in, int hash) {
     long entries = in.remaining() / ENTRY_SIZE;
 
     long offset = in.position();
@@ -127,7 +127,7 @@ public class HashTable {
 
   ///
 
-  public static IList<Entry> entries(DurableInput in) throws IOException {
+  public static IList<Entry> entries(DurableInput in) {
     in.seek(0);
     LinearList<Entry> entries = new LinearList<>();
     while (in.remaining() > 0) {
@@ -147,7 +147,7 @@ public class HashTable {
     return new Entry(a, (b << 16) | c);
   }
 
-  private static Entry read(DurableInput in) throws IOException {
+  private static Entry read(DurableInput in) {
     int
       a = in.readInt();
 

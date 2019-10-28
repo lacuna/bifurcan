@@ -3,7 +3,6 @@ package io.lacuna.bifurcan.durable;
 import io.lacuna.bifurcan.LinearList;
 import io.lacuna.bifurcan.allocator.SlabAllocator;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.WritableByteChannel;
 
@@ -18,11 +17,18 @@ public class ByteBufferWritableChannel implements WritableByteChannel {
     buffers.addLast(SlabAllocator.allocate(blockSize));
   }
 
-  public final Iterable<ByteBuffer> buffers() {
+  public Iterable<ByteBuffer> contents() {
     if (isOpen) {
       throw new IllegalStateException("cannot examine an open channel");
     }
     return buffers;
+  }
+
+  public void extend(int n) {
+    if (n > buffers.last().remaining()) {
+      buffers.last().flip();
+      buffers.addLast(SlabAllocator.allocate(Math.max(blockSize, n)));
+    }
   }
 
   @Override
@@ -31,8 +37,7 @@ public class ByteBufferWritableChannel implements WritableByteChannel {
 
     Util.transfer(src, buffers.last());
     while (src.remaining() > 0) {
-      buffers.last().flip();
-      buffers.addLast(SlabAllocator.allocate(Math.max(blockSize, src.remaining())));
+      extend(src.remaining());
       Util.transfer(src, buffers.last());
     }
 
@@ -46,7 +51,9 @@ public class ByteBufferWritableChannel implements WritableByteChannel {
 
   @Override
   public void close() {
-    buffers.last().flip();
-    isOpen = false;
+    if (isOpen) {
+      buffers.last().flip();
+      isOpen = false;
+    }
   }
 }

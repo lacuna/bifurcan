@@ -34,8 +34,9 @@
     SkipTable
     SkipTable$Writer
     SkipTable$Entry
-    ByteChannelDurableInput
     DurableHashMap]))
+
+(set! *warn-on-reflection* true)
 
 (defn ->to-int-fn [f]
   (reify java.util.function.ToIntFunction
@@ -108,7 +109,7 @@
 
 ;;; HashTable
 
-(defn hash-table-writer [n]
+(defn ^HashTable$Writer hash-table-writer [n]
   (HashTable$Writer.
     [(ByteBuffer/allocate (HashTable/requiredBytes (Math/floor (/ n 2)) 0.95))
      (ByteBuffer/allocate (HashTable/requiredBytes (Math/ceil (/ n 2)) 0.95))]))
@@ -118,14 +119,14 @@
 
 (defn encode-hash-table [entries]
   (let [hash->offset (into {} entries)
-        writer       (hash-table-writer (count hash->offset))]
-    (doseq [[hash offset] hash->offset]
-      (put-entry! writer hash offset))
-    (-> writer
-      .buffers
-      .iterator
-      iterator-seq
-      (ByteChannelDurableInput/from 1e3))))
+        writer       (hash-table-writer (count hash->offset))
+        _            (doseq [[hash offset] hash->offset]
+                       (put-entry! writer hash offset))
+        bufs         (-> writer
+                       .contents
+                       .iterator
+                       iterator-seq)]
+    (DurableInput/from ^Iterable bufs (int 1e3))))
 
 (defn get-entry [^DurableInput in hash]
   (.seek in 0)
@@ -143,22 +144,22 @@
 
 ;; SkipTable
 
-(defn skip-table-writer []
+(defn ^SkipTable$Writer skip-table-writer []
   (SkipTable$Writer.))
 
 (defn append-entry! [^SkipTable$Writer writer index offset]
   (.append writer index offset))
 
 (defn encode-skip-table [entries]
-  (let [writer (skip-table-writer)
-        entries (reductions #(map + %1 %2) entries)]
-    (doseq [[index offset] entries]
-      (append-entry! writer index offset))
-    (-> writer
-      .buffers
-      .iterator
-      iterator-seq
-      (ByteChannelDurableInput/from 1e3))))
+  (let [writer  (skip-table-writer)
+        entries (reductions #(map + %1 %2) entries)
+        _       (doseq [[index offset] entries]
+                  (append-entry! writer index offset))
+        bufs    (-> writer
+                  .contents
+                  .iterator
+                  iterator-seq)]
+    (DurableInput/from ^Iterable bufs (int 1e3))))
 
 (defn print-skip-table [^DurableInput in]
   (->> (repeatedly #(when (pos? (.remaining in)) (.readVLQ in)))

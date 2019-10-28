@@ -1,7 +1,7 @@
 package io.lacuna.bifurcan.durable;
 
-import io.lacuna.bifurcan.*;
-import io.lacuna.bifurcan.utils.Bits;
+import io.lacuna.bifurcan.DurableInput;
+import io.lacuna.bifurcan.DurableOutput;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -14,28 +14,23 @@ public class SkipTable {
 
   public static class Writer {
 
-    private final ByteBufferWritableChannel acc = new ByteBufferWritableChannel(1024);
-    private final DurableOutput out = new ByteChannelDurableOutput(acc, 1024);
+    private final DurableAccumulator acc = new DurableAccumulator(1024);
     private Writer parent = null;
 
     private long lastIndex = 0, lastOffset = 0, count = 0;
 
     public void append(long index, long offset) {
-      try {
-        if ((count & BIT_MASK) == BIT_MASK) {
-          if (parent == null) {
-            parent = new Writer();
-          }
-
-          out.writeVLQ(0);
-          parent.append(index, out.written());
-          out.writeVLQ(offset);
-        } else {
-          out.writeVLQ(index - lastIndex);
-          out.writeVLQ(offset - lastOffset);
+      if ((count & BIT_MASK) == BIT_MASK) {
+        if (parent == null) {
+          parent = new Writer();
         }
-      } catch (IOException e) {
-        throw new IllegalStateException(e);
+
+        acc.writeVLQ(0);
+        parent.append(index, acc.written());
+        acc.writeVLQ(offset);
+      } else {
+        acc.writeVLQ(index - lastIndex);
+        acc.writeVLQ(offset - lastOffset);
       }
 
       count++;
@@ -43,19 +38,26 @@ public class SkipTable {
       lastOffset = offset;
     }
 
-    private void flush(DurableOutput out, int level) throws IOException {
+    private void flush(DurableOutput out, int level) {
       if (parent == null) {
         out.writeVLQ(level);
       } else {
         parent.flush(out, level + 1);
       }
-      this.out.close();
-      out.writeVLQ(this.out.written());
-      out.write(this.acc.buffers());
+      this.acc.close();
+      out.writeVLQ(this.acc.written());
+      out.write(this.acc.contents());
     }
 
-    public Iterable<ByteBuffer> buffers() {
-      return DurableOutput.capture(out -> flush(out, 1));
+    public Iterable<ByteBuffer> contents() {
+      DurableAccumulator acc = new DurableAccumulator();
+      flushTo(acc);
+      return acc.contents();
+    }
+
+    public void flushTo(DurableOutput out) {
+      flush(out, 1);
+      acc.flushTo(out);
     }
   }
 
@@ -71,6 +73,7 @@ public class SkipTable {
     public String toString() {
       return "[" + index + ", " + offset + "]";
     }
+
   }
 
   public static Entry lookup(DurableInput in, long index) throws IOException {
@@ -92,7 +95,7 @@ public class SkipTable {
       }
 
       // scan
-      while(in.position() < nextTier) {
+      while (in.position() < nextTier) {
         long indexDelta = in.readVLQ();
 
         if (indexDelta == 0 || (currIndex + indexDelta) > index) {

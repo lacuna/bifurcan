@@ -1,6 +1,6 @@
 package io.lacuna.bifurcan.durable;
 
-import io.lacuna.bifurcan.DurableConfig;
+import io.lacuna.bifurcan.DurableInput;
 import io.lacuna.bifurcan.IEntry;
 import io.lacuna.bifurcan.IntMap;
 import io.lacuna.bifurcan.LinearList;
@@ -23,7 +23,6 @@ import java.util.concurrent.atomic.AtomicReference;
 public class DurableInputPool implements Closeable {
 
   private final FileChannel channel;
-  private final DurableConfig config;
   private final int maxDescriptors;
   private final Path path;
   private final long fileSize;
@@ -36,10 +35,9 @@ public class DurableInputPool implements Closeable {
   private AtomicInteger created = new AtomicInteger(0);
   private AtomicBoolean closed = new AtomicBoolean();
 
-  public DurableInputPool(Path path, int maxDescriptors, DurableConfig config) throws IOException {
+  public DurableInputPool(Path path, int maxDescriptors) throws IOException {
     this.maxDescriptors = maxDescriptors;
     this.path = path;
-    this.config = config;
 
     this.channel = FileChannel.open(path, EnumSet.of(StandardOpenOption.READ));
     this.fileSize = channel.size();
@@ -47,15 +45,15 @@ public class DurableInputPool implements Closeable {
     pool.add(channel);
   }
 
-  public DataInput acquire(long position, long size) throws IOException {
+  public DataInput acquire(long position, long size, int bufferSize) throws IOException {
     if (position + size > fileSize) {
       throw new IllegalArgumentException("byte range not within [0, FILE_SIZE)");
     }
     if (size <= Integer.MAX_VALUE) {
-      return ByteChannelDurableInput.from(LinearList.of(acquireBuffer(position, size)), config.defaultBufferSize);
+      return DurableInput.from(LinearList.of(acquireBuffer(position, size)), bufferSize);
     } else {
       SeekableByteChannel c = acquireChannel();
-      return new ByteChannelDurableInput(c, position, size, config.defaultBufferSize);
+      return new ByteChannelDurableInput(c, position, size, bufferSize);
     }
   }
 
