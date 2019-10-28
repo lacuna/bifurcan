@@ -19,9 +19,7 @@
     Map
     IEntry
     DurableInput
-    DurableOutput
-    DurableConfig
-    DurableConfig$Codec]
+    DurableOutput]
    [io.lacuna.bifurcan.hash
     PerlHash]
    [io.lacuna.bifurcan.durable

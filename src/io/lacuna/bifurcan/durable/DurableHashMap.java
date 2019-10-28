@@ -82,9 +82,8 @@ public class DurableHashMap {
       }
     };
   }
-
-
-  public static <K, V> Iterator<IEntry<K, V>> sortEntries(IMap<K, V> m, ToIntFunction<K> hashFn) throws IOException {
+  
+  public static <K, V> Iterator<IEntry<K, V>> sortEntries(IMap<K, V> m, ToIntFunction<K> hashFn) {
     LinearList<Iterator<Entry>> iterators = new LinearList<>();
     Chunk chunk = new Chunk();
 

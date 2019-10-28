@@ -25,7 +25,9 @@ public class SkipTable {
           parent = new Writer();
         }
 
+        // null terminator
         acc.writeVLQ(0);
+
         parent.append(index, acc.written());
         acc.writeVLQ(offset);
       } else {
