@@ -214,11 +214,6 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
   }
 
   @Override
-  public boolean contains(K key) {
-    return tableIndex(keyHash(key), key) >= 0;
-  }
-
-  @Override
   public V get(K key, V defaultValue) {
     int idx = tableIndex(keyHash(key), key);
     if (idx >= 0) {

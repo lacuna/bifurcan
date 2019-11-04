@@ -13,18 +13,6 @@ import static java.lang.Integer.bitCount;
  */
 public class Util {
 
-  private static final PrimitiveIterator.OfInt EMPTY_INT = new PrimitiveIterator.OfInt() {
-    @Override
-    public int nextInt() {
-      throw new NoSuchElementException();
-    }
-
-    @Override
-    public boolean hasNext() {
-      return false;
-    }
-  };
-
   static final Object DEFAULT_VALUE = new Object();
 
   static final int NONE_NONE = 0;

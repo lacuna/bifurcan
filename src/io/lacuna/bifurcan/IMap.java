@@ -54,7 +54,9 @@ public interface IMap<K, V> extends
   /**
    * @return true if {@code key} is in the map, false otherwise
    */
-  boolean contains(K key);
+  default boolean contains(K key) {
+    return indexOf(key) != -1;
+  }
 
   /**
    * @return a list containing all the entries within the map

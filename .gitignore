@@ -15,3 +15,4 @@ benchmarks/data/
 gen-javadoc.sh
 javadoc
 *.iml
+.java-version

@@ -6,6 +6,8 @@ import io.lacuna.bifurcan.DurableOutput;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import static io.lacuna.bifurcan.allocator.SlabAllocator.free;
+
 public class SkipTable {
   private static final int LOG_BRANCHING_FACTOR = 2;
   private static final int BRANCHING_FACTOR = 1 << LOG_BRANCHING_FACTOR;
@@ -51,6 +53,9 @@ public class SkipTable {
       out.write(this.acc.contents());
     }
 
+    /**
+     * Used for testing, in practice you should always prefer `flushTo` since it automatically frees the buffers.
+     */
     public Iterable<ByteBuffer> contents() {
       DurableAccumulator acc = new DurableAccumulator();
       flushTo(acc);
@@ -60,6 +65,10 @@ public class SkipTable {
     public void flushTo(DurableOutput out) {
       flush(out, 1);
       acc.flushTo(out);
+    }
+
+    public long size() {
+      return acc.written() + parent.size();
     }
   }
 
@@ -78,7 +87,7 @@ public class SkipTable {
 
   }
 
-  public static Entry lookup(DurableInput in, long index) throws IOException {
+  public static Entry lookup(DurableInput in, long index) {
     int tiers = (int) in.readVLQ();
 
     long currIndex = 0, currOffset = 0;
@@ -92,7 +101,7 @@ public class SkipTable {
 
       // recalibrate wrt offset on the next tier
       if (currOffset > 0) {
-        in.skip(currOffset);
+        in.skipBytes(currOffset);
         currOffset = in.readVLQ();
       }
 

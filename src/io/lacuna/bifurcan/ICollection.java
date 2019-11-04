@@ -54,10 +54,10 @@ public interface ICollection<C, V> extends Iterable<V> {
   long size();
 
   /**
-   * @return the element at {@code idx}
-   * @throws IndexOutOfBoundsException when {@code idx} is not within {@code [0, size-1]}
+   * @return the element at {@code index}
+   * @throws IndexOutOfBoundsException when {@code index} is not within {@code [0, size-1]}
    */
-  V nth(long idx);
+  V nth(long index);
 
   /**
    * @return the element at {@code idx}, or {@code defaultValue} if it is not within {@code [0, size-1]}

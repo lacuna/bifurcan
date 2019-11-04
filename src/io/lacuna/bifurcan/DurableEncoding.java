@@ -1,18 +1,56 @@
 package io.lacuna.bifurcan;
 
+import io.lacuna.bifurcan.allocator.SlabAllocator;
+import io.lacuna.bifurcan.durable.BlockPrefix;
+import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
+import io.lacuna.bifurcan.durable.DurableAccumulator;
+
+import java.nio.ByteBuffer;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.Objects;
-import java.util.function.Supplier;
-import java.util.function.ToIntFunction;
+import java.util.function.*;
 
 public interface DurableEncoding {
+
+  class Descriptor {
+    public final String id;
+
+    public Descriptor(String id) {
+      this.id = id.intern();
+    }
+
+    @Override
+    public int hashCode() {
+      return id.hashCode();
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (obj instanceof Descriptor) {
+        return id == ((Descriptor) obj).id;
+      } else {
+        return false;
+      }
+    }
+  }
+
+  interface SkippableIterator extends Iterator<Object> {
+    default SkippableIterator skip(int n) {
+      for (int i = 0; i < n; i++) {
+        skip();
+      }
+      return this;
+    }
+
+    void skip();
+  }
 
   /**
    * A plain-text description of the encoding, which is also used as its identity. All encodings sharing a name should
    * be equivalent.
    */
-  String descriptor();
+  Descriptor descriptor();
 
   /**
    * Describes whether this encoding can be used to encode maps (and implicitly sets, which are treated as maps without
@@ -25,19 +63,26 @@ public interface DurableEncoding {
   /**
    * The hash function used within maps and sets.
    */
-  default ToIntFunction<Object> hashFunction() {
+  default ToIntFunction<Object> keyHash() {
     return Objects::hashCode;
   }
 
   /**
-   * The encoding for `key` within a map or set.
+   * The key equality used within maps and sets.
    */
-  default DurableEncoding keyEncoding(Object key) {
+  default BiPredicate<Object, Object> keyEquality() {
+    return Objects::equals;
+  }
+
+  /**
+   * The encoding for any key in a map or set.
+   */
+  default DurableEncoding keyEncoding() {
     throw new UnsupportedOperationException("Encoding '" + descriptor() + "' does not support maps");
   }
 
   /**
-   * The encoding for the value corresponding to `key` within a map.
+   * The encoding for any value corresponding to `key` within a map.
    */
   default DurableEncoding valueEncoding(Object key) {
     throw new UnsupportedOperationException("Encoding '" + descriptor() + "' does not support maps");
@@ -51,7 +96,7 @@ public interface DurableEncoding {
   }
 
   /**
-   * The encoding for the value stored at `index` within a list.
+   * The encoding for an element at `index` within a list.
    */
   default DurableEncoding elementEncoding(long index) {
     throw new UnsupportedOperationException("Encoding '" + descriptor() + "' does not support lists");
@@ -81,7 +126,7 @@ public interface DurableEncoding {
   /**
    * Decodes a block of primitive values, returning an iterator of thunks representing each individual value.
    */
-  default Iterator<Supplier<Object>> decode(DurableInput in) {
+  default SkippableIterator decode(DurableInput in) {
     throw new UnsupportedOperationException("Encoding '" + descriptor() + "' does not support primitives");
   }
 
@@ -92,20 +137,8 @@ public interface DurableEncoding {
     return true;
   }
 
-  default Comparator<Object> comparator() {
+  default Comparator<Object> keyComparator() {
     return DurableEncoding::defaultComparator;
-  }
-
-  static Object defaultCoercion(Object o) {
-    if (o instanceof java.util.Map) {
-      return Maps.from((java.util.Map) o);
-    } else if (o instanceof java.util.Set) {
-      return Sets.from((java.util.Set) o);
-    } else if (o instanceof java.util.List) {
-      return Lists.from((java.util.List) o);
-    } else {
-      return o;
-    }
   }
 
   static int defaultComparator(Object a, Object b) {

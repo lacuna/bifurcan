@@ -8,6 +8,8 @@ import java.nio.ByteBuffer;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 
+import static io.lacuna.bifurcan.allocator.SlabAllocator.free;
+
 /**
  * @author ztellman
  */
@@ -55,8 +57,20 @@ public class HashTable {
       this.size = size;
     }
 
+    /**
+     * Used for testing, in practice you should always prefer `flushTo` since it automatically frees the buffers.
+     */
     public IList<ByteBuffer> contents() {
       return buffers.values();
+    }
+
+    public long size() {
+      return size;
+    }
+
+    public void flushTo(DurableOutput out) {
+      out.write(buffers.values());
+      free(buffers.values());
     }
 
     private ByteBuffer buffer(long idx) {
@@ -82,7 +96,10 @@ public class HashTable {
           overwrite(buf, e);
           break;
         } else if (curr.hash == e.hash) {
-          throw new IllegalStateException();
+          if (e.offset < curr.offset) {
+            overwrite(buf, e);
+          }
+          return;
         }
 
         long currDist = probeDistance(curr, idx, size);
@@ -95,7 +112,7 @@ public class HashTable {
     }
   }
 
-  public Writer create(long entries, double loadFactor) {
+  public static Writer create(long entries, double loadFactor) {
     return new Writer(SlabAllocator.allocate(requiredBytes(entries, loadFactor)));
   }
 

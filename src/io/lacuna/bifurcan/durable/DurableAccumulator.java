@@ -5,6 +5,7 @@ import io.lacuna.bifurcan.DurableOutput;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.function.Consumer;
 import java.util.zip.CRC32;
 
 import static io.lacuna.bifurcan.allocator.SlabAllocator.free;
@@ -23,6 +24,21 @@ public class DurableAccumulator implements DurableOutput {
     this.channel = new ByteChannelDurableOutput(buffer, bufferSize);
   }
 
+  public static void flushTo(DurableOutput out, Consumer<DurableAccumulator> body) {
+    DurableAccumulator acc = new DurableAccumulator();
+    body.accept(acc);
+    acc.flushTo(out);
+  }
+
+  public static void flushTo(DurableOutput out, BlockPrefix.BlockType type, boolean checksum, Consumer<DurableAccumulator> body) {
+    DurableAccumulator acc = new DurableAccumulator();
+    body.accept(acc);
+    acc.flushTo(out, type, checksum);
+  }
+
+  /**
+   * Writes the contents of the accumulator to `out`, and frees the associated buffers.
+   */
   public void flushTo(DurableOutput out) {
     close();
     Iterable<ByteBuffer> buffers = buffer.contents();
@@ -30,12 +46,12 @@ public class DurableAccumulator implements DurableOutput {
     free(buffers);
   }
 
-  Iterable<ByteBuffer> contents() {
+  public Iterable<ByteBuffer> contents() {
     close();
     return buffer.contents();
   }
 
-  public void flushTo(BlockPrefix.BlockType type, boolean checksum, DurableOutput out) {
+  public void flushTo(DurableOutput out, BlockPrefix.BlockType type, boolean checksum) {
     close();
     Iterable<ByteBuffer> buffers = buffer.contents();
 
@@ -44,16 +60,12 @@ public class DurableAccumulator implements DurableOutput {
       size += b.remaining();
     }
 
-    try {
-      if (checksum) {
-        CRC32 crc = new CRC32();
-        buffers.forEach(b -> crc.update(b.duplicate()));
-        BlockPrefix.write(new BlockPrefix(size, type, (int) crc.getValue()), out);
-      } else {
-        BlockPrefix.write(new BlockPrefix(size, type), out);
-      }
-    } catch (IOException e) {
-      throw new RuntimeException(e);
+    if (checksum && size > 0) {
+      CRC32 crc = new CRC32();
+      buffers.forEach(b -> crc.update(b.duplicate()));
+      BlockPrefix.write(new BlockPrefix(size, type, (int) crc.getValue()), out);
+    } else {
+      BlockPrefix.write(new BlockPrefix(size, type), out);
     }
 
     out.write(buffers);

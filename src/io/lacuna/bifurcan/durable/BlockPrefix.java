@@ -1,5 +1,8 @@
 package io.lacuna.bifurcan.durable;
 
+import io.lacuna.bifurcan.DurableInput;
+import io.lacuna.bifurcan.DurableOutput;
+
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
@@ -64,7 +67,7 @@ public class BlockPrefix {
     return "[ length=" + length + ", type=" + type + (checksum.isPresent() ? ", checksum=" + checksum.getAsInt() : "") + " ]";
   }
 
-  public static BlockPrefix read(DataInput in) throws IOException {
+  public static BlockPrefix read(DurableInput in)  {
     byte firstByte = in.readByte();
 
     boolean checksum = test(firstByte, 7);
@@ -76,7 +79,7 @@ public class BlockPrefix {
         : new BlockPrefix(length, type);
   }
 
-  public static void write(BlockPrefix prefix, DataOutput out) throws IOException {
+  public static void write(BlockPrefix prefix, DurableOutput out) {
     int checksum = prefix.checksum.isPresent() ? 1 : 0;
 
     writePrefixedVLQ(checksum << 3 | prefix.type.ordinal(), 4, prefix.length, out);

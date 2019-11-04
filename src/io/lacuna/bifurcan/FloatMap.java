@@ -88,11 +88,6 @@ public class FloatMap<V> implements ISortedMap<Double, V>, Cloneable {
   }
 
   @Override
-  public boolean contains(Double key) {
-    return contains((double) key);
-  }
-
-  @Override
   public IList<IEntry<Double, V>> entries() {
     return Lists.lazyMap(map.entries(), FloatMap::convertEntry);
   }

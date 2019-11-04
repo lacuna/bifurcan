@@ -1,15 +1,23 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.durable.*;
-import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
+import io.lacuna.bifurcan.durable.ByteChannelDurableOutput;
+import io.lacuna.bifurcan.durable.DurableOutputStream;
+import io.lacuna.bifurcan.durable.Util;
 
-import java.io.*;
+import java.io.Closeable;
+import java.io.DataOutput;
+import java.io.Flushable;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
-import java.util.function.Consumer;
+import java.nio.channels.Channels;
 
 public interface DurableOutput extends DataOutput, Flushable, Closeable, AutoCloseable {
 
   int DEFAULT_BUFFER_SIZE = 1 << 16;
+
+  static DurableOutput from(OutputStream os) {
+    return new ByteChannelDurableOutput(Channels.newChannel(os), DEFAULT_BUFFER_SIZE);
+  }
 
   default void write(byte[] b) {
     write(b, 0, b.length);
@@ -42,11 +50,7 @@ public interface DurableOutput extends DataOutput, Flushable, Closeable, AutoClo
   int write(ByteBuffer src);
 
   default void writeVLQ(long n) {
-    try {
-      Util.writeVLQ(n, this);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
+    Util.writeVLQ(n, this);
   }
 
   default void write(Iterable<ByteBuffer> buffers) {

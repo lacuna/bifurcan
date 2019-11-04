@@ -8,11 +8,6 @@
    [clojure.test.check.clojure-test :as ct :refer [defspec]]
    [bifurcan.test-utils :as u :refer [iterations]])
   (:import
-   [java.io
-    ByteArrayOutputStream
-    ByteArrayInputStream
-    DataOutputStream
-    DataInputStream]
    [java.nio
     ByteBuffer]
    [io.lacuna.bifurcan
@@ -22,17 +17,22 @@
     DurableOutput]
    [io.lacuna.bifurcan.hash
     PerlHash]
+   [io.lacuna.bifurcan.encodings
+    SelfDescribing]
    [io.lacuna.bifurcan.durable
     Util
     BlockPrefix
     BlockPrefix$BlockType
+    DurableAccumulator
+    HashMap
+    HashMap$MapEntry
     HashTable
     HashTable$Entry
     HashTable$Writer
     SkipTable
     SkipTable$Writer
     SkipTable$Entry
-    DurableHashMap]))
+    ChunkSort]))
 
 (set! *warn-on-reflection* true)
 
@@ -64,23 +64,21 @@
 
 (defspec test-vlq-roundtrip iterations
   (prop/for-all [n gen-pos-int]
-    (let [out (ByteArrayOutputStream. 12)
-          _   (Util/writeVLQ n (DataOutputStream. out))
+    (let [out (doto (DurableAccumulator.)
+                (.writeVLQ n))
           in  (->> out
-                .toByteArray
-                ByteArrayInputStream.
-                DataInputStream.)]
-      (= n (Util/readVLQ in)))))
+                .contents
+                DurableInput/from)]
+      (= n (.readVLQ in)))))
 
 (defspec test-prefixed-vlq-roundtrip iterations
   (prop/for-all [n gen-pos-int
                  bits (gen/choose 0 6)]
-    (let [out (ByteArrayOutputStream. 12)
-          _   (Util/writePrefixedVLQ 0 bits n (DataOutputStream. out))
+    (let [out (DurableAccumulator.)
+          _   (Util/writePrefixedVLQ 0 bits n out)
           in  (->> out
-                .toByteArray
-                ByteArrayInputStream.
-                DataInputStream.)]
+                .contents
+                DurableInput/from)]
       (= n (Util/readPrefixedVLQ (.readByte in) bits in)))))
 
 ;;; Prefix
@@ -92,16 +90,15 @@
                         gen/one-of)
                  checksum? gen/boolean
                  checksum (gen/fmap #(p/int %) gen/int)]
-    (let [out (ByteArrayOutputStream. 12)
+    (let [out (DurableAccumulator.)
           p   (if checksum?
                 (BlockPrefix. n type checksum)
                 (BlockPrefix. n type))
-          _   (BlockPrefix/write p (DataOutputStream. out))
+          _   (BlockPrefix/write p out)
           in  (->> out
-                .toByteArray
-                ByteArrayInputStream.
-                DataInputStream.)
-          p' (BlockPrefix/read in)]
+                .contents
+                DurableInput/from)
+          p'  (BlockPrefix/read in)]
       #_(prn p p')
       (= p p'))))
 
@@ -180,19 +177,19 @@
               (= offset (.offset e)))))
         (reductions #(map + %1 %2) entries)))))
 
-;;; DurableHashMap
+;;; SortedChunk
 
 (def hash-fn
   (->to-int-fn hash))
 
-(defspec test-sort-entries iterations
+(defspec test-sort-map-entries iterations
   (prop/for-all [entries (gen/list (gen/tuple gen-pos-int gen-pos-int))]
     (let [m (into {} entries)
-          m' (->> (DurableHashMap/sortEntries
+          m' (->> (HashMap/sortedMapEntries
                     (Map/from ^java.util.Map m)
                     hash-fn)
                iterator-seq
                (map
-                 (fn [^IEntry e]
+                 (fn [^HashMap$MapEntry e]
                    [(.key e) (.value e)])))]
       (= (sort-by #(hash (key %)) m) m'))))

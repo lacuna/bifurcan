@@ -11,6 +11,7 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.function.Function;
 
 public interface DurableInput extends DataInput, Closeable, AutoCloseable {
 
@@ -33,6 +34,10 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
     return new ByteChannelDurableInput(file, 0, file.size(), bufferSize);
   }
 
+  static DurableInput from(Iterable<ByteBuffer> buffers) {
+    return from(buffers, DEFAULT_BUFFER_SIZE);
+  }
+
   static DurableInput from(Iterable<ByteBuffer> buffers, int bufferSize) {
     long size = 0;
     for (ByteBuffer b : buffers) {
@@ -41,15 +46,17 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
     return new ByteChannelDurableInput(new ByteBufferReadableChannel(buffers), 0, size, bufferSize);
   }
 
+//  DurableInput slice(long offset, long length);
+//
+//  default DurableInput slice(long length) {
+//    return slice(position(), length);
+//  }
+
   default void readFully(byte[] b) {
     readFully(b, 0, b.length);
   }
 
   void seek(long position);
-
-  default void skip(long bytes) {
-    seek(position() + bytes);
-  }
 
   long remaining();
 
@@ -86,11 +93,7 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
   double readDouble();
 
   default long readVLQ() {
-    try {
-      return Util.readVLQ(this);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
+    return Util.readVLQ(this);
   }
 
   default boolean readBoolean() {
@@ -116,11 +119,13 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
   }
 
   default BlockPrefix readPrefix() {
-    try {
-      return BlockPrefix.read(this);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
+    return BlockPrefix.read(this);
+  }
+
+  default long skipBlock() {
+    long pos = position();
+    skipBytes(readPrefix().length);
+    return position() - pos;
   }
 
   default InputStream asInputStream() {

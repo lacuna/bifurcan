@@ -6,10 +6,7 @@ import io.lacuna.bifurcan.allocator.SlabAllocator;
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.nio.channels.SeekableByteChannel;
-import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 
 import static io.lacuna.bifurcan.allocator.SlabAllocator.free;
 
@@ -120,7 +117,7 @@ public class ByteChannelDurableInput implements DurableInput {
 
   @Override
   public long skipBytes(long n) {
-    n = (int) Math.min(n, remaining);
+    n = (int) Math.min(n, remaining());
     seek(position() + n);
     return n;
   }

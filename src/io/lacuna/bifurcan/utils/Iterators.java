@@ -1,5 +1,6 @@
 package io.lacuna.bifurcan.utils;
 
+import io.lacuna.bifurcan.IList;
 import io.lacuna.bifurcan.LinearList;
 
 import java.util.*;

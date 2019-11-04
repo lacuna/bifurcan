@@ -28,10 +28,6 @@ public class ByteBufferReadableChannel implements SeekableByteChannel {
     this.buffers = m.forked();
   }
 
-  public ByteBufferReadableChannel(ByteBuffer buffer) {
-    this(LinearList.of(buffer));
-  }
-
   private ByteBuffer read(long position) {
     IEntry<Long, ByteBuffer> e = buffers.floor(position);
     return (ByteBuffer) e.value().duplicate().position((int) (position - e.key()));
