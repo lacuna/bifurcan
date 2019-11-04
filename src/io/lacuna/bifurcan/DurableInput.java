@@ -2,10 +2,7 @@ package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.durable.*;
 
-import java.io.Closeable;
-import java.io.DataInput;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.SeekableByteChannel;
@@ -17,43 +14,14 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
 
   int DEFAULT_BUFFER_SIZE = 1 << 16;
 
-  static DurableInput from(SeekableByteChannel channel) {
-    try {
-      return DurableInput.from(channel, DEFAULT_BUFFER_SIZE);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  static DurableInput from(SeekableByteChannel channel, int bufferSize) throws IOException {
-    return new ByteChannelDurableInput(channel, channel.position(), channel.size(), bufferSize);
-  }
-
-  static DurableInput open(Path path, int bufferSize) throws IOException {
-    FileChannel file = FileChannel.open(path, StandardOpenOption.READ);
-    return new ByteChannelDurableInput(file, 0, file.size(), bufferSize);
-  }
-
   static DurableInput from(Iterable<ByteBuffer> buffers) {
-    return from(buffers, DEFAULT_BUFFER_SIZE);
+    return new ByteBufferDurableInput(buffers);
   }
 
-  static DurableInput from(Iterable<ByteBuffer> buffers, int bufferSize) {
-    long size = 0;
-    for (ByteBuffer b : buffers) {
-      size += b.remaining();
-    }
-    return new ByteChannelDurableInput(new ByteBufferReadableChannel(buffers), 0, size, bufferSize);
-  }
+  DurableInput slice(long offset, long length);
 
-//  DurableInput slice(long offset, long length);
-//
-//  default DurableInput slice(long length) {
-//    return slice(position(), length);
-//  }
-
-  default void readFully(byte[] b) {
-    readFully(b, 0, b.length);
+  default DurableInput slice(long length) {
+    return slice(position(), length);
   }
 
   void seek(long position);
@@ -67,16 +35,30 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
   }
 
   int read(ByteBuffer dst);
-  
+
   void close();
-  
-  void readFully(byte[] b, int off, int len);
+
+  default void readFully(byte[] b) throws EOFException {
+    readFully(b, 0, b.length);
+  }
+
+  default void readFully(byte[] b, int off, int len) throws EOFException {
+    ByteBuffer buf = ByteBuffer.wrap(b, off, len);
+    int n = read(buf);
+    if (n < len) {
+      throw new EOFException();
+    }
+  }
 
   default int skipBytes(int n) {
     return (int) skipBytes((long) n);
   }
 
-  long skipBytes(long n);
+  default long skipBytes(long n) {
+    n = Math.min(n, remaining());
+    seek(position() + n);
+    return n;
+  }
   
   byte readByte();
   
@@ -114,7 +96,11 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
 
   default String readUTF() {
     byte[] encoded = new byte[readUnsignedShort()];
-    readFully(encoded);
+    try {
+      readFully(encoded);
+    } catch (EOFException e) {
+      throw new RuntimeException(e);
+    }
     return new String(encoded, Util.UTF_8);
   }
 

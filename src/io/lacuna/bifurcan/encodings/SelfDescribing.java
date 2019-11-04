@@ -92,11 +92,13 @@ public class SelfDescribing implements DurableEncoding {
   @Override
   public void encode(IList<Object> primitives, DurableOutput out) {
     DurableAccumulator acc = new DurableAccumulator();
+
     DurableOutput compressor = compress.apply(acc);
     for (Object p : primitives) {
       DurableAccumulator.flushTo(compressor, BlockPrefix.BlockType.ENCODED, false, o -> encode.accept(p, o));
     }
     compressor.close();
+
     acc.flushTo(out);
   }
 

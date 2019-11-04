@@ -28,17 +28,7 @@ public class ByteChannelDurableOutput implements DurableOutput, Closeable {
     this.buffer = allocate(bufferSize);
   }
 
-  public static ByteChannelDurableOutput open(Path path, int blockSize) throws IOException {
-    FileChannel file = FileChannel.open(path, StandardOpenOption.WRITE, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-    return new ByteChannelDurableOutput(file, blockSize);
-  }
-
-  public static ByteChannelDurableOutput create(int blockSize) {
-    return new ByteChannelDurableOutput(new ByteBufferWritableChannel(blockSize), blockSize);
-  }
-
   ///
-
 
   @Override
   public void transferFrom(DurableInput in, long bytes) {
@@ -92,7 +82,6 @@ public class ByteChannelDurableOutput implements DurableOutput, Closeable {
     if (src.remaining() > buffer.capacity()) {
       try {
         return channel.write(src);
-
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
@@ -100,22 +89,6 @@ public class ByteChannelDurableOutput implements DurableOutput, Closeable {
       int n = src.remaining();
       buffer.put(src);
       return n;
-    }
-  }
-
-  @Override
-  public void write(byte[] b, int off, int len) {
-    if (buffer.capacity() < len) {
-      try {
-        flush();
-        channel.write(ByteBuffer.wrap(b, off, len));
-
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    } else {
-      checkRemaining(len);
-      buffer.put(b, off, len);
     }
   }
 

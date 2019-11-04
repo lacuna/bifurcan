@@ -121,7 +121,7 @@
                        .contents
                        .iterator
                        iterator-seq)]
-    (DurableInput/from ^Iterable bufs (int 1e3))))
+    (DurableInput/from bufs)))
 
 (defn get-entry [^DurableInput in hash]
   (.seek in 0)
@@ -154,7 +154,7 @@
                   .contents
                   .iterator
                   iterator-seq)]
-    (DurableInput/from ^Iterable bufs (int 1e3))))
+    (DurableInput/from bufs)))
 
 (defn print-skip-table [^DurableInput in]
   (->> (repeatedly #(when (pos? (.remaining in)) (.readVLQ in)))

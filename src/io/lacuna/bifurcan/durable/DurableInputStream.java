@@ -2,6 +2,7 @@ package io.lacuna.bifurcan.durable;
 
 import io.lacuna.bifurcan.DurableInput;
 
+import java.io.EOFException;
 import java.io.InputStream;
 
 public class DurableInputStream extends InputStream {
@@ -21,7 +22,11 @@ public class DurableInputStream extends InputStream {
   @Override
   public int read(byte[] b, int off, int len) {
     len = (int) Math.min(len, in.remaining());
-    in.readFully(b, off, len);
+    try {
+      in.readFully(b, off, len);
+    } catch (EOFException e) {
+      throw new RuntimeException(e);
+    }
     return len;
   }
 

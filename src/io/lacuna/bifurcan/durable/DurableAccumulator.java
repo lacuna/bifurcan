@@ -2,8 +2,9 @@ package io.lacuna.bifurcan.durable;
 
 import io.lacuna.bifurcan.DurableInput;
 import io.lacuna.bifurcan.DurableOutput;
+import io.lacuna.bifurcan.LinearList;
+import io.lacuna.bifurcan.allocator.SlabAllocator;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.function.Consumer;
 import java.util.zip.CRC32;
@@ -12,16 +13,20 @@ import static io.lacuna.bifurcan.allocator.SlabAllocator.free;
 
 public class DurableAccumulator implements DurableOutput {
 
-  private final ByteBufferWritableChannel buffer;
-  private final ByteChannelDurableOutput channel;
+  private final LinearList<ByteBuffer> flushed = new LinearList<>();
+  private ByteBuffer curr;
+  private long flushedBytes = 0;
+  private boolean isOpen = true;
+
+  private final int bufferSize;
 
   public DurableAccumulator() {
     this(DurableOutput.DEFAULT_BUFFER_SIZE);
   }
 
   public DurableAccumulator(int bufferSize) {
-    this.buffer = new ByteBufferWritableChannel(bufferSize);
-    this.channel = new ByteChannelDurableOutput(buffer, bufferSize);
+    this.bufferSize = bufferSize;
+    curr = SlabAllocator.allocate(bufferSize);
   }
 
   public static void flushTo(DurableOutput out, Consumer<DurableAccumulator> body) {
@@ -41,50 +46,52 @@ public class DurableAccumulator implements DurableOutput {
    */
   public void flushTo(DurableOutput out) {
     close();
-    Iterable<ByteBuffer> buffers = buffer.contents();
-    out.write(buffers);
-    free(buffers);
+    out.write(flushed);
+    free(flushed);
   }
 
   public Iterable<ByteBuffer> contents() {
     close();
-    return buffer.contents();
+    return flushed;
   }
 
   public void flushTo(DurableOutput out, BlockPrefix.BlockType type, boolean checksum) {
     close();
-    Iterable<ByteBuffer> buffers = buffer.contents();
 
     long size = 0;
-    for (ByteBuffer b : buffers) {
+    for (ByteBuffer b : flushed) {
       size += b.remaining();
     }
 
     if (checksum && size > 0) {
       CRC32 crc = new CRC32();
-      buffers.forEach(b -> crc.update(b.duplicate()));
+      flushed.forEach(b -> crc.update(b.duplicate()));
       BlockPrefix.write(new BlockPrefix(size, type, (int) crc.getValue()), out);
     } else {
       BlockPrefix.write(new BlockPrefix(size, type), out);
     }
 
-    out.write(buffers);
-    free(buffers);
+    out.write(flushed);
+    free(flushed);
   }
 
   @Override
   public void close() {
-    channel.close();
+    if (isOpen) {
+      isOpen = false;
+      flushedBytes += curr.position();
+      flushed.addLast((ByteBuffer) curr.flip());
+      curr = null;
+    }
   }
 
   @Override
   public void flush() {
-    channel.flush();
   }
 
   @Override
   public long written() {
-    return channel.written();
+    return flushedBytes + (isOpen ? curr.position() : 0);
   }
 
   @Override
@@ -93,52 +100,73 @@ public class DurableAccumulator implements DurableOutput {
     for (ByteBuffer b : buffers) {
       size += b.remaining();
     }
-    buffer.extend((int) Math.min(size, Integer.MAX_VALUE));
+    ensureCapacity((int) Math.min(size, Integer.MAX_VALUE));
     buffers.forEach(this::write);
   }
 
   @Override
   public int write(ByteBuffer src) {
-    return channel.write(src);
+    int n = src.remaining();
+
+    Util.transfer(src, curr);
+    if (src.remaining() > 0) {
+      Util.transfer(src, ensureCapacity(src.remaining()));
+    }
+
+    return n;
   }
 
   @Override
   public void transferFrom(DurableInput in, long bytes) {
-    channel.transferFrom(in, bytes);
+    while (bytes > 0) {
+      bytes -= in.read(curr);
+      ensureCapacity((int) Math.min(bytes, Integer.MAX_VALUE));
+    }
   }
 
   @Override
   public void writeByte(int v) {
-    channel.writeByte(v);
+    ensureCapacity(1).put((byte) v);
   }
 
   @Override
   public void writeShort(int v) {
-    channel.writeShort(v);
+    ensureCapacity(2).putShort((short) v);
   }
 
   @Override
   public void writeChar(int v) {
-    channel.writeChar(v);
+    ensureCapacity(2).putChar((char) v);
   }
 
   @Override
   public void writeInt(int v) {
-    channel.writeInt(v);
+    ensureCapacity(4).putInt(v);
   }
 
   @Override
   public void writeLong(long v) {
-    channel.writeLong(v);
+    ensureCapacity(8).putLong(v);
   }
 
   @Override
   public void writeFloat(float v) {
-    channel.writeFloat(v);
+    ensureCapacity(4).putFloat(v);
   }
 
   @Override
   public void writeDouble(double v) {
-    channel.writeDouble(v);
+    ensureCapacity(8).putDouble(v);
+  }
+
+  //
+
+  public ByteBuffer ensureCapacity(int n) {
+    if (n > curr.remaining()) {
+      flushedBytes += curr.position();
+      flushed.addLast((ByteBuffer) curr.flip());
+      curr = SlabAllocator.allocate(Math.max(bufferSize, n));
+    }
+    return curr;
   }
 }

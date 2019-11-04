@@ -40,18 +40,6 @@ public class Util {
     return size;
   }
 
-  public static int crc32(byte[] block) {
-    CRC32 crc = new CRC32();
-    crc.update(block, 0, block.length);
-    return (int) crc.getValue();
-  }
-
-  public static int crc32(ByteBuffer block) {
-    CRC32 crc = new CRC32();
-    crc.update(block);
-    return (int) crc.getValue();
-  }
-
   public static void writeVLQ(long val, DurableOutput out) {
     assert (val >= 0);
 
