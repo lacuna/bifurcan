@@ -4,11 +4,9 @@ import io.lacuna.bifurcan.DurableEncoding;
 import io.lacuna.bifurcan.DurableInput;
 import io.lacuna.bifurcan.DurableOutput;
 import io.lacuna.bifurcan.IList;
-import io.lacuna.bifurcan.allocator.SlabAllocator;
 import io.lacuna.bifurcan.durable.BlockPrefix;
 import io.lacuna.bifurcan.durable.DurableAccumulator;
 
-import java.nio.ByteBuffer;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 
@@ -95,7 +93,7 @@ public class SelfDescribing implements DurableEncoding {
 
     DurableOutput compressor = compress.apply(acc);
     for (Object p : primitives) {
-      DurableAccumulator.flushTo(compressor, BlockPrefix.BlockType.ENCODED, false, o -> encode.accept(p, o));
+      DurableAccumulator.flushTo(compressor, BlockPrefix.BlockType.OTHER, o -> encode.accept(p, o));
     }
     compressor.close();
 
@@ -118,11 +116,7 @@ public class SelfDescribing implements DurableEncoding {
 
       @Override
       public Object next() {
-        BlockPrefix prefix = in.readPrefix();
-        Iterable<ByteBuffer> bufs = SlabAllocator.allocate(prefix.length);
-        Object result = decode.apply(DurableInput.from(bufs));
-        SlabAllocator.free(bufs);
-        return result;
+        return decode.apply(in.sliceBlock(BlockPrefix.BlockType.OTHER));
       }
     };
   }

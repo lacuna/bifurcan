@@ -36,6 +36,28 @@ public interface DurableEncoding {
   }
 
   interface SkippableIterator extends Iterator<Object> {
+    static SkippableIterator singleton(Object o) {
+      return new SkippableIterator() {
+        boolean consumed = false;
+
+        @Override
+        public void skip() {
+          consumed = true;
+        }
+
+        @Override
+        public boolean hasNext() {
+          return !consumed;
+        }
+
+        @Override
+        public Object next() {
+          consumed = true;
+          return o;
+        }
+      };
+    }
+
     default SkippableIterator skip(int n) {
       for (int i = 0; i < n; i++) {
         skip();

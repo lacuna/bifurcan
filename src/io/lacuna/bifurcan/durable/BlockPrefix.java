@@ -2,6 +2,7 @@ package io.lacuna.bifurcan.durable;
 
 import io.lacuna.bifurcan.DurableInput;
 import io.lacuna.bifurcan.DurableOutput;
+import io.lacuna.bifurcan.utils.Bits;
 
 import java.io.DataInput;
 import java.io.DataOutput;

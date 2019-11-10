@@ -7,52 +7,75 @@ import io.lacuna.bifurcan.LinearList;
 
 import java.nio.ByteBuffer;
 
-public class ByteBufferDurableInput implements DurableInput {
+public class MultiBufferDurableInput implements DurableInput {
 
   private static final ThreadLocal<ByteBuffer> SCRATCH_BUFFER = ThreadLocal.withInitial(() -> ByteBuffer.allocateDirect(8));
 
+  private final Slice bounds;
   private final IntMap<ByteBuffer> buffers;
   private final long size;
 
   private long offset;
   private ByteBuffer curr;
 
-  public ByteBufferDurableInput(Iterable<ByteBuffer> buffers) {
+  private MultiBufferDurableInput(IntMap<ByteBuffer> buffers, Slice bounds, long position, long size) {
+    this.bounds = bounds;
+    this.buffers = buffers;
+    this.size = size;
+    seek(position);
+  }
+
+  public MultiBufferDurableInput(Iterable<ByteBuffer> buffers, Slice bounds) {
     IntMap<ByteBuffer> m = new IntMap<ByteBuffer>().linear();
 
     long size = 0;
     for (ByteBuffer b : buffers) {
-      m.put(size, b);
+      m.put(size, b.duplicate());
       size += b.remaining();
     }
 
+    this.bounds = bounds;
     this.size = size;
     this.buffers = m.forked();
     this.curr = this.buffers.first().value().duplicate();
   }
 
   @Override
-  public DurableInput slice(long offset, long length) {
-    IEntry<Long, ByteBuffer> f = buffers.floor(offset);
-    ByteBuffer bf = (ByteBuffer) f.value().position((int) (offset - f.key()));
-    if (length <= bf.remaining()) {
-      bf = (ByteBuffer) bf.limit(bf.position() + (int) length);
-      return new ByteBufferDurableInput(LinearList.of(bf));
-    }
-
-    IEntry<Long, ByteBuffer> l = buffers.floor(offset + length);
-    ByteBuffer bl = (ByteBuffer) l.value().limit((int) ((offset + length) - f.key()));
-
-    LinearList<ByteBuffer> bufs = LinearList.of(bf);
-    buffers.slice(offset, offset + length).values().forEach(bufs::addLast);
-    bufs.addLast(bl);
-
-    return new ByteBufferDurableInput(bufs);
+  public Slice bounds() {
+    return bounds;
   }
 
   @Override
-  public void seek(long position) {
+  public DurableInput duplicate() {
+    return new MultiBufferDurableInput(buffers, bounds, position(), size);
+  }
+
+  @Override
+  public DurableInput slice(long start, long end) {
+    long length = end - start;
+    Slice bounds = new Slice(this.bounds, start, end);
+
+    IEntry<Long, ByteBuffer> f = buffers.floor(start);
+    ByteBuffer bf = ((ByteBuffer) f.value().position((int) (start - f.key()))).slice();
+    if (length <= bf.remaining()) {
+      bf = ((ByteBuffer) bf.limit((int) length)).slice();
+      return new SingleBufferDurableInput(bf, bounds);
+    }
+
+    IEntry<Long, ByteBuffer> l = buffers.floor(end);
+    ByteBuffer bl = ((ByteBuffer) l.value().limit((int) (end - f.key()))).slice();
+
+    LinearList<ByteBuffer> bufs = LinearList.of(bf);
+    buffers.slice(start, end).values().forEach(bufs::addLast);
+    bufs.addLast(bl);
+
+    return new MultiBufferDurableInput(bufs, bounds);
+  }
+
+  @Override
+  public DurableInput seek(long position) {
     updateCurr(position);
+    return this;
   }
 
   @Override

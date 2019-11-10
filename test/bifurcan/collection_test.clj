@@ -22,6 +22,8 @@
     Iterators]
    [io.lacuna.bifurcan.nodes
     ListNodes$Node]
+   [io.lacuna.bifurcan.diffs
+    DiffMap]
    [io.lacuna.bifurcan
     IntMap
     FloatMap
@@ -327,9 +329,9 @@
     (map= a b)
     (map= a c)))
 
-(u/def-collection-check test-virtual-map iterations map-actions
+(u/def-collection-check test-diff-map iterations map-actions
   [a {} clj-map
-   b Maps/EMPTY bifurcan-map]
+   b (DiffMap. Maps/EMPTY) bifurcan-map]
   (map= a b))
 
 (u/def-collection-check test-map-indices iterations map-actions

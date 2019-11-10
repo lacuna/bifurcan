@@ -31,11 +31,23 @@ public interface DurableOutput extends DataOutput, Flushable, Closeable, AutoClo
 
   void writeByte(int v);
 
+  default void writeUnsignedByte(int v) {
+    writeByte((byte) (v & 0xFF));
+  }
+
   void writeShort(int v);
+
+  default void writeUnsignedShort(int v) {
+    writeShort((short) (v & 0xFFFF));
+  }
 
   void writeChar(int v);
 
   void writeInt(int v);
+
+  default void writeUnsignedInt(long v) {
+    writeInt((int) (v & 0xFFFFFFFFL));
+  }
 
   void writeLong(long v);
 

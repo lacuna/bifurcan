@@ -2,36 +2,44 @@
   (:require
    [primitive-math :as p]
    [byte-streams :as bs]
+   [clojure.edn :as edn]
    [clojure.test :refer :all]
    [clojure.test.check.generators :as gen]
    [clojure.test.check.properties :as prop]
    [clojure.test.check.clojure-test :as ct :refer [defspec]]
+   [bifurcan.collection-test :as coll]
    [bifurcan.test-utils :as u :refer [iterations]])
   (:import
    [java.nio
     ByteBuffer]
    [io.lacuna.bifurcan
     Map
+    Maps
     IEntry
     DurableInput
-    DurableOutput]
+    DurableOutput
+    DurableMap]
    [io.lacuna.bifurcan.hash
     PerlHash]
    [io.lacuna.bifurcan.encodings
     SelfDescribing]
+   [io.lacuna.bifurcan.durable.blocks
+    HashTable
+    HashTable$Entry
+    HashTable$Writer
+    HashTable$Reader
+    SkipTable
+    SkipTable$Reader
+    SkipTable$Writer
+    SkipTable$Entry]
+   [io.lacuna.bifurcan.durable.collections
+    HashMap
+    HashMap$MapEntry]
    [io.lacuna.bifurcan.durable
     Util
     BlockPrefix
     BlockPrefix$BlockType
     DurableAccumulator
-    HashMap
-    HashMap$MapEntry
-    HashTable
-    HashTable$Entry
-    HashTable$Writer
-    SkipTable
-    SkipTable$Writer
-    SkipTable$Entry
     ChunkSort]))
 
 (set! *warn-on-reflection* true)
@@ -45,6 +53,11 @@
   (reify java.util.function.Function
     (apply [_ x]
       (f x))))
+
+(defn ->bi-consumer [f]
+  (reify java.util.function.BiConsumer
+    (accept [_ a b]
+      (f a b))))
 
 (def gen-pos-int
   (gen/such-that
@@ -104,78 +117,50 @@
 
 ;;; HashTable
 
-(defn ^HashTable$Writer hash-table-writer [n]
-  (HashTable$Writer.
-    [(ByteBuffer/allocate (HashTable/requiredBytes (Math/floor (/ n 2)) 0.95))
-     (ByteBuffer/allocate (HashTable/requiredBytes (Math/ceil (/ n 2)) 0.95))]))
-
-(defn put-entry! [^HashTable$Writer writer hash offset]
-  (.put writer hash offset))
-
-(defn encode-hash-table [entries]
+(defn ^HashTable$Reader create-hash-table [entries]
   (let [hash->offset (into {} entries)
-        writer       (hash-table-writer (count hash->offset))
+        writer       (HashTable$Writer. 0.98)
         _            (doseq [[hash offset] hash->offset]
-                       (put-entry! writer hash offset))
-        bufs         (-> writer
-                       .contents
-                       .iterator
-                       iterator-seq)]
-    (DurableInput/from bufs)))
-
-(defn get-entry [^DurableInput in hash]
-  (.seek in 0)
-  (HashTable/get in hash))
+                       (.put writer hash offset))]
+    (HashTable$Reader. (DurableInput/from (.contents writer)) (.entryBytes writer))))
 
 (defspec test-durable-hash-table iterations
   (prop/for-all [entries (gen/such-that
                            (complement empty?)
                            (gen/list (gen/tuple gen-pos-int gen-pos-int)))]
-    (let [in (encode-hash-table entries)]
+    (let [t (create-hash-table entries)]
       (every?
         (fn [[hash offset]]
-          (= offset (.offset ^HashTable$Entry (get-entry in hash))))
+          (= offset (.offset ^HashTable$Entry (.get t hash))))
         (into {} entries)))))
 
 ;; SkipTable
 
-(defn ^SkipTable$Writer skip-table-writer []
-  (SkipTable$Writer.))
-
-(defn append-entry! [^SkipTable$Writer writer index offset]
-  (.append writer index offset))
-
-(defn encode-skip-table [entries]
-  (let [writer  (skip-table-writer)
-        entries (reductions #(map + %1 %2) entries)
+(defn ^SkipTable$Reader create-skip-table [entry-offsets]
+  (let [writer  (SkipTable$Writer.)
+        entries (reductions #(map + %1 %2) entry-offsets)
         _       (doseq [[index offset] entries]
-                  (append-entry! writer index offset))
-        bufs    (-> writer
-                  .contents
-                  .iterator
-                  iterator-seq)]
-    (DurableInput/from bufs)))
+                  (.append writer index offset))]
+    (SkipTable$Reader.
+      (.sliceBlock (DurableInput/from (.contents writer)) BlockPrefix$BlockType/TABLE)
+      (.tiers writer))))
 
 (defn print-skip-table [^DurableInput in]
   (->> (repeatedly #(when (pos? (.remaining in)) (.readVLQ in)))
     (take-while identity)))
 
-(defn lookup-entry [^DurableInput in idx]
-  (.seek in 0)
-  (SkipTable/lookup in idx))
-
 (defspec test-durable-skip-table iterations
-  (prop/for-all [entries (gen/such-that
-                           (complement empty?)
-                           (gen/list (gen/tuple gen-small-pos-int gen-small-pos-int)))]
-    (let [in (encode-skip-table entries)]
+  (prop/for-all [entry-offsets (gen/such-that
+                                 (complement empty?)
+                                 (gen/list (gen/tuple gen-small-pos-int gen-small-pos-int)))]
+    (let [t (create-skip-table entry-offsets)]
       (every?
         (fn [[index offset]]
-          (let [^SkipTable$Entry e (lookup-entry in index)]
+          (let [^SkipTable$Entry e (.floor t index)]
             (and
               (= index (.index e))
               (= offset (.offset e)))))
-        (reductions #(map + %1 %2) entries)))))
+        (reductions #(map + %1 %2) entry-offsets)))))
 
 ;;; SortedChunk
 
@@ -186,10 +171,30 @@
   (prop/for-all [entries (gen/list (gen/tuple gen-pos-int gen-pos-int))]
     (let [m (into {} entries)
           m' (->> (HashMap/sortedMapEntries
-                    (Map/from ^java.util.Map m)
+                    (.entries (Map/from ^java.util.Map m))
                     hash-fn)
                iterator-seq
                (map
                  (fn [^HashMap$MapEntry e]
                    [(.key e) (.value e)])))]
       (= (sort-by #(hash (key %)) m) m'))))
+
+;;; DurableMap
+
+(def edn-encoding
+  (SelfDescribing.
+    "edn"
+    1
+    (->bi-consumer
+      (fn [o ^DurableOutput out]
+        (.write out (.getBytes (pr-str o) "utf-8"))))
+    (->fn
+      (fn [^DurableInput in]
+        (let [ary (byte-array (.remaining in))]
+          (.readFully in ary)
+          (edn/read-string (String. ary "utf-8")))))))
+
+(defspec test-durable-map iterations
+  (prop/for-all [m (coll/map-gen #(Map.))]
+    (let [m' (DurableMap/save m edn-encoding)]
+      (= m m'))))

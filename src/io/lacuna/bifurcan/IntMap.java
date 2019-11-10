@@ -130,6 +130,29 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
   }
 
   @Override
+  public IntMap<V> difference(ISet<Long> keys) {
+    if (keys instanceof IntSet) {
+      return difference(((IntSet) keys).m);
+    } else {
+      return (IntMap<V>) Maps.difference(this, keys);
+    }
+  }
+
+  @Override
+  public IntMap<V> intersection(ISet<Long> keys) {
+    if (keys instanceof IntSet) {
+      return intersection(((IntSet) keys).m);
+    } else {
+      return (IntMap<V>) Maps.intersection(new IntMap<V>().linear(), this, keys);
+    }
+  }
+
+  @Override
+  public IntMap<V> union(IMap<Long, V> m) {
+    return merge(m, (BinaryOperator<V>) Maps.MERGE_LAST_WRITE_WINS);
+  }
+
+  @Override
   public IntMap<V> difference(IMap<Long, ?> b) {
     if (b instanceof IntMap) {
       IntMap<V> m = (IntMap<V>) b;
@@ -273,7 +296,7 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
   }
 
   @Override
-  public IMap<Long, V> update(Long key, UnaryOperator<V> update) {
+  public IntMap<V> update(Long key, UnaryOperator<V> update) {
     return update((long) key, update);
   }
 
@@ -300,7 +323,12 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
   }
 
   public long indexOf(long key) {
-    return key < 0 ? neg.indexOf(key) : neg.size() + pos.indexOf(key);
+    if (key < 0) {
+      return neg.indexOf(key);
+    } else {
+      long index = pos.indexOf(key);
+      return index < 0 ? index - neg.size() : index + neg.size();
+    }
   }
 
   @Override

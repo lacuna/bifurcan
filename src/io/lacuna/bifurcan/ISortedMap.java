@@ -2,6 +2,9 @@ package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.IMap;
 
+import java.util.function.BinaryOperator;
+import java.util.function.UnaryOperator;
+
 /**
  * @author ztellman
  */
@@ -25,6 +28,24 @@ public interface ISortedMap<K, V> extends IMap<K, V> {
    * @return a map representing all entries within [{@code} min, {@code} max]
    */
   ISortedMap<K, V> slice(K min, K max);
+
+  ISortedMap<K, V> merge(IMap<K, V> b, BinaryOperator<V> mergeFn);
+
+  ISortedMap<K, V> difference(ISet<K> keys);
+
+  ISortedMap<K, V> intersection(ISet<K> keys);
+
+  ISortedMap<K, V> union(IMap<K, V> m);
+
+  ISortedMap<K, V> difference(IMap<K, ?> m);
+
+  ISortedMap<K, V> put(K key, V value, BinaryOperator<V> merge);
+
+  ISortedMap<K, V> update(K key, UnaryOperator<V> update);
+
+  ISortedMap<K, V> put(K key, V value);
+
+  ISortedMap<K, V> remove(K key);
 
   default IEntry<K, V> first() {
     return nth(0);

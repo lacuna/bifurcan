@@ -35,10 +35,10 @@ public class DurableAccumulator implements DurableOutput {
     acc.flushTo(out);
   }
 
-  public static void flushTo(DurableOutput out, BlockPrefix.BlockType type, boolean checksum, Consumer<DurableAccumulator> body) {
+  public static void flushTo(DurableOutput out, BlockPrefix.BlockType type, Consumer<DurableAccumulator> body) {
     DurableAccumulator acc = new DurableAccumulator();
     body.accept(acc);
-    acc.flushTo(out, type, checksum);
+    acc.flushTo(out, type, false);
   }
 
   /**
@@ -53,6 +53,10 @@ public class DurableAccumulator implements DurableOutput {
   public Iterable<ByteBuffer> contents() {
     close();
     return flushed;
+  }
+
+  public void flushTo(DurableOutput out, BlockPrefix.BlockType type) {
+    flushTo(out, type, false);
   }
 
   public void flushTo(DurableOutput out, BlockPrefix.BlockType type, boolean checksum) {

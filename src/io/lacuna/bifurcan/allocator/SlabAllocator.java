@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
@@ -54,7 +55,7 @@ public class SlabAllocator {
   ///
 
   public static ByteBuffer allocate(int size) {
-    return ByteBuffer.allocateDirect(size);
+    return ByteBuffer.allocateDirect(size).order(ByteOrder.BIG_ENDIAN);
   }
 
   public static Iterable<ByteBuffer> allocate(long size) {

@@ -1,13 +1,18 @@
 package io.lacuna.bifurcan.durable;
 
 import io.lacuna.bifurcan.*;
+import io.lacuna.bifurcan.DurableEncoding.SkippableIterator;
+import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
+import io.lacuna.bifurcan.durable.blocks.HashMap;
 import io.lacuna.bifurcan.utils.Bits;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.*;
-import java.util.function.*;
-import java.util.zip.CRC32;
+import java.util.function.BiPredicate;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.function.ToIntFunction;
 
 /**
  * @author ztellman
@@ -24,11 +29,34 @@ public class Util {
     return o instanceof ICollection || o instanceof Collection;
   }
 
-  public static void encodeCollection(Object o, DurableEncoding encoding, DurableOutput out) {
-    if (o instanceof IMap) {
-      HashMap.encode((IMap) o, encoding, out);
-    } else if (o instanceof java.util.Map) {
-      HashMap.encode(Maps.from((java.util.Map) o), encoding, out);
+  public static void encodeBlock(IList<Object> os, DurableEncoding encoding, DurableOutput out) {
+    if (os.size() == 1 && isCollection(os.first())) {
+      Object o = os.first();
+      if (o instanceof IMap) {
+        HashMap.encode(((IMap<Object, Object>) o).entries(), encoding, out);
+
+      } else if (o instanceof java.util.Map) {
+        IList<IEntry<Object, Object>> entries = ((java.util.Map<Object, Object>) o).entrySet()
+            .stream()
+            .map(e -> new Maps.Entry<>(e.getKey(), e.getValue()))
+            .collect(Lists.linearCollector());
+        HashMap.encode(entries, encoding, out);
+      }
+
+    } else {
+      DurableAccumulator.flushTo(out, BlockType.ENCODED, acc -> encoding.encode(os, acc));
+    }
+  }
+
+  public static SkippableIterator decodeBlock(DurableInput in, DurableEncoding encoding) {
+    BlockPrefix prefix = in.peekPrefix();
+    switch (prefix.type) {
+      case ENCODED:
+        return encoding.decode(in.duplicate().sliceBlock(BlockType.ENCODED));
+      case HASH_MAP:
+        return SkippableIterator.singleton(HashMap.decode(in.duplicate(), encoding));
+      default:
+        throw new IllegalStateException();
     }
   }
 
@@ -57,6 +85,10 @@ public class Util {
     }
   }
 
+  public static int vlqBytes(long n) {
+    return Math.max(1, (int) Math.ceil(Bits.highestBit(n) / 7.0));
+  }
+
   public static long readVLQ(DurableInput in) {
     return readVLQ(0, in);
   }
@@ -64,12 +96,11 @@ public class Util {
   public static long readVLQ(long result, DurableInput in) {
     for (; ; ) {
       long b = in.readByte() & 0xFFL;
-      result |= (b & 127);
+      result = (result << 7) | (b & 127);
 
       if ((b & 128) == 0) {
         break;
       }
-      result <<= 7;
     }
 
     return result;
@@ -145,12 +176,10 @@ public class Util {
   }
 
   public static class Block<V, E> {
-    public final boolean isCollection;
     public final E encoding;
     public final LinearList<V> elements;
 
-    public Block(boolean isCollection, E encoding, V first) {
-      this.isCollection = isCollection;
+    public Block(E encoding, V first) {
       this.encoding = encoding;
       this.elements = LinearList.of(first);
     }
@@ -177,16 +206,15 @@ public class Util {
 
         if (curr == null) {
           V v = it.next();
-          curr = new Block<>(isCollection.test(v), encoding.apply(v), v);
+          curr = new Block<>(encoding.apply(v), v);
         }
 
         int maxSize = blockSize.applyAsInt(curr.encoding);
         while (it.hasNext() && curr.elements.size() < maxSize) {
           V v = it.next();
           E nextEncoding = encoding.apply(v);
-          boolean nextIsCollection = isCollection.test(v);
-          if (nextIsCollection || !compatibleEncoding.test(curr.encoding, nextEncoding)) {
-            next = new Block<>(nextIsCollection, nextEncoding, v);
+          if (isCollection.test(v) || !compatibleEncoding.test(curr.encoding, nextEncoding)) {
+            next = new Block<>(nextEncoding, v);
             break;
           } else {
             curr.elements.addLast(v);

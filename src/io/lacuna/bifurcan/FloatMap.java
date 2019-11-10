@@ -149,6 +149,21 @@ public class FloatMap<V> implements ISortedMap<Double, V>, Cloneable {
   }
 
   @Override
+  public FloatMap<V> difference(ISet<Double> keys) {
+    return (FloatMap<V>) Maps.difference(this, keys);
+  }
+
+  @Override
+  public FloatMap<V> intersection(ISet<Double> keys) {
+    return this.intersection(Maps.from(keys, n -> null));
+  }
+
+  @Override
+  public FloatMap<V> union(IMap<Double, V> m) {
+    return this.merge(m, (BinaryOperator<V>) Maps.MERGE_LAST_WRITE_WINS);
+  }
+
+  @Override
   public FloatMap<V> difference(IMap<Double, ?> b) {
     if (b instanceof FloatMap) {
       FloatMap<V> m = (FloatMap<V>) b;
@@ -260,7 +275,7 @@ public class FloatMap<V> implements ISortedMap<Double, V>, Cloneable {
   }
 
   @Override
-  public IMap<Double, V> update(Double key, UnaryOperator<V> update) {
+  public FloatMap<V> update(Double key, UnaryOperator<V> update) {
     return update((double) key, update);
   }
 

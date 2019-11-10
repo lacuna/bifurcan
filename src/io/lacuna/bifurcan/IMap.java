@@ -1,9 +1,12 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.Maps.VirtualMap;
+import io.lacuna.bifurcan.diffs.DiffMap;
 import io.lacuna.bifurcan.utils.Iterators;
 
-import java.util.*;
+import java.util.Iterator;
+import java.util.Optional;
+import java.util.Spliterator;
+import java.util.Spliterators;
 import java.util.function.*;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -55,7 +58,7 @@ public interface IMap<K, V> extends
    * @return true if {@code key} is in the map, false otherwise
    */
   default boolean contains(K key) {
-    return indexOf(key) != -1;
+    return indexOf(key) >= 0;
   }
 
   /**
@@ -66,7 +69,7 @@ public interface IMap<K, V> extends
   }
 
   /**
-   * @return the index of {@code key} within {@code nth()}, or -1 if it is not present
+   * @return the index of {@code key} within {@code nth()}, or a negative value if it is not present
    */
   long indexOf(K key);
 
@@ -74,7 +77,7 @@ public interface IMap<K, V> extends
    * @return a set representing all keys in the map
    */
   default ISet<K> keys() {
-    return Sets.from(Lists.lazyMap(entries(), IEntry::key), this::contains);
+    return Sets.from(Lists.lazyMap(entries(), IEntry::key), this::contains, this::indexOf);
   }
 
   /**
@@ -214,7 +217,7 @@ public interface IMap<K, V> extends
    * @return an updated map with {@code value} under {@code key}
    */
   default IMap<K, V> put(K key, V value, BinaryOperator<V> merge) {
-    return new VirtualMap<>(this).put(key, value, merge);
+    return new DiffMap<>(this).put(key, value, merge);
   }
 
   /**
@@ -237,7 +240,7 @@ public interface IMap<K, V> extends
    * @return an updated map that does not contain {@code key}
    */
   default IMap<K, V> remove(K key) {
-    return new VirtualMap<>(this).remove(key);
+    return new DiffMap<>(this).remove(key);
   }
 
   @Override
@@ -247,7 +250,7 @@ public interface IMap<K, V> extends
 
   @Override
   default IMap<K, V> linear() {
-    return new VirtualMap<>(this).linear();
+    return new DiffMap<>(this).linear();
   }
 
   @Override

@@ -1,0 +1,133 @@
+package io.lacuna.bifurcan;
+
+import java.util.Optional;
+import java.util.function.BiPredicate;
+import java.util.function.ToIntFunction;
+
+public class IntSet implements ISortedSet<Long> {
+
+  final IntMap<Void> m;
+  int hash = -1;
+
+  public IntSet() {
+    m = new IntMap<Void>();
+  }
+
+  IntSet(IntMap<Void> m) {
+    this.m = m;
+  }
+
+  @Override
+  public Long floor(Long val) {
+    return Optional.of(m.floor(val)).map(IEntry::key).orElse(null);
+  }
+
+  @Override
+  public Long ceil(Long val) {
+    return Optional.of(m.ceil(val)).map(IEntry::key).orElse(null);
+  }
+
+  @Override
+  public IntSet slice(Long min, Long max)   {
+    return new IntSet(m.slice(min, max));
+  }
+
+  @Override
+  public IntSet add(Long value) {
+    IntMap<Void> mPrime = m.put(value, null);
+    if (m == mPrime) {
+      hash = -1;
+      return this;
+    } else {
+      return new IntSet(mPrime);
+    }
+  }
+
+  @Override
+  public IntSet remove(Long value) {
+    IntMap<Void> mPrime = m.remove(value);
+    if (m == mPrime) {
+      hash = -1;
+      return this;
+    } else {
+      return new IntSet(mPrime);
+    }
+  }
+
+  @Override
+  public IntSet union(ISet<Long> s) {
+    if (s instanceof IntSet) {
+      return new IntSet(m.union(((IntSet) s).m));
+    } else {
+      return (IntSet) Sets.union(this, s);
+    }
+  }
+
+  @Override
+  public IntSet difference(ISet<Long> s) {
+    if (s instanceof IntSet) {
+      return new IntSet(m.difference(((IntSet) s).m));
+    } else {
+      return (IntSet) Sets.difference(this, s);
+    }
+  }
+
+  @Override
+  public IntSet intersection(ISet<Long> s) {
+    if (s instanceof IntSet) {
+      return new IntSet(m.intersection(((IntSet) s).m));
+    } else {
+      return (IntSet) Sets.intersection(new IntSet().linear(), this, s);
+    }
+  }
+
+  @Override
+  public ToIntFunction<Long> valueHash() {
+    return m.keyHash();
+  }
+
+  @Override
+  public BiPredicate<Long, Long> valueEquality() {
+    return m.keyEquality();
+  }
+
+  @Override
+  public boolean contains(Long value) {
+    return m.contains(value);
+  }
+
+  @Override
+  public long indexOf(Long element) {
+    return m.indexOf(element);
+  }
+
+  @Override
+  public long size() {
+    return m.size();
+  }
+
+  @Override
+  public Long nth(long index) {
+    return m.nth(index).key();
+  }
+
+  @Override
+  public IList<Long> elements() {
+    return Lists.lazyMap(m.entries(), IEntry::key);
+  }
+
+  @Override
+  public IntSet forked() {
+    return isLinear() ? new IntSet(m.forked()) : this;
+  }
+
+  @Override
+  public IntSet linear() {
+    return isLinear() ? this : new IntSet(m.linear());
+  }
+
+  @Override
+  public ISet<Long> clone() {
+    return this;
+  }
+}

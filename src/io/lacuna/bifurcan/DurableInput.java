@@ -2,29 +2,70 @@ package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.durable.*;
 
-import java.io.*;
+import java.io.Closeable;
+import java.io.DataInput;
+import java.io.EOFException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
-import java.nio.channels.SeekableByteChannel;
-import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
-import java.util.function.Function;
+import java.util.Iterator;
 
 public interface DurableInput extends DataInput, Closeable, AutoCloseable {
 
-  int DEFAULT_BUFFER_SIZE = 1 << 16;
+  class Slice {
+    public final Slice parent;
+    public final long start, end;
+
+    public Slice(Slice parent, long start, long end) {
+      this.parent = parent;
+      this.start = start;
+      this.end = end;
+    }
+
+    @Override
+    public String toString() {
+      String b = "[" + start + ", " + end + "]";
+      return parent == null ? b : parent + " -> " + b;
+    }
+  }
 
   static DurableInput from(Iterable<ByteBuffer> buffers) {
-    return new ByteBufferDurableInput(buffers);
+    Iterator<ByteBuffer> it = buffers.iterator();
+    ByteBuffer buf = it.next();
+    return it.hasNext()
+        ? new MultiBufferDurableInput(buffers, new Slice(null, 0, Util.size(buffers)))
+        : new SingleBufferDurableInput(buf, new Slice(null, 0, buf.remaining()));
   }
 
-  DurableInput slice(long offset, long length);
+  DurableInput slice(long start, long end);
 
-  default DurableInput slice(long length) {
-    return slice(position(), length);
+  default DurableInput sliceBytes(long bytes) {
+    DurableInput result = slice(position(), position() + bytes);
+    skipBytes(bytes);
+    return result;
   }
 
-  void seek(long position);
+  default DurableInput sliceBlock(BlockPrefix.BlockType type) {
+    long pos = position();
+    BlockPrefix prefix = readPrefix();
+    if (prefix.type != type) {
+      throw new IllegalStateException("expected " + type + " at " + pos + ", got " + prefix.type + " in " + bounds());
+    }
+    return sliceBytes(prefix.length);
+  }
+
+  default DurableInput slicePrefixedBlock() {
+    long start = position();
+    BlockPrefix prefix = readPrefix();
+    long end = position() + prefix.length;
+    seek(start);
+    return sliceBytes(end - start);
+  }
+
+  Slice bounds();
+
+  DurableInput duplicate();
+
+  DurableInput seek(long position);
 
   long remaining();
 
@@ -108,9 +149,17 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
     return BlockPrefix.read(this);
   }
 
+  default BlockPrefix peekPrefix() {
+    long pos = position();
+    BlockPrefix prefix = readPrefix();
+    seek(pos);
+    return prefix;
+  }
+
   default long skipBlock() {
     long pos = position();
-    skipBytes(readPrefix().length);
+    BlockPrefix prefix = readPrefix();
+    skipBytes(prefix.length);
     return position() - pos;
   }
 

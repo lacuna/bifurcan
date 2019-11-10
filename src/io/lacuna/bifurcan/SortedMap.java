@@ -8,6 +8,7 @@ import java.util.Iterator;
 import java.util.function.BiPredicate;
 import java.util.function.BinaryOperator;
 import java.util.function.ToIntFunction;
+import java.util.function.UnaryOperator;
 
 /**
  * A red-black tree based on <a href="http://matt.might.net/papers/germane2014deletion.pdf">Germane 2014</a>.
@@ -70,9 +71,7 @@ public class SortedMap<K, V> implements ISortedMap<K, V> {
 
   @Override
   public SortedMap<K, V> union(IMap<K, V> m) {
-    SortedMap<K, V> result = clone().linear();
-    m.forEach(e -> result.put(e.key(), e.value()));
-    return isLinear() ? result : result.forked();
+    return merge(m, (BinaryOperator<V>) Maps.MERGE_LAST_WRITE_WINS);
   }
 
   @Override
@@ -80,6 +79,23 @@ public class SortedMap<K, V> implements ISortedMap<K, V> {
     SortedMap<K, V> result = clone().linear();
     m.keys().forEach(result::remove);
     return isLinear() ? result : result.forked();
+  }
+
+  @Override
+  public SortedMap<K, V> merge(IMap<K, V> b, BinaryOperator<V> mergeFn) {
+    SortedMap<K, V> result = clone().linear();
+    b.forEach(e -> result.put(e.key(), e.value(), mergeFn));
+    return isLinear() ? result : result.forked();
+  }
+
+  @Override
+  public SortedMap<K, V> update(K key, UnaryOperator<V> update) {
+    return put(key, update.apply(this.get(key, null)));
+  }
+
+  @Override
+  public SortedMap<K, V> put(K key, V value) {
+    return put(key, value, (BinaryOperator<V>) Maps.MERGE_LAST_WRITE_WINS);
   }
 
   @Override

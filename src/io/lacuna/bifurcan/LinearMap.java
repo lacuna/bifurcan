@@ -1,5 +1,6 @@
 package io.lacuna.bifurcan;
 
+import io.lacuna.bifurcan.diffs.DiffMap;
 import io.lacuna.bifurcan.utils.Iterators;
 
 import java.util.*;
@@ -277,7 +278,7 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
 
   @Override
   public IMap<K, V> forked() {
-    return new Maps.VirtualMap<>(this);
+    return new DiffMap<>(this);
   }
 
   @Override

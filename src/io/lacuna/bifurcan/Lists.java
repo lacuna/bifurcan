@@ -627,7 +627,10 @@ public class Lists {
    * @return the result list
    */
   public static <V, U> IList<U> lazyMap(IList<V> l, Function<V, U> f) {
-    return Lists.from(l.size(), i -> f.apply(l.nth(i)));
+    return Lists.from(
+        l.size(),
+        i -> f.apply(l.nth(i)),
+        () -> Iterators.map(l.iterator(), f));
   }
 
   /**
