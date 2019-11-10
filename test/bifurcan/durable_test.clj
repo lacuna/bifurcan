@@ -24,6 +24,8 @@
    [io.lacuna.bifurcan.encodings
     SelfDescribing]
    [io.lacuna.bifurcan.durable.blocks
+    HashMap
+    HashMap$MapEntry
     HashTable
     HashTable$Entry
     HashTable$Writer
@@ -32,9 +34,6 @@
     SkipTable$Reader
     SkipTable$Writer
     SkipTable$Entry]
-   [io.lacuna.bifurcan.durable.collections
-    HashMap
-    HashMap$MapEntry]
    [io.lacuna.bifurcan.durable
     Util
     BlockPrefix
