@@ -29,9 +29,9 @@ import static io.lacuna.bifurcan.durable.BlockPrefix.BlockType.TABLE;
  * encoded as the bytes [2 4 3 4 2 3 0 7 8 1 1 0 2 1 1 0 4], which is interpreted as this tree:
  *
  * 2: [4, 3]
- *        └------------┐
+ *        └---------------┐
  * 4: [2, 3]          [0, 7]
- *        └----┐          └----┐
+ *        └-------┐       └-------┐
  * 8: [1, 1], [0, 2], [1, 1], [0, 4]
  *
  * Note that the {0 0} entry is implicit.  Also note that the zeroed out key in each terminating pair doesn't matter,
