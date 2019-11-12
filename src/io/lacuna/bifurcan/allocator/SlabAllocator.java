@@ -44,13 +44,13 @@ public class SlabAllocator {
     this.buffers = new IntMap<ByteBuffer>().linear();
   }
 
-  private IAllocator.Range range(ByteBuffer buffer) {
-    try {
-      return new IAllocator.Range((long) ADDRESS.get(buffer), buffer.capacity());
-    } catch (IllegalAccessException e) {
-      throw new IllegalStateException(e);
-    }
-  }
+//  private IAllocator.Range range(ByteBuffer buffer) {
+//    try {
+//      return new IAllocator.Range((long) ADDRESS.get(buffer), buffer.capacity());
+//    } catch (IllegalAccessException e) {
+//      throw new IllegalStateException(e);
+//    }
+//  }
 
   ///
 

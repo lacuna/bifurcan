@@ -1,15 +1,10 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.allocator.SlabAllocator;
-import io.lacuna.bifurcan.durable.BlockPrefix;
-import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
-import io.lacuna.bifurcan.durable.DurableAccumulator;
-
-import java.nio.ByteBuffer;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.Objects;
-import java.util.function.*;
+import java.util.function.BiPredicate;
+import java.util.function.ToIntFunction;
 
 public interface DurableEncoding {
 
@@ -58,8 +53,8 @@ public interface DurableEncoding {
       };
     }
 
-    default SkippableIterator skip(int n) {
-      for (int i = 0; i < n; i++) {
+    default SkippableIterator skip(long n) {
+      for (long i = 0; i < n; i++) {
         skip();
       }
       return this;

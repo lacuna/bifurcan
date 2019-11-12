@@ -37,7 +37,7 @@ public class BuddyAllocator implements IAllocator {
   }
 
   @Override
-  public synchronized Range acquire(long capacity) {
+  public Range acquire(long capacity) {
 
     int idx = max(0, log2Ceil(capacity) - log2Min);
     ISet<Range> s = ranges.nth(idx);
@@ -56,7 +56,7 @@ public class BuddyAllocator implements IAllocator {
   }
 
   @Override
-  public synchronized void release(Range range) {
+  public void release(Range range) {
     for (; ; ) {
       int idx = bitOffset(range.end - range.start) - log2Min;
       Range sibling = sibling(range);
@@ -73,7 +73,7 @@ public class BuddyAllocator implements IAllocator {
   }
 
   @Override
-  public synchronized Iterable<Range> available() {
+  public Iterable<Range> available() {
     return ranges.stream().flatMap(s -> s.elements().stream()).collect(Lists.linearCollector());
   }
 

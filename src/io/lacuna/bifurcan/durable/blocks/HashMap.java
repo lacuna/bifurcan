@@ -12,6 +12,19 @@ import java.util.Comparator;
 import java.util.Iterator;
 import java.util.function.ToIntFunction;
 
+/**
+ * The underlying encode/decode logic for DurableMap.
+ *
+ * Encoding:
+ * - the number of entries [VLQ]
+ * - the number of bytes per HashTable entry [uint8]
+ * - the number of SkipTable tiers [uint8]
+ * - a hash table of hashes onto entry offsets
+ * - a skip table of indices onto entry offsets
+ * - zero or more HashMapEntries blocks
+ *
+ * If there are fewer than two HashMapEntries blocks, then both tables are omitted, and the associated values set to 0.
+ */
 public class HashMap {
 
   private static double LOAD_FACTOR = 0.98;
@@ -22,7 +35,7 @@ public class HashMap {
     public final V value;
 
     public MapEntry(int hash, IEntry<K, V> e) {
-      this.hash = hash == HashTable.NONE ? HashTable.FALLBACK : hash;
+      this.hash = hash;
       this.key = e.key();
       this.value = e.value();
     }
@@ -100,10 +113,10 @@ public class HashMap {
       long offset = entries.written();
       skipTable.append(index, offset);
       b.elements.forEach(e -> hashTable.put(e.hash, offset));
-      index += b.elements.size();
 
       // write the entries
-      HashMapEntries.encode(b, keyEncoding, entries);
+      HashMapEntries.encode(index, b, keyEncoding, entries);
+      index += b.elements.size();
     }
 
     // flush everything to the provided sink
@@ -141,14 +154,14 @@ public class HashMap {
     int bytesPerEntry = in.readUnsignedByte();
     int skipTableTiers = in.readUnsignedByte();
 
-    HashTable.Reader hashTable = null;
+    HashTable hashTable = null;
     if (bytesPerEntry > 0) {
-      hashTable = new HashTable.Reader(in.sliceBlock(BlockType.TABLE), bytesPerEntry);
+      hashTable = new HashTable(in.sliceBlock(BlockType.TABLE), bytesPerEntry);
     }
 
-    SkipTable.Reader skipTable = null;
+    SkipTable skipTable = null;
     if (skipTableTiers > 0) {
-      skipTable = new SkipTable.Reader(in.sliceBlock(BlockType.TABLE), skipTableTiers);
+      skipTable = new SkipTable(in.sliceBlock(BlockType.TABLE), skipTableTiers);
     }
 
     DurableInput entries = in.sliceBytes((pos + prefix.length) - in.position());

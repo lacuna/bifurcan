@@ -29,9 +29,7 @@
     HashTable
     HashTable$Entry
     HashTable$Writer
-    HashTable$Reader
     SkipTable
-    SkipTable$Reader
     SkipTable$Writer
     SkipTable$Entry]
    [io.lacuna.bifurcan.durable
@@ -116,12 +114,12 @@
 
 ;;; HashTable
 
-(defn ^HashTable$Reader create-hash-table [entries]
+(defn ^HashTable create-hash-table [entries]
   (let [hash->offset (into {} entries)
         writer       (HashTable$Writer. 0.98)
         _            (doseq [[hash offset] hash->offset]
                        (.put writer hash offset))]
-    (HashTable$Reader. (DurableInput/from (.contents writer)) (.entryBytes writer))))
+    (HashTable. (DurableInput/from (.contents writer)) (.entryBytes writer))))
 
 (defspec test-durable-hash-table iterations
   (prop/for-all [entries (gen/such-that
@@ -135,12 +133,12 @@
 
 ;; SkipTable
 
-(defn ^SkipTable$Reader create-skip-table [entry-offsets]
+(defn ^SkipTable create-skip-table [entry-offsets]
   (let [writer  (SkipTable$Writer.)
         entries (reductions #(map + %1 %2) entry-offsets)
         _       (doseq [[index offset] entries]
                   (.append writer index offset))]
-    (SkipTable$Reader.
+    (SkipTable.
       (.sliceBlock (DurableInput/from (.contents writer)) BlockPrefix$BlockType/TABLE)
       (.tiers writer))))
 
@@ -183,7 +181,7 @@
 (def edn-encoding
   (SelfDescribing.
     "edn"
-    1
+    2
     (->bi-consumer
       (fn [o ^DurableOutput out]
         (.write out (.getBytes (pr-str o) "utf-8"))))
@@ -196,4 +194,9 @@
 (defspec test-durable-map iterations
   (prop/for-all [m (coll/map-gen #(Map.))]
     (let [m' (DurableMap/save m edn-encoding)]
-      (= m m'))))
+      (and
+        (= m m')
+        (->> (range (.size m'))
+          (every?
+            (fn [^long i]
+              (= i (->> (.nth m' i) .key (.indexOf m'))))))))))

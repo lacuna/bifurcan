@@ -5,6 +5,15 @@ import io.lacuna.bifurcan.DurableOutput;
 import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
 import io.lacuna.bifurcan.durable.DurableAccumulator;
 
+import java.util.PrimitiveIterator;
+
+/**
+ * A block representing a sorted sequence of 32-bit integers:
+ * - the initial value [int32]
+ * - zero or more deltas from the previous value [VLQs]
+ *
+ * @author ztellman
+ */
 public class HashDeltas {
 
   public static class Writer {
@@ -17,7 +26,7 @@ public class HashDeltas {
 
     public void append(int hash) {
       if (init) {
-        acc.writeVLQ(hash - prevHash);
+        acc.writeVLQ((long) hash - (long) prevHash);
       } else {
         init = true;
         acc.writeInt(hash);
@@ -54,45 +63,59 @@ public class HashDeltas {
     }
   }
 
-  public static Reader decode(DurableInput in) {
-    return new Reader(in.sliceBlock(BlockType.TABLE));
+  public static HashDeltas decode(DurableInput in) {
+    return new HashDeltas(in.sliceBlock(BlockType.TABLE));
   }
 
-  public static class Reader {
+  public final DurableInput in;
 
-    public final DurableInput in;
+  private HashDeltas(DurableInput in) {
+    this.in = in;
+  }
 
-    private Reader(DurableInput in) {
-      this.in = in;
-    }
+  public PrimitiveIterator.OfInt iterator() {
+    DurableInput in = this.in.duplicate().seek(0);
 
-    public IndexRange candidateIndices(int hash) {
-      DurableInput in = this.in.duplicate();
+    return new PrimitiveIterator.OfInt() {
+      boolean hasNext = true;
+      int next = in.readInt();
 
-      int start = -1, end = -1;
-      int currHash = in.readInt();
-
-      int i = 0;
-      if (currHash == hash) {
-        start = end = 0;
-      } else {
-        for (i = 1; in.remaining() > 0; i++) {
-          currHash += in.readVLQ();
-          if (currHash == hash) {
-            start = i;
-            break;
-          }
+      @Override
+      public int nextInt() {
+        int result = next;
+        if (in.remaining() > 0) {
+          next += (int) in.readVLQ();
+        } else {
+          hasNext = false;
         }
+        return result;
       }
 
-      for (; in.remaining() > 0; end++) {
-        currHash += in.readVLQ();
-        if (currHash > hash) {
-          return new IndexRange(start, end, true);
-        }
+      @Override
+      public boolean hasNext() {
+        return hasNext;
       }
+    };
+  }
 
-      return new IndexRange(start, end + 1, false);
+  public IndexRange candidateIndices(int hash) {
+    int start = -1, end = -1;
+    PrimitiveIterator.OfInt it = iterator();
+
+    for (int i = 0; it.hasNext(); i++) {
+      if (it.nextInt() == hash) {
+        start = i;
+        break;
+      }
     }
+
+    for (end = start; it.hasNext(); end++) {
+      if (it.nextInt() > hash) {
+        return new IndexRange(start, end + 1, true);
+      }
+    }
+
+    return new IndexRange(start, end + 1, false);
   }
 }
+

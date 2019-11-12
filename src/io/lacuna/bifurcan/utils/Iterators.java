@@ -253,6 +253,18 @@ public class Iterators {
     }
   }
 
+  /**
+   * @param it an iterator
+   * @param n the number of elements to drop, which may be larger than the number of values in the iterator
+   * @return an iterator with the first {@code n} values dropped
+   */
+  public static <V> Iterator<V> drop(Iterator<V> it, long n) {
+    for (long i = 0; i < n && it.hasNext(); i++) {
+      it.next();
+    }
+    return it;
+  }
+
   public static <V> Stream<V> toStream(Iterator<V> it) {
     return toStream(it, 0);
   }

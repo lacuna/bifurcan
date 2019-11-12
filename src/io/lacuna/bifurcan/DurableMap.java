@@ -13,16 +13,16 @@ import java.util.function.ToIntFunction;
 public class DurableMap implements IDurableCollection, IMap<Object, Object> {
 
   private final long size;
-  private final HashTable.Reader hashTable;
-  private final SkipTable.Reader skipTable;
+  private final HashTable hashTable;
+  private final SkipTable skipTable;
   private final DurableInput entries;
   private final DurableEncoding encoding;
   private final ToIntFunction<Object> keyHash;
 
   public DurableMap(
       long size,
-      HashTable.Reader hashTable,
-      SkipTable.Reader skipTable,
+      HashTable hashTable,
+      SkipTable skipTable,
       DurableInput entries,
       DurableEncoding encoding) {
     this.size = size;
@@ -39,19 +39,24 @@ public class DurableMap implements IDurableCollection, IMap<Object, Object> {
     return HashMap.decode(DurableInput.from(out.contents()), encoding);
   }
 
-  private Iterator<HashMapEntries.Reader> entries(long offset) {
+  private Iterator<HashMapEntries> chunkedEntries(long offset) {
     DurableInput in = entries.duplicate().seek(offset);
-    return new Iterator<HashMapEntries.Reader>() {
+    return new Iterator<HashMapEntries>() {
       @Override
       public boolean hasNext() {
         return in.remaining() > 0;
       }
 
       @Override
-      public HashMapEntries.Reader next() {
+      public HashMapEntries next() {
         return HashMapEntries.decode(in, encoding);
       }
     };
+  }
+
+  @Override
+  public DurableEncoding encoding() {
+    return encoding;
   }
 
   @Override
@@ -67,19 +72,21 @@ public class DurableMap implements IDurableCollection, IMap<Object, Object> {
   @Override
   public Object get(Object key, Object defaultValue) {
     int hash = keyHash.applyAsInt(key);
+    HashTable.Entry blockEntry = hashTable == null ? HashTable.Entry.EMPTY : hashTable.get(hash);
 
-    HashTable.Entry blockEntry = hashTable == null ? HashTable.Entry.ENTRY : hashTable.get(hash);
-    if (blockEntry == null) {
-      return defaultValue;
-    } else {
-      Iterator<HashMapEntries.Reader> it = entries(blockEntry.offset);
-      return HashMapEntries.get(it, hash, key, defaultValue);
-    }
+    return blockEntry == null
+        ? defaultValue
+        : HashMapEntries.get(chunkedEntries(blockEntry.offset), hash, key, defaultValue);
   }
 
   @Override
   public long indexOf(Object key) {
-    return 0;
+    int hash = keyHash.applyAsInt(key);
+    HashTable.Entry blockEntry = hashTable == null ? HashTable.Entry.EMPTY : hashTable.get(hash);
+
+    return blockEntry == null
+        ? -1
+        : HashMapEntries.indexOf(chunkedEntries(blockEntry.offset), hash, key);
   }
 
   @Override
@@ -90,7 +97,7 @@ public class DurableMap implements IDurableCollection, IMap<Object, Object> {
   @Override
   public IEntry<Object, Object> nth(long index) {
     SkipTable.Entry blockEntry = skipTable == null ? SkipTable.Entry.ENTRY : skipTable.floor(index);
-    return entries(blockEntry.offset).next().nth((int) (index - blockEntry.index));
+    return chunkedEntries(blockEntry.offset).next().nth((int) (index - blockEntry.index));
   }
 
   @Override

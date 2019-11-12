@@ -13,16 +13,16 @@ import java.util.function.LongFunction;
 import static io.lacuna.bifurcan.allocator.SlabAllocator.free;
 
 /**
+ * A sequence of fixed-size entries representing hashes and offsets.  Hashes are 32-bit integers, and offsets are n-bit
+ * integers, where the length is determined by the largest offset value.
+ *
  * @author ztellman
  */
 public class HashTable {
 
-  public static final int NONE = 0;
-  public static final int FALLBACK = -1;
-
   public static class Entry {
 
-    public static final Entry ENTRY = new Entry(0, 0);
+    public static final Entry EMPTY = new Entry(0, 0);
 
     // int32
     public final int hash;
@@ -44,6 +44,51 @@ public class HashTable {
       return "[hash=" + hash + ", offset=" + offset + "]";
     }
   }
+
+  public static final int NONE = 0;
+  public static final int FALLBACK = -1;
+
+  public final DurableInput in;
+  public final long numEntries;
+  public final int entryBytes;
+
+  public HashTable(DurableInput in, int entryBytes) {
+    this.in = in;
+    this.entryBytes = entryBytes;
+    this.numEntries = in.size() / entryBytes;
+  }
+
+  public Entry get(int hash) {
+    DurableInput in = this.in.duplicate();
+
+    long idx = estimatedIndex(hash, numEntries);
+    in.seek(idx * entryBytes);
+    for (long dist = 0; ; idx++, dist++) {
+      if (in.remaining() == 0) {
+        in.seek(0);
+      }
+
+      Entry curr = read(in, entryBytes);
+      if (curr.isEmpty()) {
+        return null;
+      } else if (curr.hash == hash) {
+        return curr;
+      } else if (dist > probeDistance(curr, idx, numEntries)) {
+        return null;
+      }
+    }
+  }
+
+  public IList<Entry> entries() {
+    in.seek(0);
+    LinearList<Entry> entries = new LinearList<>();
+    while (in.remaining() > 0) {
+      entries.addLast(read(in, entryBytes));
+    }
+    return entries;
+  }
+
+  ///
 
   public static class Writer {
 
@@ -152,49 +197,6 @@ public class HashTable {
           dist = currDist;
         }
       }
-    }
-  }
-
-  public static class Reader {
-
-    public final DurableInput in;
-    public final long numEntries;
-    public final int entryBytes;
-
-    public Reader(DurableInput in, int entryBytes) {
-      this.in = in;
-      this.entryBytes = entryBytes;
-      this.numEntries = in.size() / entryBytes;
-    }
-
-    public Entry get(int hash) {
-      DurableInput in = this.in.duplicate();
-
-      long idx = estimatedIndex(hash, numEntries);
-      in.seek(idx * entryBytes);
-      for (long dist = 0; ; idx++, dist++) {
-        if (in.remaining() == 0) {
-          in.seek(0);
-        }
-
-        Entry curr = read(in, entryBytes);
-        if (curr.isEmpty()) {
-          return null;
-        } else if (curr.hash == hash) {
-          return curr;
-        } else if (dist > probeDistance(curr, idx, numEntries)) {
-          return null;
-        }
-      }
-    }
-
-    public IList<Entry> entries() {
-      in.seek(0);
-      LinearList<Entry> entries = new LinearList<>();
-      while (in.remaining() > 0) {
-        entries.addLast(read(in, entryBytes));
-      }
-      return entries;
     }
   }
 
