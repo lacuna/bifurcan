@@ -38,7 +38,7 @@ public class DurableAccumulator implements DurableOutput {
   public static void flushTo(DurableOutput out, BlockPrefix.BlockType type, Consumer<DurableAccumulator> body) {
     DurableAccumulator acc = new DurableAccumulator();
     body.accept(acc);
-    acc.flushTo(out, type, false);
+    acc.flushTo(out, type);
   }
 
   /**
@@ -56,25 +56,10 @@ public class DurableAccumulator implements DurableOutput {
   }
 
   public void flushTo(DurableOutput out, BlockPrefix.BlockType type) {
-    flushTo(out, type, false);
-  }
-
-  public void flushTo(DurableOutput out, BlockPrefix.BlockType type, boolean checksum) {
     close();
+    BlockPrefix p = new BlockPrefix(Util.size(flushed), type);
 
-    long size = 0;
-    for (ByteBuffer b : flushed) {
-      size += b.remaining();
-    }
-
-    if (checksum && size > 0) {
-      CRC32 crc = new CRC32();
-      flushed.forEach(b -> crc.update(b.duplicate()));
-      BlockPrefix.write(new BlockPrefix(size, type, (int) crc.getValue()), out);
-    } else {
-      BlockPrefix.write(new BlockPrefix(size, type), out);
-    }
-
+    p.encode(out);
     out.write(flushed);
     free(flushed);
   }

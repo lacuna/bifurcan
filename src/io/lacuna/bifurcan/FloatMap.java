@@ -344,7 +344,7 @@ public class FloatMap<V> implements ISortedMap<Double, V>, Cloneable {
   ///
 
   private static <V> IEntry<Double, V> convertEntry(IEntry<Long, V> e) {
-    return e != null ? new Maps.Entry<>(longToDouble(e.key()), e.value()) : null;
+    return e != null ? IEntry.of(longToDouble(e.key()), e.value()) : null;
   }
 
 }

@@ -4,7 +4,9 @@ import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.DurableEncoding.SkippableIterator;
 import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
 import io.lacuna.bifurcan.durable.blocks.HashMap;
+import io.lacuna.bifurcan.durable.blocks.List;
 import io.lacuna.bifurcan.utils.Bits;
+import io.lacuna.bifurcan.utils.Iterators;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
@@ -19,7 +21,7 @@ import java.util.function.ToIntFunction;
  */
 public class Util {
 
-  private static final Object NONE = new Object();
+  public static ThreadLocal<LinearSet<IDurableCollection.Fingerprint>> DEPENDENCIES = ThreadLocal.withInitial(LinearSet::new);
 
   public final static Charset UTF_16 = Charset.forName("utf-16");
   public static final Charset UTF_8 = Charset.forName("utf-8");
@@ -33,14 +35,17 @@ public class Util {
     if (os.size() == 1 && isCollection(os.first())) {
       Object o = os.first();
       if (o instanceof IMap) {
-        HashMap.encode(((IMap<Object, Object>) o).entries(), encoding, out);
+        HashMap.encodeUnsortedEntries(((IMap<Object, Object>) o).entries(), encoding, out);
 
       } else if (o instanceof java.util.Map) {
         IList<IEntry<Object, Object>> entries = ((java.util.Map<Object, Object>) o).entrySet()
             .stream()
-            .map(e -> new Maps.Entry<>(e.getKey(), e.getValue()))
+            .map(e -> IEntry.of(e.getKey(), e.getValue()))
             .collect(Lists.linearCollector());
-        HashMap.encode(entries, encoding, out);
+        HashMap.encodeUnsortedEntries(entries, encoding, out);
+
+      } else if (o instanceof Iterable) {
+        List.encode(((Iterable) o).iterator(), encoding, out);
       }
 
     } else {
@@ -48,13 +53,15 @@ public class Util {
     }
   }
 
-  public static SkippableIterator decodeBlock(DurableInput in, DurableEncoding encoding) {
+  public static SkippableIterator decodeBlock(DurableInput in, IDurableCollection.Root root, DurableEncoding encoding) {
     BlockPrefix prefix = in.peekPrefix();
     switch (prefix.type) {
       case ENCODED:
         return encoding.decode(in.duplicate().sliceBlock(BlockType.ENCODED));
       case HASH_MAP:
-        return SkippableIterator.singleton(HashMap.decode(in.duplicate(), encoding));
+        return SkippableIterator.singleton(HashMap.decode(in.duplicate(), root, encoding));
+      case LIST:
+        return SkippableIterator.singleton(List.decode(in.duplicate(), root, encoding));
       default:
         throw new IllegalStateException();
     }
@@ -83,10 +90,6 @@ public class Util {
         out.writeByte((byte) (b | 128));
       }
     }
-  }
-
-  public static int vlqBytes(long n) {
-    return Math.max(1, (int) Math.ceil(Bits.highestBit(n) / 7.0));
   }
 
   public static long readVLQ(DurableInput in) {
@@ -136,29 +139,23 @@ public class Util {
     PriorityQueue<IEntry<Iterator<V>, V>> heap = new PriorityQueue<IEntry<Iterator<V>, V>>(Comparator.comparing(IEntry::value, comparator));
     for (Iterator<V> it : iterators) {
       if (it.hasNext()) {
-        heap.add(new Maps.Entry<>(it, it.next()));
+        heap.add(IEntry.of(it, it.next()));
       }
     }
 
-    return new Iterator<V>() {
-      @Override
-      public boolean hasNext() {
-        return heap.size() > 0;
-      }
+    return Iterators.from(
+        () -> heap.size() > 0,
+        () -> {
+          IEntry<Iterator<V>, V> e = heap.poll();
+          if (e == null) {
+            throw new NoSuchElementException();
+          }
 
-      @Override
-      public V next() {
-        IEntry<Iterator<V>, V> e = heap.poll();
-        if (e == null) {
-          throw new NoSuchElementException();
-        }
-
-        if (e.key().hasNext()) {
-          heap.add(new Maps.Entry<>(e.key(), e.key().next()));
-        }
-        return e.value();
-      }
-    };
+          if (e.key().hasNext()) {
+            heap.add(IEntry.of(e.key(), e.key().next()));
+          }
+          return e.value();
+        });
   }
 
   public static int transfer(ByteBuffer src, ByteBuffer dst) {

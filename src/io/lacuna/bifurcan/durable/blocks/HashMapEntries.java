@@ -1,6 +1,7 @@
 package io.lacuna.bifurcan.durable.blocks;
 
 import io.lacuna.bifurcan.*;
+import io.lacuna.bifurcan.IDurableCollection.Root;
 import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
 import io.lacuna.bifurcan.durable.DurableAccumulator;
 import io.lacuna.bifurcan.durable.Util;
@@ -12,7 +13,7 @@ import java.util.function.BiPredicate;
 
 /**
  * A block that represents zero or more key/value pairs in a HashMap.
- *
+ * <p>
  * Encoding:
  * - the number of preceding entries [VLQ]
  * - the hash for each entry [HashDeltas]
@@ -25,46 +26,44 @@ public class HashMapEntries {
 
   public static <K, V> void encode(
       long offset,
-      Util.Block<HashMap.MapEntry<K, V>, DurableEncoding> block,
+      Util.Block<IEntry.WithHash<K, V>, DurableEncoding> block,
       DurableEncoding keyEncoding,
       DurableOutput out) {
     DurableAccumulator.flushTo(out, BLOCK_TYPE, acc -> {
       acc.writeVLQ(offset);
 
       HashDeltas.Writer hashes = new HashDeltas.Writer();
-      block.elements.forEach(e -> hashes.append(e.hash));
+      block.elements.forEach(e -> hashes.append(e.keyHash()));
       hashes.flushTo(acc);
 
-      Util.encodeBlock(Lists.lazyMap(block.elements, e -> e.key), keyEncoding, acc);
-      Util.encodeBlock(Lists.lazyMap(block.elements, e -> e.value), block.encoding, acc);
+      Util.encodeBlock(Lists.lazyMap(block.elements, IEntry::key), keyEncoding, acc);
+      Util.encodeBlock(Lists.lazyMap(block.elements, IEntry::value), block.encoding, acc);
     });
   }
 
-  public static HashMapEntries decode(DurableInput in, DurableEncoding mapEncoding) {
+  public static HashMapEntries decode(DurableInput in, Root root, DurableEncoding mapEncoding) {
     DurableInput entries = in.sliceBlock(BLOCK_TYPE);
     long entryOffset = entries.readVLQ();
     HashDeltas deltas = HashDeltas.decode(entries);
     DurableInput keys = entries.slicePrefixedBlock();
     DurableInput values = entries.slicePrefixedBlock();
 
-    return new HashMapEntries(entryOffset, deltas, keys, values, mapEncoding);
+    return new HashMapEntries(root, entryOffset, deltas, keys, values, mapEncoding);
   }
 
-  public static Object get(Iterator<HashMapEntries> it, int hash, Object key, Object defaultValue) {
+  public static Object get(Iterator<HashMapEntries> it, Root root, int hash, Object key, Object defaultValue) {
     while (it.hasNext()) {
       HashMapEntries entries = it.next();
       HashDeltas.IndexRange candidates = entries.hashes.candidateIndices(hash);
-      if (candidates.start == -1) {
-        return defaultValue;
-      }
 
       int keyIndex = entries.localIndexOf(candidates, key);
       if (keyIndex == -1 && candidates.isBounded) {
         return defaultValue;
       } else if (keyIndex != -1) {
-        return Util.decodeBlock(entries.values, entries.mapEncoding.valueEncoding(key)).skip(keyIndex).next();
+        return Util.decodeBlock(entries.values, root, entries.mapEncoding.valueEncoding(key)).skip(keyIndex).next();
       }
     }
+
     return defaultValue;
   }
 
@@ -72,9 +71,6 @@ public class HashMapEntries {
     while (it.hasNext()) {
       HashMapEntries entries = it.next();
       HashDeltas.IndexRange candidates = entries.hashes.candidateIndices(hash);
-      if (candidates.start == -1) {
-        return -1;
-      }
 
       int keyIndex = entries.localIndexOf(candidates, key);
       if (keyIndex == -1 && candidates.isBounded) {
@@ -92,13 +88,16 @@ public class HashMapEntries {
   public final HashDeltas hashes;
   public final DurableInput keys, values;
   public final DurableEncoding mapEncoding;
+  public final Root root;
 
   private HashMapEntries(
+      Root root,
       long entryOffset,
       HashDeltas hashes,
       DurableInput keys,
       DurableInput values,
       DurableEncoding mapEncoding) {
+    this.root = root;
     this.entryOffset = entryOffset;
     this.hashes = hashes;
     this.keys = keys;
@@ -107,9 +106,11 @@ public class HashMapEntries {
   }
 
   private int localIndexOf(HashDeltas.IndexRange candidates, Object key) {
-    assert (candidates.start != -1);
+    if (candidates.start < 0) {
+      return -1;
+    }
 
-    DurableEncoding.SkippableIterator it = Util.decodeBlock(keys, mapEncoding.keyEncoding()).skip(candidates.start);
+    DurableEncoding.SkippableIterator it = Util.decodeBlock(keys, root, mapEncoding.keyEncoding()).skip(candidates.start);
     BiPredicate<Object, Object> keyEquals = mapEncoding.keyEquality();
 
     for (int i = candidates.start; i < candidates.end; i++) {
@@ -122,31 +123,21 @@ public class HashMapEntries {
     return -1;
   }
 
-  public IEntry<Object, Object> nth(long index) {
-    Object key = Util.decodeBlock(keys, mapEncoding.keyEncoding()).skip(index).next();
-    Object value = Util.decodeBlock(values, mapEncoding.valueEncoding(key)).skip(index).next();
+  public IEntry.WithHash<Object, Object> nth(long index) {
+    Object key = Util.decodeBlock(keys, root, mapEncoding.keyEncoding()).skip(index).next();
+    Object value = Util.decodeBlock(values, root, mapEncoding.valueEncoding(key)).skip(index).next();
 
-    return new Maps.Entry<>(key, value);
+    return IEntry.of(hashes.nth(index), key, value);
   }
 
-  public Iterator<HashMap.MapEntry<Object, Object>> entries(long dropped) {
+  public Iterator<IEntry.WithHash<Object, Object>> entries(long dropped) {
     PrimitiveIterator.OfInt hashes = (PrimitiveIterator.OfInt) Iterators.drop(this.hashes.iterator(), dropped);
-    DurableEncoding.SkippableIterator keys = Util.decodeBlock(this.keys, mapEncoding.keyEncoding()).skip(dropped);
+    DurableEncoding.SkippableIterator keys = Util.decodeBlock(this.keys, root, mapEncoding.keyEncoding()).skip(dropped);
     Object firstKey = keys.next();
-    DurableEncoding.SkippableIterator values = Util.decodeBlock(this.values, mapEncoding.valueEncoding(firstKey)).skip(dropped);
+    DurableEncoding.SkippableIterator values = Util.decodeBlock(this.values, root, mapEncoding.valueEncoding(firstKey)).skip(dropped);
 
     return Iterators.concat(
-        Iterators.singleton(new HashMap.MapEntry<>(hashes.next(), new Maps.Entry<>(firstKey, values.next()))),
-        new Iterator<HashMap.MapEntry<Object, Object>>() {
-          @Override
-          public boolean hasNext() {
-            return hashes.hasNext();
-          }
-
-          @Override
-          public HashMap.MapEntry<Object, Object> next() {
-            return new HashMap.MapEntry<>(hashes.next(), new Maps.Entry<>(keys.next(), values.next()));
-          }
-        });
+        Iterators.singleton(IEntry.of(hashes.next(), firstKey, values.next())),
+        Iterators.from(hashes::hasNext, () -> IEntry.of(hashes.nextInt(), keys.next(), values.next())));
   }
 }

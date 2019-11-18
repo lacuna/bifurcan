@@ -106,7 +106,7 @@ public class MapNodes {
       int numEntries = bitCount(datamap);
       if (idx < numEntries) {
         int contentIdx = (int) (idx << 1);
-        return new Maps.Entry<>((K) content[contentIdx], (V) content[contentIdx + 1]);
+        return IEntry.of((K) content[contentIdx], (V) content[contentIdx + 1]);
       }
 
       // see if the entry is local to our children
@@ -353,7 +353,7 @@ public class MapNodes {
             }
           }
 
-          IEntry<K, V> e = new Maps.Entry<>((K) content[idx], (V) content[idx + 1]);
+          IEntry<K, V> e = IEntry.of((K) content[idx], (V) content[idx + 1]);
           idx += 2;
           return e;
         }
@@ -366,7 +366,7 @@ public class MapNodes {
         Iterators.range(bitCount(datamap),
           i -> {
             int idx = (int) (i << 1);
-            return new Maps.Entry<>((K) content[idx], (V) content[idx + 1]);
+            return IEntry.of((K) content[idx], (V) content[idx + 1]);
           });
     }
 
@@ -604,7 +604,7 @@ public class MapNodes {
     @Override
     public IEntry<K, V> nth(long idx) {
       int i = (int) idx << 1;
-      return new Maps.Entry<>((K) entries[i], (V) entries[i + 1]);
+      return IEntry.of((K) entries[i], (V) entries[i + 1]);
     }
 
     @Override
@@ -663,7 +663,7 @@ public class MapNodes {
         Iterators.range(entries.length >> 1,
           i -> {
             int idx = (int) (i << 1);
-            return new Maps.Entry<>((K) entries[idx], (V) entries[idx + 1]);
+            return IEntry.of((K) entries[idx], (V) entries[idx + 1]);
           });
     }
 

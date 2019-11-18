@@ -1,5 +1,7 @@
 package io.lacuna.bifurcan;
 
+import io.lacuna.bifurcan.utils.Iterators;
+
 import java.util.*;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
@@ -644,26 +646,20 @@ public class Graphs {
 
     start.forEach(queue::addLast);
 
-    return () -> new Iterator<V>() {
-      @Override
-      public boolean hasNext() {
-        return queue.size() > 0;
-      }
+    return () -> Iterators.from(
+        () -> queue.size() > 0,
+        () -> {
+          V v = queue.popFirst();
+          traversed.add(v);
 
-      @Override
-      public V next() {
-        V v = queue.popFirst();
-        traversed.add(v);
+          adjacent.apply(v).forEach(w -> {
+            if (!traversed.contains(w)) {
+              queue.addLast(w);
+            }
+          });
 
-        adjacent.apply(v).forEach(w -> {
-          if (!traversed.contains(w)) {
-            queue.addLast(w);
-          }
+          return v;
         });
-
-        return v;
-      }
-    };
   }
 
 

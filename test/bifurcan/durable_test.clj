@@ -14,18 +14,19 @@
     ByteBuffer]
    [io.lacuna.bifurcan
     Map
+    List
     Maps
     IEntry
     DurableInput
     DurableOutput
-    DurableMap]
+    DurableMap
+    DurableList]
    [io.lacuna.bifurcan.hash
     PerlHash]
    [io.lacuna.bifurcan.encodings
     SelfDescribing]
    [io.lacuna.bifurcan.durable.blocks
     HashMap
-    HashMap$MapEntry
     HashTable
     HashTable$Entry
     HashTable$Writer
@@ -70,6 +71,19 @@
       #(Math/abs (p/int %))
       gen/int)))
 
+(def edn-encoding
+  (SelfDescribing.
+    "edn"
+    2
+    (->bi-consumer
+      (fn [o ^DurableOutput out]
+        (.write out (.getBytes (pr-str o) "utf-8"))))
+    (->fn
+      (fn [^DurableInput in]
+        (let [ary (byte-array (.remaining in))]
+          (.readFully in ary)
+          (edn/read-string (String. ary "utf-8")))))))
+
 ;;; Util
 
 (defspec test-vlq-roundtrip iterations
@@ -97,18 +111,14 @@
   (prop/for-all [n gen-pos-int
                  type (->> (BlockPrefix$BlockType/values)
                         (map gen/return)
-                        gen/one-of)
-                 checksum? gen/boolean
-                 checksum (gen/fmap #(p/int %) gen/int)]
+                        gen/one-of)]
     (let [out (DurableAccumulator.)
-          p   (if checksum?
-                (BlockPrefix. n type checksum)
-                (BlockPrefix. n type))
-          _   (BlockPrefix/write p out)
-          in  (->> out
+          p   (BlockPrefix. n type)
+          _   (.encode p out)
+          p'  (->> out
                 .contents
-                DurableInput/from)
-          p'  (BlockPrefix/read in)]
+                DurableInput/from
+                BlockPrefix/decode)]
       #_(prn p p')
       (= p p'))))
 
@@ -167,29 +177,16 @@
 (defspec test-sort-map-entries iterations
   (prop/for-all [entries (gen/list (gen/tuple gen-pos-int gen-pos-int))]
     (let [m (into {} entries)
-          m' (->> (HashMap/sortedMapEntries
+          m' (->> (HashMap/sortEntries
                     (.entries (Map/from ^java.util.Map m))
                     hash-fn)
                iterator-seq
                (map
-                 (fn [^HashMap$MapEntry e]
+                 (fn [^IEntry e]
                    [(.key e) (.value e)])))]
       (= (sort-by #(hash (key %)) m) m'))))
 
 ;;; DurableMap
-
-(def edn-encoding
-  (SelfDescribing.
-    "edn"
-    2
-    (->bi-consumer
-      (fn [o ^DurableOutput out]
-        (.write out (.getBytes (pr-str o) "utf-8"))))
-    (->fn
-      (fn [^DurableInput in]
-        (let [ary (byte-array (.remaining in))]
-          (.readFully in ary)
-          (edn/read-string (String. ary "utf-8")))))))
 
 (defspec test-durable-map iterations
   (prop/for-all [m (coll/map-gen #(Map.))]
@@ -200,3 +197,10 @@
           (every?
             (fn [^long i]
               (= i (->> (.nth m' i) .key (.indexOf m'))))))))))
+
+;;; DurableList
+
+ (defspec test-durable-list iterations
+  (prop/for-all [l (coll/list-gen #(List.))]
+    (let [l' (DurableList/save (.iterator ^Iterable l) edn-encoding)]
+      (= l l'))))

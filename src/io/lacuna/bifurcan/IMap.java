@@ -1,6 +1,7 @@
 package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.diffs.DiffMap;
+import io.lacuna.bifurcan.durable.blocks.HashMap;
 import io.lacuna.bifurcan.utils.Iterators;
 
 import java.util.Iterator;
@@ -147,6 +148,13 @@ public interface IMap<K, V> extends
    */
   default Iterator<IEntry<K, V>> iterator() {
     return Iterators.range(size(), this::nth);
+  }
+
+  /**
+   * @return an iterator over all entries, sorted by their hash
+   */
+  default Iterator<IEntry.WithHash<K, V>> hashSortedEntries() {
+    return HashMap.sortEntries(entries(), keyHash());
   }
 
   /**

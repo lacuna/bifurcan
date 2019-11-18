@@ -24,14 +24,18 @@
                                      [eftest "0.5.8"]
                                      [virgil "0.1.9"]
 
-                                     ;; for comparative benchmarks
+                                     ;; for comparative in-memory benchmarks
                                      [io.usethesource/capsule "0.6.3"]
                                      [org.pcollections/pcollections "3.0.3"]
                                      [io.vavr/vavr "0.10.0"]
                                      [org.scala-lang/scala-library "2.13.0"]
                                      [org.functionaljava/functionaljava "4.8.1"]
                                      [org.eclipse.collections/eclipse-collections "9.2.0"]
-                                     [org.organicdesign/Paguro "3.1.2"]]}}
+                                     [org.organicdesign/Paguro "3.1.2"]
+
+                                     ;; for comparative durable benchmarks
+                                     [org.rocksdb/rocksdbjni "5.5.1"]
+                                     ]}}
   :aliases {"partest"   ["run" "-m" "bifurcan.run-tests"]
             "benchmark" ["run" "-m" "bifurcan.benchmark-test" "benchmark"]}
   :jvm-opts ^:replace ["-server"

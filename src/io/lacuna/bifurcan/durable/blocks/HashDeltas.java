@@ -4,8 +4,10 @@ import io.lacuna.bifurcan.DurableInput;
 import io.lacuna.bifurcan.DurableOutput;
 import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
 import io.lacuna.bifurcan.durable.DurableAccumulator;
+import io.lacuna.bifurcan.utils.Iterators;
 
 import java.util.PrimitiveIterator;
+import java.util.PrimitiveIterator.OfInt;
 
 /**
  * A block representing a sorted sequence of 32-bit integers:
@@ -73,10 +75,16 @@ public class HashDeltas {
     this.in = in;
   }
 
-  public PrimitiveIterator.OfInt iterator() {
+  public int nth(long index) {
+    OfInt it = iterator();
+    Iterators.drop(it, index);
+    return it.nextInt();
+  }
+
+  public OfInt iterator() {
     DurableInput in = this.in.duplicate().seek(0);
 
-    return new PrimitiveIterator.OfInt() {
+    return new OfInt() {
       boolean hasNext = true;
       int next = in.readInt();
 
@@ -100,9 +108,10 @@ public class HashDeltas {
 
   public IndexRange candidateIndices(int hash) {
     int start = -1, end = -1;
-    PrimitiveIterator.OfInt it = iterator();
+    OfInt it = iterator();
 
-    for (int i = 0; it.hasNext(); i++) {
+    int currHash = Integer.MIN_VALUE;
+    for (int i = 0; currHash < hash && it.hasNext(); i++) {
       if (it.nextInt() == hash) {
         start = i;
         break;

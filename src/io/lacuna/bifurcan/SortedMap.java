@@ -45,7 +45,7 @@ public class SortedMap<K, V> implements ISortedMap<K, V> {
     Node<K, V> n = root.floor(key, comparator);
     return n == null
       ? null
-      : new Maps.Entry<>(n.k, n.v);
+      : IEntry.of(n.k, n.v);
   }
 
   @Override
@@ -53,7 +53,7 @@ public class SortedMap<K, V> implements ISortedMap<K, V> {
     Node<K, V> n = root.ceil(key, comparator);
     return n == null
       ? null
-      : new Maps.Entry<>(n.k, n.v);
+      : IEntry.of(n.k, n.v);
   }
 
   @Override
@@ -171,7 +171,7 @@ public class SortedMap<K, V> implements ISortedMap<K, V> {
       throw new IndexOutOfBoundsException();
     }
     Node<K, V> n = SortedMapNodes.nth(root, (int) index);
-    return new Maps.Entry<>(n.k, n.v);
+    return IEntry.of(n.k, n.v);
   }
 
   @Override

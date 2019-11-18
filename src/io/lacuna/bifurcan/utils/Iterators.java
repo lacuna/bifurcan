@@ -4,10 +4,7 @@ import io.lacuna.bifurcan.IList;
 import io.lacuna.bifurcan.LinearList;
 
 import java.util.*;
-import java.util.function.BiPredicate;
-import java.util.function.Function;
-import java.util.function.LongFunction;
-import java.util.function.Predicate;
+import java.util.function.*;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -86,6 +83,38 @@ public class Iterators {
     return true;
   }
 
+  public static <V> Iterator<V> from(BooleanSupplier hasNext, Supplier<V> next) {
+    return new Iterator<V>() {
+      @Override
+      public boolean hasNext() {
+        return hasNext.getAsBoolean();
+      }
+
+      @Override
+      public V next() {
+        return next.get();
+      }
+    };
+  }
+
+  public static <V> Iterator<V> onExhaustion(Iterator<V> it, Runnable f) {
+    return new Iterator<V>() {
+      @Override
+      public boolean hasNext() {
+        return it.hasNext();
+      }
+
+      @Override
+      public V next() {
+        V result = it.next();
+        if (!it.hasNext()) {
+          f.run();
+        }
+        return result;
+      }
+    };
+  }
+
   public static <V> Iterator<V> singleton(V val) {
     return new Iterator<V>() {
       boolean consumed = false;
@@ -156,17 +185,7 @@ public class Iterators {
    * @return an iterator which yields the transformed values
    */
   public static <U, V> Iterator<V> map(Iterator<U> it, Function<U, V> f) {
-    return new Iterator<V>() {
-      @Override
-      public boolean hasNext() {
-        return it.hasNext();
-      }
-
-      @Override
-      public V next() {
-        return f.apply(it.next());
-      }
-    };
+    return from(it::hasNext, () -> f.apply(it.next()));
   }
 
   /**

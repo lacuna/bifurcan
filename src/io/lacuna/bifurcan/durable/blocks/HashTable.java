@@ -22,7 +22,7 @@ public class HashTable {
 
   public static class Entry {
 
-    public static final Entry EMPTY = new Entry(0, 0);
+    public static final Entry ORIGIN = new Entry(0, 0);
 
     // int32
     public final int hash;
@@ -158,7 +158,9 @@ public class HashTable {
       long offset = out.written();
 
       Iterable<ByteBuffer> bufs = contents();
-      BlockPrefix.write(new BlockPrefix(Util.size(bufs), BlockPrefix.BlockType.TABLE), out);
+      BlockPrefix p = new BlockPrefix(Util.size(bufs), BlockPrefix.BlockType.TABLE);
+
+      p.encode(out);
       out.write(bufs);
       free(bufs);
 

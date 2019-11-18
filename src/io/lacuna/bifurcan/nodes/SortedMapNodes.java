@@ -454,7 +454,7 @@ public class SortedMapNodes {
       @Override
       public IEntry<K, V> next() {
         Node<K, V> n = stack[depth];
-        IEntry<K, V> e = new Maps.Entry<>(n.k, n.v);
+        IEntry<K, V> e = IEntry.of(n.k, n.v);
 
         cursor[depth]++;
         nextValue();

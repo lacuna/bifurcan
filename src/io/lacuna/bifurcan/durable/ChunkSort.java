@@ -40,22 +40,46 @@ public class ChunkSort {
       entries().forEach(e -> encode.accept(e, acc));
       DurableInput in = DurableInput.from(acc.contents());
 
-      return new Iterator<T>() {
-        @Override
-        public boolean hasNext() {
-          return in.remaining() > 0;
-        }
+      return Iterators.onExhaustion(
+          Iterators.from(() -> in.remaining() > 0, () -> decode.apply(in)),
+          in::close);
+    }
+  }
+  
+  public static class Accumulator<T> {
 
-        @Override
-        public T next() {
-          T e = decode.apply(in);
-          if (in.remaining() == 0) {
-            // once it's exhausted, we don't need it anymore
-            in.close();
-          }
-          return e;
-        }
-      };
+    private final BiConsumer<T, DurableOutput> encode;
+    private final Function<DurableInput, T> decode;
+    private final Comparator<T> comparator;
+    
+    private final IList<Iterator<T>> iterators = new LinearList<>();
+    private Chunk<T> curr;
+    
+    public Accumulator(BiConsumer<T, DurableOutput> encode,
+                       Function<DurableInput, T> decode,
+                       Comparator<T> comparator) {
+      this.encode = encode;
+      this.decode = decode;
+      this.comparator = comparator;
+      
+      this.curr = new Chunk<>(comparator);
+    }
+    
+    public void add(T x) {
+      curr.add(x);
+      if (curr.size() >= Chunk.MAX_SIZE) {
+        iterators.addLast(curr.spill(encode, decode));
+        curr = new Chunk<>(comparator);
+      }
+    }
+
+    public Iterator<T> sortedIterator() {
+      if (curr != null && curr.size > 0) {
+        iterators.addLast(curr.entries().iterator());
+        curr = null;
+      }
+
+      return Util.mergeSort(iterators, comparator);
     }
   }
 
@@ -64,22 +88,9 @@ public class ChunkSort {
       BiConsumer<T, DurableOutput> encode,
       Function<DurableInput, T> decode,
       Comparator<T> comparator) {
-    LinearList<Iterator<T>> iterators = new LinearList<>();
-    Chunk<T> chunk = new Chunk<>(comparator);
-
-    for (T e : entries) {
-      chunk.add(e);
-      if (chunk.size() >= Chunk.MAX_SIZE) {
-        iterators.addLast(chunk.spill(encode, decode));
-        chunk = new Chunk<>(comparator);
-      }
-    }
-
-    if (chunk.size > 0) {
-      iterators.addLast(chunk.entries().iterator());
-    }
-
-    return Util.mergeSort(iterators, comparator);
+    Accumulator<T> acc = new Accumulator<>(encode, decode, comparator);
+    entries.forEach(acc::add);
+    return acc.sortedIterator();
   }
 
   ///

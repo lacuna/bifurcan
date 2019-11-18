@@ -6,6 +6,24 @@ import java.util.function.BiPredicate;
  * @author ztellman
  */
 public interface IEntry<K, V> {
+
+  interface WithHash<K, V> extends IEntry<K, V>, Comparable<WithHash<K, V>> {
+    int keyHash();
+
+    @Override
+    default int compareTo(WithHash<K, V> o) {
+      return Integer.compare(keyHash(), o.keyHash());
+    }
+  }
+
+  static <K, V> IEntry<K, V> of(K key, V value) {
+    return new Maps.Entry<>(key, value);
+  }
+
+  static <K, V> IEntry.WithHash<K, V> of(int keyHash, K key, V value) {
+    return new Maps.HashEntry<>(keyHash, key, value);
+  }
+
   K key();
 
   V value();

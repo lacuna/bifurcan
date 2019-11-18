@@ -155,24 +155,6 @@ public class IntIterators {
     };
   }
 
-  public static OfInt deltas(OfInt it) {
-    return new OfInt() {
-      int curr = it.nextInt();
-
-      @Override
-      public int nextInt() {
-        int prev = curr;
-        this.curr = it.nextInt();
-        return curr - prev;
-      }
-
-      @Override
-      public boolean hasNext() {
-        return it.hasNext();
-      }
-    };
-  }
-
   /**
    * Represents a range implicitly starting at 0.
    *

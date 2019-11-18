@@ -15,10 +15,23 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
     public final Slice parent;
     public final long start, end;
 
+    private Slice root;
+
     public Slice(Slice parent, long start, long end) {
       this.parent = parent;
       this.start = start;
       this.end = end;
+    }
+
+    public Slice root() {
+      if (parent == null) {
+        return this;
+      } else if (root == null) {
+        Slice parentRoot = parent.root;
+        root = new Slice(null, start + parentRoot.start, end + parentRoot.start);
+      }
+
+      return root;
     }
 
     @Override
@@ -146,7 +159,7 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
   }
 
   default BlockPrefix readPrefix() {
-    return BlockPrefix.read(this);
+    return BlockPrefix.decode(this);
   }
 
   default BlockPrefix peekPrefix() {

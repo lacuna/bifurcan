@@ -110,8 +110,8 @@ public class Maps {
   };
 
   public static class Entry<K, V> implements IEntry<K, V> {
-    public final K key;
-    public final V value;
+    private final K key;
+    private final V value;
 
     public Entry(K key, V value) {
       this.key = key;
@@ -145,6 +145,50 @@ public class Maps {
       return false;
     }
   }
+
+  public static class HashEntry<K, V> implements IEntry.WithHash<K, V> {
+    private final int keyHash;
+    private final K key;
+    private final V value;
+
+    public HashEntry(int keyHash, K key, V value) {
+      this.keyHash = keyHash;
+      this.key = key;
+      this.value = value;
+    }
+
+    public int keyHash() {
+      return keyHash;
+    }
+
+    public K key() {
+      return key;
+    }
+
+    public V value() {
+      return value;
+    }
+
+    @Override
+    public String toString() {
+      return key + " = " + value;
+    }
+
+    @Override
+    public int hashCode() {
+      return (Objects.hash(key) * 31) + Objects.hash(value);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (obj instanceof IEntry.WithHash) {
+        IEntry.WithHash<K, V> e = (IEntry.WithHash<K, V>) obj;
+        return keyHash == e.keyHash() && Objects.equals(key, e.key()) && Objects.equals(value, e.value());
+      }
+      return false;
+    }
+  }
+
 
   public static <K, V> String toString(IMap<K, V> m) {
     return toString(m, Objects::toString, Objects::toString);
@@ -197,7 +241,7 @@ public class Maps {
   }
 
   public static <K, V> IMap<K, V> from(ISet<K> keys, Function<K, V> lookup) {
-    return from(keys, lookup, () -> Iterators.map(keys.iterator(), k -> new Maps.Entry<>(k, lookup.apply(k))));
+    return from(keys, lookup, () -> Iterators.map(keys.iterator(), k -> IEntry.of(k, lookup.apply(k))));
   }
 
   public static <K, V> IMap<K, V> from(ISet<K> keys, Function<K, V> lookup, Supplier<Iterator<IEntry<K, V>>> iterator) {

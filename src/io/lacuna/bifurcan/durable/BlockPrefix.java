@@ -20,36 +20,39 @@ public class BlockPrefix {
 
   public enum BlockType {
     ENCODED,
-    HASH_MAP,
-    SORTED_MAP,
-    HASH_SET,
-    SORTED_SET,
-    LIST,
     TABLE,
-    OTHER;
+    OTHER,
+
+    HASH_MAP,
+    DIFF_HASH_MAP,
+
+    SORTED_MAP,
+    DIFF_SORTED_MAP,
+
+    HASH_SET,
+    DIFF_HASH_SET,
+
+    SORTED_SET,
+    DIFF_SORTED_SET,
+
+    LIST,
+    LIST_SLICE,
+    LIST_CONCAT
   }
 
   private static final BlockType[] TYPES = BlockType.values();
 
   public final long length;
   public final BlockType type;
-  public final OptionalInt checksum;
-
-  public BlockPrefix(long length, BlockType type, int checksum) {
-    this.length = length;
-    this.type = type;
-    this.checksum = OptionalInt.of(checksum);
-  }
 
   public BlockPrefix(long length, BlockType type) {
     this.length = length;
     this.type = type;
-    this.checksum = OptionalInt.empty();
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(length, type, checksum);
+    return Objects.hash(length, type);
   }
 
   @Override
@@ -57,36 +60,25 @@ public class BlockPrefix {
     if (obj instanceof BlockPrefix) {
       BlockPrefix p = (BlockPrefix) obj;
       return length == p.length
-          && type == p.type
-          && checksum.equals(p.checksum);
+          && type == p.type;
     }
     return false;
   }
 
   @Override
   public String toString() {
-    return "[ length=" + length + ", type=" + type + (checksum.isPresent() ? ", checksum=" + checksum.getAsInt() : "") + " ]";
+    return "[ length=" + length + ", type=" + type + " ]";
   }
 
-  public static BlockPrefix read(DurableInput in)  {
+  public static BlockPrefix decode(DurableInput in)  {
     byte firstByte = in.readByte();
 
-    boolean checksum = test(firstByte, 7);
-    BlockType type = TYPES[(firstByte >> 4) & 0x7];
+    BlockType type = TYPES[(firstByte >> 4) & 15];
     long length = readPrefixedVLQ(firstByte, 4, in);
-
-    return checksum
-        ? new BlockPrefix(length, type, in.readInt())
-        : new BlockPrefix(length, type);
+    return new BlockPrefix(length, type);
   }
 
-  public static void write(BlockPrefix prefix, DurableOutput out) {
-    int checksum = prefix.checksum.isPresent() ? 1 : 0;
-
-    writePrefixedVLQ(checksum << 3 | prefix.type.ordinal(), 4, prefix.length, out);
-
-    if (prefix.checksum.isPresent()) {
-      out.writeInt(prefix.checksum.getAsInt());
-    }
+  public void encode(DurableOutput out) {
+    writePrefixedVLQ(type.ordinal(), 4, length, out);
   }
 }

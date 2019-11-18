@@ -80,7 +80,7 @@ public class IntMapNodes {
         if (isEntry(mask)) {
           if (idx-- == 0) {
             int entryIdx = entryIndex(mask);
-            return new Maps.Entry<>(keys[entryIdx], (V) content[entryIdx]);
+            return IEntry.of(keys[entryIdx], (V) content[entryIdx]);
           }
 
         } else if (isNode(mask)) {
@@ -135,7 +135,7 @@ public class IntMapNodes {
           if (isEntry(mask)) {
             int idx = entryIndex(mask);
             if (keys[idx] <= key) {
-              return new Maps.Entry<>(keys[idx], (V) content[idx]);
+              return IEntry.of(keys[idx], (V) content[idx]);
             }
           } else if (isNode(mask)) {
             IEntry<Long, V> entry = node(mask).floor(key);
@@ -161,7 +161,7 @@ public class IntMapNodes {
           if (isEntry(mask)) {
             int idx = entryIndex(mask);
             if (keys[idx] >= key) {
-              return new Maps.Entry<>(keys[idx], (V) content[idx]);
+              return IEntry.of(keys[idx], (V) content[idx]);
             }
           } else if (isNode(mask)) {
             IEntry<Long, V> entry = node(mask).ceil(key);
@@ -353,7 +353,7 @@ public class IntMapNodes {
           Node<V> n = stack[depth];
           int mask = 1 << cursors[depth << 1];
           int idx = n.entryIndex(mask);
-          Maps.Entry<Long, V> e = new Maps.Entry<>(n.keys[idx], (V) n.content[idx]);
+          IEntry<Long, V> e = IEntry.of(n.keys[idx], (V) n.content[idx]);
 
           cursors[depth << 1]++;
           nextValue();

@@ -45,7 +45,7 @@ import static io.lacuna.bifurcan.durable.BlockPrefix.BlockType.TABLE;
 public class SkipTable {
 
   public static class Entry {
-    public static final Entry ENTRY = new Entry(0, 0);
+    public static final Entry ORIGIN = new Entry(0, 0);
 
     public final long index, offset;
 
@@ -122,7 +122,7 @@ public class SkipTable {
         return;
       }
 
-      assert (index > lastIndex & offset > lastOffset);
+      assert (index > lastIndex & offset >= lastOffset);
 
       if ((count & BIT_MASK) == BIT_MASK) {
         if (parent == null) {
