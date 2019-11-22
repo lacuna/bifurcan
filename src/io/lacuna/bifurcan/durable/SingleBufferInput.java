@@ -1,16 +1,17 @@
 package io.lacuna.bifurcan.durable;
 
 import io.lacuna.bifurcan.DurableInput;
+import io.lacuna.bifurcan.durable.allocator.SlabAllocator;
 
 import java.nio.ByteBuffer;
 
-public class SingleBufferDurableInput implements DurableInput {
+public class SingleBufferInput implements DurableInput {
 
   private final ByteBuffer buf;
   private final Slice bounds;
 
-  public SingleBufferDurableInput(ByteBuffer buf, Slice bounds) {
-    this.buf = buf.duplicate();
+  public SingleBufferInput(ByteBuffer buf, Slice bounds) {
+    this.buf = buf;
     this.bounds = bounds;
   }
 
@@ -24,7 +25,7 @@ public class SingleBufferDurableInput implements DurableInput {
     if (start == 0) {
       new Throwable().printStackTrace();
     }
-    return new SingleBufferDurableInput(
+    return new SingleBufferInput(
         ((ByteBuffer) buf.duplicate()
             .clear()
             .position((int) start)
@@ -35,7 +36,7 @@ public class SingleBufferDurableInput implements DurableInput {
 
   @Override
   public DurableInput duplicate() {
-    return new SingleBufferDurableInput(buf.duplicate(), bounds);
+    return new SingleBufferInput(buf.duplicate(), bounds);
   }
 
   @Override
@@ -61,6 +62,7 @@ public class SingleBufferDurableInput implements DurableInput {
 
   @Override
   public void close() {
+    SlabAllocator.tryFree(buf);
   }
 
   @Override

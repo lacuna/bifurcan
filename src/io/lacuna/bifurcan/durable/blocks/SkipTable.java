@@ -2,13 +2,10 @@ package io.lacuna.bifurcan.durable.blocks;
 
 import io.lacuna.bifurcan.DurableInput;
 import io.lacuna.bifurcan.DurableOutput;
-import io.lacuna.bifurcan.durable.BlockPrefix;
 import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
-import io.lacuna.bifurcan.durable.DurableAccumulator;
+import io.lacuna.bifurcan.durable.AccumulatorOutput;
 
 import java.nio.ByteBuffer;
-
-import static io.lacuna.bifurcan.durable.BlockPrefix.BlockType.TABLE;
 
 /**
  * A sorted map of integer onto integer, which assumes that both keys and values are monotonically increasing.
@@ -111,7 +108,7 @@ public class SkipTable {
     private static final int BRANCHING_FACTOR = 1 << LOG_BRANCHING_FACTOR;
     private static final long BIT_MASK = BRANCHING_FACTOR - 1;
 
-    private final DurableAccumulator acc = new DurableAccumulator(1024);
+    private final AccumulatorOutput acc = new AccumulatorOutput(1024);
     private Writer parent = null;
 
     private long lastIndex = 0, lastOffset = 0, count = 0;
@@ -144,6 +141,13 @@ public class SkipTable {
       lastOffset = offset;
     }
 
+    public void free() {
+      if (parent != null) {
+        parent.free();
+      }
+      acc.free();
+    }
+
     public int tiers() {
       if (acc.written() == 0) {
         return 0;
@@ -171,14 +175,14 @@ public class SkipTable {
      * Used for testing, in practice you should always prefer `flushTo` since it automatically frees the buffers.
      */
     public Iterable<ByteBuffer> contents() {
-      DurableAccumulator acc = new DurableAccumulator();
+      AccumulatorOutput acc = new AccumulatorOutput();
       flushTo(acc);
       return acc.contents();
     }
 
     public long flushTo(DurableOutput out) {
       long offset = out.written();
-      DurableAccumulator.flushTo(out, BlockType.TABLE, acc -> flush(acc, 1));
+      AccumulatorOutput.flushTo(out, BlockType.TABLE, acc -> flush(acc, 1));
       return out.written() - offset;
     }
   }

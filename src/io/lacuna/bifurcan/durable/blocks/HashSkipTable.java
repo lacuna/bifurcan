@@ -67,6 +67,10 @@ public class HashSkipTable {
     public void flushTo(DurableOutput out) {
       table.flushTo(out);
     }
+
+    public void free() {
+      table.free();
+    }
   }
 
 

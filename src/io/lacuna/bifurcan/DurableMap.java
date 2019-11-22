@@ -1,6 +1,6 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.durable.DurableAccumulator;
+import io.lacuna.bifurcan.durable.AccumulatorOutput;
 import io.lacuna.bifurcan.durable.blocks.*;
 import io.lacuna.bifurcan.utils.Iterators;
 
@@ -36,7 +36,7 @@ public class DurableMap implements IDurableCollection, IMap<Object, Object> {
   }
 
   public static <K, V> DurableMap save(IMap<K, V> m, DurableEncoding encoding) {
-    DurableAccumulator out = new DurableAccumulator();
+    AccumulatorOutput out = new AccumulatorOutput(16 << 10, false);
     HashMap.encodeUnsortedEntries(m.entries(), encoding, out);
     return HashMap.decode(DurableInput.from(out.contents()), null, encoding);
   }

@@ -1,34 +1,16 @@
 package io.lacuna.bifurcan;
 
+import io.lacuna.bifurcan.durable.encodings.Tuple;
+
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.Objects;
 import java.util.function.BiPredicate;
+import java.util.function.IntFunction;
+import java.util.function.LongFunction;
 import java.util.function.ToIntFunction;
 
 public interface DurableEncoding {
-
-  class Descriptor {
-    public final String id;
-
-    public Descriptor(String id) {
-      this.id = id.intern();
-    }
-
-    @Override
-    public int hashCode() {
-      return id.hashCode();
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-      if (obj instanceof Descriptor) {
-        return id == ((Descriptor) obj).id;
-      } else {
-        return false;
-      }
-    }
-  }
 
   interface SkippableIterator extends Iterator<Object> {
     static SkippableIterator singleton(Object o) {
@@ -63,12 +45,36 @@ public interface DurableEncoding {
     void skip();
   }
 
-  /**
-   * A plain-text description of the encoding, which is also used as its identity. All encodings sharing a name should
-   * be equivalent.
-   */
-  Descriptor descriptor();
+  static DurableEncoding list(String description, int blockSize, LongFunction<DurableEncoding> elementEncoding) {
+    return new DurableEncoding() {
+      @Override
+      public String description() {
+        return description;
+      }
 
+      @Override
+      public int blockSize() {
+        return blockSize;
+      }
+
+      @Override
+      public boolean encodesLists() {
+        return true;
+      }
+
+      @Override
+      public DurableEncoding elementEncoding(long index) {
+        return elementEncoding.apply(index);
+      }
+    };
+  }
+
+  static DurableEncoding tuple(DurableEncoding... encodings) {
+    return new Tuple(encodings);
+  }
+
+  String description();
+  
   /**
    * Describes whether this encoding can be used to encode maps (and implicitly sets, which are treated as maps without
    * values).
@@ -95,14 +101,14 @@ public interface DurableEncoding {
    * The encoding for any key in a map or set.
    */
   default DurableEncoding keyEncoding() {
-    throw new UnsupportedOperationException("Encoding '" + descriptor() + "' does not support maps");
+    throw new UnsupportedOperationException(String.format("Encoding '%s' does not support maps", description()));
   }
 
   /**
    * The encoding for any value corresponding to `key` within a map.
    */
   default DurableEncoding valueEncoding(Object key) {
-    throw new UnsupportedOperationException("Encoding '" + descriptor() + "' does not support maps");
+    throw new UnsupportedOperationException(String.format("Encoding '%s' does not support maps", description()));
   }
 
   /**
@@ -116,7 +122,7 @@ public interface DurableEncoding {
    * The encoding for an element at `index` within a list.
    */
   default DurableEncoding elementEncoding(long index) {
-    throw new UnsupportedOperationException("Encoding '" + descriptor() + "' does not support lists");
+    throw new UnsupportedOperationException(String.format("Encoding '%s' does not support lists", description()));
   }
 
   /**
@@ -130,27 +136,27 @@ public interface DurableEncoding {
    * Describes the number of primitive values which should be encoded as a block.
    */
   default int blockSize() {
-    return 16;
+    return 32;
   }
 
   /**
    * Encodes the block of primitive values to `out`.
    */
   default void encode(IList<Object> primitives, DurableOutput out) {
-    throw new UnsupportedOperationException("Encoding '" + descriptor() + "' does not support primitives");
+    throw new UnsupportedOperationException(String.format("Encoding '%s' does not support primitives", description()));
   }
 
   /**
    * Decodes a block of primitive values, returning an iterator of thunks representing each individual value.
    */
   default SkippableIterator decode(DurableInput in) {
-    throw new UnsupportedOperationException("Encoding '" + descriptor() + "' does not support primitives");
+    throw new UnsupportedOperationException(String.format("Encoding '%s' does not support primitives", description()));
   }
 
   /**
    * Describes whether this encoding can be used with sorted collections.
    */
-  default boolean hasOrdering() {
+  default boolean hasKeyOrdering() {
     return true;
   }
 

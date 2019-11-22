@@ -2,10 +2,7 @@ package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.durable.*;
 
-import java.io.Closeable;
-import java.io.DataInput;
-import java.io.EOFException;
-import java.io.InputStream;
+import java.io.*;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
 
@@ -37,7 +34,7 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
     @Override
     public String toString() {
       String b = "[" + start + ", " + end + "]";
-      return parent == null ? b : parent + " -> " + b;
+      return b + (parent == null ? "" : " -> " + parent);
     }
   }
 
@@ -45,8 +42,8 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
     Iterator<ByteBuffer> it = buffers.iterator();
     ByteBuffer buf = it.next();
     return it.hasNext()
-        ? new MultiBufferDurableInput(buffers, new Slice(null, 0, Util.size(buffers)))
-        : new SingleBufferDurableInput(buf, new Slice(null, 0, buf.remaining()));
+        ? new MultiBufferInput(buffers, new Slice(null, 0, Util.size(buffers)))
+        : new SingleBufferInput(buf, new Slice(null, 0, buf.remaining()));
   }
 
   DurableInput slice(long start, long end);
@@ -72,6 +69,10 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
     long end = position() + prefix.length;
     seek(start);
     return sliceBytes(end - start);
+  }
+
+  default String hexBytes() {
+    return Util.prettyHexBytes(this.duplicate().seek(0));
   }
 
   Slice bounds();
@@ -177,6 +178,58 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
   }
 
   default InputStream asInputStream() {
-    return new DurableInputStream(this);
+    return new InputStream() {
+      private final DurableInput in = DurableInput.this;
+      private long mark = -1;
+
+      @Override
+      public int read() {
+        return in.readByte();
+      }
+
+      @Override
+      public int read(byte[] b, int off, int len) {
+        len = (int) Math.min(len, in.remaining());
+        try {
+          in.readFully(b, off, len);
+        } catch (EOFException e) {
+          throw new RuntimeException(e);
+        }
+        return len;
+      }
+
+      @Override
+      public long skip(long n) {
+        return in.skipBytes(n);
+      }
+
+      @Override
+      public int available() {
+        return (int) Math.min(Integer.MAX_VALUE, in.remaining());
+      }
+
+      @Override
+      public void close() {
+        in.close();
+      }
+
+      @Override
+      public synchronized void mark(int readlimit) {
+        mark = in.position();
+      }
+
+      @Override
+      public synchronized void reset() {
+        if (mark < 0) {
+          throw new IllegalStateException("no corresponding call to mark()");
+        }
+        in.seek(mark);
+      }
+
+      @Override
+      public boolean markSupported() {
+        return true;
+      }
+    };
   }
 }

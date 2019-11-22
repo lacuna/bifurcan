@@ -1,6 +1,6 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.durable.DurableAccumulator;
+import io.lacuna.bifurcan.durable.AccumulatorOutput;
 import io.lacuna.bifurcan.durable.Util;
 import io.lacuna.bifurcan.durable.blocks.List;
 import io.lacuna.bifurcan.durable.blocks.SkipTable;
@@ -28,7 +28,7 @@ public class DurableList implements IDurableCollection, IList<Object> {
   }
 
   public static <V> DurableList save(Iterator<V> it, DurableEncoding encoding) {
-    DurableAccumulator out = new DurableAccumulator();
+    AccumulatorOutput out = new AccumulatorOutput(16 << 10, false);
     List.encode(it, encoding, out);
     return List.decode(DurableInput.from(out.contents()), null, encoding);
   }

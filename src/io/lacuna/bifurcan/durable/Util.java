@@ -11,7 +11,6 @@ import io.lacuna.bifurcan.utils.Iterators;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.*;
-import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.ToIntFunction;
@@ -26,6 +25,30 @@ public class Util {
   public final static Charset UTF_16 = Charset.forName("utf-16");
   public static final Charset UTF_8 = Charset.forName("utf-8");
   public static final Charset ASCII = Charset.forName("ascii");
+
+  public static String prettyHexBytes(DurableInput in) {
+    StringBuffer sb = new StringBuffer();
+    ByteBuffer buf = ByteBuffer.allocate(16);
+    while (in.remaining() > 0) {
+      buf.clear();
+      in.read(buf);
+      buf.flip();
+
+      for (int i = 0; i < 16; i++) {
+        if (i == 8) {
+          sb.append(" ");
+        }
+
+        if (buf.hasRemaining()) {
+          sb.append(String.format("%02X", buf.get())).append(" ");
+        } else {
+          sb.append("   ");
+        }
+      }
+      sb.append("\n");
+    }
+    return sb.toString();
+  }
 
   public static boolean isCollection(Object o) {
     return o instanceof ICollection || o instanceof Collection;
@@ -49,7 +72,7 @@ public class Util {
       }
 
     } else {
-      DurableAccumulator.flushTo(out, BlockType.ENCODED, acc -> encoding.encode(os, acc));
+      AccumulatorOutput.flushTo(out, BlockType.ENCODED, acc -> encoding.encode(os, acc));
     }
   }
 
@@ -63,7 +86,7 @@ public class Util {
       case LIST:
         return SkippableIterator.singleton(List.decode(in.duplicate(), root, encoding));
       default:
-        throw new IllegalStateException();
+        throw new IllegalStateException("Unexpected block type: " + prefix.type.name());
     }
   }
 
@@ -162,7 +185,7 @@ public class Util {
     int n;
     if (dst.remaining() < src.remaining()) {
       n = dst.remaining();
-      dst.put((ByteBuffer) src.duplicate().limit(n));
+      dst.put((ByteBuffer) src.duplicate().limit(src.position() + n));
       src.position(src.position() + n);
     } else {
       n = src.remaining();
@@ -186,7 +209,6 @@ public class Util {
       Iterator<V> it,
       Function<V, E> encoding,
       ToIntFunction<E> blockSize,
-      BiPredicate<E, E> compatibleEncoding,
       Predicate<V> isCollection) {
     return new Iterator<Block<V, E>>() {
       Block<V, E> next = null;
@@ -210,7 +232,7 @@ public class Util {
         while (it.hasNext() && curr.elements.size() < maxSize) {
           V v = it.next();
           E nextEncoding = encoding.apply(v);
-          if (isCollection.test(v) || !compatibleEncoding.test(curr.encoding, nextEncoding)) {
+          if (isCollection.test(v) || !Objects.equals(curr.encoding, nextEncoding)) {
             next = new Block<>(nextEncoding, v);
             break;
           } else {

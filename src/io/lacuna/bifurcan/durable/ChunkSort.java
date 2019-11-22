@@ -7,7 +7,6 @@ import java.util.Comparator;
 import java.util.Iterator;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
-import java.util.function.ToIntFunction;
 import java.util.stream.LongStream;
 
 public class ChunkSort {
@@ -36,7 +35,7 @@ public class ChunkSort {
     }
 
     Iterator<T> spill(BiConsumer<T, DurableOutput> encode, Function<DurableInput, T> decode) {
-      DurableAccumulator acc = new DurableAccumulator();
+      AccumulatorOutput acc = new AccumulatorOutput();
       entries().forEach(e -> encode.accept(e, acc));
       DurableInput in = DurableInput.from(acc.contents());
 
@@ -88,7 +87,7 @@ public class ChunkSort {
       BiConsumer<T, DurableOutput> encode,
       Function<DurableInput, T> decode,
       Comparator<T> comparator) {
-    Accumulator<T> acc = new Accumulator<>(encode, decode, comparator);
+    Accumulator acc = new Accumulator(encode, decode, comparator);
     entries.forEach(acc::add);
     return acc.sortedIterator();
   }

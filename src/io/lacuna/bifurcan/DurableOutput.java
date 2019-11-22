@@ -1,22 +1,18 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.durable.ByteChannelDurableOutput;
-import io.lacuna.bifurcan.durable.DurableOutputStream;
+import io.lacuna.bifurcan.durable.ByteChannelOutput;
 import io.lacuna.bifurcan.durable.Util;
 
-import java.io.Closeable;
-import java.io.DataOutput;
-import java.io.Flushable;
-import java.io.OutputStream;
+import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 
 public interface DurableOutput extends DataOutput, Flushable, Closeable, AutoCloseable {
 
-  int DEFAULT_BUFFER_SIZE = 1 << 16;
+  int DEFAULT_BUFFER_SIZE = 64 << 10;
 
   static DurableOutput from(OutputStream os) {
-    return new ByteChannelDurableOutput(Channels.newChannel(os), DEFAULT_BUFFER_SIZE);
+    return new ByteChannelOutput(Channels.newChannel(os), DEFAULT_BUFFER_SIZE);
   }
 
   default void write(byte[] b) {
@@ -103,6 +99,28 @@ public interface DurableOutput extends DataOutput, Flushable, Closeable, AutoClo
   void transferFrom(DurableInput in, long bytes);
 
   default OutputStream asOutputStream() {
-    return new DurableOutputStream(this);
+    return new OutputStream() {
+      private final DurableOutput out = DurableOutput.this;
+
+      @Override
+      public void write(byte[] b, int off, int len) {
+        out.write(b, off, len);
+      }
+
+      @Override
+      public void flush() {
+        out.flush();
+      }
+
+      @Override
+      public void close() {
+        out.close();
+      }
+
+      @Override
+      public void write(int b) {
+        out.writeByte(b);
+      }
+    };
   }
 }

@@ -4,10 +4,11 @@ import io.lacuna.bifurcan.DurableInput;
 import io.lacuna.bifurcan.IEntry;
 import io.lacuna.bifurcan.IntMap;
 import io.lacuna.bifurcan.LinearList;
+import io.lacuna.bifurcan.durable.allocator.SlabAllocator;
 
 import java.nio.ByteBuffer;
 
-public class MultiBufferDurableInput implements DurableInput {
+public class MultiBufferInput implements DurableInput {
 
   private static final ThreadLocal<ByteBuffer> SCRATCH_BUFFER = ThreadLocal.withInitial(() -> ByteBuffer.allocateDirect(8));
 
@@ -18,14 +19,14 @@ public class MultiBufferDurableInput implements DurableInput {
   private long offset;
   private ByteBuffer curr;
 
-  private MultiBufferDurableInput(IntMap<ByteBuffer> buffers, Slice bounds, long position, long size) {
+  private MultiBufferInput(IntMap<ByteBuffer> buffers, Slice bounds, long position, long size) {
     this.bounds = bounds;
     this.buffers = buffers;
     this.size = size;
     seek(position);
   }
 
-  public MultiBufferDurableInput(Iterable<ByteBuffer> buffers, Slice bounds) {
+  public MultiBufferInput(Iterable<ByteBuffer> buffers, Slice bounds) {
     IntMap<ByteBuffer> m = new IntMap<ByteBuffer>().linear();
 
     long size = 0;
@@ -47,7 +48,7 @@ public class MultiBufferDurableInput implements DurableInput {
 
   @Override
   public DurableInput duplicate() {
-    return new MultiBufferDurableInput(buffers, bounds, position(), size);
+    return new MultiBufferInput(buffers, bounds, position(), size);
   }
 
   @Override
@@ -59,7 +60,7 @@ public class MultiBufferDurableInput implements DurableInput {
     ByteBuffer bf = ((ByteBuffer) f.value().position((int) (start - f.key()))).slice();
     if (length <= bf.remaining()) {
       bf = ((ByteBuffer) bf.limit((int) length)).slice();
-      return new SingleBufferDurableInput(bf, bounds);
+      return new SingleBufferInput(bf, bounds);
     }
 
     IEntry<Long, ByteBuffer> l = buffers.floor(end);
@@ -69,7 +70,7 @@ public class MultiBufferDurableInput implements DurableInput {
     buffers.slice(start, end).values().forEach(bufs::addLast);
     bufs.addLast(bl);
 
-    return new MultiBufferDurableInput(bufs, bounds);
+    return new MultiBufferInput(bufs, bounds);
   }
 
   @Override
@@ -104,6 +105,7 @@ public class MultiBufferDurableInput implements DurableInput {
 
   @Override
   public void close() {
+    SlabAllocator.tryFree(buffers.values());
   }
 
   @Override

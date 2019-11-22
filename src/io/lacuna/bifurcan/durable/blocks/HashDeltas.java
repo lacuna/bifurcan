@@ -3,10 +3,9 @@ package io.lacuna.bifurcan.durable.blocks;
 import io.lacuna.bifurcan.DurableInput;
 import io.lacuna.bifurcan.DurableOutput;
 import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
-import io.lacuna.bifurcan.durable.DurableAccumulator;
+import io.lacuna.bifurcan.durable.AccumulatorOutput;
 import io.lacuna.bifurcan.utils.Iterators;
 
-import java.util.PrimitiveIterator;
 import java.util.PrimitiveIterator.OfInt;
 
 /**
@@ -19,7 +18,7 @@ import java.util.PrimitiveIterator.OfInt;
 public class HashDeltas {
 
   public static class Writer {
-    private final DurableAccumulator acc = new DurableAccumulator();
+    private final AccumulatorOutput acc = new AccumulatorOutput();
     private int prevHash;
     private boolean init = false;
 

@@ -3,7 +3,7 @@ package io.lacuna.bifurcan.durable.blocks;
 import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.durable.BlockPrefix;
 import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
-import io.lacuna.bifurcan.durable.DurableAccumulator;
+import io.lacuna.bifurcan.durable.AccumulatorOutput;
 import io.lacuna.bifurcan.durable.Util;
 import io.lacuna.bifurcan.durable.Util.Block;
 import io.lacuna.bifurcan.utils.Iterators;
@@ -32,7 +32,7 @@ public class List {
 
   public static <V> void encode(Iterator<V> it, DurableEncoding e, DurableOutput out) {
     SkipTable.Writer skipTable = new SkipTable.Writer();
-    DurableAccumulator elements = new DurableAccumulator();
+    AccumulatorOutput elements = new AccumulatorOutput();
 
     AtomicLong counter = new AtomicLong();
     Iterator<Block<Indexed<V>, DurableEncoding>> blocks =
@@ -40,7 +40,6 @@ public class List {
             Iterators.map(it, v -> new Indexed<>(v, counter.getAndIncrement())),
             i -> e.elementEncoding(i.index),
             DurableEncoding::blockSize,
-            DurableEncoding::equals,
             i -> Util.isCollection(i.value));
 
     long index = 0;
@@ -52,12 +51,16 @@ public class List {
     }
 
     long size = index;
-    DurableAccumulator.flushTo(out, BlockType.LIST, acc -> {
+    AccumulatorOutput.flushTo(out, BlockType.LIST, acc -> {
       acc.writeVLQ(size);
       acc.writeUnsignedByte(skipTable.tiers());
+
       if (skipTable.tiers() > 0) {
         skipTable.flushTo(acc);
+      } else {
+        skipTable.free();
       }
+
       elements.flushTo(acc);
     });
   }

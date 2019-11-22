@@ -3,15 +3,12 @@ package io.lacuna.bifurcan.durable;
 import io.lacuna.bifurcan.DurableInput;
 import io.lacuna.bifurcan.DurableOutput;
 import io.lacuna.bifurcan.LinearList;
-import io.lacuna.bifurcan.allocator.SlabAllocator;
+import io.lacuna.bifurcan.durable.allocator.SlabAllocator;
 
 import java.nio.ByteBuffer;
 import java.util.function.Consumer;
-import java.util.zip.CRC32;
 
-import static io.lacuna.bifurcan.allocator.SlabAllocator.free;
-
-public class DurableAccumulator implements DurableOutput {
+public class AccumulatorOutput implements DurableOutput {
 
   private final LinearList<ByteBuffer> flushed = new LinearList<>();
   private ByteBuffer curr;
@@ -19,24 +16,31 @@ public class DurableAccumulator implements DurableOutput {
   private boolean isOpen = true;
 
   private final int bufferSize;
+  private final boolean useSlabAllocator;
 
-  public DurableAccumulator() {
-    this(DurableOutput.DEFAULT_BUFFER_SIZE);
+  public AccumulatorOutput() {
+    this(DurableOutput.DEFAULT_BUFFER_SIZE, true);
   }
 
-  public DurableAccumulator(int bufferSize) {
+  public AccumulatorOutput(int bufferSize) {
+    this(bufferSize, true);
+  }
+
+  public AccumulatorOutput(int bufferSize, boolean useSlabAllocator) {
     this.bufferSize = bufferSize;
-    curr = SlabAllocator.allocate(bufferSize);
+    this.useSlabAllocator = useSlabAllocator;
+
+    curr = allocate(bufferSize);
   }
 
-  public static void flushTo(DurableOutput out, Consumer<DurableAccumulator> body) {
-    DurableAccumulator acc = new DurableAccumulator();
+  public static void flushTo(DurableOutput out, Consumer<AccumulatorOutput> body) {
+    AccumulatorOutput acc = new AccumulatorOutput();
     body.accept(acc);
     acc.flushTo(out);
   }
 
-  public static void flushTo(DurableOutput out, BlockPrefix.BlockType type, Consumer<DurableAccumulator> body) {
-    DurableAccumulator acc = new DurableAccumulator();
+  public static void flushTo(DurableOutput out, BlockPrefix.BlockType type, Consumer<AccumulatorOutput> body) {
+    AccumulatorOutput acc = new AccumulatorOutput();
     body.accept(acc);
     acc.flushTo(out, type);
   }
@@ -47,7 +51,7 @@ public class DurableAccumulator implements DurableOutput {
   public void flushTo(DurableOutput out) {
     close();
     out.write(flushed);
-    free(flushed);
+    free();
   }
 
   public Iterable<ByteBuffer> contents() {
@@ -61,7 +65,12 @@ public class DurableAccumulator implements DurableOutput {
 
     p.encode(out);
     out.write(flushed);
-    free(flushed);
+    free();
+  }
+
+  public void free() {
+    close();
+    SlabAllocator.free(flushed);
   }
 
   @Override
@@ -150,11 +159,15 @@ public class DurableAccumulator implements DurableOutput {
 
   //
 
-  public ByteBuffer ensureCapacity(int n) {
+  private ByteBuffer allocate(int n) {
+    return useSlabAllocator ? SlabAllocator.allocate(n) : ByteBuffer.allocateDirect(n);
+  }
+
+  private ByteBuffer ensureCapacity(int n) {
     if (n > curr.remaining()) {
       flushedBytes += curr.position();
       flushed.addLast((ByteBuffer) curr.flip());
-      curr = SlabAllocator.allocate(Math.max(bufferSize, n));
+      curr = allocate(Math.max(bufferSize, n));
     }
     return curr;
   }

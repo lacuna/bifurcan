@@ -1,4 +1,4 @@
-package io.lacuna.bifurcan.allocator;
+package io.lacuna.bifurcan.durable.allocator;
 
 import io.lacuna.bifurcan.*;
 
@@ -14,6 +14,7 @@ import static java.lang.Math.min;
 public class BuddyAllocator implements IAllocator {
 
   private final int log2Min;
+  private final long capacity;
   private final IList<ISet<Range>> ranges = new LinearList<>();
 
   public BuddyAllocator(long blockSize, long capacity) {
@@ -26,6 +27,7 @@ public class BuddyAllocator implements IAllocator {
       throw new IllegalArgumentException("'capacity' must be a power of two");
     }
 
+    this.capacity = capacity;
     this.log2Min = bitOffset(blockSize);
     int log2Max = bitOffset(capacity);
 
@@ -34,6 +36,11 @@ public class BuddyAllocator implements IAllocator {
     }
 
     ranges.last().add(new Range(0, capacity));
+  }
+
+  @Override
+  public boolean isAcquired() {
+    return ranges.last().size() == 0;
   }
 
   @Override

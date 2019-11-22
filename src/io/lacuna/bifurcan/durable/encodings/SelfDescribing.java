@@ -1,18 +1,18 @@
-package io.lacuna.bifurcan.encodings;
+package io.lacuna.bifurcan.durable.encodings;
 
 import io.lacuna.bifurcan.DurableEncoding;
 import io.lacuna.bifurcan.DurableInput;
 import io.lacuna.bifurcan.DurableOutput;
 import io.lacuna.bifurcan.IList;
 import io.lacuna.bifurcan.durable.BlockPrefix;
-import io.lacuna.bifurcan.durable.DurableAccumulator;
+import io.lacuna.bifurcan.durable.AccumulatorOutput;
 
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 public class SelfDescribing implements DurableEncoding {
 
-  private final Descriptor descriptor;
+  private final String description;
   private final int blockSize;
   private final BiConsumer<Object, DurableOutput> encode;
   private final Function<DurableInput, Object> decode;
@@ -20,26 +20,31 @@ public class SelfDescribing implements DurableEncoding {
   private final Function<DurableOutput, DurableOutput> compress;
 
   public SelfDescribing(
-      String descriptor,
+      String identifier,
       int blockSize,
       BiConsumer<Object, DurableOutput> encode,
       Function<DurableInput, Object> decode) {
-    this(descriptor, blockSize, encode, decode, in -> in, out -> out);
+    this(identifier, blockSize, encode, decode, in -> in, out -> out);
   }
 
   public SelfDescribing(
-      String descriptor,
+      String description,
       int blockSize,
       BiConsumer<Object, DurableOutput> encode,
       Function<DurableInput, Object> decode,
       Function<DurableInput, DurableInput> decompress,
       Function<DurableOutput, DurableOutput> compress) {
-    this.descriptor = new Descriptor(descriptor);
+    this.description = description;
     this.blockSize = blockSize;
     this.encode = encode;
     this.decode = decode;
     this.decompress = decompress;
     this.compress = compress;
+  }
+
+  @Override
+  public String description() {
+    return description;
   }
 
   @Override
@@ -73,13 +78,8 @@ public class SelfDescribing implements DurableEncoding {
   }
 
   @Override
-  public boolean hasOrdering() {
+  public boolean hasKeyOrdering() {
     return true;
-  }
-
-  @Override
-  public Descriptor descriptor() {
-    return descriptor;
   }
 
   @Override
@@ -89,11 +89,11 @@ public class SelfDescribing implements DurableEncoding {
 
   @Override
   public void encode(IList<Object> primitives, DurableOutput out) {
-    DurableAccumulator acc = new DurableAccumulator();
+    AccumulatorOutput acc = new AccumulatorOutput();
 
     DurableOutput compressor = compress.apply(acc);
     for (Object p : primitives) {
-      DurableAccumulator.flushTo(compressor, BlockPrefix.BlockType.OTHER, o -> encode.accept(p, o));
+      AccumulatorOutput.flushTo(compressor, BlockPrefix.BlockType.OTHER, o -> encode.accept(p, o));
     }
     compressor.close();
 

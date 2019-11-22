@@ -21,15 +21,14 @@
     DurableOutput
     DurableMap
     DurableList]
+   [io.lacuna.bifurcan.durable.allocator
+    SlabAllocator]
    [io.lacuna.bifurcan.hash
     PerlHash]
-   [io.lacuna.bifurcan.encodings
+   [io.lacuna.bifurcan.durable.encodings
     SelfDescribing]
    [io.lacuna.bifurcan.durable.blocks
     HashMap
-    HashTable
-    HashTable$Entry
-    HashTable$Writer
     SkipTable
     SkipTable$Writer
     SkipTable$Entry]
@@ -84,6 +83,13 @@
           (.readFully in ary)
           (edn/read-string (String. ary "utf-8")))))))
 
+(defn no-leaks? []
+  (zero? (SlabAllocator/allocatedBytes)))
+
+(defn free! [^DurableInput in]
+  (.close in)
+  (assert (no-leaks?)))
+
 ;;; Util
 
 (defspec test-vlq-roundtrip iterations
@@ -93,17 +99,21 @@
           in  (->> out
                 .contents
                 DurableInput/from)]
-      (= n (.readVLQ in)))))
+      (try
+        (= n (.readVLQ in))
+        (finally
+          (free! in))))))
 
 (defspec test-prefixed-vlq-roundtrip iterations
   (prop/for-all [n gen-pos-int
                  bits (gen/choose 0 6)]
     (let [out (DurableAccumulator.)
           _   (Util/writePrefixedVLQ 0 bits n out)
-          in  (->> out
-                .contents
-                DurableInput/from)]
-      (= n (Util/readPrefixedVLQ (.readByte in) bits in)))))
+          in  (->> out .contents DurableInput/from)]
+      (try
+        (= n (Util/readPrefixedVLQ (.readByte in) bits in))
+        (finally
+          (free! in))))))
 
 ;;; Prefix
 
@@ -115,42 +125,24 @@
     (let [out (DurableAccumulator.)
           p   (BlockPrefix. n type)
           _   (.encode p out)
-          p'  (->> out
-                .contents
-                DurableInput/from
-                BlockPrefix/decode)]
-      #_(prn p p')
-      (= p p'))))
-
-;;; HashTable
-
-(defn ^HashTable create-hash-table [entries]
-  (let [hash->offset (into {} entries)
-        writer       (HashTable$Writer. 0.98)
-        _            (doseq [[hash offset] hash->offset]
-                       (.put writer hash offset))]
-    (HashTable. (DurableInput/from (.contents writer)) (.entryBytes writer))))
-
-(defspec test-durable-hash-table iterations
-  (prop/for-all [entries (gen/such-that
-                           (complement empty?)
-                           (gen/list (gen/tuple gen-pos-int gen-pos-int)))]
-    (let [t (create-hash-table entries)]
-      (every?
-        (fn [[hash offset]]
-          (= offset (.offset ^HashTable$Entry (.get t hash))))
-        (into {} entries)))))
+          in  (->> out .contents DurableInput/from)]
+      (try
+        (= p (BlockPrefix/decode in))
+        (finally
+          (free! in))))))
 
 ;; SkipTable
 
-(defn ^SkipTable create-skip-table [entry-offsets]
+(defn create-skip-table [entry-offsets]
   (let [writer  (SkipTable$Writer.)
         entries (reductions #(map + %1 %2) entry-offsets)
         _       (doseq [[index offset] entries]
-                  (.append writer index offset))]
-    (SkipTable.
-      (.sliceBlock (DurableInput/from (.contents writer)) BlockPrefix$BlockType/TABLE)
-      (.tiers writer))))
+                  (.append writer index offset))
+        in      (->> writer .contents DurableInput/from)]
+    [in
+     (SkipTable.
+        (.sliceBlock in BlockPrefix$BlockType/TABLE)
+        (.tiers writer))]))
 
 (defn print-skip-table [^DurableInput in]
   (->> (repeatedly #(when (pos? (.remaining in)) (.readVLQ in)))
@@ -160,14 +152,17 @@
   (prop/for-all [entry-offsets (gen/such-that
                                  (complement empty?)
                                  (gen/list (gen/tuple gen-small-pos-int gen-small-pos-int)))]
-    (let [t (create-skip-table entry-offsets)]
-      (every?
-        (fn [[index offset]]
-          (let [^SkipTable$Entry e (.floor t index)]
-            (and
-              (= index (.index e))
-              (= offset (.offset e)))))
-        (reductions #(map + %1 %2) entry-offsets)))))
+    (let [[in t] (create-skip-table entry-offsets)]
+      (try
+        (every?
+          (fn [[index offset]]
+            (let [e (.floor ^SkipTable t index)]
+              (and
+                (= index (.index e))
+                (= offset (.offset e)))))
+          (reductions #(map + %1 %2) entry-offsets))
+        (finally
+          (free! in))))))
 
 ;;; SortedChunk
 
@@ -184,23 +179,29 @@
                (map
                  (fn [^IEntry e]
                    [(.key e) (.value e)])))]
-      (= (sort-by #(hash (key %)) m) m'))))
+      (and
+        (= (sort-by #(hash (key %)) m) m')
+        (no-leaks?)))))
 
 ;;; DurableMap
 
 (defspec test-durable-map iterations
   (prop/for-all [m (coll/map-gen #(Map.))]
     (let [m' (DurableMap/save m edn-encoding)]
-      (and
-        (= m m')
-        (->> (range (.size m'))
-          (every?
-            (fn [^long i]
-              (= i (->> (.nth m' i) .key (.indexOf m'))))))))))
+      (try
+        (and
+          (= m m')
+          (->> (range (.size m'))
+            (every?
+              (fn [^long i]
+                (= i (->> (.nth m' i) .key (.indexOf m'))))))
+          (no-leaks?))))))
 
 ;;; DurableList
 
  (defspec test-durable-list iterations
   (prop/for-all [l (coll/list-gen #(List.))]
     (let [l' (DurableList/save (.iterator ^Iterable l) edn-encoding)]
-      (= l l'))))
+      (and
+        (= l l')
+        (no-leaks?)))))
