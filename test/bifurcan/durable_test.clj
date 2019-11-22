@@ -36,7 +36,7 @@
     Util
     BlockPrefix
     BlockPrefix$BlockType
-    DurableAccumulator
+    AccumulatorOutput
     ChunkSort]))
 
 (set! *warn-on-reflection* true)
@@ -94,7 +94,7 @@
 
 (defspec test-vlq-roundtrip iterations
   (prop/for-all [n gen-pos-int]
-    (let [out (doto (DurableAccumulator.)
+    (let [out (doto (AccumulatorOutput.)
                 (.writeVLQ n))
           in  (->> out
                 .contents
@@ -107,7 +107,7 @@
 (defspec test-prefixed-vlq-roundtrip iterations
   (prop/for-all [n gen-pos-int
                  bits (gen/choose 0 6)]
-    (let [out (DurableAccumulator.)
+    (let [out (AccumulatorOutput.)
           _   (Util/writePrefixedVLQ 0 bits n out)
           in  (->> out .contents DurableInput/from)]
       (try
@@ -122,7 +122,7 @@
                  type (->> (BlockPrefix$BlockType/values)
                         (map gen/return)
                         gen/one-of)]
-    (let [out (DurableAccumulator.)
+    (let [out (AccumulatorOutput.)
           p   (BlockPrefix. n type)
           _   (.encode p out)
           in  (->> out .contents DurableInput/from)]
