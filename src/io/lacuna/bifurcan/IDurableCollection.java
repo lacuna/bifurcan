@@ -1,23 +1,34 @@
 package io.lacuna.bifurcan;
 
+import io.lacuna.bifurcan.durable.Util;
+
+import java.nio.ByteBuffer;
+import java.nio.file.Path;
+
 public interface IDurableCollection {
 
-  interface Fingerprint {
+  interface Fingerprint extends Comparable<Fingerprint> {
     byte[] binary();
 
     default String toHexString() {
-      StringBuffer sb = new StringBuffer();
-      for (byte b : binary()) {
-        sb.append(Integer.toHexString(b & 0xFF));
-      }
-      return sb.toString();
+      return Util.toHexString(ByteBuffer.wrap(binary()));
+    }
+
+    default int compareTo(Fingerprint o) {
+      return Util.compare(
+          ByteBuffer.wrap(binary()),
+          ByteBuffer.wrap(o.binary()));
     }
   }
 
   interface Root {
+    Path file();
+
+    DurableInput bytes();
+
     Fingerprint fingerprint();
 
-    IList<Fingerprint> dependencies();
+    IMap<Fingerprint, Root> dependencies();
   }
 
   DurableEncoding encoding();
@@ -26,7 +37,11 @@ public interface IDurableCollection {
 
   Root root();
 
-  default long rootOffset() {
-    return bytes().bounds().root().start;
+  default IList<Fingerprint> dependencies() {
+    return null;
+  }
+
+  default long rootByteOffset() {
+    return bytes().bounds().absolute().start;
   }
 }

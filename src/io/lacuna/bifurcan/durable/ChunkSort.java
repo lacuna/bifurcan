@@ -35,7 +35,7 @@ public class ChunkSort {
     }
 
     Iterator<T> spill(BiConsumer<T, DurableOutput> encode, Function<DurableInput, T> decode) {
-      AccumulatorOutput acc = new AccumulatorOutput();
+      SwapBuffer acc = new SwapBuffer();
       entries().forEach(e -> encode.accept(e, acc));
       DurableInput in = DurableInput.from(acc.contents());
 

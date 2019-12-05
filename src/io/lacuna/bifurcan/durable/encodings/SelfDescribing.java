@@ -5,7 +5,7 @@ import io.lacuna.bifurcan.DurableInput;
 import io.lacuna.bifurcan.DurableOutput;
 import io.lacuna.bifurcan.IList;
 import io.lacuna.bifurcan.durable.BlockPrefix;
-import io.lacuna.bifurcan.durable.AccumulatorOutput;
+import io.lacuna.bifurcan.durable.SwapBuffer;
 
 import java.util.function.BiConsumer;
 import java.util.function.Function;
@@ -89,11 +89,11 @@ public class SelfDescribing implements DurableEncoding {
 
   @Override
   public void encode(IList<Object> primitives, DurableOutput out) {
-    AccumulatorOutput acc = new AccumulatorOutput();
+    SwapBuffer acc = new SwapBuffer();
 
     DurableOutput compressor = compress.apply(acc);
     for (Object p : primitives) {
-      AccumulatorOutput.flushTo(compressor, BlockPrefix.BlockType.OTHER, o -> encode.accept(p, o));
+      SwapBuffer.flushTo(compressor, BlockPrefix.BlockType.OTHER, o -> encode.accept(p, o));
     }
     compressor.close();
 

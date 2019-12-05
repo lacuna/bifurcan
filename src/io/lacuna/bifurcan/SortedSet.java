@@ -2,6 +2,7 @@ package io.lacuna.bifurcan;
 
 import java.util.Optional;
 import java.util.function.BiPredicate;
+import java.util.function.Function;
 import java.util.function.ToIntFunction;
 
 public class SortedSet<V> implements ISortedSet<V> {
@@ -61,6 +62,11 @@ public class SortedSet<V> implements ISortedSet<V> {
     } else {
       return new SortedSet<>(m.union(Maps.from(s, k -> null)));
     }
+  }
+
+  @Override
+  public <U> SortedMap<V, U> zip(Function<V, U> f) {
+    return m.mapValues((k, v) -> f.apply(k));
   }
 
   @Override

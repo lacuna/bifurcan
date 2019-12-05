@@ -23,6 +23,10 @@ public class ByteChannelOutput implements DurableOutput, Closeable {
   private final ByteBuffer buffer;
   private long position;
 
+  public ByteChannelOutput(WritableByteChannel channel) {
+    this(channel, 64 << 10);
+  }
+
   public ByteChannelOutput(WritableByteChannel channel, int bufferSize) {
     this.channel = channel;
     this.buffer = allocate(bufferSize);

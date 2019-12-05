@@ -3,7 +3,7 @@ package io.lacuna.bifurcan.durable.blocks;
 import io.lacuna.bifurcan.DurableInput;
 import io.lacuna.bifurcan.DurableOutput;
 import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
-import io.lacuna.bifurcan.durable.AccumulatorOutput;
+import io.lacuna.bifurcan.durable.SwapBuffer;
 
 import java.nio.ByteBuffer;
 
@@ -108,7 +108,7 @@ public class SkipTable {
     private static final int BRANCHING_FACTOR = 1 << LOG_BRANCHING_FACTOR;
     private static final long BIT_MASK = BRANCHING_FACTOR - 1;
 
-    private final AccumulatorOutput acc = new AccumulatorOutput(1024);
+    private final SwapBuffer acc = new SwapBuffer();
     private Writer parent = null;
 
     private long lastIndex = 0, lastOffset = 0, count = 0;
@@ -175,14 +175,14 @@ public class SkipTable {
      * Used for testing, in practice you should always prefer `flushTo` since it automatically frees the buffers.
      */
     public Iterable<ByteBuffer> contents() {
-      AccumulatorOutput acc = new AccumulatorOutput();
+      SwapBuffer acc = new SwapBuffer();
       flushTo(acc);
       return acc.contents();
     }
 
     public long flushTo(DurableOutput out) {
       long offset = out.written();
-      AccumulatorOutput.flushTo(out, BlockType.TABLE, acc -> flush(acc, 1));
+      SwapBuffer.flushTo(out, BlockType.TABLE, acc -> flush(acc, 1));
       return out.written() - offset;
     }
   }

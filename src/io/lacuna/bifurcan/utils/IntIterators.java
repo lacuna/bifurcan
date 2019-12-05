@@ -35,6 +35,24 @@ public class IntIterators {
     return true;
   }
 
+  public static OfInt from(BitSet bitSet) {
+    return new OfInt() {
+      int curr = bitSet.nextSetBit(0);
+
+      @Override
+      public int nextInt() {
+        int result = curr;
+        this.curr = bitSet.nextSetBit(curr + 1);
+        return result;
+      }
+
+      @Override
+      public boolean hasNext() {
+        return curr >= 0;
+      }
+    };
+  }
+
   /**
    * @param it an iterator
    * @param f a predicate

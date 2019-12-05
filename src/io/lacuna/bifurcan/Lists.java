@@ -911,6 +911,10 @@ public class Lists {
     return (IList<V>) Lists.from(array);
   }
 
+  public static <V> IList<V> sort(IList<V> l) {
+    return sort(l, (Comparator<V>) Comparator.naturalOrder());
+  }
+
   /**
    * @return a concatenation of all the lists
    */

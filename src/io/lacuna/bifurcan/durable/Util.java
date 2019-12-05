@@ -2,6 +2,7 @@ package io.lacuna.bifurcan.durable;
 
 import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.DurableEncoding.SkippableIterator;
+import io.lacuna.bifurcan.IDurableCollection.Fingerprint;
 import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
 import io.lacuna.bifurcan.durable.blocks.HashMap;
 import io.lacuna.bifurcan.durable.blocks.List;
@@ -19,14 +20,11 @@ import java.util.function.ToIntFunction;
  * @author ztellman
  */
 public class Util {
-
-  public static ThreadLocal<LinearSet<IDurableCollection.Fingerprint>> DEPENDENCIES = ThreadLocal.withInitial(LinearSet::new);
-
   public final static Charset UTF_16 = Charset.forName("utf-16");
   public static final Charset UTF_8 = Charset.forName("utf-8");
   public static final Charset ASCII = Charset.forName("ascii");
 
-  public static String prettyHexBytes(DurableInput in) {
+  public static String toHexTable(DurableInput in) {
     StringBuffer sb = new StringBuffer();
     ByteBuffer buf = ByteBuffer.allocate(16);
     while (in.remaining() > 0) {
@@ -50,8 +48,37 @@ public class Util {
     return sb.toString();
   }
 
+  public static String toHexString(ByteBuffer buf) {
+    StringBuffer sb = new StringBuffer();
+    buf = buf.duplicate();
+    while (buf.hasRemaining()) {
+      sb.append(Integer.toHexString(buf.get() & 0xFF));
+    }
+    return sb.toString();
+  }
+
+  public static int compare(ByteBuffer a, ByteBuffer b) {
+    a = a.duplicate();
+    b = b.duplicate();
+
+    while (a.hasRemaining() && b.hasRemaining()) {
+      int d = (a.get() & 0xFF) - (b.get() & 0xFF);
+      if (d != 0) {
+        return d;
+      }
+    }
+
+    if (a.hasRemaining()) {
+      return 1;
+    } else if (b.hasRemaining()) {
+      return -1;
+    } else {
+      return 0;
+    }
+  }
+
   public static boolean isCollection(Object o) {
-    return o instanceof ICollection || o instanceof Collection;
+    return o instanceof ICollection || o instanceof Iterable;
   }
 
   public static void encodeBlock(IList<Object> os, DurableEncoding encoding, DurableOutput out) {
@@ -72,22 +99,26 @@ public class Util {
       }
 
     } else {
-      AccumulatorOutput.flushTo(out, BlockType.ENCODED, acc -> encoding.encode(os, acc));
+      SwapBuffer.flushTo(out, BlockType.ENCODED, acc -> encoding.encode(os, acc));
+    }
+  }
+
+  public static IDurableCollection decodeCollection(BlockPrefix prefix, IDurableCollection.Root root, DurableEncoding encoding, DurableInput in) {
+    switch (prefix.type) {
+      case HASH_MAP:
+        return HashMap.decode(in.duplicate(), root, encoding);
+      case LIST:
+        return List.decode(in.duplicate(), root, encoding);
+      default:
+        throw new IllegalStateException("Unexpected block type: " + prefix.type.name());
     }
   }
 
   public static SkippableIterator decodeBlock(DurableInput in, IDurableCollection.Root root, DurableEncoding encoding) {
     BlockPrefix prefix = in.peekPrefix();
-    switch (prefix.type) {
-      case ENCODED:
-        return encoding.decode(in.duplicate().sliceBlock(BlockType.ENCODED));
-      case HASH_MAP:
-        return SkippableIterator.singleton(HashMap.decode(in.duplicate(), root, encoding));
-      case LIST:
-        return SkippableIterator.singleton(List.decode(in.duplicate(), root, encoding));
-      default:
-        throw new IllegalStateException("Unexpected block type: " + prefix.type.name());
-    }
+    return prefix.type == BlockType.ENCODED
+        ? encoding.decode(in.duplicate().sliceBlock(BlockType.ENCODED))
+        : SkippableIterator.singleton(decodeCollection(prefix, root, encoding, in));
   }
 
   public static long size(Iterable<ByteBuffer> bufs) {
@@ -101,9 +132,7 @@ public class Util {
   public static void writeVLQ(long val, DurableOutput out) {
     assert (val >= 0);
 
-    int highestBit = Bits.bitOffset(Bits.highestBit(val));
-
-    int shift = Math.floorDiv(highestBit, 7) * 7;
+    int shift = Math.floorDiv(Bits.log2Ceil(val), 7) * 7;
     for (; ; shift -= 7) {
       byte b = (byte) ((val >> shift) & 127);
       if (shift == 0) {

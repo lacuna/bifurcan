@@ -1,5 +1,8 @@
 package io.lacuna.bifurcan;
 
+import java.nio.file.Path;
+import java.util.Optional;
+
 /**
  * @author ztellman
  */
@@ -73,4 +76,18 @@ public interface ICollection<C, V> extends Iterable<V> {
    * @return a cloned copy of the collection
    */
   C clone();
+
+  /**
+   * @param directory the directory in which to save the durable data structure
+   * @param encoding the encoding for the durable data structure
+   * @param diffMergeThreshold TODO
+   * @return a durable version of the data structure
+   */
+  default C save(Path directory, DurableEncoding encoding, double diffMergeThreshold) {
+    throw new UnsupportedOperationException();
+  }
+
+  default C save(Path directory, DurableEncoding encoding) {
+    return save(directory, encoding, 1.0);
+  }
 }

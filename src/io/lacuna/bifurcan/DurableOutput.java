@@ -6,13 +6,16 @@ import io.lacuna.bifurcan.durable.Util;
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
+import java.nio.channels.WritableByteChannel;
 
 public interface DurableOutput extends DataOutput, Flushable, Closeable, AutoCloseable {
 
-  int DEFAULT_BUFFER_SIZE = 64 << 10;
-
   static DurableOutput from(OutputStream os) {
-    return new ByteChannelOutput(Channels.newChannel(os), DEFAULT_BUFFER_SIZE);
+    return new ByteChannelOutput(Channels.newChannel(os), 16 << 10);
+  }
+
+  static DurableOutput from(WritableByteChannel channel) {
+    return new ByteChannelOutput(channel, 16 << 10);
   }
 
   default void write(byte[] b) {

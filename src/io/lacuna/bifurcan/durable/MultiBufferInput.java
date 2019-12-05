@@ -7,6 +7,7 @@ import io.lacuna.bifurcan.LinearList;
 import io.lacuna.bifurcan.durable.allocator.SlabAllocator;
 
 import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
 
 public class MultiBufferInput implements DurableInput {
 

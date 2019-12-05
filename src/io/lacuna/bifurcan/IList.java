@@ -1,7 +1,12 @@
 package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.Lists.VirtualList;
+import io.lacuna.bifurcan.durable.Dependencies;
+import io.lacuna.bifurcan.durable.FileOutput;
+import io.lacuna.bifurcan.durable.SwapBuffer;
+import io.lacuna.bifurcan.durable.blocks.List;
 
+import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.Spliterator;
 import java.util.Spliterators;
@@ -163,6 +168,20 @@ public interface IList<V> extends
       throw new IndexOutOfBoundsException();
     }
     return nth(size() - 1);
+  }
+
+  @Override
+  default DurableList<V> save(Path directory, DurableEncoding encoding, double diffMergeThreshold) {
+    SwapBuffer acc = new SwapBuffer();
+    List.encode(iterator(), encoding, acc);
+
+    FileOutput file = new FileOutput(Dependencies.popRoot());
+    DurableOutput out = DurableOutput.from(file);
+    acc.flushTo(out);
+    out.close();
+
+    Path path = file.moveTo(directory);
+    return (DurableList<V>) DurableCollections.open(path, encoding);
   }
 
   @Override

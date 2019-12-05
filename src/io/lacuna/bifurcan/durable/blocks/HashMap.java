@@ -4,9 +4,8 @@ import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.durable.BlockPrefix;
 import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
 import io.lacuna.bifurcan.durable.ChunkSort;
-import io.lacuna.bifurcan.durable.AccumulatorOutput;
+import io.lacuna.bifurcan.durable.SwapBuffer;
 import io.lacuna.bifurcan.durable.Util;
-import io.lacuna.bifurcan.durable.encodings.Tuple;
 import io.lacuna.bifurcan.utils.Iterators;
 
 import java.util.Comparator;
@@ -100,7 +99,7 @@ public class HashMap {
 
   public static <K, V> void encodeSortedEntries(Iterator<IEntry.WithHash<K, V>> sortedEntries, DurableEncoding encoding, DurableOutput out) {
     // two tables and actual entries
-    AccumulatorOutput entries = new AccumulatorOutput();
+    SwapBuffer entries = new SwapBuffer();
     SkipTable.Writer skipTable = new SkipTable.Writer();
     HashSkipTable.Writer hashTable = new HashSkipTable.Writer();
 
@@ -128,7 +127,7 @@ public class HashMap {
 
     // flush everything to the provided sink
     long size = index;
-    AccumulatorOutput.flushTo(out, BlockType.HASH_MAP, acc -> {
+    SwapBuffer.flushTo(out, BlockType.HASH_MAP, acc -> {
       acc.writeVLQ(size);
 
       // skip table metadata

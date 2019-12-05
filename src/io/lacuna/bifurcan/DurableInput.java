@@ -20,7 +20,7 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
       this.end = end;
     }
 
-    public Slice root() {
+    public Slice absolute() {
       if (parent == null) {
         return this;
       } else if (root == null) {
@@ -72,7 +72,7 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
   }
 
   default String hexBytes() {
-    return Util.prettyHexBytes(this.duplicate().seek(0));
+    return Util.toHexTable(this.duplicate().seek(0));
   }
 
   Slice bounds();
@@ -143,6 +143,10 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
 
   default int readUnsignedShort() {
     return readShort() & 0xFFFF;
+  }
+
+  default long readUnsignedInt() {
+    return readInt() & 0xFFFFFFFFL;
   }
 
   default String readLine() {

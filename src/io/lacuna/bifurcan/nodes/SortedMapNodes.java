@@ -9,7 +9,9 @@ import io.lacuna.bifurcan.utils.Iterators;
 import java.util.BitSet;
 import java.util.Comparator;
 import java.util.Iterator;
+import java.util.function.BiFunction;
 import java.util.function.BinaryOperator;
+import java.util.function.Function;
 
 import static io.lacuna.bifurcan.nodes.SortedMapNodes.Color.*;
 
@@ -43,8 +45,8 @@ public class SortedMapNodes {
 
     public Node<K, V> redden() {
       return c == BLACK && size > 0 && l.c == BLACK && r.c == BLACK
-        ? node(RED, l, k, v, r)
-        : this;
+          ? node(RED, l, k, v, r)
+          : this;
     }
 
     public Node<K, V> blacken() {
@@ -291,6 +293,12 @@ public class SortedMapNodes {
       return node(c, l.slice(min, max, comparator), k, v, r.slice(min, max, comparator)).rotate();
     }
 
+    public <U> Node<K, U> mapValues(BiFunction<K, V, U> f) {
+      return size == 0
+          ? (Node<K, U>) this
+          : new Node<>(c, l.mapValues(f), k, f.apply(k, v), r.mapValues(f));
+    }
+
     public int checkInvariant() {
       if (c == DOUBLE_BLACK) {
         throw new IllegalStateException();
@@ -330,7 +338,7 @@ public class SortedMapNodes {
     }
   }
 
- static <K, V> Node<K, V> red(Node<K, V> l, K k, V v, Node<K, V> r) {
+  static <K, V> Node<K, V> red(Node<K, V> l, K k, V v, Node<K, V> r) {
     return new Node<>(RED, l, k, v, r);
   }
 

@@ -2,7 +2,7 @@ package io.lacuna.bifurcan.durable.encodings;
 
 import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
-import io.lacuna.bifurcan.durable.AccumulatorOutput;
+import io.lacuna.bifurcan.durable.SwapBuffer;
 
 import java.util.Arrays;
 
@@ -49,7 +49,7 @@ public class Tuple implements DurableEncoding {
     int index = 0;
     for (DurableEncoding e : encodings) {
       final int i = index++;
-      AccumulatorOutput.flushTo(
+      SwapBuffer.flushTo(
           out,
           BlockType.OTHER,
           inner -> e.encode(Lists.lazyMap(primitives, t -> ((Object[]) t)[i]), inner));

@@ -1,14 +1,15 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.durable.AccumulatorOutput;
+import io.lacuna.bifurcan.durable.SwapBuffer;
 import io.lacuna.bifurcan.durable.blocks.*;
 import io.lacuna.bifurcan.utils.Iterators;
 
+import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.function.BiPredicate;
 import java.util.function.ToIntFunction;
 
-public class DurableMap implements IDurableCollection, IMap<Object, Object> {
+public class DurableMap<K, V> implements IDurableCollection, IMap<K, V> {
   private final DurableEncoding encoding;
   private final Root root;
   private final DurableInput bytes;
@@ -35,8 +36,12 @@ public class DurableMap implements IDurableCollection, IMap<Object, Object> {
     this.encoding = encoding;
   }
 
-  public static <K, V> DurableMap save(IMap<K, V> m, DurableEncoding encoding) {
-    AccumulatorOutput out = new AccumulatorOutput(16 << 10, false);
+  public static <K, V> DurableMap<K, V> open(Path path, DurableEncoding encoding) {
+    return (DurableMap<K, V>) DurableCollections.open(path, encoding);
+  }
+
+  public static <K, V> DurableMap<K, V> save(IMap<K, V> m, DurableEncoding encoding) {
+    SwapBuffer out = new SwapBuffer(false);
     HashMap.encodeUnsortedEntries(m.entries(), encoding, out);
     return HashMap.decode(DurableInput.from(out.contents()), null, encoding);
   }
@@ -64,23 +69,23 @@ public class DurableMap implements IDurableCollection, IMap<Object, Object> {
   }
 
   @Override
-  public ToIntFunction<Object> keyHash() {
-    return encoding.keyHash();
+  public ToIntFunction<K> keyHash() {
+    return (ToIntFunction<K>) encoding.keyHash();
   }
 
   @Override
-  public BiPredicate<Object, Object> keyEquality() {
-    return encoding.keyEquality();
+  public BiPredicate<K, K> keyEquality() {
+    return (BiPredicate<K, K>) encoding.keyEquality();
   }
 
   @Override
-  public Object get(Object key, Object defaultValue) {
+  public V get(K key, V defaultValue) {
     int hash = encoding.keyHash().applyAsInt(key);
     HashSkipTable.Entry blockEntry = hashTable == null ? HashSkipTable.Entry.ORIGIN : hashTable.floor(hash);
 
     return blockEntry == null
         ? defaultValue
-        : HashMapEntries.get(chunkedEntries(blockEntry.offset), root, hash, key, defaultValue);
+        : (V) HashMapEntries.get(chunkedEntries(blockEntry.offset), root, hash, key, defaultValue);
   }
 
   @Override
@@ -99,16 +104,16 @@ public class DurableMap implements IDurableCollection, IMap<Object, Object> {
   }
 
   @Override
-  public IEntry.WithHash<Object, Object> nth(long index) {
+  public IEntry.WithHash<K, V> nth(long index) {
     if (index < 0 || index >= size) {
       throw new IndexOutOfBoundsException(index + " must be within [0," + size() + ")");
     }
     SkipTable.Entry blockEntry = indexTable == null ? SkipTable.Entry.ORIGIN : indexTable.floor(index);
-    return chunkedEntries(blockEntry.offset).next().nth((int) (index - blockEntry.index));
+    return (IEntry.WithHash<K, V>) chunkedEntries(blockEntry.offset).next().nth((int) (index - blockEntry.index));
   }
 
   @Override
-  public DurableMap clone() {
+  public DurableMap<K,V> clone() {
     return this;
   }
 

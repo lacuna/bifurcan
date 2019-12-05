@@ -5,10 +5,7 @@ import io.lacuna.bifurcan.nodes.SortedMapNodes.Node;
 
 import java.util.Comparator;
 import java.util.Iterator;
-import java.util.function.BiPredicate;
-import java.util.function.BinaryOperator;
-import java.util.function.ToIntFunction;
-import java.util.function.UnaryOperator;
+import java.util.function.*;
 
 /**
  * A red-black tree based on <a href="http://matt.might.net/papers/germane2014deletion.pdf">Germane 2014</a>.
@@ -158,6 +155,11 @@ public class SortedMap<K, V> implements ISortedMap<K, V> {
   @Override
   public long indexOf(K key) {
     return SortedMapNodes.indexOf(root, key, comparator);
+  }
+
+  @Override
+  public <U> SortedMap<K, U> mapValues(BiFunction<K, V, U> f) {
+    return new SortedMap<>(root.mapValues(f), isLinear(), comparator);
   }
 
   @Override

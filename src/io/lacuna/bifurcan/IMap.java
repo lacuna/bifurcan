@@ -1,9 +1,13 @@
 package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.diffs.DiffMap;
+import io.lacuna.bifurcan.durable.Dependencies;
+import io.lacuna.bifurcan.durable.FileOutput;
+import io.lacuna.bifurcan.durable.SwapBuffer;
 import io.lacuna.bifurcan.durable.blocks.HashMap;
 import io.lacuna.bifurcan.utils.Iterators;
 
+import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.Optional;
 import java.util.Spliterator;
@@ -281,6 +285,20 @@ public interface IMap<K, V> extends
 
   @Override
   default V apply(K k) {
-    return get(k, null);
+    return get(k).orElseThrow(IllegalArgumentException::new);
+  }
+
+  @Override
+  default DurableMap<K, V> save(Path directory, DurableEncoding encoding, double diffMergeThreshold) {
+    SwapBuffer acc = new SwapBuffer();
+    HashMap.encodeSortedEntries(hashSortedEntries(), encoding, acc);
+
+    FileOutput file = new FileOutput(Dependencies.popRoot());
+    DurableOutput out = DurableOutput.from(file);
+    acc.flushTo(out);
+    out.close();
+
+    Path path = file.moveTo(directory);
+    return (DurableMap<K, V>) DurableCollections.open(path, encoding);
   }
 }

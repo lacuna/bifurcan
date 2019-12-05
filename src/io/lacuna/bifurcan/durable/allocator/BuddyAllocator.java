@@ -1,6 +1,7 @@
 package io.lacuna.bifurcan.durable.allocator;
 
 import io.lacuna.bifurcan.*;
+import io.lacuna.bifurcan.utils.Bits;
 
 import static io.lacuna.bifurcan.utils.Bits.*;
 import static java.lang.Math.max;
@@ -28,8 +29,8 @@ public class BuddyAllocator implements IAllocator {
     }
 
     this.capacity = capacity;
-    this.log2Min = bitOffset(blockSize);
-    int log2Max = bitOffset(capacity);
+    this.log2Min = Bits.log2Floor(blockSize);
+    int log2Max = Bits.log2Floor(capacity);
 
     for (int i = 0; i <= (log2Max - log2Min); i++) {
       ranges.addLast(new LinearSet<>());

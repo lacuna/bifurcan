@@ -3,6 +3,7 @@
    [primitive-math :as p]
    [byte-streams :as bs]
    [clojure.edn :as edn]
+   [clojure.java.io :as io]
    [clojure.test :refer :all]
    [clojure.test.check.generators :as gen]
    [clojure.test.check.properties :as prop]
@@ -36,7 +37,7 @@
     Util
     BlockPrefix
     BlockPrefix$BlockType
-    AccumulatorOutput
+    SwapBuffer
     ChunkSort]))
 
 (set! *warn-on-reflection* true)
@@ -94,7 +95,7 @@
 
 (defspec test-vlq-roundtrip iterations
   (prop/for-all [n gen-pos-int]
-    (let [out (doto (AccumulatorOutput.)
+    (let [out (doto (SwapBuffer.)
                 (.writeVLQ n))
           in  (->> out
                 .contents
@@ -107,7 +108,7 @@
 (defspec test-prefixed-vlq-roundtrip iterations
   (prop/for-all [n gen-pos-int
                  bits (gen/choose 0 6)]
-    (let [out (AccumulatorOutput.)
+    (let [out (SwapBuffer.)
           _   (Util/writePrefixedVLQ 0 bits n out)
           in  (->> out .contents DurableInput/from)]
       (try
@@ -122,7 +123,7 @@
                  type (->> (BlockPrefix$BlockType/values)
                         (map gen/return)
                         gen/one-of)]
-    (let [out (AccumulatorOutput.)
+    (let [out (SwapBuffer.)
           p   (BlockPrefix. n type)
           _   (.encode p out)
           in  (->> out .contents DurableInput/from)]

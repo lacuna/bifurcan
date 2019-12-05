@@ -8,39 +8,32 @@ import io.lacuna.bifurcan.durable.allocator.SlabAllocator;
 import java.nio.ByteBuffer;
 import java.util.function.Consumer;
 
-public class AccumulatorOutput implements DurableOutput {
+public class SwapBuffer implements DurableOutput {
 
   private final LinearList<ByteBuffer> flushed = new LinearList<>();
   private ByteBuffer curr;
   private long flushedBytes = 0;
   private boolean isOpen = true;
 
-  private final int bufferSize;
   private final boolean useSlabAllocator;
 
-  public AccumulatorOutput() {
-    this(DurableOutput.DEFAULT_BUFFER_SIZE, true);
+  public SwapBuffer() {
+    this(true);
   }
 
-  public AccumulatorOutput(int bufferSize) {
-    this(bufferSize, true);
-  }
-
-  public AccumulatorOutput(int bufferSize, boolean useSlabAllocator) {
-    this.bufferSize = bufferSize;
+  public SwapBuffer(boolean useSlabAllocator) {
     this.useSlabAllocator = useSlabAllocator;
-
-    curr = allocate(bufferSize);
+    this.curr = allocate(MIN_BUFFER_SIZE);
   }
 
-  public static void flushTo(DurableOutput out, Consumer<AccumulatorOutput> body) {
-    AccumulatorOutput acc = new AccumulatorOutput();
+  public static void flushTo(DurableOutput out, Consumer<SwapBuffer> body) {
+    SwapBuffer acc = new SwapBuffer();
     body.accept(acc);
     acc.flushTo(out);
   }
 
-  public static void flushTo(DurableOutput out, BlockPrefix.BlockType type, Consumer<AccumulatorOutput> body) {
-    AccumulatorOutput acc = new AccumulatorOutput();
+  public static void flushTo(DurableOutput out, BlockPrefix.BlockType type, Consumer<SwapBuffer> body) {
+    SwapBuffer acc = new SwapBuffer();
     body.accept(acc);
     acc.flushTo(out, type);
   }
@@ -159,6 +152,13 @@ public class AccumulatorOutput implements DurableOutput {
 
   //
 
+  private static final int MIN_BUFFER_SIZE = 1 << 10;
+  private static final int MAX_BUFFER_SIZE = 1 << 20;
+
+  private int bufferSize() {
+    return (int) Math.min(MAX_BUFFER_SIZE, Math.max(MIN_BUFFER_SIZE, written() / 16));
+  }
+
   private ByteBuffer allocate(int n) {
     return useSlabAllocator ? SlabAllocator.allocate(n) : ByteBuffer.allocateDirect(n);
   }
@@ -167,7 +167,7 @@ public class AccumulatorOutput implements DurableOutput {
     if (n > curr.remaining()) {
       flushedBytes += curr.position();
       flushed.addLast((ByteBuffer) curr.flip());
-      curr = allocate(Math.max(bufferSize, n));
+      curr = allocate(Math.max(MAX_BUFFER_SIZE, n));
     }
     return curr;
   }
