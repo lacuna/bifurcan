@@ -23,7 +23,9 @@
    [io.lacuna.bifurcan.nodes
     ListNodes$Node]
    [io.lacuna.bifurcan.diffs
-    DiffMap]
+    DiffMap
+    DiffList
+    DiffSet]
    [io.lacuna.bifurcan
     IntMap
     FloatMap
@@ -108,6 +110,9 @@
     (->> b ->set (filter #(.contains b %)) (into #{}))))
 
 (defn list= [a ^IList b]
+  #_(prn (seq a)
+    (-> b .iterator iterator-seq)
+    (->> (.size b) range (map #(.nth b %)) seq))
   (= (seq a)
     (-> b .iterator iterator-seq)
     (->> (.size b) range (map #(.nth b %)) seq)))
@@ -331,7 +336,7 @@
 
 (u/def-collection-check test-diff-map iterations map-actions
   [a {} clj-map
-   b (DiffMap. Maps/EMPTY) bifurcan-map]
+   b (DiffMap. Map/EMPTY) bifurcan-map]
   (map= a b))
 
 (u/def-collection-check test-map-indices iterations map-actions
@@ -366,9 +371,9 @@
     (set= a b)
     (set= a c)))
 
-(u/def-collection-check test-virtual-set iterations set-actions
+(u/def-collection-check test-diff-set iterations set-actions
   [a #{} clj-set
-   b Sets/EMPTY bifurcan-set]
+   b (DiffSet. Set/EMPTY) bifurcan-set]
   (set= a b))
 
 (u/def-collection-check test-set-indices iterations set-actions
@@ -391,10 +396,11 @@
     (list= a b)
     (list= a c)))
 
-(u/def-collection-check test-virtual-list iterations list-actions
+(u/def-collection-check test-diff-list iterations list-actions
   [a [] clj-list
-   b Lists/EMPTY bifurcan-list
-   c (.linear (Lists/from [])) bifurcan-list]
+   b (DiffList. List/EMPTY) bifurcan-list
+   c (.linear (DiffList. List/EMPTY)) bifurcan-list
+   ]
   (and
     (= b c)
     (list= a b)
@@ -571,7 +577,7 @@
     (= (concat (->vec a) (->vec b))
       (->vec (.concat ^IList a b)))))
 
-(defspec test-virtual-list-concat iterations
+(defspec test-concat-wrapper iterations
   (prop/for-all [a (list-gen #(Lists/from []))
                  b (list-gen #(Lists/from []))]
     (= (concat (->vec a) (->vec b))

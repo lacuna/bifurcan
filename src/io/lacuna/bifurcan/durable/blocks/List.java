@@ -5,11 +5,8 @@ import io.lacuna.bifurcan.durable.BlockPrefix;
 import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
 import io.lacuna.bifurcan.durable.SwapBuffer;
 import io.lacuna.bifurcan.durable.Util;
-import io.lacuna.bifurcan.durable.Util.Block;
-import io.lacuna.bifurcan.utils.Iterators;
 
 import java.util.Iterator;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * An indexed list, encoded as:
@@ -20,34 +17,22 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class List {
 
-  private static class Indexed<V> {
-    public final long index;
-    public final V value;
-
-    public Indexed(V value, long index) {
-      this.value = value;
-      this.index = index;
-    }
-  }
-
-  public static <V> void encode(Iterator<V> it, DurableEncoding e, DurableOutput out) {
+  public static <V> void encode(Iterator<V> it, IDurableEncoding.List listEncoding, DurableOutput out) {
     SkipTable.Writer skipTable = new SkipTable.Writer();
     SwapBuffer elements = new SwapBuffer();
 
-    AtomicLong counter = new AtomicLong();
-    Iterator<Block<Indexed<V>, DurableEncoding>> blocks =
-        Util.partitionBy(
-            Iterators.map(it, v -> new Indexed<>(v, counter.getAndIncrement())),
-            i -> e.elementEncoding(i.index),
-            DurableEncoding::blockSize,
-            i -> Util.isCollection(i.value));
+    IDurableEncoding elementEncoding = listEncoding.elementEncoding();
+    Iterator<IList<V>> blocks = Util.partitionBy(
+        it,
+        elementEncoding.blockSize(),
+        elementEncoding::isSingleton);
 
     long index = 0;
     while (blocks.hasNext()) {
-      Block<Indexed<V>, DurableEncoding> b = blocks.next();
+      IList<V> b = blocks.next();
       skipTable.append(index, elements.written());
-      Util.encodeBlock(Lists.lazyMap(b.elements, i -> i.value), b.encoding, elements);
-      index += b.elements.size();
+      Util.encodeBlock((IList<Object>) b, elementEncoding, elements);
+      index += b.size();
     }
 
     long size = index;
@@ -65,7 +50,7 @@ public class List {
     });
   }
 
-  public static DurableList decode(DurableInput in, IDurableCollection.Root root, DurableEncoding encoding) {
+  public static DurableList decode(DurableInput in, IDurableCollection.Root root, IDurableEncoding.List encoding) {
     DurableInput bytes = in.duplicate();
 
     BlockPrefix prefix = in.readPrefix();

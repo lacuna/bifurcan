@@ -1,6 +1,7 @@
 package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.durable.*;
+import io.lacuna.bifurcan.utils.Iterators;
 
 import java.io.*;
 import java.nio.ByteBuffer;
@@ -36,6 +37,10 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
       String b = "[" + start + ", " + end + "]";
       return b + (parent == null ? "" : " -> " + parent);
     }
+  }
+
+  static DurableInput from(ByteBuffer buffer) {
+    return from(() -> Iterators.singleton(buffer));
   }
 
   static DurableInput from(Iterable<ByteBuffer> buffers) {
@@ -82,6 +87,10 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
   DurableInput seek(long position);
 
   long remaining();
+
+  default boolean hasRemaining() {
+    return remaining() > 0;
+  }
 
   long position();
 

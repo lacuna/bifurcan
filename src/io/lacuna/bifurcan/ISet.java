@@ -1,5 +1,7 @@
 package io.lacuna.bifurcan;
 
+import io.lacuna.bifurcan.diffs.DiffSet;
+
 import java.util.Iterator;
 import java.util.Spliterator;
 import java.util.Spliterators;
@@ -87,14 +89,14 @@ public interface ISet<V> extends
    * @return the set, containing {@code rowValue}
    */
   default ISet<V> add(V value) {
-    return new Sets.VirtualSet<V>(this).add(value);
+    return new DiffSet<V>(this).add(value);
   }
 
   /**
    * @return the set, without {@code rowValue}
    */
   default ISet<V> remove(V value) {
-    return new Sets.VirtualSet<V>(this).remove(value);
+    return new DiffSet<V>(this).remove(value);
   }
 
   /**
@@ -185,7 +187,7 @@ public interface ISet<V> extends
 
   @Override
   default ISet<V> linear() {
-    return new Sets.VirtualSet<>(this).linear();
+    return new DiffSet<>(this).linear();
   }
 
   @Override

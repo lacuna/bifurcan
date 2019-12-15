@@ -158,7 +158,7 @@ public interface IMap<K, V> extends
    * @return an iterator over all entries, sorted by their hash
    */
   default Iterator<IEntry.WithHash<K, V>> hashSortedEntries() {
-    return HashMap.sortEntries(entries(), keyHash());
+    return HashMap.sortIndexedEntries(this, keyHash());
   }
 
   /**
@@ -289,9 +289,13 @@ public interface IMap<K, V> extends
   }
 
   @Override
-  default DurableMap<K, V> save(Path directory, DurableEncoding encoding, double diffMergeThreshold) {
+  default DurableMap<K, V> save(Path directory, IDurableEncoding encoding, double diffMergeThreshold) {
+    if (!(encoding instanceof IDurableEncoding.Map)) {
+      throw new IllegalArgumentException(String.format("%s cannot be used to encode maps", encoding.description()));
+    }
+
     SwapBuffer acc = new SwapBuffer();
-    HashMap.encodeSortedEntries(hashSortedEntries(), encoding, acc);
+    HashMap.encodeSortedEntries(hashSortedEntries(), (IDurableEncoding.Map) encoding, acc);
 
     FileOutput file = new FileOutput(Dependencies.popRoot());
     DurableOutput out = DurableOutput.from(file);

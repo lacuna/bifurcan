@@ -1,7 +1,9 @@
 package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.diffs.Util;
+import io.lacuna.bifurcan.utils.Iterators;
 
+import java.util.Iterator;
 import java.util.function.BiPredicate;
 import java.util.function.ToIntFunction;
 
@@ -76,6 +78,14 @@ public interface IDiffSet<V> extends ISet<V>, IDiff<ISet<V>, V> {
     } else {
       return added().nth(index - underlyingSize);
     }
+  }
+
+  @Override
+  default IList<V> elements() {
+    return Lists.from(size(), this::nth, () ->
+        Iterators.concat(
+            Util.skipIndices(underlying().elements().iterator(), removedIndices().iterator()),
+            added().elements().iterator()));
   }
 
   @Override

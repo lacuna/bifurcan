@@ -38,6 +38,11 @@ public class SortedMap<K, V> implements ISortedMap<K, V> {
   }
 
   @Override
+  public Comparator<K> comparator() {
+    return comparator;
+  }
+
+  @Override
   public IEntry<K, V> floor(K key) {
     Node<K, V> n = root.floor(key, comparator);
     return n == null

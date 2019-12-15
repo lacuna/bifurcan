@@ -87,6 +87,12 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
 
   ///
 
+
+  @Override
+  public Comparator<Long> comparator() {
+    return Comparator.naturalOrder();
+  }
+
   @Override
   public ToIntFunction<Long> keyHash() {
     return HASH;

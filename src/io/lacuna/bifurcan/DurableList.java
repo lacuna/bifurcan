@@ -13,11 +13,11 @@ public class DurableList<V> implements IDurableCollection, IList<V> {
   private final Root root;
 
   private final long size;
-  private final DurableEncoding encoding;
+  private final IDurableEncoding.List encoding;
   private final SkipTable skipTable;
   private final DurableInput elements;
 
-  public DurableList(DurableInput bytes, Root root, long size, SkipTable skipTable, DurableInput elements, DurableEncoding encoding) {
+  public DurableList(DurableInput bytes, Root root, long size, SkipTable skipTable, DurableInput elements, IDurableEncoding.List encoding) {
     this.bytes = bytes;
     this.root = root;
 
@@ -27,7 +27,7 @@ public class DurableList<V> implements IDurableCollection, IList<V> {
     this.encoding = encoding;
   }
 
-  public static <V> DurableList<V> save(Iterator<V> it, DurableEncoding encoding) {
+  public static <V> DurableList<V> save(Iterator<V> it, IDurableEncoding.List encoding) {
     SwapBuffer out = new SwapBuffer(false);
     List.encode(it, encoding, out);
     return List.decode(DurableInput.from(out.contents()), null, encoding);
@@ -44,7 +44,7 @@ public class DurableList<V> implements IDurableCollection, IList<V> {
   }
 
   @Override
-  public DurableEncoding encoding() {
+  public IDurableEncoding.List encoding() {
     return encoding;
   }
 
@@ -64,7 +64,7 @@ public class DurableList<V> implements IDurableCollection, IList<V> {
       throw new IndexOutOfBoundsException(index + " must be within [0," + size() + ")");
     }
     SkipTable.Entry entry = skipTable == null ? SkipTable.Entry.ORIGIN : skipTable.floor(index);
-    return (V) Util.decodeBlock(elements.duplicate().seek(entry.offset), root, encoding.elementEncoding(entry.index))
+    return (V) Util.decodeBlock(elements.duplicate().seek(entry.offset), root, encoding.elementEncoding())
         .skip(index - entry.index)
         .next();
   }

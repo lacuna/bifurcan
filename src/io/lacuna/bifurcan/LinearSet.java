@@ -1,5 +1,6 @@
 package io.lacuna.bifurcan;
 
+import io.lacuna.bifurcan.diffs.DiffSet;
 import io.lacuna.bifurcan.utils.Iterators;
 
 import java.util.Iterator;
@@ -212,7 +213,7 @@ public class LinearSet<V> implements ISet<V>, Cloneable {
 
   @Override
   public ISet<V> forked() {
-    return new Sets.VirtualSet<>(this);
+    return new DiffSet<>(this);
   }
 
   @Override

@@ -21,13 +21,13 @@
     DurableInput
     DurableOutput
     DurableMap
-    DurableList]
+    DurableList
+    DurableEncodings
+    DurableEncodings$Codec]
    [io.lacuna.bifurcan.durable.allocator
     SlabAllocator]
    [io.lacuna.bifurcan.hash
     PerlHash]
-   [io.lacuna.bifurcan.durable.encodings
-    SelfDescribing]
    [io.lacuna.bifurcan.durable.blocks
     HashMap
     SkipTable
@@ -57,6 +57,11 @@
     (accept [_ a b]
       (f a b))))
 
+(defn ->bi-fn [f]
+  (reify java.util.function.BiFunction
+    (apply [_ a b]
+      (f a b))))
+
 (def gen-pos-int
   (gen/such-that
     #(not= 0 %)
@@ -72,17 +77,19 @@
       gen/int)))
 
 (def edn-encoding
-  (SelfDescribing.
-    "edn"
-    2
-    (->bi-consumer
-      (fn [o ^DurableOutput out]
-        (.write out (.getBytes (pr-str o) "utf-8"))))
-    (->fn
-      (fn [^DurableInput in]
-        (let [ary (byte-array (.remaining in))]
-          (.readFully in ary)
-          (edn/read-string (String. ary "utf-8")))))))
+  (DurableEncodings/unityped
+    (DurableEncodings/primitive
+      "edn"
+      2
+      (DurableEncodings$Codec/piecewise
+       (->bi-consumer
+         (fn [o ^DurableOutput out]
+           (.write out (.getBytes (pr-str o) "utf-8"))))
+       (->bi-fn
+         (fn [^DurableInput in root]
+           (let [ary (byte-array (.remaining in))]
+             (.readFully in ary)
+             (edn/read-string (String. ary "utf-8")))))))))
 
 (defn no-leaks? []
   (zero? (SlabAllocator/allocatedBytes)))
@@ -121,6 +128,10 @@
 (defspec test-prefix-roundtrip iterations
   (prop/for-all [n gen-pos-int
                  type (->> (BlockPrefix$BlockType/values)
+                        (remove
+                          #{BlockPrefix$BlockType/DIFF
+                            BlockPrefix$BlockType/COLLECTION
+                            BlockPrefix$BlockType/EXTENDED})
                         (map gen/return)
                         gen/one-of)]
     (let [out (SwapBuffer.)
@@ -173,8 +184,8 @@
 (defspec test-sort-map-entries iterations
   (prop/for-all [entries (gen/list (gen/tuple gen-pos-int gen-pos-int))]
     (let [m (into {} entries)
-          m' (->> (HashMap/sortEntries
-                    (.entries (Map/from ^java.util.Map m))
+          m' (->> (HashMap/sortIndexedEntries
+                    (Map/from ^java.util.Map m)
                     hash-fn)
                iterator-seq
                (map

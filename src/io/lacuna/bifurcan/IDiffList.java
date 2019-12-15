@@ -28,6 +28,17 @@ public interface IDiffList<V> extends IList<V>, IDiff<IList<V>, V> {
   IList<V> suffix();
 
   @Override
+  default IList<V> concat(IList<V> l) {
+    IList<V> result = Lists.concat(
+        prefix(),
+        underlying().slice(underlyingSlice().start, underlyingSlice().end),
+        suffix(),
+        l);
+
+    return isLinear() ? result.linear() : result;
+  }
+
+  @Override
   default long size() {
     return prefix().size() + underlyingSlice().size() + suffix().size();
   }
@@ -40,7 +51,7 @@ public interface IDiffList<V> extends IList<V>, IDiff<IList<V>, V> {
     index -= prefix().size();
 
     if (index < underlyingSlice().size()) {
-      return underlying().nth(index - underlyingSlice().start);
+      return underlying().nth(underlyingSlice().start + index);
     }
     index -= underlyingSlice().size();
 

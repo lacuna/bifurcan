@@ -9,6 +9,8 @@ import java.util.function.ToIntFunction;
 import static io.lacuna.bifurcan.Graphs.MERGE_LAST_WRITE_WINS;
 
 /**
+ * A directed graph which will throw a {@code DirectedAcyclicGraph.CycleException} if any new edge creates a cycle.
+ *
  * @author ztellman
  */
 public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {

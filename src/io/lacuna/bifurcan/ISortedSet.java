@@ -1,6 +1,11 @@
 package io.lacuna.bifurcan;
 
+import java.util.Comparator;
+
 public interface ISortedSet<V> extends ISet<V> {
+
+  Comparator<V> comparator();
+
   /**
    * @return the entry whose key is either equal to {@code key}, or just below it. If {@code key} is less than the
    * minimum value in the map, returns {@code null}.

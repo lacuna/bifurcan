@@ -31,7 +31,7 @@ public interface IDurableCollection {
     IMap<Fingerprint, Root> dependencies();
   }
 
-  DurableEncoding encoding();
+  IDurableEncoding encoding();
 
   DurableInput bytes();
 

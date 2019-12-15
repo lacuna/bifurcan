@@ -1,5 +1,6 @@
 package io.lacuna.bifurcan;
 
+import java.util.Comparator;
 import java.util.Optional;
 import java.util.function.BiPredicate;
 import java.util.function.ToIntFunction;
@@ -79,6 +80,11 @@ public class IntSet implements ISortedSet<Long> {
     } else {
       return (IntSet) Sets.intersection(new IntSet().linear(), this, s);
     }
+  }
+
+  @Override
+  public Comparator<Long> comparator() {
+    return Comparator.naturalOrder();
   }
 
   @Override

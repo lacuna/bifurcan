@@ -38,6 +38,14 @@ public class SwapBuffer implements DurableOutput {
     acc.flushTo(out, type);
   }
 
+  public ByteBuffer toByteBuffer() {
+    close();
+    assert (written() <= Integer.MAX_VALUE);
+    ByteBuffer dst = SlabAllocator.allocate((int) written());
+    flushed.forEach(b -> Util.transfer(b, dst));
+    return (ByteBuffer) dst.flip();
+  }
+
   /**
    * Writes the contents of the accumulator to `out`, and frees the associated buffers.
    */

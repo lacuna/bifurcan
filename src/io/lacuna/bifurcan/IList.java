@@ -1,6 +1,6 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.Lists.VirtualList;
+import io.lacuna.bifurcan.diffs.DiffList;
 import io.lacuna.bifurcan.durable.Dependencies;
 import io.lacuna.bifurcan.durable.FileOutput;
 import io.lacuna.bifurcan.durable.SwapBuffer;
@@ -40,28 +40,28 @@ public interface IList<V> extends
    * @return a new list, with {@code value} appended
    */
   default IList<V> addLast(V value) {
-    return new VirtualList<>(this).addLast(value);
+    return new DiffList<>(this).addLast(value);
   }
 
   /**
    * @return a new list, with {@code value} prepended
    */
   default IList<V> addFirst(V value) {
-    return new VirtualList<>(this).addFirst(value);
+    return new DiffList<>(this).addFirst(value);
   }
 
   /**
    * @return a new list with the last value removed, or the same list if already empty
    */
   default IList<V> removeLast() {
-    return new VirtualList<V>(this).removeLast();
+    return new DiffList<>(this).removeLast();
   }
 
   /**
    * @return a new list with the first value removed, or the same value if already empty
    */
   default IList<V> removeFirst() {
-    return new VirtualList<V>(this).removeFirst();
+    return new DiffList<>(this).removeFirst();
   }
 
   /**
@@ -69,7 +69,7 @@ public interface IList<V> extends
    * @throws IndexOutOfBoundsException when {@code idx} is not within {@code [0, count]}
    */
   default IList<V> set(long idx, V value) {
-    return new VirtualList<V>(this).set(idx, value);
+    return new DiffList<>(this).set(idx, value);
   }
 
   /**
@@ -134,7 +134,7 @@ public interface IList<V> extends
   /**
    * @param start the inclusive start of the range
    * @param end   the exclusive end of the range
-   * @return a read-only view into this sub-range of the list
+   * @return a sub-range of the list within [start, end), which is linear if {@code this} is linear
    */
   default IList<V> slice(long start, long end) {
     return Lists.slice(this, start, end);
@@ -142,7 +142,7 @@ public interface IList<V> extends
 
   /**
    * @param l another list
-   * @return a new collection representing the concatenation of the two lists
+   * @return a new collection representing the concatenation of the two lists, which is linear if {@code this} is linear
    */
   default IList<V> concat(IList<V> l) {
     return Lists.concat(this, l);
@@ -171,9 +171,13 @@ public interface IList<V> extends
   }
 
   @Override
-  default DurableList<V> save(Path directory, DurableEncoding encoding, double diffMergeThreshold) {
+  default DurableList<V> save(Path directory, IDurableEncoding encoding, double diffMergeThreshold) {
+    if (!(encoding instanceof IDurableEncoding.List)) {
+      throw new IllegalArgumentException(String.format("%s cannot be used to encode lists", encoding.description()));
+    }
+
     SwapBuffer acc = new SwapBuffer();
-    List.encode(iterator(), encoding, acc);
+    List.encode(iterator(), (IDurableEncoding.List) encoding, acc);
 
     FileOutput file = new FileOutput(Dependencies.popRoot());
     DurableOutput out = DurableOutput.from(file);
@@ -191,7 +195,7 @@ public interface IList<V> extends
 
   @Override
   default IList<V> linear() {
-    return new VirtualList<V>(this).linear();
+    return new DiffList<>(this).linear();
   }
 
   default boolean equals(Object o, BiPredicate<V, V> equals) {

@@ -23,6 +23,8 @@ import java.util.function.*;
  */
 public class Map<K, V> implements IMap<K, V>, Cloneable {
 
+  public static final Map EMPTY = new Map();
+
   private static final Object DEFAULT_VALUE = new Object();
 
   private final BiPredicate<K, K> equalsFn;

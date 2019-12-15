@@ -1,5 +1,6 @@
 package io.lacuna.bifurcan;
 
+import java.util.Comparator;
 import java.util.Optional;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
@@ -16,6 +17,11 @@ public class SortedSet<V> implements ISortedSet<V> {
 
   private SortedSet(SortedMap<V, Void> m) {
     this.m = m;
+  }
+
+  @Override
+  public Comparator<V> comparator() {
+    return m.comparator();
   }
 
   @Override

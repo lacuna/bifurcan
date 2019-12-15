@@ -18,6 +18,8 @@ import static java.lang.System.arraycopy;
  */
 public class List<V> implements IList<V>, Cloneable {
 
+  public static final List EMPTY = new List();
+
   private Node root;
   private byte prefixLen, suffixLen;
   public Object[] prefix, suffix;
@@ -200,6 +202,8 @@ public class List<V> implements IList<V>, Cloneable {
   public List<V> slice(long start, long end) {
     if (start < 0 || end > size()) {
       throw new IndexOutOfBoundsException();
+    } else if (end <= start) {
+      List<V> result = new List<>();
     }
 
     int s = (int) start;

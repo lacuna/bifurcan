@@ -2,6 +2,7 @@ package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.IMap;
 
+import java.util.Comparator;
 import java.util.function.BinaryOperator;
 import java.util.function.UnaryOperator;
 
@@ -9,6 +10,8 @@ import java.util.function.UnaryOperator;
  * @author ztellman
  */
 public interface ISortedMap<K, V> extends IMap<K, V> {
+
+  Comparator<K> comparator();
 
   /**
    * @return the entry whose key is either equal to {@code key}, or just below it. If {@code key} is less than the

@@ -10,6 +10,7 @@ import io.lacuna.bifurcan.utils.Iterators;
 
 import java.util.Comparator;
 import java.util.Iterator;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.ToIntFunction;
 
 /**
@@ -50,79 +51,78 @@ public class HashMap {
     }
   }
 
-  public static <K, V> Iterator<IEntry.WithHash<K, V>> sortEntries(IList<IEntry<K, V>> entries, ToIntFunction<K> keyHash) {
+  public static <K, V> Iterator<IEntry.WithHash<K, V>> sortIndexedEntries(ICollection<?, IEntry<K, V>> entries, ToIntFunction<K> keyHash) {
+    AtomicLong index = new AtomicLong(0);
     return Iterators.map(
         ChunkSort.sortedEntries(
-            Lists.from(entries.size(), i -> new MapIndex(keyHash.applyAsInt(entries.nth(i).key()), i)),
-            MapIndex::encode,
-            MapIndex::decode,
-            Comparator.comparingInt((MapIndex e) -> e.hash)),
+            Iterators.map(entries.iterator(), e -> new MapIndex(keyHash.applyAsInt(e.key()), index.getAndIncrement())),
+            (it, out) -> it.forEach(e -> MapIndex.encode(e, out)),
+            in -> Iterators.from(in::hasRemaining, () -> MapIndex.decode(in)),
+            Comparator.comparingInt((MapIndex e) -> e.hash),
+            1 << 16),
         i -> {
           IEntry<K, V> e = entries.nth(i.index);
           return IEntry.of(i.hash, e.key(), e.value());
         });
   }
 
-  public static <K, V> Iterator<IEntry.WithHash<K, V>> sortEntryStream(Iterator<IEntry<K, V>> entries, int spillThreshold, DurableEncoding encoding) {
-    long index = 0;
-    ChunkSort.Accumulator<MapIndex> sorter = new ChunkSort.Accumulator<>(
-        MapIndex::encode,
-        MapIndex::decode,
-        Comparator.comparingInt((MapIndex e) -> e.hash));
+  public static <K, V> Iterator<IEntry.WithHash<K, V>> sortEntries(Iterator<IEntry<K, V>> entries, IDurableEncoding.Map encoding, int maxRealizedEntries) {
+    IDurableEncoding hashEncoding = DurableEncodings.primitive(
+        "int32",
+        1024,
+        DurableEncodings.Codec.from(
+            (l, out) -> l.forEach(n -> out.writeInt((int) n)),
+            (in, root) -> Iterators.skippable(Iterators.from(in::hasRemaining, in::readInt))));
 
-    IList<IEntry<K, V>> spilled = Lists.EMPTY;
-    LinearList<IEntry<K, V>> curr = new LinearList<>();
-    while (entries.hasNext()) {
-      IEntry<K, V> e = entries.next();
-      sorter.add(new MapIndex(encoding.keyHash().applyAsInt(e.key()), index++));
+    ToIntFunction<Object> hashFn = encoding.keyEncoding().hashFn();
 
-      curr.addLast(e);
-      if (curr.size() == spillThreshold) {
-        // TODO: actually encode `curr`
-        spilled = spilled.concat(curr);
-        curr = new LinearList<>();
-      }
-    }
-
-    IList<IEntry<K, V>> es = spilled.concat(curr);
-    return Iterators.map(sorter.sortedIterator(), i -> {
-      IEntry<K, V> e = es.nth(i.index);
-      return IEntry.of(i.hash, e.key(), e.value());
-    });
+    return ChunkSort.sortedEntries(
+        Iterators.map(entries, e -> IEntry.of(hashFn.applyAsInt(e.key()), e.key(), e.value())),
+        Comparator.comparingInt(IEntry.WithHash::keyHash),
+        DurableEncodings.list(
+            DurableEncodings.tuple(
+                o -> {
+                  IEntry.WithHash<Object, Object> e = (IEntry.WithHash<Object, Object>) o;
+                  return new Object[]{e.keyHash(), e.key(), e.value()};
+                },
+                ary -> IEntry.of((int) ary[0], ary[1], ary[2]),
+                hashEncoding,
+                encoding.keyEncoding(),
+                encoding.valueEncoding())),
+        maxRealizedEntries);
   }
 
   /// encoding
 
-  public static <K, V> void encodeUnsortedEntries(IList<IEntry<K, V>> entries, DurableEncoding encoding, DurableOutput out) {
-    encodeSortedEntries(sortEntries(entries, (ToIntFunction<K>) encoding.keyHash()), encoding, out);
+  public static <K, V> void encodeUnsortedEntries(IList<IEntry<K, V>> entries, IDurableEncoding.Map encoding, DurableOutput out) {
+    encodeSortedEntries(sortIndexedEntries(entries, (ToIntFunction<K>) encoding.keyEncoding().hashFn()), encoding, out);
   }
 
-  public static <K, V> void encodeSortedEntries(Iterator<IEntry.WithHash<K, V>> sortedEntries, DurableEncoding encoding, DurableOutput out) {
+  public static <K, V> void encodeSortedEntries(Iterator<IEntry.WithHash<K, V>> sortedEntries, IDurableEncoding.Map encoding, DurableOutput out) {
     // two tables and actual entries
     SwapBuffer entries = new SwapBuffer();
     SkipTable.Writer skipTable = new SkipTable.Writer();
     HashSkipTable.Writer hashTable = new HashSkipTable.Writer();
 
     // chunk up the entries so that collections are always singletons
-    Iterator<Util.Block<IEntry.WithHash<K, V>, DurableEncoding>> entryBlocks = Util.partitionBy(
-        sortedEntries,
-        e -> encoding.valueEncoding(e.key()),
-        DurableEncoding::blockSize,
-        e -> Util.isCollection(e.key()) || Util.isCollection(e.value()));
+    Iterator<IList<IEntry.WithHash<Object, Object>>> entryBlocks =
+        Util.partitionBy(
+            Iterators.map(sortedEntries, e -> IEntry.of(e.keyHash(), e.key(), e.value())),
+            Math.min(encoding.keyEncoding().blockSize(), encoding.keyEncoding().blockSize()),
+            e -> encoding.keyEncoding().isSingleton(e.key()) || encoding.valueEncoding().isSingleton(e.value()));
 
     long index = 0;
-    DurableEncoding keyEncoding = encoding.keyEncoding();
     while (entryBlocks.hasNext()) {
-      Util.Block<IEntry.WithHash<K, V>, DurableEncoding> b = entryBlocks.next();
+      IList<IEntry.WithHash<Object, Object>> b = entryBlocks.next();
 
       // update the tables
       long offset = entries.written();
       skipTable.append(index, offset);
-      hashTable.append(b.elements.stream().mapToInt(IEntry.WithHash::keyHash), offset);
+      hashTable.append(b.stream().mapToInt(IEntry.WithHash::keyHash), offset);
 
       // write the entries
-      HashMapEntries.encode(index, b, keyEncoding, entries);
-      index += b.elements.size();
+      HashMapEntries.encode(index, b, encoding, entries);
+      index += b.size();
     }
 
     // flush everything to the provided sink
@@ -156,7 +156,7 @@ public class HashMap {
 
   /// decoding
 
-  public static DurableMap decode(DurableInput in, IDurableCollection.Root root, DurableEncoding encoding) {
+  public static DurableMap decode(DurableInput in, IDurableCollection.Root root, IDurableEncoding.Map encoding) {
     DurableInput bytes = in.duplicate();
 
     BlockPrefix prefix = in.readPrefix();

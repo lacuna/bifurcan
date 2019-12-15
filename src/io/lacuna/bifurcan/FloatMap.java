@@ -73,6 +73,12 @@ public class FloatMap<V> implements ISortedMap<Double, V>, Cloneable {
 
   ///
 
+
+  @Override
+  public Comparator<Double> comparator() {
+    return Comparator.naturalOrder();
+  }
+
   @Override
   public ToIntFunction<Double> keyHash() {
     return HASH;

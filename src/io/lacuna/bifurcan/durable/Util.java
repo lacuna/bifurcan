@@ -1,8 +1,6 @@
 package io.lacuna.bifurcan.durable;
 
 import io.lacuna.bifurcan.*;
-import io.lacuna.bifurcan.DurableEncoding.SkippableIterator;
-import io.lacuna.bifurcan.IDurableCollection.Fingerprint;
 import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
 import io.lacuna.bifurcan.durable.blocks.HashMap;
 import io.lacuna.bifurcan.durable.blocks.List;
@@ -12,9 +10,7 @@ import io.lacuna.bifurcan.utils.Iterators;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.*;
-import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.function.ToIntFunction;
 
 /**
  * @author ztellman
@@ -77,48 +73,61 @@ public class Util {
     }
   }
 
-  public static boolean isCollection(Object o) {
-    return o instanceof ICollection || o instanceof Iterable;
+  public static void encodePrimitives(IList<Object> os, IDurableEncoding.Primitive encoding, DurableOutput out) {
+    SwapBuffer.flushTo(out, BlockType.PRIMITIVE, acc -> encoding.encode(os, acc));
   }
 
-  public static void encodeBlock(IList<Object> os, DurableEncoding encoding, DurableOutput out) {
-    if (os.size() == 1 && isCollection(os.first())) {
-      Object o = os.first();
-      if (o instanceof IMap) {
-        HashMap.encodeUnsortedEntries(((IMap<Object, Object>) o).entries(), encoding, out);
-
-      } else if (o instanceof java.util.Map) {
-        IList<IEntry<Object, Object>> entries = ((java.util.Map<Object, Object>) o).entrySet()
-            .stream()
-            .map(e -> IEntry.of(e.getKey(), e.getValue()))
-            .collect(Lists.linearCollector());
-        HashMap.encodeUnsortedEntries(entries, encoding, out);
-
-      } else if (o instanceof Iterable) {
-        List.encode(((Iterable) o).iterator(), encoding, out);
-      }
-
+  public static void encodeSingleton(Object o, IDurableEncoding encoding, DurableOutput out) {
+    if (o instanceof IMap && encoding instanceof IDurableEncoding.Map) {
+      HashMap.encodeUnsortedEntries(((IMap) o).entries(), (IDurableEncoding.Map) encoding, out);
+    } else if (o instanceof ISet && encoding instanceof IDurableEncoding.Set) {
+      throw new IllegalArgumentException();
+    } else if (o instanceof IList && encoding instanceof IDurableEncoding.List) {
+      List.encode(((IList) o).iterator(), (IDurableEncoding.List) encoding, out);
+    } else if (encoding instanceof IDurableEncoding.Primitive) {
+      encodePrimitives(LinearList.of(o), (IDurableEncoding.Primitive) encoding, out);
     } else {
-      SwapBuffer.flushTo(out, BlockType.ENCODED, acc -> encoding.encode(os, acc));
+      throw new IllegalArgumentException(String.format("cannot encode %s with %s", o.getClass().getName(), encoding.description()));
     }
   }
 
-  public static IDurableCollection decodeCollection(BlockPrefix prefix, IDurableCollection.Root root, DurableEncoding encoding, DurableInput in) {
+  public static void encodeBlock(IList<Object> os, IDurableEncoding encoding, DurableOutput out) {
+    if (os.size() == 1) {
+      encodeSingleton(os.first(), encoding, out);
+    } else if (encoding instanceof IDurableEncoding.Primitive){
+      encodePrimitives(os, (IDurableEncoding.Primitive) encoding, out);
+    } else {
+      throw new IllegalArgumentException(String.format("cannot encode primitive with %s", encoding.description()));
+    }
+  }
+
+  public static IDurableCollection decodeCollection(BlockPrefix prefix, IDurableCollection.Root root, IDurableEncoding encoding, DurableInput in) {
     switch (prefix.type) {
       case HASH_MAP:
-        return HashMap.decode(in.duplicate(), root, encoding);
+        if (!(encoding instanceof IDurableEncoding.Map)) {
+          throw new IllegalArgumentException(String.format("cannot decode map with %s", encoding.description()));
+        }
+        return HashMap.decode(in.duplicate(), root, (IDurableEncoding.Map) encoding);
       case LIST:
-        return List.decode(in.duplicate(), root, encoding);
+        if (!(encoding instanceof IDurableEncoding.List)) {
+          throw new IllegalArgumentException(String.format("cannot decode list with %s", encoding.description()));
+        }
+        return List.decode(in.duplicate(), root, (IDurableEncoding.List) encoding);
       default:
-        throw new IllegalStateException("Unexpected block type: " + prefix.type.name());
+        throw new IllegalArgumentException("Unexpected block type: " + prefix.type.name());
     }
   }
 
-  public static SkippableIterator decodeBlock(DurableInput in, IDurableCollection.Root root, DurableEncoding encoding) {
+  public static IDurableEncoding.SkippableIterator decodeBlock(DurableInput in, IDurableCollection.Root root, IDurableEncoding encoding) {
     BlockPrefix prefix = in.peekPrefix();
-    return prefix.type == BlockType.ENCODED
-        ? encoding.decode(in.duplicate().sliceBlock(BlockType.ENCODED))
-        : SkippableIterator.singleton(decodeCollection(prefix, root, encoding, in));
+    if (prefix.type == BlockType.PRIMITIVE) {
+      if (!(encoding instanceof IDurableEncoding.Primitive)) {
+        throw new IllegalArgumentException(String.format("cannot decode primitive value using %s", encoding.description()));
+      }
+      return ((IDurableEncoding.Primitive) encoding).decode(in.duplicate().sliceBlock(BlockType.PRIMITIVE), root);
+    } else {
+      return Iterators.skippable(Iterators.singleton(decodeCollection(prefix, root, encoding, in)));
+    }
   }
 
   public static long size(Iterable<ByteBuffer> bufs) {
@@ -224,23 +233,12 @@ public class Util {
     return n;
   }
 
-  public static class Block<V, E> {
-    public final E encoding;
-    public final LinearList<V> elements;
-
-    public Block(E encoding, V first) {
-      this.encoding = encoding;
-      this.elements = LinearList.of(first);
-    }
-  }
-
-  public static <V, E> Iterator<Block<V, E>> partitionBy(
+  public static <V, E> Iterator<IList<V>> partitionBy(
       Iterator<V> it,
-      Function<V, E> encoding,
-      ToIntFunction<E> blockSize,
-      Predicate<V> isCollection) {
-    return new Iterator<Block<V, E>>() {
-      Block<V, E> next = null;
+      int blockSize,
+      Predicate<V> isSingleton) {
+    return new Iterator<IList<V>>() {
+      LinearList<V> next = null;
 
       @Override
       public boolean hasNext() {
@@ -248,24 +246,23 @@ public class Util {
       }
 
       @Override
-      public Block<V, E> next() {
-        Block<V, E> curr = next;
+      public IList<V> next() {
+        IList<V> curr = next;
         next = null;
 
         if (curr == null) {
-          V v = it.next();
-          curr = new Block<>(encoding.apply(v), v);
+          curr = LinearList.of(it.next());
         }
 
-        int maxSize = blockSize.applyAsInt(curr.encoding);
-        while (it.hasNext() && curr.elements.size() < maxSize) {
-          V v = it.next();
-          E nextEncoding = encoding.apply(v);
-          if (isCollection.test(v) || !Objects.equals(curr.encoding, nextEncoding)) {
-            next = new Block<>(nextEncoding, v);
-            break;
-          } else {
-            curr.elements.addLast(v);
+        if (!isSingleton.test(curr.first())) {
+          while (it.hasNext() && curr.size() < blockSize) {
+            V v = it.next();
+            if (isSingleton.test(v)) {
+              next = LinearList.of(v);
+              break;
+            } else {
+              curr.addLast(v);
+            }
           }
         }
 

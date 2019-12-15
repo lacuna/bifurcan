@@ -22,26 +22,26 @@ import java.util.function.BiPredicate;
  */
 public class HashMapEntries {
 
-  private static final BlockType BLOCK_TYPE = BlockType.OTHER;
+  private static final BlockType BLOCK_TYPE = BlockType.TABLE;
 
   public static <K, V> void encode(
       long offset,
-      Util.Block<IEntry.WithHash<K, V>, DurableEncoding> block,
-      DurableEncoding keyEncoding,
+      IList<IEntry.WithHash<K, V>> block,
+      IDurableEncoding.Map mapEncoding,
       DurableOutput out) {
     SwapBuffer.flushTo(out, BLOCK_TYPE, acc -> {
       acc.writeVLQ(offset);
 
       HashDeltas.Writer hashes = new HashDeltas.Writer();
-      block.elements.forEach(e -> hashes.append(e.keyHash()));
+      block.forEach(e -> hashes.append(e.keyHash()));
       hashes.flushTo(acc);
 
-      Util.encodeBlock(Lists.lazyMap(block.elements, IEntry::key), keyEncoding, acc);
-      Util.encodeBlock(Lists.lazyMap(block.elements, IEntry::value), block.encoding, acc);
+      Util.encodeBlock(Lists.lazyMap(block, IEntry::key), mapEncoding.keyEncoding(), acc);
+      Util.encodeBlock(Lists.lazyMap(block, IEntry::value), mapEncoding.valueEncoding(), acc);
     });
   }
 
-  public static HashMapEntries decode(DurableInput in, Root root, DurableEncoding mapEncoding) {
+  public static HashMapEntries decode(DurableInput in, Root root, IDurableEncoding.Map mapEncoding) {
     DurableInput entries = in.sliceBlock(BLOCK_TYPE);
     long entryOffset = entries.readVLQ();
     HashDeltas deltas = HashDeltas.decode(entries);
@@ -60,7 +60,7 @@ public class HashMapEntries {
       if (keyIndex == -1 && candidates.isBounded) {
         return defaultValue;
       } else if (keyIndex != -1) {
-        return Util.decodeBlock(entries.values, root, entries.mapEncoding.valueEncoding(key)).skip(keyIndex).next();
+        return Util.decodeBlock(entries.values, root, entries.mapEncoding.valueEncoding()).skip(keyIndex).next();
       }
     }
 
@@ -74,7 +74,6 @@ public class HashMapEntries {
 
       int keyIndex = entries.localIndexOf(candidates, key);
       if (keyIndex == -1 && candidates.isBounded) {
-        return -1;
       } else if (keyIndex != -1) {
         return entries.entryOffset + keyIndex;
       }
@@ -83,11 +82,10 @@ public class HashMapEntries {
     return -1;
   }
 
-
   public final long entryOffset;
   public final HashDeltas hashes;
   public final DurableInput keys, values;
-  public final DurableEncoding mapEncoding;
+  public final IDurableEncoding.Map mapEncoding;
   public final Root root;
 
   private HashMapEntries(
@@ -96,7 +94,7 @@ public class HashMapEntries {
       HashDeltas hashes,
       DurableInput keys,
       DurableInput values,
-      DurableEncoding mapEncoding) {
+      IDurableEncoding.Map mapEncoding) {
     this.root = root;
     this.entryOffset = entryOffset;
     this.hashes = hashes;
@@ -110,8 +108,8 @@ public class HashMapEntries {
       return -1;
     }
 
-    DurableEncoding.SkippableIterator it = Util.decodeBlock(keys, root, mapEncoding.keyEncoding()).skip(candidates.start);
-    BiPredicate<Object, Object> keyEquals = mapEncoding.keyEquality();
+    IDurableEncoding.SkippableIterator it = Util.decodeBlock(keys, root, mapEncoding.keyEncoding()).skip(candidates.start);
+    BiPredicate<Object, Object> keyEquals = mapEncoding.keyEncoding().equalityFn();
 
     for (int i = candidates.start; i < candidates.end; i++) {
       Object k = it.next();
@@ -125,19 +123,15 @@ public class HashMapEntries {
 
   public IEntry.WithHash<Object, Object> nth(long index) {
     Object key = Util.decodeBlock(keys, root, mapEncoding.keyEncoding()).skip(index).next();
-    Object value = Util.decodeBlock(values, root, mapEncoding.valueEncoding(key)).skip(index).next();
+    Object value = Util.decodeBlock(values, root, mapEncoding.valueEncoding()).skip(index).next();
 
     return IEntry.of(hashes.nth(index), key, value);
   }
 
   public Iterator<IEntry.WithHash<Object, Object>> entries(long dropped) {
     PrimitiveIterator.OfInt hashes = (PrimitiveIterator.OfInt) Iterators.drop(this.hashes.iterator(), dropped);
-    DurableEncoding.SkippableIterator keys = Util.decodeBlock(this.keys, root, mapEncoding.keyEncoding()).skip(dropped);
-    Object firstKey = keys.next();
-    DurableEncoding.SkippableIterator values = Util.decodeBlock(this.values, root, mapEncoding.valueEncoding(firstKey)).skip(dropped);
-
-    return Iterators.concat(
-        Iterators.singleton(IEntry.of(hashes.next(), firstKey, values.next())),
-        Iterators.from(hashes::hasNext, () -> IEntry.of(hashes.nextInt(), keys.next(), values.next())));
+    IDurableEncoding.SkippableIterator keys = Util.decodeBlock(this.keys, root, mapEncoding.keyEncoding()).skip(dropped);
+    IDurableEncoding.SkippableIterator values = Util.decodeBlock(this.values, root, mapEncoding.valueEncoding()).skip(dropped);
+    return Iterators.from(hashes::hasNext, () -> IEntry.of(hashes.nextInt(), keys.next(), values.next()));
   }
 }

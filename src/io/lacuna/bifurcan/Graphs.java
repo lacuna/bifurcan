@@ -615,7 +615,7 @@ public class Graphs {
                 V u = stack.popLast();
                 if (blocked.contains(u)) {
                   blocked.remove(u);
-                  blocking.get(u, (ISet<V>) Sets.EMPTY).forEach(stack::addLast);
+                  blocking.get(u, (ISet<V>) Set.EMPTY).forEach(stack::addLast);
                   blocking.remove(u);
                 }
               }

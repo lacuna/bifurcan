@@ -1,5 +1,7 @@
 package io.lacuna.bifurcan;
 
+import io.lacuna.bifurcan.diffs.ConcatList;
+import io.lacuna.bifurcan.diffs.DiffList;
 import io.lacuna.bifurcan.utils.Iterators;
 
 import java.lang.reflect.Array;
@@ -25,238 +27,6 @@ import static java.lang.Math.min;
  */
 @SuppressWarnings("unchecked")
 public class Lists {
-
-  public static final IList EMPTY = new IList() {
-    @Override
-    public Object nth(long idx) {
-      throw new IndexOutOfBoundsException();
-    }
-
-    @Override
-    public long size() {
-      return 0;
-    }
-
-    @Override
-    public IList set(long idx, Object value) {
-      if (idx == 0) {
-        return addLast(value);
-      } else {
-        throw new IndexOutOfBoundsException();
-      }
-    }
-
-    @Override
-    public IList addLast(Object value) {
-      return new List().addLast(value);
-    }
-
-    @Override
-    public IList addFirst(Object value) {
-      return new List().addFirst(value);
-    }
-
-    @Override
-    public IList removeLast() {
-      return this;
-    }
-
-    @Override
-    public IList removeFirst() {
-      return this;
-    }
-
-    @Override
-    public IList forked() {
-      return this;
-    }
-
-    @Override
-    public IList linear() {
-      return new List().linear();
-    }
-
-    @Override
-    public int hashCode() {
-      return 0;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-      if (obj instanceof IList) {
-        return ((IList) obj).size() == 0;
-      }
-      return false;
-    }
-
-    @Override
-    public IList clone() {
-      return this;
-    }
-
-    @Override
-    public String toString() {
-      return Lists.toString(this);
-    }
-  };
-
-  /**
-   * A concatenation wrapper that doesn't blow up the stack due to left-leaning trees.
-   */
-  private static class Concat<V> implements IList<V> {
-
-    final IntMap<IList<V>> lists;
-    final long size;
-
-    // both constructors assume the lists are non-empty
-    Concat(IList<V> a, IList<V> b) {
-      lists = new IntMap<IList<V>>().linear().put(0, a).put(a.size(), b).forked();
-      size = a.size() + b.size();
-    }
-
-    Concat(IList<V> list) {
-      lists = new IntMap<IList<V>>().linear().put(0, list).linear();
-      size = list.size();
-    }
-
-    private Concat(IntMap<IList<V>> lists, long size) {
-      this.lists = lists;
-      this.size = size;
-    }
-
-    @Override
-    public V nth(long idx) {
-      if (idx < 0 || size <= idx) {
-        throw new IndexOutOfBoundsException(idx + " must be within [0," + size + ")");
-      }
-      IEntry<Long, IList<V>> entry = lists.floor(idx);
-      return entry.value().nth(idx - entry.key());
-    }
-
-    @Override
-    public Iterator<V> iterator() {
-      return Iterators.flatMap(lists.iterator(), e -> e.value().iterator());
-    }
-
-    @Override
-    public long size() {
-      return size;
-    }
-
-    @Override
-    public int hashCode() {
-      return (int) Lists.hash(this);
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-      if (obj instanceof IList) {
-        return Lists.equals(this, (IList<V>) obj);
-      }
-      return false;
-    }
-
-    @Override
-    public String toString() {
-      return Lists.toString(this);
-    }
-
-    @Override
-    public IList<V> slice(long start, long end) {
-      if (end > size() || start < 0) {
-        throw new IndexOutOfBoundsException();
-      } else if (start == 0 && end == size()) {
-        return this;
-      } else if (start == end) {
-        return EMPTY;
-      }
-
-      IntMap<IList<V>> m = new IntMap<IList<V>>().linear();
-      long pos = start;
-      while (pos < end) {
-        IEntry<Long, IList<V>> e = lists.floor(pos);
-        IList<V> l = e.value().slice(pos - e.key(), min(end - e.key(), e.value().size()));
-        m = m.put(pos - start, l);
-        pos = e.key() + e.value().size();
-      }
-      return new Concat<V>(m.forked(), end - start);
-    }
-
-    Concat<V> concat(Concat<V> o) {
-      IntMap<IList<V>> m = lists.linear();
-      long nSize = size;
-      for (IList<V> l : o.lists.values()) {
-        if (l.size() > 0) {
-          m = m.put(nSize, l);
-          nSize += l.size();
-        }
-      }
-      return new Concat<V>(m.forked(), nSize);
-    }
-
-    @Override
-    public IList<V> clone() {
-      return this;
-    }
-  }
-
-  private static class Slice<V> implements IList<V> {
-    private final IList<V> list;
-    private final long offset;
-    private final long size;
-
-    Slice(IList<V> list, long offset, long size) {
-      this.list = list;
-      this.offset = offset;
-      this.size = size;
-    }
-
-    @Override
-    public V nth(long idx) {
-      if (idx < 0 || size <= idx) {
-        throw new IndexOutOfBoundsException(idx + " must be within [0," + size + ")");
-      }
-      return list.nth(offset + idx);
-    }
-
-    @Override
-    public long size() {
-      return size;
-    }
-
-    @Override
-    public IList<V> slice(long start, long end) {
-      if (start == end) {
-        return EMPTY;
-      } else if (start < 0 || end <= start || end > size) {
-        throw new IllegalArgumentException();
-      }
-      return new Slice<V>(list, offset + start, end - start);
-    }
-
-    @Override
-    public int hashCode() {
-      return (int) Lists.hash(this);
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-      if (obj instanceof IList) {
-        return Lists.equals(this, (IList<V>) obj);
-      }
-      return false;
-    }
-
-    @Override
-    public IList<V> clone() {
-      return this;
-    }
-
-    @Override
-    public String toString() {
-      return Lists.toString(this);
-    }
-  }
 
   private static class JavaList<V> implements java.util.List<V>, RandomAccess {
 
@@ -458,165 +228,6 @@ public class Lists {
     }
   }
 
-  static class VirtualList<V> implements IList<V> {
-
-    private IList<V> prefix, base, suffix;
-    private final boolean linear;
-
-    public VirtualList(IList<V> base) {
-      this(Lists.EMPTY, base, Lists.EMPTY, false);
-    }
-
-    private VirtualList(IList<V> prefix, IList<V> base, IList<V> suffix, boolean linear) {
-      this.prefix = prefix;
-      this.base = base;
-      this.suffix = suffix;
-      this.linear = linear;
-    }
-
-    @Override
-    public V nth(long idx) {
-      long prefixSize = prefix.size();
-      long listSize = base.size();
-
-      if (idx < prefixSize) {
-        return prefix.nth(idx);
-      } else if (idx < (prefixSize + listSize)) {
-        return base.nth(idx - prefixSize);
-      } else {
-        return suffix.nth(idx - (prefixSize + listSize));
-      }
-    }
-
-    @Override
-    public Iterator<V> iterator() {
-      if (prefix == Lists.EMPTY && suffix == Lists.EMPTY) {
-        return base.iterator();
-      } else {
-        return Lists.iterator(this);
-      }
-    }
-
-    @Override
-    public long size() {
-      return prefix.size() + base.size() + suffix.size();
-    }
-
-    @Override
-    public IList<V> addLast(V value) {
-      IList<V> suffixPrime = suffix.addLast(value);
-      return linear ? this : new VirtualList<V>(prefix, base, suffixPrime, false);
-    }
-
-    @Override
-    public IList<V> addFirst(V value) {
-      IList<V> prefixPrime = prefix.addFirst(value);
-      return linear ? this : new VirtualList<V>(prefixPrime, base, suffix, false);
-    }
-
-    @Override
-    public IList<V> removeLast() {
-      if (suffix.size() > 0) {
-        IList<V> suffixPrime = suffix.removeLast();
-        return linear ? this : new VirtualList<V>(prefix, base, suffixPrime, false);
-      }
-
-      if (base.size() > 0) {
-        IList<V> basePrime = base.slice(0, base.size() - 1);
-        if (linear) {
-          base = basePrime;
-          return this;
-        } else {
-          return new VirtualList<V>(prefix, basePrime, suffix, false);
-        }
-      }
-
-      IList<V> prefixPrime = prefix.removeLast();
-      return linear ? this : new VirtualList<V>(prefixPrime, base, suffix, false);
-    }
-
-    @Override
-    public IList<V> removeFirst() {
-      if (prefix.size() > 0) {
-        IList<V> prefixPrime = prefix.removeFirst();
-        return linear ? this : new VirtualList<V>(prefixPrime, base, suffix, false);
-      }
-
-      if (base.size() > 0) {
-        IList<V> basePrime = base.slice(1, base.size());
-        if (linear) {
-          base = basePrime;
-          return this;
-        } else {
-          return new VirtualList<V>(prefix, basePrime, suffix, false);
-        }
-      }
-
-      IList<V> suffixPrime = suffix.removeFirst();
-      return linear ? this : new VirtualList<V>(prefix, base, suffixPrime, false);
-    }
-
-    @Override
-    public IList<V> set(long idx, V value) {
-      long prefixSize = prefix.size();
-      long baseSize = base.size();
-
-      if (idx < 0 || idx > size()) {
-        throw new IndexOutOfBoundsException();
-      } else if (idx == size()) {
-        return addLast(value);
-      } else if (idx < prefixSize) {
-        IList<V> prefixPrime = prefix.set(idx, value);
-        return linear ? this : new VirtualList<V>(prefixPrime, base, suffix, false);
-      } else if (idx < (prefixSize + baseSize)) {
-        idx -= prefixSize;
-        IList<V> basePrime = Lists.concat(
-          base.slice(0, idx),
-          new LinearList(1).addLast(value),
-          base.slice(idx + 1, base.size()));
-        return new VirtualList<V>(prefix, basePrime, suffix, linear);
-      } else {
-        idx -= prefixSize + baseSize;
-        IList<V> suffixPrime = suffix.set(idx, value);
-        return linear ? this : new VirtualList<V>(prefix, base, suffixPrime, false);
-      }
-    }
-
-    @Override
-    public IList<V> forked() {
-      return linear ? new VirtualList<V>(prefix.forked(), base, suffix.forked(), false) : this;
-    }
-
-    @Override
-    public IList<V> linear() {
-      return linear ? this : new VirtualList<V>(prefix.linear(), base, suffix.linear(), true);
-    }
-
-    @Override
-    public int hashCode() {
-      return (int) Lists.hash(this);
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-      if (obj instanceof IList) {
-        return Lists.equals(this, (IList<V>) obj);
-      }
-      return false;
-    }
-
-    @Override
-    public VirtualList<V> clone() {
-      return new VirtualList<V>(prefix.clone(), base, suffix.clone(), isLinear());
-    }
-
-    @Override
-    public String toString() {
-      return Lists.toString(this);
-    }
-
-  }
-
   /**
    * Returns a list which will lazily, and repeatedly, transform each element of the input list on lookup.
    *
@@ -711,13 +322,14 @@ public class Lists {
   public static <V> IList<V> slice(IList<V> list, long start, long end) {
     IList<V> result;
 
-    long size = end - start;
-    if (size == 0) {
-      result = Lists.EMPTY;
+    if (end <= start) {
+      result = List.EMPTY;
     } else if (start < 0 || end > list.size()) {
-      throw new IllegalArgumentException();
+      throw new IndexOutOfBoundsException();
+    } else if (end - start == list.size()) {
+      result = list;
     } else {
-      result = new Slice<V>(list, start, size);
+      result = new DiffList<>(list).slice(start, end);
     }
 
     return list.isLinear() ? result.linear() : result;
@@ -886,19 +498,17 @@ public class Lists {
   public static <V> IList<V> concat(IList<V> a, IList<V> b) {
     IList<V> result;
     if (a.size() == 0) {
-      result = b.forked();
+      result = b;
     } else if (b.size() == 0) {
-      result = a.forked();
-    } else if (a instanceof Concat && b instanceof Concat) {
-      result = ((Concat<V>) a).concat((Concat<V>) b);
-    } else if (a instanceof Concat) {
-      result = ((Concat<V>) a).concat(new Concat<>(b));
-    } else if (b instanceof Concat) {
-      result = new Concat<>(a).concat((Concat<V>) b);
+      result = a;
+    } else if (a instanceof ConcatList) {
+      result = a.concat(b);
+    } else if (b instanceof ConcatList) {
+      result = new ConcatList<>(a).concat(b);
     } else {
-      result = new Concat<V>(a, b);
+      result = new ConcatList<V>(a, b);
     }
-    return a.isLinear() ? result.linear() : result;
+    return a.isLinear() ? result.linear() : result.forked();
   }
 
   public static <V> IList<V> reverse(IList<V> l) {

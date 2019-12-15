@@ -10,9 +10,7 @@ public class DiffMap<K, V> implements IDiffMap<K, V> {
   private final ISortedSet<Long> removedIndices;
 
   public DiffMap(IMap<K, V> underlying) {
-    this.underlying = underlying;
-    this.added = new Map<>();
-    this.removedIndices = new IntSet();
+    this(underlying, new Map<>(underlying.keyHash(), underlying.keyEquality()), new IntSet());
   }
 
   private DiffMap(IMap<K, V> underlying, IMap<K, V> added, ISortedSet<Long> removedIndices) {
@@ -40,6 +38,11 @@ public class DiffMap<K, V> implements IDiffMap<K, V> {
     long idx = underlying.indexOf(key);
     ISortedSet<Long> removedIndicesPrime = idx < 0 ? removedIndices : removedIndices.add(idx);
     return isLinear() ? this : new DiffMap<>(underlying, addedPrime, removedIndicesPrime);
+  }
+
+  @Override
+  public boolean isLinear() {
+    return added.isLinear();
   }
 
   @Override
