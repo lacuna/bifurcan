@@ -1145,41 +1145,41 @@
   {"clone" [:clone [linear-map linear-set java-hash-map java-hash-set]]
 
    "sorted_map_construct" [:construct sorted-maps]
-   "map_construct" [:construct maps]
-   "list_construct" [:construct lists]
+   "map_construct"        [:construct maps]
+   "list_construct"       [:construct lists]
 
    "sorted_map_lookup" [:lookup sorted-maps]
-   "map_lookup" [:lookup maps]
-   "list_lookup" [:lookup lists]
+   "map_lookup"        [:lookup maps]
+   "list_lookup"       [:lookup lists]
 
    "sorted_map_iterate" [:iteration sorted-maps]
-   "map_iterate" [:iteration maps]
-   "list_iterate" [:iteration lists]
+   "map_iterate"        [:iteration maps]
+   "list_iterate"       [:iteration lists]
 
    "string_construct" [:construct strings]
-   "string_lookup" [:lookup strings]
-   "string_insert" [:insert strings]
-   "string_remove" [:remove strings]
-   "string_concat" [:concat strings]
-   "string_iterate" [:iteration strings]
+   "string_lookup"    [:lookup strings]
+   "string_insert"    [:insert strings]
+   "string_remove"    [:remove strings]
+   "string_concat"    [:concat strings]
+   "string_iterate"   [:iteration strings]
 
    "concat" [:concat lists]
 
-   "set_union" [:union sets]
-   "set_difference" [:difference sets]
+   "set_union"        [:union sets]
+   "set_difference"   [:difference sets]
    "set_intersection" [:intersection sets]
 
-   "map_union" [:union maps]
-   "map_difference" [:difference maps]
+   "map_union"        [:union maps]
+   "map_difference"   [:difference maps]
    "map_intersection" [:intersection maps]
 
-   "sorted_map_union" [:union sorted-maps]
-   "sorted_map_difference" [:difference sorted-maps]
+   "sorted_map_union"        [:union sorted-maps]
+   "sorted_map_difference"   [:difference sorted-maps]
    "sorted_map_intersection" [:intersection sorted-maps]
 
    "sorted_map_equals" [:equals sorted-maps]
-   "map_equals" [:equals maps]
-   "set_equals" [:equals sets]
+   "map_equals"        [:equals maps]
+   "set_equals"        [:equals sets]
 
    })
 

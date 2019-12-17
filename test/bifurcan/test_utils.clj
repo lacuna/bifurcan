@@ -1,6 +1,4 @@
 (ns bifurcan.test-utils
-  (:import
-   [java.utils])
   (:require
    [clojure.test.check.generators :as gen]
    [clojure.test.check.properties :as prop]

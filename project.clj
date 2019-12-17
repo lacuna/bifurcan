@@ -15,26 +15,27 @@
   :profiles {:travis {:jvm-opts ^:replace ["-server" "-Xmx1g"]}
              :bench  {:jvm-opts ^:replace ["-server" "-Xmx10g" #_"-XX:+UseParallelGC"]}
              :dev    {:dependencies [;; for tests
-                                     [org.clojure/clojure "1.8.0"]
+                                     [org.clojure/clojure "1.10.0"]
                                      [org.clojure/test.check "0.9.0"]
                                      [criterium "0.4.5"]
                                      [potemkin "0.4.5"]
                                      [proteus "0.1.6"]
                                      [byte-streams "0.2.4"]
+                                     [byte-transforms "0.1.4"]
                                      [eftest "0.5.8"]
                                      [virgil "0.1.9"]
 
                                      ;; for comparative in-memory benchmarks
                                      [io.usethesource/capsule "0.6.3"]
-                                     [org.pcollections/pcollections "3.0.3"]
-                                     [io.vavr/vavr "0.10.0"]
-                                     [org.scala-lang/scala-library "2.13.0"]
+                                     [org.pcollections/pcollections "3.1.2"]
+                                     [io.vavr/vavr "0.10.2"]
+                                     [org.scala-lang/scala-library "2.13.1"]
                                      [org.functionaljava/functionaljava "4.8.1"]
-                                     [org.eclipse.collections/eclipse-collections "9.2.0"]
                                      [org.organicdesign/Paguro "3.1.2"]
 
                                      ;; for comparative durable benchmarks
-                                     [org.rocksdb/rocksdbjni "5.5.1"]
+                                     [org.rocksdb/rocksdbjni "6.4.6"]
+                                     [com.sleepycat/je "18.3.12"]
                                      ]}}
   :aliases {"partest"   ["run" "-m" "bifurcan.run-tests"]
             "benchmark" ["run" "-m" "bifurcan.benchmark-test" "benchmark"]}
