@@ -14,6 +14,7 @@
    [java.nio
     ByteBuffer]
    [io.lacuna.bifurcan
+    IMap
     Map
     List
     Maps
@@ -37,30 +38,10 @@
     Util
     BlockPrefix
     BlockPrefix$BlockType
-    SwapBuffer
+    DurableBuffer
     ChunkSort]))
 
 (set! *warn-on-reflection* true)
-
-(defn ->to-int-fn [f]
-  (reify java.util.function.ToIntFunction
-    (applyAsInt [_ x]
-      (f x))))
-
-(defn ->fn [f]
-  (reify java.util.function.Function
-    (apply [_ x]
-      (f x))))
-
-(defn ->bi-consumer [f]
-  (reify java.util.function.BiConsumer
-    (accept [_ a b]
-      (f a b))))
-
-(defn ->bi-fn [f]
-  (reify java.util.function.BiFunction
-    (apply [_ a b]
-      (f a b))))
 
 (def gen-pos-int
   (gen/such-that
@@ -80,19 +61,19 @@
   (DurableEncodings/unityped
     (DurableEncodings/primitive
       "edn"
-      2
-      (DurableEncodings$Codec/piecewise
-       (->bi-consumer
+      4
+      (DurableEncodings$Codec/undelimited
+       (u/->bi-consumer
          (fn [o ^DurableOutput out]
            (.write out (.getBytes (pr-str o) "utf-8"))))
-       (->bi-fn
+       (u/->bi-fn
          (fn [^DurableInput in root]
            (let [ary (byte-array (.remaining in))]
              (.readFully in ary)
              (edn/read-string (String. ary "utf-8")))))))))
 
 (defn no-leaks? []
-  (zero? (SlabAllocator/allocatedBytes)))
+  (zero? (SlabAllocator/acquiredBytes)))
 
 (defn free! [^DurableInput in]
   (.close in)
@@ -102,11 +83,9 @@
 
 (defspec test-vlq-roundtrip iterations
   (prop/for-all [n gen-pos-int]
-    (let [out (doto (SwapBuffer.)
+    (let [out (doto (DurableBuffer.)
                 (.writeVLQ n))
-          in  (->> out
-                .contents
-                DurableInput/from)]
+          in  (.toInput out)]
       (try
         (= n (.readVLQ in))
         (finally
@@ -115,9 +94,9 @@
 (defspec test-prefixed-vlq-roundtrip iterations
   (prop/for-all [n gen-pos-int
                  bits (gen/choose 0 6)]
-    (let [out (SwapBuffer.)
+    (let [out (DurableBuffer.)
           _   (Util/writePrefixedVLQ 0 bits n out)
-          in  (->> out .contents DurableInput/from)]
+          in  (.toInput out)]
       (try
         (= n (Util/readPrefixedVLQ (.readByte in) bits in))
         (finally
@@ -134,10 +113,10 @@
                             BlockPrefix$BlockType/EXTENDED})
                         (map gen/return)
                         gen/one-of)]
-    (let [out (SwapBuffer.)
+    (let [out (DurableBuffer.)
           p   (BlockPrefix. n type)
           _   (.encode p out)
-          in  (->> out .contents DurableInput/from)]
+          in  (.toInput out)]
       (try
         (= p (BlockPrefix/decode in))
         (finally
@@ -150,7 +129,9 @@
         entries (reductions #(map + %1 %2) entry-offsets)
         _       (doseq [[index offset] entries]
                   (.append writer index offset))
-        in      (->> writer .contents DurableInput/from)]
+        out  (DurableBuffer.)
+        _ (.flushTo writer out)
+        in (.toInput out)]
     [in
      (SkipTable.
         (.sliceBlock in BlockPrefix$BlockType/TABLE)
@@ -179,7 +160,7 @@
 ;;; SortedChunk
 
 (def hash-fn
-  (->to-int-fn hash))
+  (u/->to-int-fn hash))
 
 (defspec test-sort-map-entries iterations
   (prop/for-all [entries (gen/list (gen/tuple gen-pos-int gen-pos-int))]
@@ -199,7 +180,9 @@
 
 (defspec test-durable-map iterations
   (prop/for-all [m (coll/map-gen #(Map.))]
-    (let [m' (DurableMap/save m edn-encoding)]
+    (let [out (DurableBuffer. false)
+          _   (DurableMap/encode (-> ^IMap m .entries .iterator) edn-encoding 10 out)
+          m'  (DurableMap/decode (.toInput out) nil edn-encoding)]
       (try
         (and
           (= m m')
@@ -213,7 +196,9 @@
 
  (defspec test-durable-list iterations
   (prop/for-all [l (coll/list-gen #(List.))]
-    (let [l' (DurableList/save (.iterator ^Iterable l) edn-encoding)]
+    (let [out (DurableBuffer. false)
+          _   (DurableList/encode (.iterator ^Iterable l) edn-encoding out)
+          l'  (DurableList/decode (.toInput out) nil edn-encoding)]
       (and
         (= l l')
         (no-leaks?)))))

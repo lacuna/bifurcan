@@ -50,6 +50,8 @@ public class HashSkipTable {
     public void append(IntStream hashes, long offset) {
       PrimitiveIterator.OfLong it = hashes.mapToLong(n -> (long) n + HASH_OFFSET).iterator();
       long h = it.nextLong();
+      assert (prevHash <= h);
+
       if (h != prevHash) {
         prevHash = h;
         table.append(h, offset);

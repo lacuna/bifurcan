@@ -76,6 +76,21 @@ public interface IDurableEncoding {
     default boolean isSingleton(Object o) {
       return o instanceof ICollection;
     }
+
+    @Override
+    default IDurableEncoding keyEncoding() {
+      return this;
+    }
+
+    @Override
+    default IDurableEncoding valueEncoding() {
+      return this;
+    }
+
+    @Override
+    default IDurableEncoding elementEncoding() {
+      return this;
+    }
   }
 
   interface SkippableIterator extends Iterator<Object> {

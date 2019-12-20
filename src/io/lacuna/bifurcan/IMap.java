@@ -3,7 +3,7 @@ package io.lacuna.bifurcan;
 import io.lacuna.bifurcan.diffs.DiffMap;
 import io.lacuna.bifurcan.durable.Dependencies;
 import io.lacuna.bifurcan.durable.FileOutput;
-import io.lacuna.bifurcan.durable.SwapBuffer;
+import io.lacuna.bifurcan.durable.DurableBuffer;
 import io.lacuna.bifurcan.durable.blocks.HashMap;
 import io.lacuna.bifurcan.utils.Iterators;
 
@@ -294,10 +294,11 @@ public interface IMap<K, V> extends
       throw new IllegalArgumentException(String.format("%s cannot be used to encode maps", encoding.description()));
     }
 
-    SwapBuffer acc = new SwapBuffer();
+    Dependencies.enter();
+    DurableBuffer acc = new DurableBuffer();
     HashMap.encodeSortedEntries(hashSortedEntries(), (IDurableEncoding.Map) encoding, acc);
 
-    FileOutput file = new FileOutput(Dependencies.popRoot());
+    FileOutput file = new FileOutput(Dependencies.exit());
     DurableOutput out = DurableOutput.from(file);
     acc.flushTo(out);
     out.close();

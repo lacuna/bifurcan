@@ -1,10 +1,12 @@
 (ns bifurcan.durable-benchmark-test
   (:require
+   [potemkin :as p :refer (doary doit)]
    [clojure.string :as str]
    [clojure.java.shell :as sh]
    [clojure.java.io :as io]
    [byte-streams :as bs]
-   [byte-transforms :as bt])
+   [byte-transforms :as bt]
+   [bifurcan.test-utils :as u])
   (:import
    [java.lang.management
     ManagementFactory]
@@ -12,6 +14,21 @@
     ByteBuffer]
    [java.util.concurrent
     ThreadLocalRandom]
+   [io.lacuna.bifurcan.durable.allocator
+    SlabAllocator
+    SlabAllocator$SlabBuffer]
+   [io.lacuna.bifurcan
+    IEntry
+    DurableInput
+    DurableOutput
+    Map
+    DurableMap
+    DurableEncodings
+    DurableEncodings$Codec]
+   [io.lacuna.bifurcan.durable
+    Util]
+   [io.lacuna.bifurcan.hash
+    PerlHash]
    [com.sleepycat.je
     EnvironmentConfig
     Environment
@@ -98,10 +115,10 @@
 (defn bdb-flush! [^Database db]
   (.sync db))
 
-;;; io stats
+;;; I/O stats
 
 (defn pidstat? []
-  (= 0 (:exit (sh/sh "which" "pidstat"))))
+  (zero? (:exit (sh/sh "which" "pidstat"))))
 
 (defn pid []
   (-> (.getName (ManagementFactory/getRuntimeMXBean))
@@ -166,7 +183,12 @@
            (finally
              (.destroy p#)))))))
 
-;;;
+;;; benchmarking
+
+(defn scale-stats [{:keys [kbs-read kbs-written duration]} factor]
+  {:read-amplification (/ kbs-read factor)
+   :write-amplification (/ kbs-written factor)
+   :duration duration})
 
 (defn hashed-key [n]
   (let [ary (byte-array 8)
@@ -186,3 +208,100 @@
   (doseq [k keys]
     (put-fn db (hashed-key k) (rand-array val-size)))
   (flush-fn db))
+
+(defn random-reads [db get-fn keys]
+  (doseq [k keys]
+    (get-fn db (hashed-key k))))
+
+(defn benchmark-db [db get-fn scan-fn put-fn flush-fn sizes]
+  (into
+    (sorted-map)
+    (zipmap
+      (map #(/ % (Math/pow 2 20)) sizes)
+      (->> (cons 0 sizes)
+        (partition 2 1)
+        (map
+          (fn [[a b]]
+            ;; we write 8 byte keys + 1016 byte values so each entry is exactly 1kb
+            (let [write      (io-stats (populate! db put-fn flush-fn (range a b) 1016))
+                  random     (io-stats (random-reads db get-fn (range b)))
+                  sequential (io-stats (scan-fn db))]
+              {:write      (scale-stats write (- b a))
+               :random     (scale-stats random b)
+               :sequential (scale-stats sequential b)})))))))
+
+(defn benchmark-databases [n log-steps]
+  (sh/sh "rm" "-rf" "/tmp/rocks" "/tmp/bdb")
+  (let [sizes (->> (u/log-steps n 2 log-steps)
+                (drop (* 20 log-steps))
+                (map long))
+        rdb   (rdb-open "/tmp/rocks" true)
+        bdb   (bdb-open "/tmp/bdb" true)]
+    (prn sizes)
+    (try
+      {:rocksdb (benchmark-db
+                  rdb
+                  rdb-get
+                  rdb-scan
+                  rdb-put!
+                  rdb-flush!
+                  sizes)
+       :bdb      (benchmark-db
+                   bdb
+                   bdb-get
+                   bdb-scan
+                   bdb-put!
+                   bdb-flush!
+                   sizes)}
+      (finally
+        (.close rdb)
+        (.close bdb)
+        (-> bdb .getEnvironment .close)))))
+
+;;;
+
+(def binary-encoding
+  (DurableEncodings/primitive
+    "binary"
+    4
+    (u/->to-int-fn
+      (fn [^DurableInput in]
+        (PerlHash/hash 0 (.duplicate in))))
+    (u/->bi-predicate
+      (fn [a b]
+        (zero? (Util/compare a b))))
+    (comparator
+      (fn [a b]
+        (Util/compare a b)))
+    (u/->predicate
+      (fn [_]
+        false))
+    (DurableEncodings$Codec/undelimited
+      (u/->bi-consumer
+        (fn [^DurableInput in ^DurableOutput out]
+          (.transferFrom out in (.remaining in))))
+      (u/->bi-fn
+        (fn [^DurableInput in root]
+          in)))))
+
+(defn ->durable-input [^bytes ary]
+  (DurableInput/from
+    (SlabAllocator$SlabBuffer.
+      (ByteBuffer/wrap
+        ary))))
+
+(defn create-hash-map [dir n]
+  (.mkdirs (io/file dir))
+  (DurableMap/from
+    (->> (range n)
+      (map
+        (fn [i]
+          (IEntry/of
+            (->durable-input (hashed-key i))
+            (->durable-input (rand-array 1016)))))
+      .iterator)
+    (DurableEncodings/map
+      binary-encoding
+      binary-encoding)
+    (.toPath (io/file dir))
+    1e5))

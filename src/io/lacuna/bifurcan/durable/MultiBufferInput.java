@@ -4,42 +4,42 @@ import io.lacuna.bifurcan.DurableInput;
 import io.lacuna.bifurcan.IEntry;
 import io.lacuna.bifurcan.IntMap;
 import io.lacuna.bifurcan.LinearList;
-import io.lacuna.bifurcan.durable.allocator.SlabAllocator;
+import io.lacuna.bifurcan.durable.allocator.SlabAllocator.SlabBuffer;
 
 import java.nio.ByteBuffer;
-import java.nio.MappedByteBuffer;
 
 public class MultiBufferInput implements DurableInput {
 
   private static final ThreadLocal<ByteBuffer> SCRATCH_BUFFER = ThreadLocal.withInitial(() -> ByteBuffer.allocateDirect(8));
 
   private final Slice bounds;
-  private final IntMap<ByteBuffer> buffers;
+  private final IntMap<SlabBuffer> buffers;
   private final long size;
 
-  private long offset;
+  private long offset = 0;
   private ByteBuffer curr;
 
-  private MultiBufferInput(IntMap<ByteBuffer> buffers, Slice bounds, long position, long size) {
+  private MultiBufferInput(IntMap<SlabBuffer> buffers, Slice bounds, long position, long size) {
     this.bounds = bounds;
     this.buffers = buffers;
     this.size = size;
     seek(position);
   }
 
-  public MultiBufferInput(Iterable<ByteBuffer> buffers, Slice bounds) {
-    IntMap<ByteBuffer> m = new IntMap<ByteBuffer>().linear();
+  public MultiBufferInput(Iterable<SlabBuffer> buffers, Slice bounds) {
+    IntMap<SlabBuffer> m = new IntMap<SlabBuffer>().linear();
 
     long size = 0;
-    for (ByteBuffer b : buffers) {
-      m.put(size, b.duplicate());
-      size += b.remaining();
+    for (SlabBuffer b : buffers) {
+      m.put(size, b);
+      size += b.size();
     }
+    assert (size == bounds.size());
 
     this.bounds = bounds;
     this.size = size;
     this.buffers = m.forked();
-    this.curr = this.buffers.first().value().duplicate();
+    this.curr = this.buffers.first().value().bytes();
   }
 
   @Override
@@ -54,22 +54,30 @@ public class MultiBufferInput implements DurableInput {
 
   @Override
   public DurableInput slice(long start, long end) {
+    if (start < 0 && end >= size()) {
+      throw new IllegalArgumentException(String.format("[%d, %d) is not within [0, %d)", start, end, size()));
+    }
+
     long length = end - start;
     Slice bounds = new Slice(this.bounds, start, end);
 
-    IEntry<Long, ByteBuffer> f = buffers.floor(start);
-    ByteBuffer bf = ((ByteBuffer) f.value().position((int) (start - f.key()))).slice();
-    if (length <= bf.remaining()) {
-      bf = ((ByteBuffer) bf.limit((int) length)).slice();
-      return new SingleBufferInput(bf, bounds);
+    IEntry<Long, SlabBuffer> f = buffers.floor(start);
+    SlabBuffer bf = f.value().slice((int) (start - f.key()), f.value().size());
+    if (length <= bf.size()) {
+      return new SingleBufferInput(bf.slice(0, (int) length), bounds);
     }
 
-    IEntry<Long, ByteBuffer> l = buffers.floor(end);
-    ByteBuffer bl = ((ByteBuffer) l.value().limit((int) (end - f.key()))).slice();
+    IEntry<Long, SlabBuffer> l = buffers.floor(end);
+    if ((end - l.key()) > l.value().size()) {
+      System.out.println(l.value().bytes());
+      System.out.println(start + " " + end + " " + buffers.keys());
+    }
+    SlabBuffer bl = l.value().slice(0, (int) (end - l.key()));
 
-    LinearList<ByteBuffer> bufs = LinearList.of(bf);
-    buffers.slice(start, end).values().forEach(bufs::addLast);
-    bufs.addLast(bl);
+    LinearList<SlabBuffer> bufs =
+        LinearList.from(buffers.slice(f.key() + bf.size(), l.key() - 1).values())
+            .addFirst(bf)
+            .addLast(bl);
 
     return new MultiBufferInput(bufs, bounds);
   }
@@ -106,7 +114,7 @@ public class MultiBufferInput implements DurableInput {
 
   @Override
   public void close() {
-    SlabAllocator.tryFree(buffers.values());
+    buffers.values().forEach(SlabBuffer::release);
   }
 
   @Override
@@ -151,9 +159,9 @@ public class MultiBufferInput implements DurableInput {
   ///
 
   private void updateCurr(long position) {
-    IEntry<Long, ByteBuffer> e = buffers.floor(position);
+    IEntry<Long, SlabBuffer> e = buffers.floor(position);
     offset = e.key();
-    curr = (ByteBuffer) e.value().duplicate().position((int) (position - offset));
+    curr = (ByteBuffer) e.value().bytes().position((int) (position - offset));
   }
 
   private ByteBuffer readableBuffer(int bytes) {

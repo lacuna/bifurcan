@@ -1,7 +1,6 @@
 package io.lacuna.bifurcan.durable;
 
 import io.lacuna.bifurcan.IDurableCollection.Fingerprint;
-import io.lacuna.bifurcan.IList;
 import io.lacuna.bifurcan.ISet;
 
 import java.io.IOException;
@@ -46,9 +45,7 @@ public class FileOutput implements WritableByteChannel {
       // skip over prefix, to fill in later
       file.position(PREFIX_LENGTH);
 
-      ByteChannelOutput out = new ByteChannelOutput(this);
-      Dependencies.encode(dependencies, out);
-      out.flush();
+      ByteChannelOutput.wrap(this, out -> Dependencies.encode(dependencies, out));
 
     } catch (Exception e) {
       throw new RuntimeException(e);
@@ -71,7 +68,7 @@ public class FileOutput implements WritableByteChannel {
   @Override
   public int write(ByteBuffer src) throws IOException {
     int len = file.write(src);
-    digest.update((ByteBuffer) src.duplicate().limit(src.position() + len));
+    digest.update((ByteBuffer) src.duplicate().limit(src.position()).position(src.position() - len));
     return len;
   }
 
@@ -88,12 +85,11 @@ public class FileOutput implements WritableByteChannel {
       file.position(0);
 
       // overwrite the header space we reserved before closing the file descriptor
-      ByteChannelOutput out = new ByteChannelOutput(this);
-      SwapBuffer.flushTo(out, acc -> {
-        acc.write(MAGIC_BYTES.duplicate());
-        Fingerprints.encode(hash, HASH_BYTES, acc);
-      });
-      out.flush();
+      ByteChannelOutput.wrap(this, out ->
+          DurableBuffer.flushTo(out, acc -> {
+            acc.write(MAGIC_BYTES.duplicate());
+            Fingerprints.encode(hash, HASH_BYTES, acc);
+          }));
 
       file.close();
     } catch (IOException e) {

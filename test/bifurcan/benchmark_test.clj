@@ -1098,8 +1098,9 @@
   (let [n     (if (= coll java-string)
                 (min 1e4 n)
                 n)
-        log10 (Math/log10 n)
-        sizes (->> log10 (* log-step) inc (range log-step) (map #(Math/pow 10 (/ % log-step))) (map long))]
+        sizes (->> (u/log-steps n 10 log-step)
+                (drop log-step)
+                (map long))]
     (prn (:label coll) sizes)
     (println "warming up...")
     (binding [*warmup* true]

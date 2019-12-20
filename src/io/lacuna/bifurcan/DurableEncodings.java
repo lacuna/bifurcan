@@ -1,11 +1,12 @@
 package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.durable.BlockPrefix;
-import io.lacuna.bifurcan.durable.SwapBuffer;
+import io.lacuna.bifurcan.durable.DurableBuffer;
 import io.lacuna.bifurcan.durable.Util;
 
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.function.*;
 
@@ -32,14 +33,14 @@ public class DurableEncodings {
       };
     }
 
-    static Codec piecewise(
+    static Codec undelimited(
         BiConsumer<Object, DurableOutput> encode,
-        BiFunction<DurableInput, IDurableCollection.Root, Objects> decode) {
+        BiFunction<DurableInput, IDurableCollection.Root, Object> decode) {
       return new Codec() {
         @Override
         public void encode(IList<Object> values, DurableOutput out) {
           for (Object p : values) {
-            SwapBuffer.flushTo(out, BlockPrefix.BlockType.PRIMITIVE, o -> encode.accept(p, o));
+            DurableBuffer.flushTo(out, BlockPrefix.BlockType.PRIMITIVE, o -> encode.accept(p, o));
           }
         }
 
@@ -58,7 +59,41 @@ public class DurableEncodings {
 
             @Override
             public Object next() {
+              if (!hasNext()) {
+                throw new NoSuchElementException();
+              }
               return decode.apply(in.sliceBlock(BlockPrefix.BlockType.PRIMITIVE), root);
+            }
+          };
+        }
+      };
+    }
+
+    static Codec selfDelimited(
+        BiConsumer<Object, DurableOutput> encode,
+        BiFunction<DurableInput, IDurableCollection.Root, Object> decode) {
+      return new Codec() {
+        @Override
+        public void encode(IList<Object> values, DurableOutput out) {
+          values.forEach(o -> encode.accept(o, out));
+        }
+
+        @Override
+        public IDurableEncoding.SkippableIterator decode(DurableInput in, IDurableCollection.Root root) {
+          return new IDurableEncoding.SkippableIterator() {
+            @Override
+            public void skip() {
+              next();
+            }
+
+            @Override
+            public boolean hasNext() {
+              return in.hasRemaining();
+            }
+
+            @Override
+            public Object next() {
+              return decode.apply(in, root);
             }
           };
         }
@@ -227,7 +262,7 @@ public class DurableEncodings {
         IList<Object[]> arrays = primitives.stream().map(preEncode).collect(Lists.linearCollector());
         for (IDurableEncoding e : encodings) {
           final int i = index++;
-          SwapBuffer.flushTo(
+          DurableBuffer.flushTo(
               out,
               BlockPrefix.BlockType.PRIMITIVE,
               inner -> Util.encodeBlock(Lists.lazyMap(arrays, t -> t[i]), e, inner));
@@ -238,7 +273,7 @@ public class DurableEncodings {
       public SkippableIterator decode(DurableInput in, IDurableCollection.Root root) {
         SkippableIterator[] iterators = new SkippableIterator[encodings.length];
         for (int i = 0; i < encodings.length; i++) {
-          iterators[i] = Util.decodeBlock(in, root, encodings[i]);
+          iterators[i] = Util.decodeBlock(in.sliceBlock(BlockPrefix.BlockType.PRIMITIVE), root, encodings[i]);
         }
 
         return new SkippableIterator() {
@@ -251,6 +286,9 @@ public class DurableEncodings {
 
           @Override
           public boolean hasNext() {
+            for (int i = 1; i < iterators.length; i++) {
+              assert(iterators[0].hasNext() == iterators[i].hasNext());
+            }
             return iterators[0].hasNext();
           }
 

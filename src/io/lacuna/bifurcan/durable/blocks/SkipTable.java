@@ -3,9 +3,7 @@ package io.lacuna.bifurcan.durable.blocks;
 import io.lacuna.bifurcan.DurableInput;
 import io.lacuna.bifurcan.DurableOutput;
 import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
-import io.lacuna.bifurcan.durable.SwapBuffer;
-
-import java.nio.ByteBuffer;
+import io.lacuna.bifurcan.durable.DurableBuffer;
 
 /**
  * A sorted map of integer onto integer, which assumes that both keys and values are monotonically increasing.
@@ -108,7 +106,7 @@ public class SkipTable {
     private static final int BRANCHING_FACTOR = 1 << LOG_BRANCHING_FACTOR;
     private static final long BIT_MASK = BRANCHING_FACTOR - 1;
 
-    private final SwapBuffer acc = new SwapBuffer();
+    private final DurableBuffer acc = new DurableBuffer();
     private Writer parent = null;
 
     private long lastIndex = 0, lastOffset = 0, count = 0;
@@ -171,18 +169,9 @@ public class SkipTable {
       this.acc.flushTo(out);
     }
 
-    /**
-     * Used for testing, in practice you should always prefer `flushTo` since it automatically frees the buffers.
-     */
-    public Iterable<ByteBuffer> contents() {
-      SwapBuffer acc = new SwapBuffer();
-      flushTo(acc);
-      return acc.contents();
-    }
-
     public long flushTo(DurableOutput out) {
       long offset = out.written();
-      SwapBuffer.flushTo(out, BlockType.TABLE, acc -> flush(acc, 1));
+      DurableBuffer.flushTo(out, BlockType.TABLE, acc -> flush(acc, 1));
       return out.written() - offset;
     }
   }

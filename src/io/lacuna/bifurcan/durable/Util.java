@@ -2,6 +2,7 @@ package io.lacuna.bifurcan.durable;
 
 import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
+import io.lacuna.bifurcan.durable.allocator.SlabAllocator.SlabBuffer;
 import io.lacuna.bifurcan.durable.blocks.HashMap;
 import io.lacuna.bifurcan.durable.blocks.List;
 import io.lacuna.bifurcan.utils.Bits;
@@ -74,7 +75,7 @@ public class Util {
   }
 
   public static void encodePrimitives(IList<Object> os, IDurableEncoding.Primitive encoding, DurableOutput out) {
-    SwapBuffer.flushTo(out, BlockType.PRIMITIVE, acc -> encoding.encode(os, acc));
+    DurableBuffer.flushTo(out, BlockType.PRIMITIVE, acc -> encoding.encode(os, acc));
   }
 
   public static void encodeSingleton(Object o, IDurableEncoding encoding, DurableOutput out) {
@@ -101,6 +102,9 @@ public class Util {
     }
   }
 
+  /**
+   * Decodes a singleton collection.  This does NOT advance the input.
+   */
   public static IDurableCollection decodeCollection(BlockPrefix prefix, IDurableCollection.Root root, IDurableEncoding encoding, DurableInput in) {
     switch (prefix.type) {
       case HASH_MAP:
@@ -118,6 +122,9 @@ public class Util {
     }
   }
 
+  /**
+   * Decodes a block of encoded values, which may or may not be a singleton collection.  This does NOT advance the input.
+   */
   public static IDurableEncoding.SkippableIterator decodeBlock(DurableInput in, IDurableCollection.Root root, IDurableEncoding encoding) {
     BlockPrefix prefix = in.peekPrefix();
     if (prefix.type == BlockType.PRIMITIVE) {
@@ -130,10 +137,10 @@ public class Util {
     }
   }
 
-  public static long size(Iterable<ByteBuffer> bufs) {
+  public static long size(Iterable<SlabBuffer> bufs) {
     long size = 0;
-    for (ByteBuffer b : bufs) {
-      size += b.remaining();
+    for (SlabBuffer b : bufs) {
+      size += b.size();
     }
     return size;
   }
@@ -197,25 +204,21 @@ public class Util {
       return iterators.first();
     }
 
-    PriorityQueue<IEntry<Iterator<V>, V>> heap = new PriorityQueue<IEntry<Iterator<V>, V>>(Comparator.comparing(IEntry::value, comparator));
+    PriorityQueue<IEntry<V, Iterator<V>>> heap = new PriorityQueue<>(Comparator.comparing(IEntry::key, comparator));
     for (Iterator<V> it : iterators) {
       if (it.hasNext()) {
-        heap.add(IEntry.of(it, it.next()));
+        heap.add(IEntry.of(it.next(), it));
       }
     }
 
     return Iterators.from(
         () -> heap.size() > 0,
         () -> {
-          IEntry<Iterator<V>, V> e = heap.poll();
-          if (e == null) {
-            throw new NoSuchElementException();
+          IEntry<V, Iterator<V>> e = heap.poll();
+          if (e.value().hasNext()) {
+            heap.add(IEntry.of(e.value().next(), e.value()));
           }
-
-          if (e.key().hasNext()) {
-            heap.add(IEntry.of(e.key(), e.key().next()));
-          }
-          return e.value();
+          return e.key();
         });
   }
 

@@ -3,7 +3,7 @@ package io.lacuna.bifurcan.durable.blocks;
 import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.durable.BlockPrefix;
 import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
-import io.lacuna.bifurcan.durable.SwapBuffer;
+import io.lacuna.bifurcan.durable.DurableBuffer;
 import io.lacuna.bifurcan.durable.Util;
 
 import java.util.Iterator;
@@ -19,7 +19,7 @@ public class List {
 
   public static <V> void encode(Iterator<V> it, IDurableEncoding.List listEncoding, DurableOutput out) {
     SkipTable.Writer skipTable = new SkipTable.Writer();
-    SwapBuffer elements = new SwapBuffer();
+    DurableBuffer elements = new DurableBuffer();
 
     IDurableEncoding elementEncoding = listEncoding.elementEncoding();
     Iterator<IList<V>> blocks = Util.partitionBy(
@@ -36,7 +36,7 @@ public class List {
     }
 
     long size = index;
-    SwapBuffer.flushTo(out, BlockType.LIST, acc -> {
+    DurableBuffer.flushTo(out, BlockType.LIST, acc -> {
       acc.writeVLQ(size);
       acc.writeUnsignedByte(skipTable.tiers());
 

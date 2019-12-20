@@ -64,12 +64,6 @@ public interface DurableOutput extends DataOutput, Flushable, Closeable, AutoClo
     Util.writeVLQ(n, this);
   }
 
-  default void write(Iterable<ByteBuffer> buffers) {
-    for (ByteBuffer b : buffers) {
-      write(b);
-    }
-  }
-
   default void write(int b) {
     writeByte(b);
   }

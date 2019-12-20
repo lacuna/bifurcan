@@ -22,7 +22,7 @@ public interface IDurableCollection {
   }
 
   interface Root {
-    Path file();
+    Path path();
 
     DurableInput bytes();
 

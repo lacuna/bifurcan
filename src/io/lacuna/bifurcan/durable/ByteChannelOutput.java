@@ -2,15 +2,14 @@ package io.lacuna.bifurcan.durable;
 
 import io.lacuna.bifurcan.DurableInput;
 import io.lacuna.bifurcan.DurableOutput;
-import io.lacuna.bifurcan.durable.allocator.SlabAllocator;
+import io.lacuna.bifurcan.durable.allocator.SlabAllocator.SlabBuffer;
 
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.WritableByteChannel;
-import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
+import java.util.function.Consumer;
 
 import static io.lacuna.bifurcan.durable.allocator.SlabAllocator.allocate;
 
@@ -20,6 +19,7 @@ import static io.lacuna.bifurcan.durable.allocator.SlabAllocator.allocate;
 public class ByteChannelOutput implements DurableOutput, Closeable {
 
   private final WritableByteChannel channel;
+  private final SlabBuffer bufferHandle;
   private final ByteBuffer buffer;
   private long position;
 
@@ -29,7 +29,14 @@ public class ByteChannelOutput implements DurableOutput, Closeable {
 
   public ByteChannelOutput(WritableByteChannel channel, int bufferSize) {
     this.channel = channel;
-    this.buffer = allocate(bufferSize);
+    this.bufferHandle = allocate(bufferSize);
+    this.buffer = bufferHandle.bytes();
+  }
+
+  public static void wrap(WritableByteChannel channel, Consumer<ByteChannelOutput> body) {
+    ByteChannelOutput out = new ByteChannelOutput(channel);
+    body.accept(out);
+    out.free();
   }
 
   ///
@@ -64,10 +71,14 @@ public class ByteChannelOutput implements DurableOutput, Closeable {
     }
   }
 
+  public void free() {
+    flush();
+    bufferHandle.release();
+  }
+
   @Override
   public void close() {
-    flush();
-    SlabAllocator.free(buffer);
+    free();
 
     try {
       if (channel instanceof FileChannel) {

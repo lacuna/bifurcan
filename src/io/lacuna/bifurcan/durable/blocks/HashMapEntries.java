@@ -3,7 +3,7 @@ package io.lacuna.bifurcan.durable.blocks;
 import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.IDurableCollection.Root;
 import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
-import io.lacuna.bifurcan.durable.SwapBuffer;
+import io.lacuna.bifurcan.durable.DurableBuffer;
 import io.lacuna.bifurcan.durable.Util;
 import io.lacuna.bifurcan.utils.Iterators;
 
@@ -29,7 +29,7 @@ public class HashMapEntries {
       IList<IEntry.WithHash<K, V>> block,
       IDurableEncoding.Map mapEncoding,
       DurableOutput out) {
-    SwapBuffer.flushTo(out, BLOCK_TYPE, acc -> {
+    DurableBuffer.flushTo(out, BLOCK_TYPE, acc -> {
       acc.writeVLQ(offset);
 
       HashDeltas.Writer hashes = new HashDeltas.Writer();

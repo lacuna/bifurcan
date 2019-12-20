@@ -8,14 +8,16 @@ public class Dependencies {
 
   private static ThreadLocal<LinearSet<Fingerprint>> ROOT_DEPENDENCIES = ThreadLocal.withInitial(LinearSet::new);
 
+  public static void enter() {
+    ROOT_DEPENDENCIES.set(new LinearSet<>());
+  }
+
   public static void add(IDurableCollection.Root root) {
     ROOT_DEPENDENCIES.get().add(root.fingerprint());
   }
 
-  public static ISet<Fingerprint> popRoot() {
-    ISet<Fingerprint> result = ROOT_DEPENDENCIES.get();
-    ROOT_DEPENDENCIES.get().clear();
-    return result;
+  public static ISet<Fingerprint> exit() {
+    return ROOT_DEPENDENCIES.get();
   }
   
   public static void encode(ISet<Fingerprint> dependencies, DurableOutput out) {

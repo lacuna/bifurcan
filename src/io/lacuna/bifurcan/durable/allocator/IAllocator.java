@@ -13,6 +13,10 @@ public interface IAllocator {
       this.end = end;
     }
 
+    public long size() {
+      return end - start;
+    }
+
     @Override
     public int hashCode() {
       long h = start ^ end;

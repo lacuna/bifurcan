@@ -4,7 +4,7 @@ import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.durable.BlockPrefix;
 import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
 import io.lacuna.bifurcan.durable.ChunkSort;
-import io.lacuna.bifurcan.durable.SwapBuffer;
+import io.lacuna.bifurcan.durable.DurableBuffer;
 import io.lacuna.bifurcan.durable.Util;
 import io.lacuna.bifurcan.utils.Iterators;
 
@@ -66,13 +66,11 @@ public class HashMap {
         });
   }
 
-  public static <K, V> Iterator<IEntry.WithHash<K, V>> sortEntries(Iterator<IEntry<K, V>> entries, IDurableEncoding.Map encoding, int maxRealizedEntries) {
-    IDurableEncoding hashEncoding = DurableEncodings.primitive(
-        "int32",
-        1024,
-        DurableEncodings.Codec.from(
-            (l, out) -> l.forEach(n -> out.writeInt((int) n)),
-            (in, root) -> Iterators.skippable(Iterators.from(in::hasRemaining, in::readInt))));
+  public static <K, V> ChunkSort.CloseableIterator<IEntry.WithHash<K, V>> sortEntries(Iterator<IEntry<K, V>> entries, IDurableEncoding.Map encoding, int maxRealizedEntries) {
+    IDurableEncoding hashEncoding = DurableEncodings.primitive("int32", 1024,
+        DurableEncodings.Codec.selfDelimited(
+            (o, out) -> out.writeInt((int) o),
+            (in, root) -> in.readInt()));
 
     ToIntFunction<Object> hashFn = encoding.keyEncoding().hashFn();
 
@@ -100,20 +98,20 @@ public class HashMap {
 
   public static <K, V> void encodeSortedEntries(Iterator<IEntry.WithHash<K, V>> sortedEntries, IDurableEncoding.Map encoding, DurableOutput out) {
     // two tables and actual entries
-    SwapBuffer entries = new SwapBuffer();
+    DurableBuffer entries = new DurableBuffer();
     SkipTable.Writer skipTable = new SkipTable.Writer();
     HashSkipTable.Writer hashTable = new HashSkipTable.Writer();
 
     // chunk up the entries so that collections are always singletons
-    Iterator<IList<IEntry.WithHash<Object, Object>>> entryBlocks =
+    Iterator<IList<IEntry.WithHash<K, V>>> entryBlocks =
         Util.partitionBy(
-            Iterators.map(sortedEntries, e -> IEntry.of(e.keyHash(), e.key(), e.value())),
+            sortedEntries,
             Math.min(encoding.keyEncoding().blockSize(), encoding.keyEncoding().blockSize()),
             e -> encoding.keyEncoding().isSingleton(e.key()) || encoding.valueEncoding().isSingleton(e.value()));
 
     long index = 0;
     while (entryBlocks.hasNext()) {
-      IList<IEntry.WithHash<Object, Object>> b = entryBlocks.next();
+      IList<IEntry.WithHash<K, V>> b = entryBlocks.next();
 
       // update the tables
       long offset = entries.written();
@@ -127,7 +125,7 @@ public class HashMap {
 
     // flush everything to the provided sink
     long size = index;
-    SwapBuffer.flushTo(out, BlockType.HASH_MAP, acc -> {
+    DurableBuffer.flushTo(out, BlockType.HASH_MAP, acc -> {
       acc.writeVLQ(size);
 
       // skip table metadata
@@ -152,6 +150,10 @@ public class HashMap {
 
       entries.flushTo(acc);
     });
+
+    if (sortedEntries instanceof ChunkSort.CloseableIterator) {
+      ((ChunkSort.CloseableIterator<IEntry.WithHash<K,V>>) sortedEntries).close();
+    }
   }
 
   /// decoding

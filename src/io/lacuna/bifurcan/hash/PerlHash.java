@@ -1,5 +1,7 @@
 package io.lacuna.bifurcan.hash;
 
+import io.lacuna.bifurcan.DurableInput;
+
 import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.PrimitiveIterator;
@@ -17,6 +19,18 @@ public class PerlHash {
 
   public static int hash(int seed, ByteBuffer buf) {
     return hash(seed, buf, buf.position(), buf.remaining());
+  }
+
+  public static int hash(int seed, DurableInput in) {
+    int key = seed;
+
+    while (in.hasRemaining()) {
+      key += in.readUnsignedByte();
+      key += key << 10;
+      key ^= key >>> 6;
+    }
+
+    return finalize(key);
   }
 
   public static int hash(int seed, PrimitiveIterator.OfInt values) {

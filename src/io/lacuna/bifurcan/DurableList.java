@@ -1,10 +1,11 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.durable.SwapBuffer;
 import io.lacuna.bifurcan.durable.Util;
 import io.lacuna.bifurcan.durable.blocks.List;
 import io.lacuna.bifurcan.durable.blocks.SkipTable;
+import io.lacuna.bifurcan.utils.Iterators;
 
+import java.nio.file.Path;
 import java.util.Iterator;
 
 public class DurableList<V> implements IDurableCollection, IList<V> {
@@ -27,10 +28,16 @@ public class DurableList<V> implements IDurableCollection, IList<V> {
     this.encoding = encoding;
   }
 
-  public static <V> DurableList<V> save(Iterator<V> it, IDurableEncoding.List encoding) {
-    SwapBuffer out = new SwapBuffer(false);
-    List.encode(it, encoding, out);
-    return List.decode(DurableInput.from(out.contents()), null, encoding);
+  public static <V> DurableList<V> open(Path path, IDurableEncoding.List encoding) {
+    return (DurableList<V>) DurableCollections.open(path, encoding);
+  }
+
+  public static <V> void encode(Iterator<V> elements, IDurableEncoding.List encoding, DurableOutput out) {
+    List.encode(elements, encoding, out);
+  }
+
+  public static <V> DurableList<V> decode(DurableInput in, Root root, IDurableEncoding.List encoding) {
+    return List.decode(in, root, encoding);
   }
 
   @Override
@@ -67,6 +74,14 @@ public class DurableList<V> implements IDurableCollection, IList<V> {
     return (V) Util.decodeBlock(elements.duplicate().seek(entry.offset), root, encoding.elementEncoding())
         .skip(index - entry.index)
         .next();
+  }
+
+  @Override
+  public Iterator<V> iterator() {
+    DurableInput elements = this.elements.duplicate();
+    return Iterators.flatMap(
+        Iterators.from(elements::hasRemaining, elements::slicePrefixedBlock),
+        in -> (Iterator<V>) Util.decodeBlock(in, root, encoding.elementEncoding()));
   }
 
   @Override

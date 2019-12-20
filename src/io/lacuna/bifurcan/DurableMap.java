@@ -1,6 +1,8 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.durable.SwapBuffer;
+import io.lacuna.bifurcan.durable.Dependencies;
+import io.lacuna.bifurcan.durable.FileOutput;
+import io.lacuna.bifurcan.durable.DurableBuffer;
 import io.lacuna.bifurcan.durable.blocks.*;
 import io.lacuna.bifurcan.utils.Iterators;
 
@@ -40,10 +42,26 @@ public class DurableMap<K, V> implements IDurableCollection, IMap<K, V> {
     return (DurableMap<K, V>) DurableCollections.open(path, encoding);
   }
 
-  public static <K, V> DurableMap<K, V> save(IMap<K, V> m, IDurableEncoding.Map encoding) {
-    SwapBuffer out = new SwapBuffer(false);
-    HashMap.encodeUnsortedEntries(m.entries(), encoding, out);
-    return HashMap.decode(DurableInput.from(out.contents()), null, encoding);
+  public static <K, V> void encode(Iterator<IEntry<K, V>> entries, IDurableEncoding.Map encoding, int maxRealizedEntries, DurableOutput out) {
+    HashMap.encodeSortedEntries(HashMap.sortEntries(entries, encoding, maxRealizedEntries), encoding, out);
+  }
+
+  public static <K, V> DurableMap<K, V> decode(DurableInput in, Root root, IDurableEncoding.Map encoding) {
+    return HashMap.decode(in, root, encoding);
+  }
+
+  public static <K, V> DurableMap<K, V> from(Iterator<IEntry<K, V>> entries, IDurableEncoding.Map encoding, Path directory, int maxRealizedEntries) {
+    Dependencies.enter();
+    DurableBuffer acc = new DurableBuffer();
+    encode(entries, encoding, maxRealizedEntries, acc);
+
+    FileOutput file = new FileOutput(Dependencies.exit());
+    DurableOutput out = DurableOutput.from(file);
+    acc.flushTo(out);
+    out.close();
+
+    Path path = file.moveTo(directory);
+    return (DurableMap<K, V>) DurableCollections.open(path, encoding);
   }
 
   private Iterator<HashMapEntries> chunkedEntries(long offset) {

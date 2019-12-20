@@ -1,6 +1,8 @@
 package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.durable.*;
+import io.lacuna.bifurcan.durable.allocator.SlabAllocator;
+import io.lacuna.bifurcan.durable.allocator.SlabAllocator.SlabBuffer;
 import io.lacuna.bifurcan.utils.Iterators;
 
 import java.io.*;
@@ -32,6 +34,10 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
       return root;
     }
 
+    public long size() {
+      return end - start;
+    }
+
     @Override
     public String toString() {
       String b = "[" + start + ", " + end + "]";
@@ -39,16 +45,16 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
     }
   }
 
-  static DurableInput from(ByteBuffer buffer) {
+  static DurableInput from(SlabBuffer buffer) {
     return from(() -> Iterators.singleton(buffer));
   }
 
-  static DurableInput from(Iterable<ByteBuffer> buffers) {
-    Iterator<ByteBuffer> it = buffers.iterator();
-    ByteBuffer buf = it.next();
+  static DurableInput from(Iterable<SlabBuffer> buffers) {
+    Iterator<SlabBuffer> it = buffers.iterator();
+    SlabBuffer buf = it.next();
     return it.hasNext()
         ? new MultiBufferInput(buffers, new Slice(null, 0, Util.size(buffers)))
-        : new SingleBufferInput(buf, new Slice(null, 0, buf.remaining()));
+        : new SingleBufferInput(buf, new Slice(null, 0, buf.size()));
   }
 
   DurableInput slice(long start, long end);
@@ -123,19 +129,19 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
     seek(position() + n);
     return n;
   }
-  
+
   byte readByte();
-  
+
   short readShort();
 
   char readChar();
-  
+
   int readInt();
 
   long readLong();
-  
+
   float readFloat();
-  
+
   double readDouble();
 
   default long readVLQ() {

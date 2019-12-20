@@ -3,13 +3,38 @@ package io.lacuna.bifurcan.durable;
 import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.utils.Iterators;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 
 public class ChunkSort {
+
+  public interface CloseableIterator<T> extends Iterator<T> {
+    void close();
+
+    static <T> CloseableIterator<T> from(Iterator<T> iterator, Runnable closeFn) {
+      return new CloseableIterator<T>() {
+        public void close() {
+          closeFn.run();
+        }
+
+        @Override
+        public boolean hasNext() {
+          return iterator.hasNext();
+        }
+
+        @Override
+        public T next() {
+          return iterator.next();
+        }
+      };
+    }
+  }
 
   private static class Chunk<T> {
     private final SortedMap<T, LinearList<T>> entries;
@@ -28,30 +53,28 @@ public class ChunkSort {
       return size;
     }
 
-    IList<T> entries() {
-      return entries.values().stream().flatMap(IList::stream).collect(Lists.linearCollector());
+    Iterator<T> entries() {
+      return entries.values().stream().flatMap(IList::stream).iterator();
     }
 
-    Iterator<T> spill(BiConsumer<IList<T>, DurableOutput> encode, Function<DurableInput, Iterator<T>> decode) {
-      SwapBuffer acc = new SwapBuffer();
+    DurableInput spill(BiConsumer<Iterator<T>, DurableOutput> encode) {
+      DurableBuffer acc = new DurableBuffer();
       encode.accept(entries(), acc);
-      DurableInput in = DurableInput.from(acc.contents());
-
-      return Iterators.onExhaustion(decode.apply(in), in::close);
+      return acc.toInput();
     }
   }
-  
+
   public static class Accumulator<T> {
 
-    private final BiConsumer<IList<T>, DurableOutput> encode;
+    private final BiConsumer<Iterator<T>, DurableOutput> encode;
     private final Function<DurableInput, Iterator<T>> decode;
     private final Comparator<T> comparator;
     private final int maxRealizedElements;
-    
-    private final LinearList<Iterator<T>> iterators = new LinearList<>();
+
+    private LinearList<DurableInput> spilled = new LinearList<>();
     private Chunk<T> curr;
-    
-    public Accumulator(BiConsumer<IList<T>, DurableOutput> encode,
+
+    public Accumulator(BiConsumer<Iterator<T>, DurableOutput> encode,
                        Function<DurableInput, Iterator<T>> decode,
                        Comparator<T> comparator,
                        int maxRealizedElements) {
@@ -59,42 +82,52 @@ public class ChunkSort {
       this.decode = decode;
       this.comparator = comparator;
       this.maxRealizedElements = maxRealizedElements;
-      
+
       this.curr = new Chunk<>(comparator);
     }
-    
+
     public void add(T x) {
       curr.add(x);
       if (curr.size() >= maxRealizedElements) {
-        iterators.addLast(curr.spill(encode, decode));
+        spilled.addLast(curr.spill(encode));
         curr = new Chunk<>(comparator);
       }
     }
 
-    public Iterator<T> sortedIterator() {
+    private DurableInput spill(IList<Iterator<T>> iterators) {
+      DurableBuffer acc = new DurableBuffer();
+      encode.accept(Util.mergeSort(iterators, comparator), acc);
+      return acc.toInput();
+    }
+
+    public CloseableIterator<T> sortedIterator() {
+      IList<DurableInput> bytes = LinearList.from(this.spilled);
+      IList<Iterator<T>> iterators = bytes.stream().map(decode).collect(Lists.linearCollector());
       if (curr != null && curr.size > 0) {
-        iterators.addLast(curr.entries().iterator());
+        iterators.addLast(curr.entries());
         curr = null;
       }
 
-      LinearList<Iterator<T>> iterators = this.iterators;
       while (iterators.size() > maxRealizedElements) {
-        LinearList<Iterator<T>> merged = new LinearList<>();
+        LinearList<DurableInput> merged = new LinearList<>();
         for (int i = 0; i < iterators.size(); i += maxRealizedElements) {
-          merged.addLast(Util.mergeSort(iterators.slice(i, Math.min(iterators.size(), i + maxRealizedElements)), comparator));
+          merged.addLast(spill(iterators.slice(i, Math.min(iterators.size(), i + maxRealizedElements))));
         }
-        iterators = merged;
+        bytes.forEach(DurableInput::close);
+        bytes = merged;
+        iterators = merged.stream().map(decode).collect(Lists.linearCollector());
       }
 
-      return Util.mergeSort(iterators, comparator);
+      final IList<DurableInput> resources = bytes;
+      return CloseableIterator.from(Util.mergeSort(iterators, comparator), () -> resources.forEach(DurableInput::close));
     }
   }
 
   ///
 
-  public static <T> Iterator<T> sortedEntries(
+  public static <T> CloseableIterator<T> sortedEntries(
       Iterator<T> entries,
-      BiConsumer<IList<T>, DurableOutput> encode,
+      BiConsumer<Iterator<T>, DurableOutput> encode,
       Function<DurableInput, Iterator<T>> decode,
       Comparator<T> comparator,
       int maxRealizedElements) {
@@ -103,25 +136,25 @@ public class ChunkSort {
     return acc.sortedIterator();
   }
 
-  public static <V> Iterator<V> sortedIndexedEntries(ICollection<?, V> c, Comparator<V> comparator) {
-    return Iterators.map(
-        sortedEntries(
-            LongStream.range(0, c.size()).iterator(),
-            (l, out) -> l.forEach(out::writeVLQ),
-            in -> Iterators.from(() -> in.remaining() > 0, in::readVLQ),
-            (a, b) -> comparator.compare(c.nth(a), c.nth(b)),
-            1 << 16),
-        c::nth);
+  public static <V> CloseableIterator<V> sortedIndexedEntries(ICollection<?, V> c, Comparator<V> comparator) {
+    CloseableIterator<Long> it = sortedEntries(
+        LongStream.range(0, c.size()).iterator(),
+        (l, out) -> l.forEachRemaining(out::writeVLQ),
+        in -> Iterators.from(() -> in.remaining() > 0, in::readVLQ),
+        (a, b) -> comparator.compare(c.nth(a), c.nth(b)),
+        1 << 16);
+
+    return CloseableIterator.from(Iterators.map(it, c::nth), it::close);
   }
 
-  public static <V> Iterator<V> sortedEntries(
+  public static <V> CloseableIterator<V> sortedEntries(
       Iterator<V> entries,
       Comparator<V> comparator,
       IDurableEncoding.List listEncoding,
       int maxRealizedElements) {
     return sortedEntries(
         entries,
-        (l, out) -> io.lacuna.bifurcan.durable.blocks.List.encode(l.iterator(), listEncoding, out),
+        (it, out) -> io.lacuna.bifurcan.durable.blocks.List.encode(it, listEncoding, out),
         in -> (Iterator<V>) io.lacuna.bifurcan.durable.blocks.List.decode(in, null, listEncoding).iterator(),
         comparator,
         maxRealizedElements);

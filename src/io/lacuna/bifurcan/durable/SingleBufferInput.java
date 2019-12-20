@@ -1,17 +1,19 @@
 package io.lacuna.bifurcan.durable;
 
 import io.lacuna.bifurcan.DurableInput;
-import io.lacuna.bifurcan.durable.allocator.SlabAllocator;
+import io.lacuna.bifurcan.durable.allocator.SlabAllocator.SlabBuffer;
 
 import java.nio.ByteBuffer;
 
 public class SingleBufferInput implements DurableInput {
 
-  private final ByteBuffer buf;
+  private final SlabBuffer buffer;
+  private final ByteBuffer bytes;
   private final Slice bounds;
 
-  public SingleBufferInput(ByteBuffer buf, Slice bounds) {
-    this.buf = buf;
+  public SingleBufferInput(SlabBuffer buffer, Slice bounds) {
+    this.buffer = buffer;
+    this.bytes = buffer.bytes();
     this.bounds = bounds;
   }
 
@@ -22,81 +24,78 @@ public class SingleBufferInput implements DurableInput {
 
   @Override
   public DurableInput slice(long start, long end) {
-    if (start == 0) {
-      new Throwable().printStackTrace();
+    if (start < 0 && end >= size()) {
+      throw new IllegalArgumentException(String.format("[%d, %d) is not within [0, %d)", start, end, size()));
     }
+
     return new SingleBufferInput(
-        ((ByteBuffer) buf.duplicate()
-            .clear()
-            .position((int) start)
-            .limit((int) end))
-            .slice(),
+        buffer.slice((int) start, (int) end),
         new Slice(bounds, start, end));
   }
 
   @Override
   public DurableInput duplicate() {
-    return new SingleBufferInput(buf.duplicate(), bounds);
+    return new SingleBufferInput(buffer.duplicate(), bounds);
   }
 
   @Override
   public DurableInput seek(long position) {
-    buf.position((int) position);
+    bytes.position((int) position);
     return this;
   }
 
   @Override
   public long remaining() {
-    return buf.remaining();
+    return bytes.remaining();
   }
 
   @Override
   public long position() {
-    return buf.position();
+    return bytes.position();
   }
 
   @Override
   public int read(ByteBuffer dst) {
-    return Util.transfer(buf, dst);
+    return Util.transfer(bytes, dst);
   }
 
   @Override
   public void close() {
-    SlabAllocator.tryFree(buf);
+    buffer.release();
   }
 
   @Override
   public byte readByte() {
-    return buf.get();
+    return bytes.get();
   }
 
   @Override
   public short readShort() {
-    return buf.getShort();
+    return bytes.getShort();
   }
 
   @Override
   public char readChar() {
-    return buf.getChar();
+    return bytes.getChar();
   }
 
   @Override
   public int readInt() {
-    return buf.getInt();
+    return bytes.getInt();
   }
 
   @Override
   public long readLong() {
-    return buf.getLong();
+    return bytes.getLong();
   }
 
   @Override
   public float readFloat() {
-    return buf.getFloat();
+    return bytes.getFloat();
   }
 
   @Override
   public double readDouble() {
-    return buf.getDouble();
+    return bytes.getDouble();
   }
 }
