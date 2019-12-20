@@ -56,7 +56,7 @@ public class HashMap {
     return Iterators.map(
         ChunkSort.sortedEntries(
             Iterators.map(entries.iterator(), e -> new MapIndex(keyHash.applyAsInt(e.key()), index.getAndIncrement())),
-            (it, out) -> it.forEach(e -> MapIndex.encode(e, out)),
+            (it, out) -> it.forEachRemaining(e -> MapIndex.encode(e, out)),
             in -> Iterators.from(in::hasRemaining, () -> MapIndex.decode(in)),
             Comparator.comparingInt((MapIndex e) -> e.hash),
             1 << 16),
