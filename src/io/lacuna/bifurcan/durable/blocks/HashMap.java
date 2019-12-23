@@ -4,7 +4,7 @@ import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.durable.BlockPrefix;
 import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
 import io.lacuna.bifurcan.durable.ChunkSort;
-import io.lacuna.bifurcan.durable.DurableBuffer;
+import io.lacuna.bifurcan.durable.io.DurableBuffer;
 import io.lacuna.bifurcan.durable.Util;
 import io.lacuna.bifurcan.utils.Iterators;
 
@@ -158,8 +158,8 @@ public class HashMap {
 
   /// decoding
 
-  public static DurableMap decode(DurableInput in, IDurableCollection.Root root, IDurableEncoding.Map encoding) {
-    DurableInput bytes = in.duplicate();
+  public static DurableMap decode(DurableInput.Pool pool, IDurableCollection.Root root, IDurableEncoding.Map encoding) {
+    DurableInput in = pool.instance();
 
     BlockPrefix prefix = in.readPrefix();
     assert (prefix.type == BlockType.HASH_MAP);
@@ -171,17 +171,17 @@ public class HashMap {
 
     SkipTable skipTable = null;
     if (skipTableTiers > 0) {
-      skipTable = new SkipTable(in.sliceBlock(BlockType.TABLE), skipTableTiers);
+      skipTable = new SkipTable(in.sliceBlock(BlockType.TABLE).pool(), skipTableTiers);
     }
 
     HashSkipTable hashTable = null;
     if (hashTableTiers > 0) {
-      hashTable = new HashSkipTable(in.sliceBlock(BlockType.TABLE), hashTableTiers);
+      hashTable = new HashSkipTable(in.sliceBlock(BlockType.TABLE).pool(), hashTableTiers);
     }
 
-    DurableInput entries = in.sliceBytes((pos + prefix.length) - in.position());
+    DurableInput.Pool entries = in.sliceBytes((pos + prefix.length) - in.position()).pool();
 
-    return new DurableMap(bytes, root, size, hashTable, skipTable, entries, encoding);
+    return new DurableMap(pool, root, size, hashTable, skipTable, entries, encoding);
   }
 
 }

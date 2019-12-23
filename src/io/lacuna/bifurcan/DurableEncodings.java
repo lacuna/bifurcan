@@ -1,7 +1,7 @@
 package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.durable.BlockPrefix;
-import io.lacuna.bifurcan.durable.DurableBuffer;
+import io.lacuna.bifurcan.durable.io.DurableBuffer;
 import io.lacuna.bifurcan.durable.Util;
 
 import java.util.Arrays;

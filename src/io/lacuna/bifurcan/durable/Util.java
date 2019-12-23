@@ -5,12 +5,15 @@ import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
 import io.lacuna.bifurcan.durable.allocator.SlabAllocator.SlabBuffer;
 import io.lacuna.bifurcan.durable.blocks.HashMap;
 import io.lacuna.bifurcan.durable.blocks.List;
+import io.lacuna.bifurcan.durable.io.DurableBuffer;
 import io.lacuna.bifurcan.utils.Bits;
 import io.lacuna.bifurcan.utils.Iterators;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
-import java.util.*;
+import java.util.Comparator;
+import java.util.Iterator;
+import java.util.PriorityQueue;
 import java.util.function.Predicate;
 
 /**
@@ -54,7 +57,7 @@ public class Util {
     return sb.toString();
   }
 
-  public static int compare(ByteBuffer a, ByteBuffer b) {
+  public static int compareBuffers(ByteBuffer a, ByteBuffer b) {
     a = a.duplicate();
     b = b.duplicate();
 
@@ -73,6 +76,27 @@ public class Util {
       return 0;
     }
   }
+
+  public static int compareInputs(DurableInput a, DurableInput b) {
+    a = a.duplicate();
+    b = b.duplicate();
+
+    while (a.hasRemaining() && b.hasRemaining()) {
+      int d = a.readUnsignedByte() - b.readUnsignedByte();
+      if (d != 0) {
+        return d;
+      }
+    }
+
+    if (a.hasRemaining()) {
+      return 1;
+    } else if (b.hasRemaining()) {
+      return -1;
+    } else {
+      return 0;
+    }
+  }
+
 
   public static void encodePrimitives(IList<Object> os, IDurableEncoding.Primitive encoding, DurableOutput out) {
     DurableBuffer.flushTo(out, BlockType.PRIMITIVE, acc -> encoding.encode(os, acc));
@@ -105,18 +129,18 @@ public class Util {
   /**
    * Decodes a singleton collection.  This does NOT advance the input.
    */
-  public static IDurableCollection decodeCollection(BlockPrefix prefix, IDurableCollection.Root root, IDurableEncoding encoding, DurableInput in) {
+  public static IDurableCollection decodeCollection(BlockPrefix prefix, IDurableCollection.Root root, IDurableEncoding encoding, DurableInput.Pool pool) {
     switch (prefix.type) {
       case HASH_MAP:
         if (!(encoding instanceof IDurableEncoding.Map)) {
           throw new IllegalArgumentException(String.format("cannot decode map with %s", encoding.description()));
         }
-        return HashMap.decode(in.duplicate(), root, (IDurableEncoding.Map) encoding);
+        return HashMap.decode(pool, root, (IDurableEncoding.Map) encoding);
       case LIST:
         if (!(encoding instanceof IDurableEncoding.List)) {
           throw new IllegalArgumentException(String.format("cannot decode list with %s", encoding.description()));
         }
-        return List.decode(in.duplicate(), root, (IDurableEncoding.List) encoding);
+        return List.decode(pool, root, (IDurableEncoding.List) encoding);
       default:
         throw new IllegalArgumentException("Unexpected block type: " + prefix.type.name());
     }
@@ -133,7 +157,7 @@ public class Util {
       }
       return ((IDurableEncoding.Primitive) encoding).decode(in.duplicate().sliceBlock(BlockType.PRIMITIVE), root);
     } else {
-      return Iterators.skippable(Iterators.singleton(decodeCollection(prefix, root, encoding, in)));
+      return Iterators.skippable(Iterators.singleton(decodeCollection(prefix, root, encoding, in.pool())));
     }
   }
 

@@ -3,7 +3,7 @@ package io.lacuna.bifurcan.durable.blocks;
 import io.lacuna.bifurcan.DurableInput;
 import io.lacuna.bifurcan.DurableOutput;
 import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
-import io.lacuna.bifurcan.durable.DurableBuffer;
+import io.lacuna.bifurcan.durable.io.DurableBuffer;
 
 /**
  * A sorted map of integer onto integer, which assumes that both keys and values are monotonically increasing.
@@ -56,16 +56,16 @@ public class SkipTable {
 
   }
 
-  public final DurableInput in;
+  public final DurableInput.Pool pool;
   public final int tiers;
 
-  public SkipTable(DurableInput in, int tiers) {
-    this.in = in;
+  public SkipTable(DurableInput.Pool pool, int tiers) {
+    this.pool = pool;
     this.tiers = tiers;
   }
 
   public Entry floor(long index) {
-    DurableInput in = this.in.duplicate().seek(0);
+    DurableInput in = pool.instance();
 
     long currIndex = 0, currOffset = 0, nextTier = 0;
     for (int i = 0; i < tiers; i++) {

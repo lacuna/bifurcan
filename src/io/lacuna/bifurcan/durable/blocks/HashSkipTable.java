@@ -30,7 +30,7 @@ public class HashSkipTable {
 
   private final SkipTable table;
 
-  public HashSkipTable(DurableInput in, int tiers) {
+  public HashSkipTable(DurableInput.Pool in, int tiers) {
     this.table = new SkipTable(in, tiers);
   }
 

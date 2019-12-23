@@ -3,7 +3,7 @@ package io.lacuna.bifurcan.durable.blocks;
 import io.lacuna.bifurcan.DurableInput;
 import io.lacuna.bifurcan.DurableOutput;
 import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
-import io.lacuna.bifurcan.durable.DurableBuffer;
+import io.lacuna.bifurcan.durable.io.DurableBuffer;
 import io.lacuna.bifurcan.utils.Iterators;
 
 import java.util.PrimitiveIterator.OfInt;
@@ -65,13 +65,13 @@ public class HashDeltas {
   }
 
   public static HashDeltas decode(DurableInput in) {
-    return new HashDeltas(in.sliceBlock(BlockType.TABLE));
+    return new HashDeltas(in.sliceBlock(BlockType.TABLE).pool());
   }
 
-  public final DurableInput in;
+  public final DurableInput.Pool pool;
 
-  private HashDeltas(DurableInput in) {
-    this.in = in;
+  private HashDeltas(DurableInput.Pool pool) {
+    this.pool = pool;
   }
 
   public int nth(long index) {
@@ -81,7 +81,7 @@ public class HashDeltas {
   }
 
   public OfInt iterator() {
-    DurableInput in = this.in.duplicate().seek(0);
+    DurableInput in = pool.instance();
 
     return new OfInt() {
       boolean hasNext = true;

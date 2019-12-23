@@ -49,7 +49,7 @@ public class SlabAllocator {
         }
         long offset = size.getAndAdd(bytes);
         System.out.println("mapping " + offset + " " + bytes);
-        return channel.map(FileChannel.MapMode.PRIVATE, offset, bytes).order(ByteOrder.BIG_ENDIAN);
+        return channel.map(FileChannel.MapMode.READ_WRITE, offset, bytes).order(ByteOrder.BIG_ENDIAN);
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
@@ -123,6 +123,7 @@ public class SlabAllocator {
     private final ByteBuffer bytes;
 
     public SlabBuffer(Slab slab, Range range, ByteBuffer bytes) {
+      assert(bytes.capacity() == bytes.remaining());
       this.slab = slab;
       this.range = range;
       this.bytes = bytes;
@@ -143,7 +144,7 @@ public class SlabAllocator {
     }
 
     public SlabBuffer slice(int start, int end) {
-      if (start < 0 && end >= size()) {
+      if (start < 0 || end > size() || end < start) {
         throw new IllegalArgumentException(String.format("[%d, %d) is not within [0, %d)", start, end, size()));
       }
       return new SlabBuffer(((ByteBuffer) bytes().position(start).limit(end)).slice());

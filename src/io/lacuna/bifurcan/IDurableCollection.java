@@ -15,7 +15,7 @@ public interface IDurableCollection {
     }
 
     default int compareTo(Fingerprint o) {
-      return Util.compare(
+      return Util.compareBuffers(
           ByteBuffer.wrap(binary()),
           ByteBuffer.wrap(o.binary()));
     }
@@ -24,7 +24,7 @@ public interface IDurableCollection {
   interface Root {
     Path path();
 
-    DurableInput bytes();
+    DurableInput.Pool bytes();
 
     Fingerprint fingerprint();
 
@@ -33,7 +33,7 @@ public interface IDurableCollection {
 
   IDurableEncoding encoding();
 
-  DurableInput bytes();
+  DurableInput.Pool bytes();
 
   Root root();
 
@@ -42,6 +42,6 @@ public interface IDurableCollection {
   }
 
   default long rootByteOffset() {
-    return bytes().bounds().absolute().start;
+    return bytes().instance().bounds().absolute().start;
   }
 }

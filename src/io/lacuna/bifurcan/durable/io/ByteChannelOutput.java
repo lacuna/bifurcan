@@ -1,10 +1,9 @@
-package io.lacuna.bifurcan.durable;
+package io.lacuna.bifurcan.durable.io;
 
 import io.lacuna.bifurcan.DurableInput;
 import io.lacuna.bifurcan.DurableOutput;
 import io.lacuna.bifurcan.durable.allocator.SlabAllocator.SlabBuffer;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -16,7 +15,7 @@ import static io.lacuna.bifurcan.durable.allocator.SlabAllocator.allocate;
 /**
  * @author ztellman
  */
-public class ByteChannelOutput implements DurableOutput, Closeable {
+public class ByteChannelOutput implements DurableOutput {
 
   private final WritableByteChannel channel;
   private final SlabBuffer bufferHandle;
@@ -41,13 +40,27 @@ public class ByteChannelOutput implements DurableOutput, Closeable {
 
   ///
 
+
   @Override
-  public void transferFrom(DurableInput in, long bytes) {
-    while (bytes > 0) {
-      bytes -= in.read(buffer);
-      if (buffer.remaining() == 0) {
+  public void transferFrom(DurableInput in) {
+    while (in.hasRemaining()) {
+      in.read(buffer);
+      if (!buffer.hasRemaining()) {
         flush();
       }
+    }
+  }
+
+  @Override
+  public void append(Iterable<SlabBuffer> buffers) {
+    flush();
+    try {
+      for (SlabBuffer b : buffers) {
+        channel.write(b.bytes());
+        b.release();
+      }
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     }
   }
 

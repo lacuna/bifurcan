@@ -9,8 +9,8 @@ public class DurableCollections {
 
   public static IDurableCollection open(Path path, IDurableEncoding encoding) {
     IDurableCollection.Root root = Roots.open(path);
-    DurableInput in = root.bytes();
-    return Util.decodeCollection(in.peekPrefix(), root, encoding, in);
+    DurableInput.Pool pool = root.bytes();
+    return Util.decodeCollection(pool.instance().peekPrefix(), root, encoding, pool);
   }
 
   public static IDurableCollection migrate(Path path, IDurableEncoding oldEncoding, IDurableEncoding newEncoding) {

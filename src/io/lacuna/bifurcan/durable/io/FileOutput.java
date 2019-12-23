@@ -1,7 +1,10 @@
-package io.lacuna.bifurcan.durable;
+package io.lacuna.bifurcan.durable.io;
 
 import io.lacuna.bifurcan.IDurableCollection.Fingerprint;
 import io.lacuna.bifurcan.ISet;
+import io.lacuna.bifurcan.durable.Dependencies;
+import io.lacuna.bifurcan.durable.Fingerprints;
+import io.lacuna.bifurcan.durable.Util;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -20,7 +23,7 @@ public class FileOutput implements WritableByteChannel {
 
   private static final int HASH_BYTES = 32;
 
-  static final ByteBuffer MAGIC_BYTES = (ByteBuffer)
+  public static final ByteBuffer MAGIC_BYTES = (ByteBuffer)
       ByteBuffer.allocate(4)
           .put((byte) 0xB4) // B4 CA N
           .put((byte) 0xCA)

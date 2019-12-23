@@ -2,8 +2,8 @@ package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.diffs.DiffMap;
 import io.lacuna.bifurcan.durable.Dependencies;
-import io.lacuna.bifurcan.durable.FileOutput;
-import io.lacuna.bifurcan.durable.DurableBuffer;
+import io.lacuna.bifurcan.durable.io.FileOutput;
+import io.lacuna.bifurcan.durable.io.DurableBuffer;
 import io.lacuna.bifurcan.durable.blocks.HashMap;
 import io.lacuna.bifurcan.utils.Iterators;
 

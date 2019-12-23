@@ -1,8 +1,9 @@
 package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.durable.*;
-import io.lacuna.bifurcan.durable.allocator.SlabAllocator;
 import io.lacuna.bifurcan.durable.allocator.SlabAllocator.SlabBuffer;
+import io.lacuna.bifurcan.durable.io.MultiBufferInput;
+import io.lacuna.bifurcan.durable.io.SingleBufferInput;
 import io.lacuna.bifurcan.utils.Iterators;
 
 import java.io.*;
@@ -11,6 +12,10 @@ import java.util.Iterator;
 
 public interface DurableInput extends DataInput, Closeable, AutoCloseable {
 
+  interface Pool {
+    DurableInput instance();
+  }
+
   class Slice {
     public final Slice parent;
     public final long start, end;
@@ -18,19 +23,22 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
     private Slice root;
 
     public Slice(Slice parent, long start, long end) {
+      assert (start <= end);
+
       this.parent = parent;
       this.start = start;
       this.end = end;
+
+      if (parent == null) {
+        this.root = this;
+      }
     }
 
     public Slice absolute() {
-      if (parent == null) {
-        return this;
-      } else if (root == null) {
-        Slice parentRoot = parent.root;
+      if (root == null) {
+        Slice parentRoot = parent.absolute();
         root = new Slice(null, start + parentRoot.start, end + parentRoot.start);
       }
-
       return root;
     }
 
@@ -93,6 +101,8 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
   DurableInput seek(long position);
 
   long remaining();
+
+  Pool pool();
 
   default boolean hasRemaining() {
     return remaining() > 0;

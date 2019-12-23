@@ -10,15 +10,15 @@ import java.util.Iterator;
 
 public class DurableList<V> implements IDurableCollection, IList<V> {
 
-  private final DurableInput bytes;
+  private final DurableInput.Pool bytes;
   private final Root root;
 
   private final long size;
   private final IDurableEncoding.List encoding;
   private final SkipTable skipTable;
-  private final DurableInput elements;
+  private final DurableInput.Pool elements;
 
-  public DurableList(DurableInput bytes, Root root, long size, SkipTable skipTable, DurableInput elements, IDurableEncoding.List encoding) {
+  public DurableList(DurableInput.Pool bytes, Root root, long size, SkipTable skipTable, DurableInput.Pool elements, IDurableEncoding.List encoding) {
     this.bytes = bytes;
     this.root = root;
 
@@ -36,8 +36,8 @@ public class DurableList<V> implements IDurableCollection, IList<V> {
     List.encode(elements, encoding, out);
   }
 
-  public static <V> DurableList<V> decode(DurableInput in, Root root, IDurableEncoding.List encoding) {
-    return List.decode(in, root, encoding);
+  public static <V> DurableList<V> decode(DurableInput.Pool pool, Root root, IDurableEncoding.List encoding) {
+    return List.decode(pool, root, encoding);
   }
 
   @Override
@@ -56,8 +56,8 @@ public class DurableList<V> implements IDurableCollection, IList<V> {
   }
 
   @Override
-  public DurableInput bytes() {
-    return bytes.duplicate();
+  public DurableInput.Pool bytes() {
+    return bytes;
   }
 
   @Override
@@ -71,14 +71,14 @@ public class DurableList<V> implements IDurableCollection, IList<V> {
       throw new IndexOutOfBoundsException(index + " must be within [0," + size() + ")");
     }
     SkipTable.Entry entry = skipTable == null ? SkipTable.Entry.ORIGIN : skipTable.floor(index);
-    return (V) Util.decodeBlock(elements.duplicate().seek(entry.offset), root, encoding.elementEncoding())
+    return (V) Util.decodeBlock(elements.instance().seek(entry.offset), root, encoding.elementEncoding())
         .skip(index - entry.index)
         .next();
   }
 
   @Override
   public Iterator<V> iterator() {
-    DurableInput elements = this.elements.duplicate();
+    DurableInput elements = this.elements.instance();
     return Iterators.flatMap(
         Iterators.from(elements::hasRemaining, elements::slicePrefixedBlock),
         in -> (Iterator<V>) Util.decodeBlock(in, root, encoding.elementEncoding()));

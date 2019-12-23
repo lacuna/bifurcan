@@ -3,8 +3,9 @@ package io.lacuna.bifurcan.durable;
 import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.IDurableCollection.Fingerprint;
 import io.lacuna.bifurcan.IDurableCollection.Root;
-import io.lacuna.bifurcan.durable.allocator.SlabAllocator;
 import io.lacuna.bifurcan.durable.allocator.SlabAllocator.SlabBuffer;
+import io.lacuna.bifurcan.durable.io.ByteChannelInput;
+import io.lacuna.bifurcan.durable.io.FileOutput;
 import io.lacuna.bifurcan.utils.Functions;
 
 import java.io.IOException;
@@ -12,7 +13,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
@@ -30,52 +30,55 @@ public class Roots {
 
   private static Root open(Path path, Function<Fingerprint, Root> roots) {
     try {
-      try (FileChannel file = FileChannel.open(path, StandardOpenOption.READ)) {
-        long size = file.size();
-        LinearList<SlabBuffer> bufs = LinearList.of(map(file, 0, Math.min(Integer.MAX_VALUE, size)));
-        DurableInput in = DurableInput.from(bufs);
+      FileChannel fc = FileChannel.open(path, StandardOpenOption.READ);
+      DurableInput file = new ByteChannelInput(fc);
 
-        // check magic bytes
-        ByteBuffer magicBytes = FileOutput.MAGIC_BYTES.duplicate();
-        while (magicBytes.hasRemaining()) {
-          assert magicBytes.get() == in.readByte();
-        }
-
-        // read in header
-        Fingerprint fingerprint = Fingerprints.decode(in);
-        IMap<Fingerprint, Root> dependencies = Dependencies.decode(in).zip(roots);
-
-        // map over the remainder of the file
-        long offset = bufs.first().size();
-        while (offset < size) {
-          long len = Math.min(Integer.MAX_VALUE, size - offset);
-          bufs.addLast(map(file, offset, len));
-          offset += len;
-        }
-        final DurableInput contents = in.slice(in.position(), in.size());
-
-        return new Root() {
-          @Override
-          public Path path() {
-            return path;
-          }
-
-          @Override
-          public DurableInput bytes() {
-            return contents;
-          }
-
-          @Override
-          public Fingerprint fingerprint() {
-            return fingerprint;
-          }
-
-          @Override
-          public IMap<Fingerprint, Root> dependencies() {
-            return dependencies;
-          }
-        };
+      // check magic bytes
+      ByteBuffer magicBytes = FileOutput.MAGIC_BYTES.duplicate();
+      while (magicBytes.hasRemaining()) {
+        assert magicBytes.get() == file.readByte();
       }
+
+      // read in header
+      Fingerprint fingerprint = Fingerprints.decode(file);
+      IMap<Fingerprint, Root> dependencies = Dependencies.decode(file).zip(roots);
+
+
+      // map over the file
+//      long size = file.size();
+//      LinearList<SlabBuffer> bufs = new LinearList<>();
+//      long offset = 0;
+//      while (offset < size) {
+//        long len = Math.min(Integer.MAX_VALUE, size - offset);
+//        bufs.addLast(map(fc, offset, len));
+//        offset += len;
+//      }
+//      file.close();
+//      final DurableInput.Pool contents = DurableInput.from(bufs).slice(file.position(), size).pool();
+
+      final DurableInput.Pool contents = file.slice(file.position(), file.size()).pool();
+      return new Root() {
+        @Override
+        public Path path() {
+          return path;
+        }
+
+        @Override
+        public DurableInput.Pool bytes() {
+          return contents;
+        }
+
+        @Override
+        public Fingerprint fingerprint() {
+          return fingerprint;
+        }
+
+        @Override
+        public IMap<Fingerprint, Root> dependencies() {
+          return dependencies;
+        }
+      };
+
     } catch (IOException e) {
       throw new RuntimeException(e);
     }

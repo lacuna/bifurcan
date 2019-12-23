@@ -1,9 +1,10 @@
-package io.lacuna.bifurcan.durable;
+package io.lacuna.bifurcan.durable.io;
 
 import io.lacuna.bifurcan.DurableInput;
 import io.lacuna.bifurcan.IEntry;
 import io.lacuna.bifurcan.IntMap;
 import io.lacuna.bifurcan.LinearList;
+import io.lacuna.bifurcan.durable.Util;
 import io.lacuna.bifurcan.durable.allocator.SlabAllocator.SlabBuffer;
 
 import java.nio.ByteBuffer;
@@ -43,6 +44,11 @@ public class MultiBufferInput implements DurableInput {
   }
 
   @Override
+  public Pool pool() {
+    return () -> this.duplicate().seek(0);
+  }
+
+  @Override
   public Slice bounds() {
     return bounds;
   }
@@ -54,7 +60,7 @@ public class MultiBufferInput implements DurableInput {
 
   @Override
   public DurableInput slice(long start, long end) {
-    if (start < 0 && end >= size()) {
+    if (start < 0 || end > size() || end < start) {
       throw new IllegalArgumentException(String.format("[%d, %d) is not within [0, %d)", start, end, size()));
     }
 
@@ -68,10 +74,6 @@ public class MultiBufferInput implements DurableInput {
     }
 
     IEntry<Long, SlabBuffer> l = buffers.floor(end);
-    if ((end - l.key()) > l.value().size()) {
-      System.out.println(l.value().bytes());
-      System.out.println(start + " " + end + " " + buffers.keys());
-    }
     SlabBuffer bl = l.value().slice(0, (int) (end - l.key()));
 
     LinearList<SlabBuffer> bufs =

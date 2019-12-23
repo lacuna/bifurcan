@@ -1,15 +1,13 @@
 package io.lacuna.bifurcan.durable;
 
 import io.lacuna.bifurcan.*;
+import io.lacuna.bifurcan.durable.io.DurableBuffer;
 import io.lacuna.bifurcan.utils.Iterators;
 
-import java.io.Closeable;
-import java.io.IOException;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 
 public class ChunkSort {
@@ -155,7 +153,7 @@ public class ChunkSort {
     return sortedEntries(
         entries,
         (it, out) -> io.lacuna.bifurcan.durable.blocks.List.encode(it, listEncoding, out),
-        in -> (Iterator<V>) io.lacuna.bifurcan.durable.blocks.List.decode(in, null, listEncoding).iterator(),
+        in -> (Iterator<V>) io.lacuna.bifurcan.durable.blocks.List.decode(in.pool(), null, listEncoding).iterator(),
         comparator,
         maxRealizedElements);
   }

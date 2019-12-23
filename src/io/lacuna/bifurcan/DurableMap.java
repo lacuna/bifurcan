@@ -1,8 +1,8 @@
 package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.durable.Dependencies;
-import io.lacuna.bifurcan.durable.FileOutput;
-import io.lacuna.bifurcan.durable.DurableBuffer;
+import io.lacuna.bifurcan.durable.io.FileOutput;
+import io.lacuna.bifurcan.durable.io.DurableBuffer;
 import io.lacuna.bifurcan.durable.blocks.*;
 import io.lacuna.bifurcan.utils.Iterators;
 
@@ -14,20 +14,20 @@ import java.util.function.ToIntFunction;
 public class DurableMap<K, V> implements IDurableCollection, IMap<K, V> {
   private final IDurableEncoding.Map encoding;
   private final Root root;
-  private final DurableInput bytes;
+  private final DurableInput.Pool bytes;
 
   private final long size;
   private final HashSkipTable hashTable;
   private final SkipTable indexTable;
-  private final DurableInput entries;
+  private final DurableInput.Pool entries;
 
   public DurableMap(
-      DurableInput bytes,
+      DurableInput.Pool bytes,
       Root root,
       long size,
       HashSkipTable hashTable,
       SkipTable indexTable,
-      DurableInput entries,
+      DurableInput.Pool entries,
       IDurableEncoding.Map encoding) {
     this.bytes = bytes;
     this.root = root;
@@ -46,8 +46,8 @@ public class DurableMap<K, V> implements IDurableCollection, IMap<K, V> {
     HashMap.encodeSortedEntries(HashMap.sortEntries(entries, encoding, maxRealizedEntries), encoding, out);
   }
 
-  public static <K, V> DurableMap<K, V> decode(DurableInput in, Root root, IDurableEncoding.Map encoding) {
-    return HashMap.decode(in, root, encoding);
+  public static <K, V> DurableMap<K, V> decode(DurableInput.Pool pool, Root root, IDurableEncoding.Map encoding) {
+    return HashMap.decode(pool, root, encoding);
   }
 
   public static <K, V> DurableMap<K, V> from(Iterator<IEntry<K, V>> entries, IDurableEncoding.Map encoding, Path directory, int maxRealizedEntries) {
@@ -65,15 +65,15 @@ public class DurableMap<K, V> implements IDurableCollection, IMap<K, V> {
   }
 
   private Iterator<HashMapEntries> chunkedEntries(long offset) {
-    DurableInput in = entries.duplicate().seek(offset);
+    DurableInput in = entries.instance().seek(offset);
     return Iterators.from(
         () -> in.remaining() > 0,
         () -> HashMapEntries.decode(in, root, encoding));
   }
 
   @Override
-  public DurableInput bytes() {
-    return bytes.duplicate();
+  public DurableInput.Pool bytes() {
+    return bytes();
   }
 
   @Override

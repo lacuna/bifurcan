@@ -3,7 +3,7 @@ package io.lacuna.bifurcan.durable.blocks;
 import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.durable.BlockPrefix;
 import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
-import io.lacuna.bifurcan.durable.DurableBuffer;
+import io.lacuna.bifurcan.durable.io.DurableBuffer;
 import io.lacuna.bifurcan.durable.Util;
 
 import java.util.Iterator;
@@ -50,8 +50,8 @@ public class List {
     });
   }
 
-  public static DurableList decode(DurableInput in, IDurableCollection.Root root, IDurableEncoding.List encoding) {
-    DurableInput bytes = in.duplicate();
+  public static DurableList decode(DurableInput.Pool pool, IDurableCollection.Root root, IDurableEncoding.List encoding) {
+    DurableInput in = pool.instance();
 
     BlockPrefix prefix = in.readPrefix();
     assert (prefix.type == BlockType.LIST);
@@ -62,12 +62,12 @@ public class List {
 
     SkipTable skipTable = null;
     if (skipTableTiers > 0) {
-      skipTable = new SkipTable(in.sliceBlock(BlockType.TABLE), skipTableTiers);
+      skipTable = new SkipTable(in.sliceBlock(BlockType.TABLE).pool(), skipTableTiers);
     }
 
-    DurableInput elements = in.sliceBytes((pos + prefix.length) - in.position());
+    DurableInput.Pool elements = in.sliceBytes((pos + prefix.length) - in.position()).pool();
 
-    return new DurableList(bytes, root, size, skipTable, elements, encoding);
+    return new DurableList(pool, root, size, skipTable, elements, encoding);
   }
 
 

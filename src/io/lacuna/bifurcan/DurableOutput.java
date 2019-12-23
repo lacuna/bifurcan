@@ -1,7 +1,8 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.durable.ByteChannelOutput;
+import io.lacuna.bifurcan.durable.io.ByteChannelOutput;
 import io.lacuna.bifurcan.durable.Util;
+import io.lacuna.bifurcan.durable.allocator.SlabAllocator;
 
 import java.io.*;
 import java.nio.ByteBuffer;
@@ -93,7 +94,9 @@ public interface DurableOutput extends DataOutput, Flushable, Closeable, AutoClo
     writeByte((byte) (v ? 0x1 : 0x0));
   }
 
-  void transferFrom(DurableInput in, long bytes);
+  void transferFrom(DurableInput in);
+
+  void append(Iterable<SlabAllocator.SlabBuffer> buffers);
 
   default OutputStream asOutputStream() {
     return new OutputStream() {

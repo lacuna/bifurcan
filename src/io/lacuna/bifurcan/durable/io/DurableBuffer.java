@@ -1,8 +1,10 @@
-package io.lacuna.bifurcan.durable;
+package io.lacuna.bifurcan.durable.io;
 
 import io.lacuna.bifurcan.DurableInput;
 import io.lacuna.bifurcan.DurableOutput;
 import io.lacuna.bifurcan.LinearList;
+import io.lacuna.bifurcan.durable.BlockPrefix;
+import io.lacuna.bifurcan.durable.Util;
 import io.lacuna.bifurcan.durable.allocator.SlabAllocator;
 import io.lacuna.bifurcan.durable.allocator.SlabAllocator.SlabBuffer;
 
@@ -48,10 +50,7 @@ public class DurableBuffer implements DurableOutput {
    */
   public void flushTo(DurableOutput out) {
     close();
-    for (SlabBuffer b : flushed) {
-      out.write(b.bytes());
-      b.release();
-    }
+    out.append(flushed);
   }
 
   public DurableInput toInput() {
@@ -75,8 +74,7 @@ public class DurableBuffer implements DurableOutput {
   public void close() {
     if (isOpen) {
       isOpen = false;
-      flushedBytes += bytes.position();
-      flushed.addLast(curr.trim(bytes.position()));
+      flushCurrentBuffer(true);
       bytes = null;
     }
   }
@@ -103,10 +101,24 @@ public class DurableBuffer implements DurableOutput {
   }
 
   @Override
-  public void transferFrom(DurableInput in, long numBytes) {
-    while (numBytes > 0) {
-      numBytes -= in.read(this.bytes);
-      ensureCapacity((int) Math.min(numBytes, Integer.MAX_VALUE));
+  public void transferFrom(DurableInput in) {
+    while (in.hasRemaining()) {
+      in.read(this.bytes);
+      ensureCapacity((int) Math.min(in.remaining(), Integer.MAX_VALUE));
+    }
+  }
+
+  @Override
+  public void append(Iterable<SlabBuffer> buffers) {
+    long size = Util.size(buffers);
+    if (size > (16 << 10)) {
+      flushCurrentBuffer(false);
+      buffers.forEach(flushed::addLast);
+    } else {
+      for (SlabBuffer b : buffers) {
+        write(b.bytes());
+        b.release();
+      }
     }
   }
 
@@ -147,23 +159,29 @@ public class DurableBuffer implements DurableOutput {
 
   //
 
-  private static final int MIN_BUFFER_SIZE = 1 << 10;
+  private static final int MIN_BUFFER_SIZE = 4 << 10;
   private static final int MAX_BUFFER_SIZE = 64 << 20;
 
   private int bufferSize() {
-    return curr == null ? MIN_BUFFER_SIZE : Math.min(MAX_BUFFER_SIZE, curr.size() * 2);
+    return curr == null ? MIN_BUFFER_SIZE : (int) Math.min(MAX_BUFFER_SIZE, written() / 4);
   }
 
   private SlabBuffer allocate(int n) {
     return SlabAllocator.allocate(n, useCachedAllocator);
   }
 
+  private void flushCurrentBuffer(boolean isClosed) {
+    flushedBytes += bytes.position();
+    flushed.addLast(curr.trim(bytes.position()));
+    if (!isClosed) {
+      curr = allocate(bufferSize());
+      bytes = curr.bytes();
+    }
+  }
+
   private ByteBuffer ensureCapacity(int n) {
     if (n > bytes.remaining()) {
-      flushedBytes += bytes.position();
-      flushed.addLast(curr.trim(bytes.position()));
-      curr = allocate(Math.max(bufferSize(), n));
-      bytes = curr.bytes();
+      flushCurrentBuffer(false);
     }
     return bytes;
   }

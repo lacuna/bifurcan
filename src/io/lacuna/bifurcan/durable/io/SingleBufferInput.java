@@ -1,6 +1,7 @@
-package io.lacuna.bifurcan.durable;
+package io.lacuna.bifurcan.durable.io;
 
 import io.lacuna.bifurcan.DurableInput;
+import io.lacuna.bifurcan.durable.Util;
 import io.lacuna.bifurcan.durable.allocator.SlabAllocator.SlabBuffer;
 
 import java.nio.ByteBuffer;
@@ -18,13 +19,18 @@ public class SingleBufferInput implements DurableInput {
   }
 
   @Override
+  public Pool pool() {
+    return () -> this.duplicate().seek(0);
+  }
+
+  @Override
   public Slice bounds() {
     return bounds;
   }
 
   @Override
   public DurableInput slice(long start, long end) {
-    if (start < 0 && end >= size()) {
+    if (start < 0 || end > size() || end < start) {
       throw new IllegalArgumentException(String.format("[%d, %d) is not within [0, %d)", start, end, size()));
     }
 
