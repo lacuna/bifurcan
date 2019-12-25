@@ -47,6 +47,21 @@
 
 (RocksDB/loadLibrary)
 
+;;;
+
+(defn clear-directory [dir]
+  (.mkdirs (io/file dir))
+  (sh/sh "rm" "-rf" dir))
+
+(defn directory-size [dir]
+  (-> (sh/sh "du" "-k" (str dir "/"))
+    :out
+    bs/to-line-seq
+    last
+    (str/split #"\t")
+    first
+    read-string))
+
 ;;; RocksDB
 
 (defn rdb-open [dir create?]
@@ -216,7 +231,7 @@
   (doseq [k keys]
     (get-fn db (hashed-key k))))
 
-(defn benchmark-db [db get-fn scan-fn put-fn flush-fn sizes]
+(defn benchmark-db [name dir db get-fn scan-fn put-fn flush-fn sizes]
   (into
     (sorted-map)
     (zipmap
@@ -225,13 +240,15 @@
         (partition 2 1)
         (map
           (fn [[a b]]
+            (prn name b)
             ;; we write 8 byte keys + 1016 byte values so each entry is exactly 1kb
             (let [write      (io-stats (populate! db put-fn flush-fn (range a b) 1016))
                   sequential (io-stats (scan-fn db))
                   random     (io-stats (random-reads db get-fn (range b)))]
               {:write      (scale-stats write (- b a))
                :random     (scale-stats random b)
-               :sequential (scale-stats sequential b)})))))))
+               :sequential (scale-stats sequential b)
+               :size-kbs   (directory-size dir)})))))))
 
 ;;;
 
@@ -287,62 +304,83 @@
     (.toPath (io/file dir))
     1e5))
 
-(defn benchmark-bifurcan [sizes]
-  (into
-    (sorted-map)
-    (zipmap
-      (map #(/ % (Math/pow 2 20)) sizes)
-      (->> (cons 0 sizes)
-        (map
-          (fn [n]
-            (let [m          (atom nil)
-                  write      (io-stats
-                               (reset! m
-                                 (create-hash-map "/tmp/bifurcan" n 1016)))
-                  sequential (io-stats
-                               (doit [e @m]
-                                 e))
-                  random     (io-stats
-                               (dotimes [i n]
-                                 (.get @m (->durable-input (hashed-key i)))))]
-              [n {:write write, :random random, :sequential sequential}])))
-               (partition 2 1)
-               (map
-                 (fn [[[a m-a] [b m-b]]]
-                   {:write      (scale-stats (merge-with - (:write m-b) (:write m-a)) (- b a))
-                    :random     (scale-stats (:random m-b) b)
-                    :sequential (scale-stats (:sequential m-b) b)}))))))
+(defn benchmark-bifurcan [dir sizes]
+  (clear-directory dir)
+  (try
+    (into
+     (sorted-map)
+     (zipmap
+       (map #(/ % (Math/pow 2 20)) sizes)
+       (->> (cons 0 sizes)
+         (map
+           (fn [n]
+             (prn 'bifurcan n)
+             (let [m          (atom nil)
+                   write      (io-stats
+                                (reset! m
+                                  (create-hash-map dir n 1016)))
+                   sequential (io-stats
+                                (doit [e @m]
+                                  e))
+                   random     (io-stats
+                                (dotimes [i n]
+                                  (.get @m (->durable-input (hashed-key i)))))]
+               [n {:write      write
+                   :random     random
+                   :sequential sequential
+                   :size-kbs   (directory-size dir)}])))
+         (partition 2 1)
+         (map
+           (fn [[[a m-a] [b m-b]]]
+             {:write      (scale-stats (merge-with - (:write m-b) (:write m-a)) (- b a))
+              :random     (scale-stats (:random m-b) b)
+              :sequential (scale-stats (:sequential m-b) b)
+              :size-kbs   (:size-kbs m-b)})))))
+    (finally
+      (clear-directory dir))))
 
 ;;;
 
-(defn benchmark-databases [n log-steps]
-  (sh/sh "rm" "-rf" "/tmp/rocks" "/tmp/bdb" "/tmp/bifurcan")
-  (let [sizes (->> (u/log-steps n 2 log-steps)
-                (drop (* 20 log-steps))
-                (map long))
-        rdb   (rdb-open "/tmp/rocks" true)
-        bdb   (bdb-open "/tmp/bdb" true)]
-    (prn sizes)
+(defn benchmark-rocks [dir sizes]
+  (clear-directory dir)
+  (let [rdb (rdb-open dir true)]
     (try
-      {:rocksdb  (comment
-                   (benchmark-db
-                     rdb
-                     rdb-get
-                     rdb-scan
-                     rdb-put!
-                     rdb-flush!
-                     sizes))
-       :bdb      (comment
-                   (benchmark-db
-                     bdb
-                     bdb-get
-                     bdb-scan
-                     bdb-put!
-                     bdb-flush!
-                     sizes))
-       :bifurcan (benchmark-bifurcan
-                   sizes)}
+      (benchmark-db
+        'rocks
+        dir
+        rdb
+        rdb-get
+        rdb-scan
+        rdb-put!
+        rdb-flush!
+        sizes)
       (finally
         (.close rdb)
+        (clear-directory dir)))))
+
+(defn benchmark-berkeley [dir sizes]
+  (clear-directory dir)
+  (let [bdb (bdb-open dir true)]
+    (try
+      (benchmark-db
+        'berkeley
+        dir
+        bdb
+        bdb-get
+        bdb-scan
+        bdb-put!
+        bdb-flush!
+        sizes)
+      (finally
         (.close bdb)
-        (-> bdb .getEnvironment .close)))))
+        (-> bdb .getEnvironment .close)
+        (clear-directory dir)))))
+
+(defn benchmark-databases [n log-steps]
+  (let [sizes (->> (u/log-steps n 2 log-steps)
+                (drop (* 20 log-steps))
+                (map long))]
+    (prn sizes)
+    {:rocksdb  (benchmark-rocks "/tmp/rocks" sizes)
+     :bdb      (benchmark-berkeley "tmp/bdb" sizes)
+     :bifurcan (benchmark-bifurcan "/tmp/bifurcan" sizes)}))

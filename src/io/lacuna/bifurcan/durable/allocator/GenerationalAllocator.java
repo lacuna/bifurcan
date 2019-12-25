@@ -19,7 +19,7 @@ public class GenerationalAllocator {
   public static final int SPILL_THRESHOLD = 1 << 20;
   private static final int TRIM_THRESHOLD = 1 << 30;
   private static final int MIN_ALLOCATION_SIZE = 1 << 10;
-  private static final int BUFFER_SIZE = 1 << 30;
+  private static final int BUFFER_SIZE = 256 << 20;
 
   private static class FileBuffer implements IBuffer {
 
@@ -170,11 +170,11 @@ public class GenerationalAllocator {
       spilled.remove(b.start);
       long end = end();
 //      System.out.println("freeing " + (b.size() / (1 << 20)));
-      if ((fileSize - end) >= TRIM_THRESHOLD) {
-//        System.out.println("truncating " + (end / (1 << 20)));
-        channel.truncate(end);
-        fileSize = end;
-      }
+//      if ((fileSize - end) >= TRIM_THRESHOLD) {
+////        System.out.println("truncating " + (end / (1 << 20)));
+//        channel.truncate(end);
+//        fileSize = end;
+//      }
     }
 
     MemoryBuffer allocate(int bytes) {
