@@ -76,6 +76,8 @@ public class ByteChannelInput implements DurableInput {
 
   @Override
   public void readFully(byte[] b, int off, int len) throws EOFException {
+    assert (len < remaining());
+
     preRead();
     if (len <= channel.remainingBuffer()) {
       channel.buffer.get(b, off, len);
@@ -93,11 +95,15 @@ public class ByteChannelInput implements DurableInput {
   @Override
   public int read(ByteBuffer dst) {
     preRead();
-    int n = Util.transfer(channel.buffer, dst);
-    if (dst.hasRemaining()) {
-      n += channel.read(dst);
+
+    ByteBuffer trimmed = Util.slice(dst, 0, remaining());
+    int n = Util.transfer(channel.buffer, trimmed);
+    if (trimmed.hasRemaining()) {
+      n += Math.max(0, channel.read(trimmed));
     }
+
     position += n;
+    dst.position(dst.position() + n);
     return n;
   }
 

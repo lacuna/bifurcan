@@ -10,9 +10,10 @@ import java.nio.channels.WritableByteChannel;
 public class BufferedChannel {
   private static final int DEFAULT_BUFFER_SIZE = 4 << 10;
 
-  final FileChannel channel;
-  final ByteBuffer buffer;
-  final long size;
+  private final FileChannel channel;
+
+  public final ByteBuffer buffer;
+  public final long size;
 
   private long channelPosition, bufferOriginPosition;
 

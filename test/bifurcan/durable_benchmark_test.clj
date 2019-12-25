@@ -238,7 +238,7 @@
 (def binary-encoding
   (DurableEncodings/primitive
     "binary"
-    4
+    2
     (u/->to-int-fn
       (fn [^DurableInput in]
         (PerlHash/hash 0 (.duplicate in))))
@@ -285,7 +285,7 @@
       binary-encoding
       binary-encoding)
     (.toPath (io/file dir))
-    1e3))
+    1e5))
 
 (defn benchmark-bifurcan [sizes]
   (into
