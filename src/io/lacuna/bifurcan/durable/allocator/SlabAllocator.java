@@ -1,12 +1,16 @@
 package io.lacuna.bifurcan.durable.allocator;
 
+import io.lacuna.bifurcan.DurableInput;
 import io.lacuna.bifurcan.Set;
+import io.lacuna.bifurcan.durable.Util;
 import io.lacuna.bifurcan.durable.allocator.IAllocator.Range;
+import io.lacuna.bifurcan.durable.io.BufferInput;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
+import java.nio.channels.WritableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
 import java.util.concurrent.ConcurrentLinkedDeque;
@@ -106,7 +110,7 @@ public class SlabAllocator {
       Range r = allocator.acquire(bytes);
       return r == null
           ? null
-          : new SlabBuffer(this, r, ((ByteBuffer) buffer.duplicate().position((int) r.start).limit((int) r.end)).slice());
+          : new SlabBuffer(this, r, Util.slice(buffer, r.start, r.end));
     }
 
     void release(Range range) {
@@ -117,13 +121,13 @@ public class SlabAllocator {
     }
   }
 
-  public static class SlabBuffer {
+  public static class SlabBuffer implements IBuffer {
     private Range range;
     private final Slab slab;
     private final ByteBuffer bytes;
 
     public SlabBuffer(Slab slab, Range range, ByteBuffer bytes) {
-      assert(bytes.capacity() == bytes.remaining());
+      assert (bytes.capacity() == bytes.remaining());
       this.slab = slab;
       this.range = range;
       this.bytes = bytes;
@@ -135,30 +139,40 @@ public class SlabAllocator {
       this.bytes = bytes;
     }
 
-    public int size() {
+    public long size() {
       return bytes.remaining();
     }
 
+    @Override
+    public DurableInput toInput() {
+      return new BufferInput(bytes());
+    }
+
+    @Override
+    public void transferTo(WritableByteChannel target) {
+      try {
+        target.write(bytes());
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }
+
     public ByteBuffer bytes() {
-      return bytes.duplicate();
+      return Util.duplicate(bytes);
     }
 
     public SlabBuffer slice(int start, int end) {
       if (start < 0 || end > size() || end < start) {
         throw new IllegalArgumentException(String.format("[%d, %d) is not within [0, %d)", start, end, size()));
       }
-      return new SlabBuffer(((ByteBuffer) bytes().position(start).limit(end)).slice());
+      return new SlabBuffer(Util.slice(bytes(), start, end));
     }
 
-    public SlabBuffer trim(int length) {
-      return length == size() ? this : new SlabBuffer(slab, range, ((ByteBuffer) bytes().limit(length)).slice());
+    public SlabBuffer close(int length) {
+      return length == size() ? this : new SlabBuffer(slab, range, Util.slice(bytes(), 0, length));
     }
 
-    public SlabBuffer duplicate() {
-      return new SlabBuffer(bytes);
-    }
-
-    public void release() {
+    public void free() {
       if (range != null) {
         slab.release(range);
         range = null;
@@ -209,7 +223,7 @@ public class SlabAllocator {
   public static SlabBuffer allocate(int bytes, boolean useCachedAllocator) {
     return useCachedAllocator
         ? ALLOCATOR.get().allocate(bytes)
-        : new SlabBuffer(ByteBuffer.allocateDirect(bytes).order(ByteOrder.BIG_ENDIAN));
+        : new SlabBuffer(Util.allocate(bytes));
   }
 
   public static long acquiredBytes() {

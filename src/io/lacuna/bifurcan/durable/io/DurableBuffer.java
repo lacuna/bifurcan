@@ -3,32 +3,30 @@ package io.lacuna.bifurcan.durable.io;
 import io.lacuna.bifurcan.DurableInput;
 import io.lacuna.bifurcan.DurableOutput;
 import io.lacuna.bifurcan.LinearList;
+import io.lacuna.bifurcan.Lists;
 import io.lacuna.bifurcan.durable.BlockPrefix;
 import io.lacuna.bifurcan.durable.Util;
+import io.lacuna.bifurcan.durable.allocator.GenerationalAllocator;
+import io.lacuna.bifurcan.durable.allocator.IBuffer;
 import io.lacuna.bifurcan.durable.allocator.SlabAllocator;
-import io.lacuna.bifurcan.durable.allocator.SlabAllocator.SlabBuffer;
 
 import java.nio.ByteBuffer;
+import java.util.Iterator;
 import java.util.function.Consumer;
 
 public class DurableBuffer implements DurableOutput {
 
-  private final LinearList<SlabBuffer> flushed = new LinearList<>();
+  private static final int BUFFER_MERGE_THRESHOLD = GenerationalAllocator.SPILL_THRESHOLD;
+
+  private final LinearList<IBuffer> flushed = new LinearList<>();
   private long flushedBytes = 0;
 
-  private SlabBuffer curr;
+  private IBuffer curr;
   private ByteBuffer bytes;
 
   private boolean isOpen = true;
 
-  private final boolean useCachedAllocator;
-
   public DurableBuffer() {
-    this(true);
-  }
-
-  public DurableBuffer(boolean useCachedAllocator) {
-    this.useCachedAllocator = useCachedAllocator;
     this.curr = allocate(bufferSize());
     this.bytes = curr.bytes();
   }
@@ -55,19 +53,19 @@ public class DurableBuffer implements DurableOutput {
 
   public DurableInput toInput() {
     close();
-    return DurableInput.from(flushed);
+    return DurableInput.from(flushed.stream().map(IBuffer::toInput).collect(Lists.linearCollector()));
   }
 
   public void flushTo(DurableOutput out, BlockPrefix.BlockType type) {
     close();
-    BlockPrefix p = new BlockPrefix(Util.size(flushed), type);
+    BlockPrefix p = new BlockPrefix(written(), type);
     p.encode(out);
     flushTo(out);
   }
 
   public void free() {
     close();
-    flushed.forEach(SlabBuffer::release);
+    flushed.forEach(IBuffer::free);
   }
 
   @Override
@@ -109,15 +107,17 @@ public class DurableBuffer implements DurableOutput {
   }
 
   @Override
-  public void append(Iterable<SlabBuffer> buffers) {
-    long size = Util.size(buffers);
-    if (size > (16 << 10)) {
-      flushCurrentBuffer(false);
-      buffers.forEach(flushed::addLast);
-    } else {
-      for (SlabBuffer b : buffers) {
-        write(b.bytes());
-        b.release();
+  public void append(Iterable<IBuffer> buffers) {
+    Iterator<IBuffer> it = buffers.iterator();
+    while (it.hasNext()) {
+      IBuffer buf = it.next();
+      if (buf.size() < BUFFER_MERGE_THRESHOLD) {
+        transferFrom(buf.toInput());
+        buf.free();
+      } else {
+        flushCurrentBuffer(false);
+        appendBuffer(buf);
+        it.forEachRemaining(this::appendBuffer);
       }
     }
   }
@@ -160,19 +160,24 @@ public class DurableBuffer implements DurableOutput {
   //
 
   private static final int MIN_BUFFER_SIZE = 4 << 10;
-  private static final int MAX_BUFFER_SIZE = 64 << 20;
+  private static final int MAX_BUFFER_SIZE = 16 << 20;
 
   private int bufferSize() {
     return curr == null ? MIN_BUFFER_SIZE : (int) Math.min(MAX_BUFFER_SIZE, written() / 4);
   }
 
-  private SlabBuffer allocate(int n) {
-    return SlabAllocator.allocate(n, useCachedAllocator);
+  private IBuffer allocate(int n) {
+//    return SlabAllocator.allocate(n);
+    return GenerationalAllocator.allocate(n);
+  }
+
+  private void appendBuffer(IBuffer b) {
+    flushedBytes += b.size();
+    flushed.addLast(b);
   }
 
   private void flushCurrentBuffer(boolean isClosed) {
-    flushedBytes += bytes.position();
-    flushed.addLast(curr.trim(bytes.position()));
+    appendBuffer(curr.close(bytes.position()));
     if (!isClosed) {
       curr = allocate(bufferSize());
       bytes = curr.bytes();

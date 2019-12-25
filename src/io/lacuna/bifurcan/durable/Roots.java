@@ -4,6 +4,7 @@ import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.IDurableCollection.Fingerprint;
 import io.lacuna.bifurcan.IDurableCollection.Root;
 import io.lacuna.bifurcan.durable.allocator.SlabAllocator.SlabBuffer;
+import io.lacuna.bifurcan.durable.io.BufferedChannel;
 import io.lacuna.bifurcan.durable.io.ByteChannelInput;
 import io.lacuna.bifurcan.durable.io.FileOutput;
 import io.lacuna.bifurcan.utils.Functions;
@@ -30,8 +31,8 @@ public class Roots {
 
   private static Root open(Path path, Function<Fingerprint, Root> roots) {
     try {
-      FileChannel fc = FileChannel.open(path, StandardOpenOption.READ);
-      DurableInput file = new ByteChannelInput(fc);
+      BufferedChannel channel = new BufferedChannel(FileChannel.open(path, StandardOpenOption.READ));
+      DurableInput file = new ByteChannelInput(channel);
 
       // check magic bytes
       ByteBuffer magicBytes = FileOutput.MAGIC_BYTES.duplicate();

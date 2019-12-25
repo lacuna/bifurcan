@@ -2,6 +2,7 @@ package io.lacuna.bifurcan.durable;
 
 import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
+import io.lacuna.bifurcan.durable.allocator.IBuffer;
 import io.lacuna.bifurcan.durable.allocator.SlabAllocator.SlabBuffer;
 import io.lacuna.bifurcan.durable.blocks.HashMap;
 import io.lacuna.bifurcan.durable.blocks.List;
@@ -10,6 +11,7 @@ import io.lacuna.bifurcan.utils.Bits;
 import io.lacuna.bifurcan.utils.Iterators;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.Charset;
 import java.util.Comparator;
 import java.util.Iterator;
@@ -97,6 +99,17 @@ public class Util {
     }
   }
 
+  public static ByteBuffer slice(ByteBuffer b, long start, long end) {
+    return ((ByteBuffer) b.duplicate().position((int) start).limit((int) end)).slice().order(ByteOrder.BIG_ENDIAN);
+  }
+
+  public static ByteBuffer allocate(int n) {
+    return ByteBuffer.allocateDirect(n).order(ByteOrder.BIG_ENDIAN);
+  }
+
+  public static ByteBuffer duplicate(ByteBuffer b) {
+    return b.duplicate().order(ByteOrder.BIG_ENDIAN);
+  }
 
   public static void encodePrimitives(IList<Object> os, IDurableEncoding.Primitive encoding, DurableOutput out) {
     DurableBuffer.flushTo(out, BlockType.PRIMITIVE, acc -> encoding.encode(os, acc));
@@ -142,7 +155,7 @@ public class Util {
         }
         return List.decode(pool, root, (IDurableEncoding.List) encoding);
       default:
-        throw new IllegalArgumentException("Unexpected block type: " + prefix.type.name());
+        throw new IllegalArgumentException("Unexpected collection block type: " + prefix.type.name());
     }
   }
 
@@ -159,14 +172,6 @@ public class Util {
     } else {
       return Iterators.skippable(Iterators.singleton(decodeCollection(prefix, root, encoding, in.pool())));
     }
-  }
-
-  public static long size(Iterable<SlabBuffer> bufs) {
-    long size = 0;
-    for (SlabBuffer b : bufs) {
-      size += b.size();
-    }
-    return size;
   }
 
   public static void writeVLQ(long val, DurableOutput out) {

@@ -5,42 +5,41 @@ import io.lacuna.bifurcan.IEntry;
 import io.lacuna.bifurcan.IntMap;
 import io.lacuna.bifurcan.LinearList;
 import io.lacuna.bifurcan.durable.Util;
-import io.lacuna.bifurcan.durable.allocator.SlabAllocator.SlabBuffer;
 
 import java.nio.ByteBuffer;
 
-public class MultiBufferInput implements DurableInput {
+public class ConcatInput implements DurableInput {
 
-  private static final ThreadLocal<ByteBuffer> SCRATCH_BUFFER = ThreadLocal.withInitial(() -> ByteBuffer.allocateDirect(8));
+  private static final ThreadLocal<ByteBuffer> SCRATCH_BUFFER = ThreadLocal.withInitial(() -> Util.allocate(8));
 
   private final Slice bounds;
-  private final IntMap<SlabBuffer> buffers;
+  private final IntMap<DurableInput> inputs;
   private final long size;
 
   private long offset = 0;
-  private ByteBuffer curr;
+  private DurableInput curr;
 
-  private MultiBufferInput(IntMap<SlabBuffer> buffers, Slice bounds, long position, long size) {
+  private ConcatInput(IntMap<DurableInput> inputs, Slice bounds, long position, long size) {
     this.bounds = bounds;
-    this.buffers = buffers;
+    this.inputs = inputs;
     this.size = size;
     seek(position);
   }
 
-  public MultiBufferInput(Iterable<SlabBuffer> buffers, Slice bounds) {
-    IntMap<SlabBuffer> m = new IntMap<SlabBuffer>().linear();
+  public ConcatInput(Iterable<DurableInput> inputs, Slice bounds) {
+    IntMap<DurableInput> m = new IntMap<DurableInput>().linear();
 
     long size = 0;
-    for (SlabBuffer b : buffers) {
-      m.put(size, b);
-      size += b.size();
+    for (DurableInput in : inputs) {
+      m.put(size, in);
+      size += in.size();
     }
     assert (size == bounds.size());
 
     this.bounds = bounds;
     this.size = size;
-    this.buffers = m.forked();
-    this.curr = this.buffers.first().value().bytes();
+    this.inputs = m.forked();
+    this.curr = this.inputs.first().value().duplicate();
   }
 
   @Override
@@ -55,33 +54,44 @@ public class MultiBufferInput implements DurableInput {
 
   @Override
   public DurableInput duplicate() {
-    return new MultiBufferInput(buffers, bounds, position(), size);
+    return new ConcatInput(inputs, bounds, position(), size);
   }
 
   @Override
   public DurableInput slice(long start, long end) {
     if (start < 0 || end > size() || end < start) {
+      for (IEntry<Long, DurableInput> e : inputs) {
+        System.out.println(e.key() + " " + e.value() + " " + e.value().size());
+      }
+      System.out.println(bounds);
       throw new IllegalArgumentException(String.format("[%d, %d) is not within [0, %d)", start, end, size()));
     }
 
     long length = end - start;
     Slice bounds = new Slice(this.bounds, start, end);
 
-    IEntry<Long, SlabBuffer> f = buffers.floor(start);
-    SlabBuffer bf = f.value().slice((int) (start - f.key()), f.value().size());
-    if (length <= bf.size()) {
-      return new SingleBufferInput(bf.slice(0, (int) length), bounds);
+    IEntry<Long, DurableInput> fe = inputs.floor(start);
+    DurableInput f = fe.value().slice(start - fe.key(), fe.value().size());
+    if (length <= f.remaining()) {
+      return f.sliceBytes(length);
     }
 
-    IEntry<Long, SlabBuffer> l = buffers.floor(end);
-    SlabBuffer bl = l.value().slice(0, (int) (end - l.key()));
+    IEntry<Long, DurableInput> le = inputs.floor(end - 1);
+    DurableInput l = le.value().slice(0, end - le.key());
 
-    LinearList<SlabBuffer> bufs =
-        LinearList.from(buffers.slice(f.key() + bf.size(), l.key() - 1).values())
-            .addFirst(bf)
-            .addLast(bl);
+    LinearList<DurableInput> bufs =
+        LinearList.from(inputs.slice(fe.key() + f.remaining(), le.key() - 1).values())
+            .addFirst(f)
+            .addLast(l);
 
-    return new MultiBufferInput(bufs, bounds);
+    return new ConcatInput(bufs, bounds);
+  }
+
+  @Override
+  public void close() {
+    if (bounds.parent == null) {
+      inputs.values().forEach(DurableInput::close);
+    }
   }
 
   @Override
@@ -108,15 +118,10 @@ public class MultiBufferInput implements DurableInput {
       if (curr.remaining() == 0) {
         updateCurr(position());
       }
-      Util.transfer(curr, dst);
+      curr.read(dst);
     }
 
     return dst.position() - pos;
-  }
-
-  @Override
-  public void close() {
-    buffers.values().forEach(SlabBuffer::release);
   }
 
   @Override
@@ -124,49 +129,52 @@ public class MultiBufferInput implements DurableInput {
     if (curr.remaining() == 0) {
       updateCurr(position());
     }
-    byte b = curr.get();
-    return b;
+    return curr.readByte();
   }
 
   @Override
   public short readShort() {
-    return readableBuffer(2).getShort();
+    return readableInput(2).readShort();
   }
 
   @Override
   public char readChar() {
-    return readableBuffer(2).getChar();
+    return readableInput(2).readChar();
   }
 
   @Override
   public int readInt() {
-    return readableBuffer(4).getInt();
+    return readableInput(4).readInt();
   }
 
   @Override
   public long readLong() {
-    return readableBuffer(8).getLong();
+    return readableInput(8).readLong();
   }
 
   @Override
   public float readFloat() {
-    return readableBuffer(4).getFloat();
+    return readableInput(4).readFloat();
   }
 
   @Override
   public double readDouble() {
-    return readableBuffer(8).getDouble();
+    return readableInput(8).readDouble();
   }
 
   ///
 
-  private void updateCurr(long position) {
-    IEntry<Long, SlabBuffer> e = buffers.floor(position);
-    offset = e.key();
-    curr = (ByteBuffer) e.value().bytes().position((int) (position - offset));
+  private static ByteBuffer slice(ByteBuffer buf, int start, int end) {
+    return ((ByteBuffer) buf.position(start).limit(end)).slice();
   }
 
-  private ByteBuffer readableBuffer(int bytes) {
+  private void updateCurr(long position) {
+    IEntry<Long, DurableInput> e = inputs.floor(position);
+    offset = e.key();
+    curr = e.value().duplicate().seek(position - offset);
+  }
+
+  private DurableInput readableInput(int bytes) {
     if (curr.remaining() >= bytes) {
       return curr;
     } else {
@@ -174,7 +182,7 @@ public class MultiBufferInput implements DurableInput {
       for (int i = 0; i < bytes; i++) {
         buf.put(readByte());
       }
-      return (ByteBuffer) buf.flip();
+      return new BufferInput((ByteBuffer) buf.flip(), null, null);
     }
   }
 

@@ -2,20 +2,34 @@ package io.lacuna.bifurcan.durable.io;
 
 import io.lacuna.bifurcan.DurableInput;
 import io.lacuna.bifurcan.durable.Util;
-import io.lacuna.bifurcan.durable.allocator.SlabAllocator.SlabBuffer;
 
 import java.nio.ByteBuffer;
 
-public class SingleBufferInput implements DurableInput {
+public class BufferInput implements DurableInput {
 
-  private final SlabBuffer buffer;
-  private final ByteBuffer bytes;
+  private final ByteBuffer buffer;
   private final Slice bounds;
+  private final Runnable closeFn;
 
-  public SingleBufferInput(SlabBuffer buffer, Slice bounds) {
+  public BufferInput(ByteBuffer buffer) {
+    this(buffer, new Slice(null, 0, buffer.remaining()), null);
+  }
+
+  public BufferInput(ByteBuffer buffer, Runnable closeFn) {
+    this(buffer, new Slice(null, 0, buffer.remaining()), closeFn);
+  }
+
+  public BufferInput(ByteBuffer buffer, Slice bounds, Runnable closeFn) {
     this.buffer = buffer;
-    this.bytes = buffer.bytes();
     this.bounds = bounds;
+    this.closeFn = closeFn;
+  }
+
+  @Override
+  public void close() {
+    if (closeFn != null) {
+      closeFn.run();
+    }
   }
 
   @Override
@@ -34,74 +48,67 @@ public class SingleBufferInput implements DurableInput {
       throw new IllegalArgumentException(String.format("[%d, %d) is not within [0, %d)", start, end, size()));
     }
 
-    return new SingleBufferInput(
-        buffer.slice((int) start, (int) end),
-        new Slice(bounds, start, end));
+    return new BufferInput(Util.slice(buffer, start, end), new Slice(bounds, start, end), null);
   }
 
   @Override
   public DurableInput duplicate() {
-    return new SingleBufferInput(buffer.duplicate(), bounds);
+    return new BufferInput(buffer, bounds, closeFn);
   }
 
   @Override
   public DurableInput seek(long position) {
-    bytes.position((int) position);
+    buffer.position((int) position);
     return this;
   }
 
   @Override
   public long remaining() {
-    return bytes.remaining();
+    return buffer.remaining();
   }
 
   @Override
   public long position() {
-    return bytes.position();
+    return buffer.position();
   }
 
   @Override
   public int read(ByteBuffer dst) {
-    return Util.transfer(bytes, dst);
-  }
-
-  @Override
-  public void close() {
-    buffer.release();
+    return Util.transfer(buffer, dst);
   }
 
   @Override
   public byte readByte() {
-    return bytes.get();
+    return buffer.get();
   }
 
   @Override
   public short readShort() {
-    return bytes.getShort();
+    return buffer.getShort();
   }
 
   @Override
   public char readChar() {
-    return bytes.getChar();
+    return buffer.getChar();
   }
 
   @Override
   public int readInt() {
-    return bytes.getInt();
+    return buffer.getInt();
   }
 
   @Override
   public long readLong() {
-    return bytes.getLong();
+    return buffer.getLong();
   }
 
   @Override
   public float readFloat() {
-    return bytes.getFloat();
+    return buffer.getFloat();
   }
 
   @Override
   public double readDouble() {
-    return bytes.getDouble();
+    return buffer.getDouble();
   }
 }

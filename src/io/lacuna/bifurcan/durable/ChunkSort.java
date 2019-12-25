@@ -62,7 +62,7 @@ public class ChunkSort {
     }
   }
 
-  public static class Accumulator<T> {
+  private static class Accumulator<T> {
 
     private final BiConsumer<Iterator<T>, DurableOutput> encode;
     private final Function<DurableInput, Iterator<T>> decode;
@@ -152,8 +152,8 @@ public class ChunkSort {
       int maxRealizedElements) {
     return sortedEntries(
         entries,
-        (it, out) -> io.lacuna.bifurcan.durable.blocks.List.encode(it, listEncoding, out),
-        in -> (Iterator<V>) io.lacuna.bifurcan.durable.blocks.List.decode(in.pool(), null, listEncoding).iterator(),
+        (it, out) -> DurableList.encode(it, listEncoding, out),
+        in -> (Iterator<V>) DurableList.decode(in.pool(), null, listEncoding).iterator(),
         comparator,
         maxRealizedElements);
   }

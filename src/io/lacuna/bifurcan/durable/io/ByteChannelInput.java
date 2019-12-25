@@ -4,102 +4,30 @@ import io.lacuna.bifurcan.DurableInput;
 import io.lacuna.bifurcan.durable.Util;
 
 import java.io.EOFException;
-import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.channels.SeekableByteChannel;
 
 public class ByteChannelInput implements DurableInput {
-
-  private static class Reader {
-    final SeekableByteChannel channel;
-    final ByteBuffer buffer;
-    final long size;
-
-    private long channelPosition, bufferOriginPosition;
-
-    public Reader(SeekableByteChannel channel, int bufferSize) {
-      this.channel = channel;
-      this.buffer = ByteBuffer.allocateDirect(bufferSize).order(ByteOrder.BIG_ENDIAN);
-
-      try {
-        this.size = channel.size();
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-
-      this.buffer.limit(0);
-      this.channelPosition = 0;
-      this.bufferOriginPosition = 0;
-    }
-
-    private int bufferRemaining() {
-      return buffer.remaining();
-    }
-
-    public long position() {
-      return bufferOriginPosition + buffer.position();
-    }
-
-    /**
-     * Updates the buffer such that it reflects the current position.
-     */
-    public void seek(long position) {
-     if (position >= bufferOriginPosition && position < (bufferOriginPosition + buffer.limit())) {
-        buffer.position((int) (position - bufferOriginPosition));
-
-        // the position doesn't fall within the current buffer, so just empty it
-      } else {
-        buffer.position(0).limit(0);
-        bufferOriginPosition = position;
-      }
-    }
-
-    /**
-     * Reads directly from the file into the buffer.
-     */
-    public int read(ByteBuffer buf) {
-      try {
-        if (position() != channelPosition) {
-          channel.position(position());
-        }
-
-        int bytes = Math.max(0, channel.read(buf));
-        if (bytes < 0) {
-          throw new EOFException();
-        }
-        channelPosition += bytes;
-        return bytes;
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }
-
-    /**
-     * Fills the remainder of the buffer from the file.
-     */
-    public int readToBuffer() {
-      bufferOriginPosition += buffer.position();
-      buffer.compact().limit(buffer.capacity());
-      int bytes = read(buffer);
-      buffer.flip();
-      return bytes;
-    }
-  }
-
-  private final Reader reader;
+  private final BufferedChannel channel;
   private final Slice bounds;
+  private final Runnable closeFn;
+
   private long position;
 
-  public ByteChannelInput(SeekableByteChannel channel) {
-    this.reader = new Reader(channel, 4 << 10);
-    this.bounds = new Slice(null, 0, reader.size);
+  public ByteChannelInput(BufferedChannel channel) {
+    this(channel, null);
+  }
+
+  public ByteChannelInput(BufferedChannel channel, Runnable closeFn) {
+    this.channel = channel;
+    this.bounds = new Slice(null, 0, this.channel.size);
+    this.closeFn = closeFn;
     this.position = 0;
   }
 
-  private ByteChannelInput(Reader reader, Slice bounds, long position) {
-    this.reader = reader;
+  private ByteChannelInput(BufferedChannel channel, Slice bounds, Runnable closeFn, long position) {
+    this.channel = channel;
     this.bounds = bounds;
+    this.closeFn = closeFn;
     this.position = position;
   }
 
@@ -110,7 +38,14 @@ public class ByteChannelInput implements DurableInput {
 
   @Override
   public DurableInput slice(long start, long end) {
-    return new ByteChannelInput(reader, new Slice(bounds, start, end), 0);
+    return new ByteChannelInput(channel, new Slice(bounds, start, end), null, 0);
+  }
+
+  @Override
+  public void close() {
+    if (closeFn != null) {
+      closeFn.run();
+    }
   }
 
   @Override
@@ -120,7 +55,7 @@ public class ByteChannelInput implements DurableInput {
 
   @Override
   public DurableInput duplicate() {
-    return new ByteChannelInput(reader, bounds, position);
+    return new ByteChannelInput(channel, bounds, closeFn, position);
   }
 
   @Override
@@ -140,18 +75,14 @@ public class ByteChannelInput implements DurableInput {
   }
 
   @Override
-  public void close() {
-  }
-
-  @Override
   public void readFully(byte[] b, int off, int len) throws EOFException {
     preRead();
-    if (len <= reader.bufferRemaining()) {
-      reader.buffer.get(b, off, len);
+    if (len <= channel.remainingBuffer()) {
+      channel.buffer.get(b, off, len);
     } else {
       ByteBuffer tmp = ByteBuffer.wrap(b, off, len);
-      tmp.put(reader.buffer);
-      reader.read(tmp);
+      tmp.put(channel.buffer);
+      channel.read(tmp);
       if (tmp.hasRemaining()) {
         throw new EOFException();
       }
@@ -162,9 +93,9 @@ public class ByteChannelInput implements DurableInput {
   @Override
   public int read(ByteBuffer dst) {
     preRead();
-    int n = Util.transfer(reader.buffer, dst);
+    int n = Util.transfer(channel.buffer, dst);
     if (dst.hasRemaining()) {
-      n += reader.read(dst);
+      n += channel.read(dst);
     }
     position += n;
     return n;
@@ -185,43 +116,43 @@ public class ByteChannelInput implements DurableInput {
   @Override
   public byte readByte() {
     preRead(1);
-    return reader.buffer.get();
+    return channel.buffer.get();
   }
 
   @Override
   public short readShort() {
     preRead(2);
-    return reader.buffer.getShort();
+    return channel.buffer.getShort();
   }
 
   @Override
   public char readChar() {
     preRead(2);
-    return reader.buffer.getChar();
+    return channel.buffer.getChar();
   }
 
   @Override
   public int readInt() {
     preRead(4);
-    return reader.buffer.getInt();
+    return channel.buffer.getInt();
   }
 
   @Override
   public long readLong() {
     preRead(8);
-    return reader.buffer.getLong();
+    return channel.buffer.getLong();
   }
 
   @Override
   public float readFloat() {
     preRead(4);
-    return reader.buffer.getFloat();
+    return channel.buffer.getFloat();
   }
 
   @Override
   public double readDouble() {
     preRead(8);
-    return reader.buffer.getDouble();
+    return channel.buffer.getDouble();
   }
 
   ///
@@ -231,8 +162,8 @@ public class ByteChannelInput implements DurableInput {
    */
   private void preRead() {
     long absolutePosition = bounds.absolute().start + position;
-    if (reader.position() != absolutePosition) {
-      reader.seek(absolutePosition);
+    if (channel.position() != absolutePosition) {
+      channel.seek(absolutePosition);
     }
   }
 
@@ -241,8 +172,8 @@ public class ByteChannelInput implements DurableInput {
    */
   private void preRead(int bytes) {
     preRead();
-    if (reader.bufferRemaining() < bytes) {
-      reader.readToBuffer();
+    if (channel.remainingBuffer() < bytes) {
+      channel.readToBuffer();
     }
     position += bytes;
   }

@@ -43,7 +43,7 @@
                        "-XX:+UseG1GC"
                        "-XX:-OmitStackTraceInFastThrow"
                        "-ea:io.lacuna..."
-                       "-Xmx4g"
+                       "-Xmx8g"
 
                        #_"-XX:+UnlockDiagnosticVMOptions"
                        #_"-XX:+PrintAssembly"

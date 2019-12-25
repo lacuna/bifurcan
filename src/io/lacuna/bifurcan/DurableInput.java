@@ -1,9 +1,9 @@
 package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.durable.*;
-import io.lacuna.bifurcan.durable.allocator.SlabAllocator.SlabBuffer;
-import io.lacuna.bifurcan.durable.io.MultiBufferInput;
-import io.lacuna.bifurcan.durable.io.SingleBufferInput;
+import io.lacuna.bifurcan.durable.allocator.IBuffer;
+import io.lacuna.bifurcan.durable.io.BufferInput;
+import io.lacuna.bifurcan.durable.io.ConcatInput;
 import io.lacuna.bifurcan.utils.Iterators;
 
 import java.io.*;
@@ -53,16 +53,12 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
     }
   }
 
-  static DurableInput from(SlabBuffer buffer) {
-    return from(() -> Iterators.singleton(buffer));
-  }
-
-  static DurableInput from(Iterable<SlabBuffer> buffers) {
-    Iterator<SlabBuffer> it = buffers.iterator();
-    SlabBuffer buf = it.next();
+  static DurableInput from(Iterable<DurableInput> inputs) {
+    Iterator<DurableInput> it = inputs.iterator();
+    DurableInput in = it.next();
     return it.hasNext()
-        ? new MultiBufferInput(buffers, new Slice(null, 0, Util.size(buffers)))
-        : new SingleBufferInput(buf, new Slice(null, 0, buf.size()));
+        ? new ConcatInput(inputs, new Slice(null, 0, Iterators.toStream(inputs.iterator()).mapToLong(DurableInput::size).sum()))
+        : in;
   }
 
   DurableInput slice(long start, long end);
@@ -77,7 +73,7 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
     long pos = position();
     BlockPrefix prefix = readPrefix();
     if (prefix.type != type) {
-      throw new IllegalStateException("expected " + type + " at " + pos + ", got " + prefix.type + " in " + bounds());
+      throw new IllegalStateException(String.format("expected %s at %d, got %s in %s", type, pos, prefix.type, bounds()));
     }
     return sliceBytes(prefix.length);
   }
@@ -89,6 +85,8 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
     seek(start);
     return sliceBytes(end - start);
   }
+
+  void close();
 
   default String hexBytes() {
     return Util.toHexTable(this.duplicate().seek(0));
@@ -115,8 +113,6 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
   }
 
   int read(ByteBuffer dst);
-
-  void close();
 
   default void readFully(byte[] b) throws EOFException {
     readFully(b, 0, b.length);
@@ -239,7 +235,6 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
 
       @Override
       public void close() {
-        in.close();
       }
 
       @Override

@@ -2,15 +2,15 @@ package io.lacuna.bifurcan.durable.io;
 
 import io.lacuna.bifurcan.DurableInput;
 import io.lacuna.bifurcan.DurableOutput;
-import io.lacuna.bifurcan.durable.allocator.SlabAllocator.SlabBuffer;
+import io.lacuna.bifurcan.durable.Util;
+import io.lacuna.bifurcan.durable.allocator.IBuffer;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.nio.channels.WritableByteChannel;
 import java.util.function.Consumer;
-
-import static io.lacuna.bifurcan.durable.allocator.SlabAllocator.allocate;
 
 /**
  * @author ztellman
@@ -18,7 +18,6 @@ import static io.lacuna.bifurcan.durable.allocator.SlabAllocator.allocate;
 public class ByteChannelOutput implements DurableOutput {
 
   private final WritableByteChannel channel;
-  private final SlabBuffer bufferHandle;
   private final ByteBuffer buffer;
   private long position;
 
@@ -28,14 +27,13 @@ public class ByteChannelOutput implements DurableOutput {
 
   public ByteChannelOutput(WritableByteChannel channel, int bufferSize) {
     this.channel = channel;
-    this.bufferHandle = allocate(bufferSize);
-    this.buffer = bufferHandle.bytes();
+    this.buffer = Util.allocate(bufferSize);
   }
 
   public static void wrap(WritableByteChannel channel, Consumer<ByteChannelOutput> body) {
     ByteChannelOutput out = new ByteChannelOutput(channel);
     body.accept(out);
-    out.free();
+    out.flush();
   }
 
   ///
@@ -52,15 +50,11 @@ public class ByteChannelOutput implements DurableOutput {
   }
 
   @Override
-  public void append(Iterable<SlabBuffer> buffers) {
+  public void append(Iterable<IBuffer> buffers) {
     flush();
-    try {
-      for (SlabBuffer b : buffers) {
-        channel.write(b.bytes());
-        b.release();
-      }
-    } catch (IOException e) {
-      throw new RuntimeException(e);
+    for (IBuffer b : buffers) {
+      b.transferTo(channel);
+      b.free();
     }
   }
 
@@ -84,14 +78,9 @@ public class ByteChannelOutput implements DurableOutput {
     }
   }
 
-  public void free() {
-    flush();
-    bufferHandle.release();
-  }
-
   @Override
   public void close() {
-    free();
+    flush();
 
     try {
       if (channel instanceof FileChannel) {

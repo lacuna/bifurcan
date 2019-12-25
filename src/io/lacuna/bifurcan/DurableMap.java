@@ -131,7 +131,16 @@ public class DurableMap<K, V> implements IDurableCollection, IMap<K, V> {
   }
 
   @Override
-  public DurableMap<K,V> clone() {
+  public Iterator<IEntry<K, V>> iterator() {
+    return Iterators.flatMap(
+        chunkedEntries(0),
+        chunk -> Iterators.map(
+            chunk.entries(0),
+            e -> IEntry.of((K) e.key(), (V) e.value())));
+  }
+
+  @Override
+  public DurableMap<K, V> clone() {
     return this;
   }
 

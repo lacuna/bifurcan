@@ -17,6 +17,8 @@
    [io.lacuna.bifurcan.durable.allocator
     SlabAllocator
     SlabAllocator$SlabBuffer]
+   [io.lacuna.bifurcan.durable.io
+    BufferInput]
    [io.lacuna.bifurcan
     IEntry
     DurableInput
@@ -236,7 +238,7 @@
 (def binary-encoding
   (DurableEncodings/primitive
     "binary"
-    3
+    4
     (u/->to-int-fn
       (fn [^DurableInput in]
         (PerlHash/hash 0 (.duplicate in))))
@@ -252,16 +254,15 @@
     (DurableEncodings$Codec/undelimited
       (u/->bi-consumer
         (fn [^DurableInput in ^DurableOutput out]
-          (.transferFrom out in)))
+          (.transferFrom out (-> in .duplicate (.seek 0)))))
       (u/->bi-fn
         (fn [^DurableInput in root]
           in)))))
 
 (defn ->durable-input [^bytes ary]
-  (DurableInput/from
-    (SlabAllocator$SlabBuffer.
-      (ByteBuffer/wrap
-        ary))))
+  (BufferInput.
+    (ByteBuffer/wrap
+      ary)))
 
 (defn open-hash-map [file]
   (DurableMap/open
@@ -284,7 +285,7 @@
       binary-encoding
       binary-encoding)
     (.toPath (io/file dir))
-    1e5))
+    1e3))
 
 (defn benchmark-bifurcan [sizes]
   (into
