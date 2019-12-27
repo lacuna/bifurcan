@@ -10,5 +10,5 @@
     e/find-tests
     (remove #(-> % meta (contains? :benchmark)))
     (#(e/run-tests % #_{:report eftest.report.pretty/report, :capture-output? false}))
-    (#(if (= (:test %) (:pass %)) 0 1))
+    (#(if (pos? (:fail %)) 1 0))
     System/exit))
