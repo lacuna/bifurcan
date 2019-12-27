@@ -359,6 +359,17 @@ public class ListNodes {
 
       Node[] stack = new Node[(shift - node.shift) / SHIFT_INCREMENT];
       stack[0] = this;
+      if (stack.length > 1 && stack[0].numNodes == 0) {
+	// The existing tree is empty beneath Node this.  We need to
+	// create a path of new nodes from node 'this' to the new one
+	// 'node'.
+        for (int i = stack.length - 1; i >= 0; i--) {
+	  Node n = from(editor, shift - i * SHIFT_INCREMENT,
+                        (i == stack.length - 1) ? node : stack[i+1]);
+	  stack[i] = n;
+        }
+	return stack[0];
+      }
       for (int i = 1; i < stack.length; i++) {
         Node n = stack[i - 1];
         stack[i] = (Node) n.nodes[n.numNodes - 1];
@@ -471,7 +482,7 @@ public class ListNodes {
 
           // shift everything left
           n.numNodes--;
-          if (n.numNodes == 1 && n.shift > SHIFT_INCREMENT) {
+          if (i == 0 && n.numNodes == 1 && n.shift > SHIFT_INCREMENT) {
             return (Node) n.nodes[1];
           }
 
@@ -514,7 +525,7 @@ public class ListNodes {
 
           // lop off the rightmost node
           n.numNodes--;
-          if (n.numNodes == 1 && n.shift > SHIFT_INCREMENT) {
+          if (i == 0 && n.numNodes == 1 && n.shift > SHIFT_INCREMENT) {
             return (Node) n.nodes[0];
           }
 
