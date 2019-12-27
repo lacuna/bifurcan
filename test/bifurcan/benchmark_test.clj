@@ -1269,6 +1269,7 @@
                            nil))
                        descriptor)]
 
+      (io/make-parents "benchmarks/data/benchmarks.edn")
       (spit "benchmarks/data/benchmarks.edn" (pr-str descriptor))
 
       (write-out-csvs descriptor)))
