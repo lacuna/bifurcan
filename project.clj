@@ -38,7 +38,8 @@
                                      [com.sleepycat/je "18.3.12"]
                                      ]}}
   :aliases {"partest"   ["run" "-m" "bifurcan.run-tests"]
-            "benchmark" ["run" "-m" "bifurcan.benchmark-test" "benchmark"]}
+            "benchmark" ["run" "-m" "bifurcan.benchmark-test" "benchmark"]
+            "help-benchmark" ["run" "-m" "bifurcan.benchmark-test" "help"]}
   :jvm-opts ^:replace ["-server"
                        "-XX:+UseG1GC"
                        "-XX:-OmitStackTraceInFastThrow"
