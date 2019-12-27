@@ -12,7 +12,7 @@
                    :benchmark :benchmark
                    :stress    :stress
                    :all       (constantly true)}
-  :profiles {:travis {:jvm-opts ^:replace ["-server" "-Xmx1g"]}
+  :profiles {:travis {:jvm-opts ^:replace ["-server" "-Xmx2g"]}
              :bench  {:jvm-opts ^:replace ["-server" "-Xmx10g" #_"-XX:+UseParallelGC"]}
              :dev    {:dependencies [;; for tests
                                      [org.clojure/clojure "1.10.0"]
