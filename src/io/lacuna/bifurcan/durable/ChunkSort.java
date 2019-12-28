@@ -153,7 +153,7 @@ public class ChunkSort {
     return sortedEntries(
         entries,
         (it, out) -> DurableList.encode(it, listEncoding, out),
-        in -> (Iterator<V>) DurableList.decode(in.pool(), null, listEncoding).iterator(),
+        in -> (Iterator<V>) DurableList.decode(listEncoding, null, in.pool()).iterator(),
         comparator,
         maxRealizedElements);
   }

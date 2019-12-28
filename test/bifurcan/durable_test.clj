@@ -187,7 +187,7 @@
     (let [out (DurableBuffer.)
           _   (DurableMap/encode (-> ^IMap m .entries .iterator) edn-encoding 10 out)
           in  (.toInput out)
-          m'  (DurableMap/decode (.pool in) nil edn-encoding)]
+          m'  (DurableMap/decode edn-encoding nil (.pool in))]
       (try
         (and
           (= m m')
@@ -204,7 +204,7 @@
     (let [out (DurableBuffer.)
           _   (DurableList/encode (.iterator ^Iterable l) edn-encoding out)
           in  (.toInput out)
-          l'  (DurableList/decode (.pool in) nil edn-encoding)]
+          l'  (DurableList/decode edn-encoding nil (.pool in))]
       (and
         (= l l')
         (free! in)))))

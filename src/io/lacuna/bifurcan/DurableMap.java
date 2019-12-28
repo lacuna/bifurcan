@@ -46,7 +46,7 @@ public class DurableMap<K, V> implements IDurableCollection, IMap<K, V> {
     HashMap.encodeSortedEntries(HashMap.sortEntries(entries, encoding, maxRealizedEntries), encoding, out);
   }
 
-  public static <K, V> DurableMap<K, V> decode(DurableInput.Pool pool, Root root, IDurableEncoding.Map encoding) {
+  public static <K, V> DurableMap<K, V> decode(IDurableEncoding.Map encoding, Root root, DurableInput.Pool pool ) {
     return HashMap.decode(encoding, root, pool);
   }
 

@@ -53,7 +53,7 @@ public class DurableList<V> implements IDurableCollection, IList<V> {
     List.encode(elements, encoding, out);
   }
 
-  public static <V> DurableList<V> decode(IDurableEncoding.List encoding, DurableInput.Pool pool, Root root) {
+  public static <V> DurableList<V> decode(IDurableEncoding.List encoding, Root root, DurableInput.Pool pool) {
     return List.decode(encoding, root, pool);
   }
 
