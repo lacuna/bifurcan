@@ -1,5 +1,6 @@
 package io.lacuna.bifurcan;
 
+import io.lacuna.bifurcan.durable.Bytes;
 import io.lacuna.bifurcan.durable.Util;
 
 import java.nio.ByteBuffer;
@@ -11,11 +12,11 @@ public interface IDurableCollection {
     byte[] binary();
 
     default String toHexString() {
-      return Util.toHexString(ByteBuffer.wrap(binary()));
+      return Bytes.toHexString(ByteBuffer.wrap(binary()));
     }
 
     default int compareTo(Fingerprint o) {
-      return Util.compareBuffers(
+      return Bytes.compareBuffers(
           ByteBuffer.wrap(binary()),
           ByteBuffer.wrap(o.binary()));
     }

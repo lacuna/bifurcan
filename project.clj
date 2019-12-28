@@ -16,13 +16,13 @@
              :bench  {:jvm-opts ^:replace ["-server" "-Xmx10g" #_"-XX:+UseParallelGC"]}
              :dev    {:dependencies [;; for tests
                                      [org.clojure/clojure "1.10.0"]
-                                     [org.clojure/test.check "0.9.0"]
+                                     [org.clojure/test.check "0.10.0"]
                                      [criterium "0.4.5"]
                                      [potemkin "0.4.5"]
                                      [proteus "0.1.6"]
                                      [byte-streams "0.2.4"]
                                      [byte-transforms "0.1.4"]
-                                     [eftest "0.5.8"]
+                                     [eftest "0.5.9"]
                                      [virgil "0.1.9"]
 
                                      ;; for comparative in-memory benchmarks
@@ -37,9 +37,11 @@
                                      [org.rocksdb/rocksdbjni "6.4.6"]
                                      [com.sleepycat/je "18.3.12"]
                                      ]}}
-  :aliases {"partest"   ["run" "-m" "bifurcan.run-tests"]
-            "benchmark" ["run" "-m" "bifurcan.benchmark-test" "benchmark"]
-            "help-benchmark" ["run" "-m" "bifurcan.benchmark-test" "help"]}
+  :aliases {"partest"              ["run" "-m" "bifurcan.run-tests"]
+            "benchmark"            ["run" "-m" "bifurcan.benchmark-test" "benchmark"]
+            "benchmark-collection" ["run" "-m" "bifurcan.benchmark-test" "benchmark-collection"]
+            "benchmark-databases"  ["run" "-m" "bifurcan.durable-benchmark-test" "benchmark"]
+            "benchmark-help"       ["run" "-m" "bifurcan.benchmark-test" "help"]}
   :jvm-opts ^:replace ["-server"
                        "-XX:+UseG1GC"
                        "-XX:-OmitStackTraceInFastThrow"

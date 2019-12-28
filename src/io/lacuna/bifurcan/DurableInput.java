@@ -12,8 +12,14 @@ import java.util.Iterator;
 
 public interface DurableInput extends DataInput, Closeable, AutoCloseable {
 
+  int DEFAULT_BUFFER_SIZE = 4 << 10;
+
   interface Pool {
-    DurableInput instance();
+    default DurableInput instance() {
+      return instance(DEFAULT_BUFFER_SIZE);
+    }
+
+    DurableInput instance(int bufferSize);
   }
 
   class Slice {
@@ -89,7 +95,7 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
   void close();
 
   default String hexBytes() {
-    return Util.toHexTable(this.duplicate().seek(0));
+    return Bytes.toHexTable(this.duplicate().seek(0));
   }
 
   Slice bounds();

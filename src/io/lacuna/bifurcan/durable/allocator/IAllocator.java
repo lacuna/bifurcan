@@ -44,6 +44,8 @@ public interface IAllocator {
 
   boolean isAcquired();
 
+  long acquired();
+
   Iterable<Range> available();
 
 }

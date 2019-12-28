@@ -1,14 +1,10 @@
 package io.lacuna.bifurcan.durable.io;
 
-import io.lacuna.bifurcan.DurableInput;
-import io.lacuna.bifurcan.DurableOutput;
-import io.lacuna.bifurcan.LinearList;
-import io.lacuna.bifurcan.Lists;
+import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.durable.BlockPrefix;
-import io.lacuna.bifurcan.durable.Util;
+import io.lacuna.bifurcan.durable.Bytes;
 import io.lacuna.bifurcan.durable.allocator.GenerationalAllocator;
 import io.lacuna.bifurcan.durable.allocator.IBuffer;
-import io.lacuna.bifurcan.durable.allocator.SlabAllocator;
 
 import java.nio.ByteBuffer;
 import java.util.Iterator;
@@ -16,7 +12,7 @@ import java.util.function.Consumer;
 
 public class DurableBuffer implements DurableOutput {
 
-  private static final int BUFFER_MERGE_THRESHOLD = GenerationalAllocator.SPILL_THRESHOLD;
+  private static final int BUFFER_SPILL_THRESHOLD = 1 << 20;
 
   private final LinearList<IBuffer> flushed = new LinearList<>();
   private long flushedBytes = 0;
@@ -90,9 +86,9 @@ public class DurableBuffer implements DurableOutput {
   public int write(ByteBuffer src) {
     int n = src.remaining();
 
-    Util.transfer(src, bytes);
+    Bytes.transfer(src, bytes);
     while (src.remaining() > 0) {
-      Util.transfer(src, ensureCapacity(src.remaining()));
+      Bytes.transfer(src, ensureCapacity(src.remaining()));
     }
 
     return n;
@@ -111,7 +107,7 @@ public class DurableBuffer implements DurableOutput {
     Iterator<IBuffer> it = buffers.iterator();
     while (it.hasNext()) {
       IBuffer buf = it.next();
-      if (buf.size() < BUFFER_MERGE_THRESHOLD) {
+      if (!buf.isDurable()) {
         transferFrom(buf.toInput());
         buf.free();
       } else {
@@ -172,12 +168,18 @@ public class DurableBuffer implements DurableOutput {
   }
 
   private void appendBuffer(IBuffer b) {
-    flushedBytes += b.size();
-    flushed.addLast(b);
+    if (b.size() == 0) {
+      b.free();
+    } else {
+      flushedBytes += b.size();
+      flushed.addLast(b);
+    }
   }
 
   private void flushCurrentBuffer(boolean isClosed) {
-    appendBuffer(curr.close(bytes.position()));
+    int size = bytes.position();
+    boolean spill = size > 0 && (size >= BUFFER_SPILL_THRESHOLD || (flushed.size() > 0 && flushed.last().isDurable()));
+    appendBuffer(curr.close(size, spill));
     if (!isClosed) {
       curr = allocate(bufferSize());
       bytes = curr.bytes();

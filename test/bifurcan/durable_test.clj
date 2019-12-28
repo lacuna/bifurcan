@@ -26,7 +26,8 @@
     DurableEncodings
     DurableEncodings$Codec]
    [io.lacuna.bifurcan.durable.allocator
-    SlabAllocator]
+    SlabAllocator
+    GenerationalAllocator]
    [io.lacuna.bifurcan.hash
     PerlHash]
    [io.lacuna.bifurcan.durable.blocks
@@ -74,12 +75,16 @@
              (edn/read-string (String. ary "utf-8")))))))))
 
 (defn no-leaks? []
-  (zero? 0 #_(SlabAllocator/acquiredBytes)))
+  (and
+    (zero? (GenerationalAllocator/diskAllocations))
+    (zero? (GenerationalAllocator/memoryAllocations))))
 
 (defn free! [^DurableInput in]
   (.close in)
-  true
-  #_(assert (no-leaks?)))
+  (doto (no-leaks?)
+    (assert
+      (str "we have leaks! disk: " (GenerationalAllocator/diskAllocations)
+        " mem: " (GenerationalAllocator/memoryAllocations)))))
 
 ;;; Util
 
@@ -133,8 +138,8 @@
                   (.append writer index offset))
         out     (DurableBuffer.)
         _       (.flushTo writer out)
-        in      (-> out .toInput (.sliceBlock BlockPrefix$BlockType/TABLE))]
-    [in (SkipTable. (.pool in) (.tiers writer))]))
+        in      (-> out .toInput)]
+    [in (SkipTable. (-> in (.sliceBlock BlockPrefix$BlockType/TABLE) .pool) (.tiers writer))]))
 
 (defn print-skip-table [^DurableInput in]
   (->> (repeatedly #(when (pos? (.remaining in)) (.readVLQ in)))

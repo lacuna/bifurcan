@@ -83,11 +83,11 @@ public interface ICollection<C, V> extends Iterable<V> {
    * @param diffMergeThreshold TODO
    * @return a durable version of the data structure
    */
-  default C save(Path directory, IDurableEncoding encoding, double diffMergeThreshold) {
+  default C save(IDurableEncoding encoding, Path directory, double diffMergeThreshold) {
     throw new UnsupportedOperationException();
   }
 
-  default C save(Path directory, IDurableEncoding encoding) {
-    return save(directory, encoding, 1.0);
+  default C save(IDurableEncoding encoding, Path directory) {
+    return save(encoding, directory, 1.0);
   }
 }

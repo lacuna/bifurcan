@@ -2,6 +2,7 @@ package io.lacuna.bifurcan.durable.io;
 
 import io.lacuna.bifurcan.DurableInput;
 import io.lacuna.bifurcan.DurableOutput;
+import io.lacuna.bifurcan.durable.Bytes;
 import io.lacuna.bifurcan.durable.Util;
 import io.lacuna.bifurcan.durable.allocator.IBuffer;
 
@@ -27,7 +28,7 @@ public class ByteChannelOutput implements DurableOutput {
 
   public ByteChannelOutput(WritableByteChannel channel, int bufferSize) {
     this.channel = channel;
-    this.buffer = Util.allocate(bufferSize);
+    this.buffer = Bytes.allocate(bufferSize);
   }
 
   public static void wrap(WritableByteChannel channel, Consumer<ByteChannelOutput> body) {

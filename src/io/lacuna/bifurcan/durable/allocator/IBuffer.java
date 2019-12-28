@@ -12,9 +12,11 @@ public interface IBuffer {
 
   ByteBuffer bytes();
 
-  IBuffer close(int length);
+  IBuffer close(int length, boolean spill);
 
   void transferTo(WritableByteChannel target);
 
   void free();
+
+  boolean isDurable();
 }

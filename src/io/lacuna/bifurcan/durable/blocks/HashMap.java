@@ -158,7 +158,7 @@ public class HashMap {
 
   /// decoding
 
-  public static DurableMap decode(DurableInput.Pool pool, IDurableCollection.Root root, IDurableEncoding.Map encoding) {
+  public static DurableMap decode(IDurableEncoding.Map encoding, IDurableCollection.Root root, DurableInput.Pool pool) {
     DurableInput in = pool.instance();
 
     BlockPrefix prefix = in.readPrefix();

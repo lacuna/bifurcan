@@ -47,7 +47,7 @@ public class DurableMap<K, V> implements IDurableCollection, IMap<K, V> {
   }
 
   public static <K, V> DurableMap<K, V> decode(DurableInput.Pool pool, Root root, IDurableEncoding.Map encoding) {
-    return HashMap.decode(pool, root, encoding);
+    return HashMap.decode(encoding, root, pool);
   }
 
   public static <K, V> DurableMap<K, V> from(Iterator<IEntry<K, V>> entries, IDurableEncoding.Map encoding, Path directory, int maxRealizedEntries) {
@@ -65,6 +65,7 @@ public class DurableMap<K, V> implements IDurableCollection, IMap<K, V> {
   }
 
   private Iterator<HashMapEntries> chunkedEntries(long offset) {
+    // TODO: don't rely on this being realized on a single thread
     DurableInput in = entries.instance().seek(offset);
     return Iterators.from(
         () -> in.remaining() > 0,

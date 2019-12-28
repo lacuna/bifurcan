@@ -2,6 +2,7 @@ package io.lacuna.bifurcan.durable.allocator;
 
 import io.lacuna.bifurcan.DurableInput;
 import io.lacuna.bifurcan.Set;
+import io.lacuna.bifurcan.durable.Bytes;
 import io.lacuna.bifurcan.durable.Util;
 import io.lacuna.bifurcan.durable.allocator.IAllocator.Range;
 import io.lacuna.bifurcan.durable.io.BufferInput;
@@ -110,7 +111,7 @@ public class SlabAllocator {
       Range r = allocator.acquire(bytes);
       return r == null
           ? null
-          : new SlabBuffer(this, r, Util.slice(buffer, r.start, r.end));
+          : new SlabBuffer(this, r, Bytes.slice(buffer, r.start, r.end));
     }
 
     void release(Range range) {
@@ -158,18 +159,18 @@ public class SlabAllocator {
     }
 
     public ByteBuffer bytes() {
-      return Util.duplicate(bytes);
+      return Bytes.duplicate(bytes);
     }
 
     public SlabBuffer slice(int start, int end) {
       if (start < 0 || end > size() || end < start) {
         throw new IllegalArgumentException(String.format("[%d, %d) is not within [0, %d)", start, end, size()));
       }
-      return new SlabBuffer(Util.slice(bytes(), start, end));
+      return new SlabBuffer(Bytes.slice(bytes(), start, end));
     }
 
-    public SlabBuffer close(int length) {
-      return length == size() ? this : new SlabBuffer(slab, range, Util.slice(bytes(), 0, length));
+    public SlabBuffer close(int length, boolean spill) {
+      return length == size() ? this : new SlabBuffer(slab, range, Bytes.slice(bytes(), 0, length));
     }
 
     public void free() {
@@ -177,6 +178,11 @@ public class SlabAllocator {
         slab.release(range);
         range = null;
       }
+    }
+
+    @Override
+    public boolean isDurable() {
+      return false;
     }
   }
 
@@ -223,7 +229,7 @@ public class SlabAllocator {
   public static SlabBuffer allocate(int bytes, boolean useCachedAllocator) {
     return useCachedAllocator
         ? ALLOCATOR.get().allocate(bytes)
-        : new SlabBuffer(Util.allocate(bytes));
+        : new SlabBuffer(Bytes.allocate(bytes));
   }
 
   public static long acquiredBytes() {

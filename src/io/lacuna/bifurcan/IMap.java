@@ -289,7 +289,7 @@ public interface IMap<K, V> extends
   }
 
   @Override
-  default DurableMap<K, V> save(Path directory, IDurableEncoding encoding, double diffMergeThreshold) {
+  default DurableMap<K, V> save(IDurableEncoding encoding, Path directory, double diffMergeThreshold) {
     if (!(encoding instanceof IDurableEncoding.Map)) {
       throw new IllegalArgumentException(String.format("%s cannot be used to encode maps", encoding.description()));
     }

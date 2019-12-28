@@ -1,8 +1,11 @@
 package io.lacuna.bifurcan;
 
+import io.lacuna.bifurcan.durable.Dependencies;
 import io.lacuna.bifurcan.durable.Util;
 import io.lacuna.bifurcan.durable.blocks.List;
 import io.lacuna.bifurcan.durable.blocks.SkipTable;
+import io.lacuna.bifurcan.durable.io.DurableBuffer;
+import io.lacuna.bifurcan.durable.io.FileOutput;
 import io.lacuna.bifurcan.utils.Iterators;
 
 import java.nio.file.Path;
@@ -28,7 +31,21 @@ public class DurableList<V> implements IDurableCollection, IList<V> {
     this.encoding = encoding;
   }
 
-  public static <V> DurableList<V> open(Path path, IDurableEncoding.List encoding) {
+  public static <V> DurableList<V> open(IDurableEncoding.List encoding, Path path) {
+    return (DurableList<V>) DurableCollections.open(path, encoding);
+  }
+
+  public static <V> DurableList<V> from(Iterator<V> elements, IDurableEncoding.List encoding, Path directory) {
+    Dependencies.enter();
+    DurableBuffer acc = new DurableBuffer();
+    encode(elements, encoding, acc);
+
+    FileOutput file = new FileOutput(Dependencies.exit());
+    DurableOutput out = DurableOutput.from(file);
+    acc.flushTo(out);
+    out.close();
+
+    Path path = file.moveTo(directory);
     return (DurableList<V>) DurableCollections.open(path, encoding);
   }
 
@@ -36,8 +53,8 @@ public class DurableList<V> implements IDurableCollection, IList<V> {
     List.encode(elements, encoding, out);
   }
 
-  public static <V> DurableList<V> decode(DurableInput.Pool pool, Root root, IDurableEncoding.List encoding) {
-    return List.decode(pool, root, encoding);
+  public static <V> DurableList<V> decode(IDurableEncoding.List encoding, DurableInput.Pool pool, Root root) {
+    return List.decode(encoding, root, pool);
   }
 
   @Override

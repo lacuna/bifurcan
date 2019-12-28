@@ -1,7 +1,7 @@
 package io.lacuna.bifurcan.durable.io;
 
 import io.lacuna.bifurcan.DurableInput;
-import io.lacuna.bifurcan.durable.Util;
+import io.lacuna.bifurcan.durable.Bytes;
 
 import java.nio.ByteBuffer;
 
@@ -34,7 +34,7 @@ public class BufferInput implements DurableInput {
 
   @Override
   public Pool pool() {
-    return () -> this.duplicate().seek(0);
+    return bufferSize -> this.duplicate().seek(0);
   }
 
   @Override
@@ -48,12 +48,12 @@ public class BufferInput implements DurableInput {
       throw new IllegalArgumentException(String.format("[%d, %d) is not within [0, %d)", start, end, size()));
     }
 
-    return new BufferInput(Util.slice(buffer, start, end), new Slice(bounds, start, end), null);
+    return new BufferInput(Bytes.slice(buffer, start, end), new Slice(bounds, start, end), null);
   }
 
   @Override
   public DurableInput duplicate() {
-    return new BufferInput(buffer, bounds, closeFn);
+    return new BufferInput(Bytes.duplicate(buffer), bounds, closeFn);
   }
 
   @Override
@@ -74,7 +74,7 @@ public class BufferInput implements DurableInput {
 
   @Override
   public int read(ByteBuffer dst) {
-    return Util.transfer(buffer, dst);
+    return Bytes.transfer(buffer, dst);
   }
 
   @Override

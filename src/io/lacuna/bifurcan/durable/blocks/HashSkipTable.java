@@ -8,7 +8,7 @@ import java.util.stream.IntStream;
 
 public class HashSkipTable {
 
-  private static final long HASH_OFFSET = Integer.MAX_VALUE;
+  private static final long HASH_OFFSET = -((long) Integer.MIN_VALUE);
 
   public static class Entry {
     public static final HashSkipTable.Entry ORIGIN = new HashSkipTable.Entry(0, 0);
@@ -48,9 +48,13 @@ public class HashSkipTable {
     private final SkipTable.Writer table = new SkipTable.Writer();
 
     public void append(IntStream hashes, long offset) {
-      PrimitiveIterator.OfLong it = hashes.mapToLong(n -> (long) n + HASH_OFFSET).iterator();
+      int[] ary = hashes.toArray();
+      PrimitiveIterator.OfLong it = IntStream.of(ary).mapToLong(n -> ((long) n) + HASH_OFFSET).iterator();
       long h = it.nextLong();
-      assert (prevHash <= h);
+      if (prevHash > h) {
+        System.out.println(ary[0]);
+        throw new IllegalStateException(String.format("out-of-order hashes: %d > %d", prevHash, h));
+      }
 
       if (h != prevHash) {
         prevHash = h;

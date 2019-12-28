@@ -171,22 +171,12 @@ public interface IList<V> extends
   }
 
   @Override
-  default DurableList<V> save(Path directory, IDurableEncoding encoding, double diffMergeThreshold) {
+  default DurableList<V> save(IDurableEncoding encoding, Path directory, double diffMergeThreshold) {
     if (!(encoding instanceof IDurableEncoding.List)) {
       throw new IllegalArgumentException(String.format("%s cannot be used to encode lists", encoding.description()));
     }
 
-    Dependencies.enter();
-    DurableBuffer acc = new DurableBuffer();
-    List.encode(iterator(), (IDurableEncoding.List) encoding, acc);
-
-    FileOutput file = new FileOutput(Dependencies.exit());
-    DurableOutput out = DurableOutput.from(file);
-    acc.flushTo(out);
-    out.close();
-
-    Path path = file.moveTo(directory);
-    return (DurableList<V>) DurableCollections.open(path, encoding);
+    return DurableList.from(iterator(), (IDurableEncoding.List) encoding, directory);
   }
 
   @Override

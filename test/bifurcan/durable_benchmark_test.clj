@@ -15,21 +15,25 @@
    [java.util.concurrent
     ThreadLocalRandom]
    [io.lacuna.bifurcan.durable.allocator
+    GenerationalAllocator
     SlabAllocator
     SlabAllocator$SlabBuffer]
    [io.lacuna.bifurcan.durable.io
-    BufferInput]
+    BufferInput
+    DurableBuffer]
    [io.lacuna.bifurcan
     IEntry
     DurableInput
     DurableOutput
     IMap
+    IList
     Map
     DurableMap
+    DurableList
     DurableEncodings
     DurableEncodings$Codec]
    [io.lacuna.bifurcan.durable
-    Util]
+    Bytes]
    [io.lacuna.bifurcan.hash
     PerlHash]
    [com.sleepycat.je
@@ -203,10 +207,10 @@
 
 ;;; benchmarking
 
-(defn scale-stats [{:keys [kbs-read kbs-written duration]} factor]
-  {:read-amplification (when kbs-read (/ kbs-read factor))
-   :write-amplification (when kbs-written (/ kbs-written factor))
-   :duration duration})
+(defn scale-stats [{:keys [kbs-read kbs-written duration]} entries]
+  {:read-amplification (when kbs-read (/ kbs-read entries))
+   :write-amplification (when kbs-written (/ kbs-written entries))
+   :us-per-entry (* 1e6 (/ duration entries))})
 
 (defn hashed-key [n]
   (let [ary (byte-array 8)
@@ -227,28 +231,28 @@
     (put-fn db (hashed-key k) (rand-array val-size)))
   (flush-fn db))
 
-(defn random-reads [db get-fn keys]
-  (doseq [k keys]
-    (get-fn db (hashed-key k))))
+(defn random-reads [db get-fn n]
+  (dotimes [_ (/ n 10)]
+    (get-fn db (hashed-key (rand-int n)))))
 
 (defn benchmark-db [name dir db get-fn scan-fn put-fn flush-fn sizes]
-  (into
-    (sorted-map)
-    (zipmap
-      (map #(/ % (Math/pow 2 20)) sizes)
-      (->> (cons 0 sizes)
-        (partition 2 1)
-        (map
-          (fn [[a b]]
-            (prn name b)
-            ;; we write 8 byte keys + 1016 byte values so each entry is exactly 1kb
+  (zipmap
+    (map #(/ % (Math/pow 2 20)) sizes)
+    (->> (cons 0 sizes)
+      (partition 2 1)
+      (map
+        (fn [[a b]]
+          (prn name b)
+          ;; we write 8 byte keys + 1016 byte values so each entry is exactly 1kb
+          (time
             (let [write      (io-stats (populate! db put-fn flush-fn (range a b) 1016))
                   sequential (io-stats (scan-fn db))
-                  random     (io-stats (random-reads db get-fn (range b)))]
-              {:write      (scale-stats write (- b a))
-               :random     (scale-stats random b)
-               :sequential (scale-stats sequential b)
-               :size-kbs   (directory-size dir)})))))))
+                  random     (io-stats (random-reads db get-fn b))
+                  size       (directory-size dir)]
+              {:write                 (scale-stats write (- b a))
+               :random                (scale-stats random (/ b 10))
+               :sequential            (scale-stats sequential b)
+               :storage-amplification (/ (double size) b)})))))))
 
 ;;;
 
@@ -260,11 +264,11 @@
       (fn [^DurableInput in]
         (PerlHash/hash 0 (.duplicate in))))
     (u/->bi-predicate
-      (fn [a b]
-        (zero? (Util/compareInputs a b))))
+      (fn [^DurableInput a ^DurableInput b]
+        (zero? (Bytes/compareInputs a b))))
     (comparator
       (fn [a b]
-        (Util/compareInputs a b)))
+        (Bytes/compareInputs a b)))
     (u/->predicate
       (fn [_]
         false))
@@ -288,6 +292,13 @@
       binary-encoding
       binary-encoding)))
 
+(defn create-list [dir n val-size]
+  (.mkdirs (io/file dir))
+  (DurableList/from
+    (.iterator (repeatedly n #(->durable-input (rand-array val-size))))
+    (DurableEncodings/list binary-encoding)
+    (.toPath (io/file dir))))
+
 (defn create-hash-map [dir n val-size]
   (.mkdirs (io/file dir))
   (DurableMap/from
@@ -304,38 +315,41 @@
     (.toPath (io/file dir))
     1e5))
 
-(defn benchmark-bifurcan [dir sizes]
+(defn benchmark-bifurcan [dir sizes create-fn get-fn]
   (clear-directory dir)
   (try
-    (into
-     (sorted-map)
-     (zipmap
-       (map #(/ % (Math/pow 2 20)) sizes)
-       (->> (cons 0 sizes)
-         (map
-           (fn [n]
-             (prn 'bifurcan n)
-             (let [m          (atom nil)
-                   write      (io-stats
-                                (reset! m
-                                  (create-hash-map dir n 1016)))
-                   sequential (io-stats
-                                (doit [e @m]
-                                  e))
-                   random     (io-stats
-                                (dotimes [i n]
-                                  (.get @m (->durable-input (hashed-key i)))))]
-               [n {:write      write
-                   :random     random
-                   :sequential sequential
-                   :size-kbs   (directory-size dir)}])))
-         (partition 2 1)
-         (map
-           (fn [[[a m-a] [b m-b]]]
-             {:write      (scale-stats (merge-with - (:write m-b) (:write m-a)) (- b a))
-              :random     (scale-stats (:random m-b) b)
-              :sequential (scale-stats (:sequential m-b) b)
-              :size-kbs   (:size-kbs m-b)})))))
+    (zipmap
+      (map #(/ % (Math/pow 2 20)) sizes)
+      (->> (cons 0 sizes)
+        (map
+          (fn [n]
+            (prn 'bifurcan n)
+            (time
+              (let [m          (atom nil)
+                    write      (io-stats
+                                 (reset! m
+                                   (create-fn dir n)))
+                    sequential (io-stats
+                                 (doit [e @m]
+                                   e))
+                    random     (io-stats
+                                 (let [^IMap m @m]
+                                   (dotimes [_ (/ n 10)]
+                                     (get-fn m (rand-int n)))))
+                    size       (directory-size dir)]
+                (prn 'log-size (/ (GenerationalAllocator/logSize) (double (* 1024 1024 1024))))
+                (clear-directory dir)
+                [n {:write      write
+                    :random     random
+                    :sequential sequential
+                    :size-kbs   size}]))))
+        (partition 2 1)
+        (map
+          (fn [[[a m-a] [b m-b]]]
+            {:write                 (scale-stats (merge-with - (:write m-b) (:write m-a)) (- b a))
+             :random                (scale-stats (:random m-b) (/ b 10))
+             :sequential            (scale-stats (:sequential m-b) b)
+             :storage-amplification (/ (:size-kbs m-b) (double b))}))))
     (finally
       (clear-directory dir))))
 
@@ -343,7 +357,7 @@
 
 (defn benchmark-rocks [dir sizes]
   (clear-directory dir)
-  (let [rdb (rdb-open dir true)]
+  (let [^RocksDB rdb (rdb-open dir true)]
     (try
       (benchmark-db
         'rocks
@@ -360,7 +374,7 @@
 
 (defn benchmark-berkeley [dir sizes]
   (clear-directory dir)
-  (let [bdb (bdb-open dir true)]
+  (let [^Database bdb (bdb-open dir true)]
     (try
       (benchmark-db
         'berkeley
@@ -376,11 +390,107 @@
         (-> bdb .getEnvironment .close)
         (clear-directory dir)))))
 
-(defn benchmark-databases [n log-steps]
+(def benchmark-edn "benchmarks/data/durable.edn")
+
+(defn run-database-benchmarks [n log-steps]
   (let [sizes (->> (u/log-steps n 2 log-steps)
                 (drop (* 20 log-steps))
                 (map long))]
     (prn sizes)
-    {:rocksdb  (benchmark-rocks "/tmp/rocks" sizes)
-     :bdb      (benchmark-berkeley "tmp/bdb" sizes)
-     :bifurcan (benchmark-bifurcan "/tmp/bifurcan" sizes)}))
+    (io/make-parents benchmark-edn)
+    (spit
+      benchmark-edn
+      (pr-str
+        (merge-with
+          #(or %2 %1)
+          (try
+            (read-string (slurp benchmark-edn))
+            (catch Exception e
+              nil))
+          {"RocksDB"              (benchmark-rocks "/tmp/rocks" sizes)
+           "Berkeley DB"          (benchmark-berkeley "tmp/bdb" sizes)
+           "bifurcan.DurableMap"  (benchmark-bifurcan "/tmp/bifurcan" sizes
+                                    #(create-hash-map %1 %2 1016)
+                                    #(-> ^IMap %1
+                                       (.get (->durable-input (hashed-key %2)))
+                                       .get))
+           "bifurcan.DurableList" (benchmark-bifurcan "/tmp/bifurcan" sizes
+                                    #(create-list %1 %2 1016)
+                                    #(.nth ^IList %1 %2))})))))
+
+(def benchmark-csvs
+  {"durable_write_amplification"
+   (fn [db-data]
+     {" writes" (-> db-data :write :write-amplification)
+      " reads"  (-> db-data :write :read-amplification)})
+
+   "durable_write_duration"
+   (fn [db-data]
+     {"" (-> db-data :write :us-per-entry)})
+
+   "durable_random_read_amplification"
+   (fn [db-data]
+     {"" (-> db-data :random :read-amplification)})
+
+   "durable_random_read_duration"
+   (fn [db-data]
+     {"" (-> db-data :random :us-per-entry)})
+
+   "durable_sequential_read_amplification"
+   (fn [db-data]
+     {"" (-> db-data :sequential :read-amplification)})
+
+   "durable_sequential_read_duration"
+   (fn [db-data]
+     {"" (-> db-data :sequential :us-per-entry)})
+
+   "durable_storage_amplification"
+   (fn [db-data]
+     {"" (-> db-data :storage-amplification)})})
+
+(defn generate-csvs []
+  (let [data  (read-string (slurp benchmark-edn))
+        dbs   (keys data)
+        sizes (-> data
+                (get (first dbs))
+                keys)]
+    (doseq [[n f] benchmark-csvs]
+      (let [db->size->data (reduce
+                             #(assoc-in %1 %2 (f (get-in data %2)))
+                             {}
+                             (for [db dbs, size sizes] [db size]))
+            field->path (->> db->size->data
+                         (mapcat
+                           (fn [[db size->data]]
+                             (->> size->data
+                               vals
+                               first
+                               keys
+                               (map #(vector (str (name db) %) [db %])))))
+                         (into {}))]
+        (spit
+          (str "benchmarks/data/" n ".csv")
+          (with-out-str
+           (println (->> field->path keys (cons "size") (interpose ",") (apply str)))
+           (doseq [s sizes]
+             (println
+               (->> field->path
+                 vals
+                 (map
+                   (fn [[db field]]
+                     (get-in db->size->data [db s field])))
+                 (cons s)
+                 (interpose ",")
+                 (apply str))))))))))
+
+(defn -main [task & args]
+  (case task
+    "benchmark"
+    (let [gbs (read-string (first args))
+          steps (read-string (or (second args) "1"))]
+       (run-database-benchmarks (* gbs 1024 1024) steps)
+       (generate-csvs)))
+
+  (flush)
+  (Thread/sleep 100)
+  (System/exit 0))

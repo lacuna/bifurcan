@@ -45,6 +45,11 @@ public class BuddyAllocator implements IAllocator {
   }
 
   @Override
+  public long acquired() {
+    return capacity - ranges.stream().flatMap(s -> s.elements().stream()).mapToLong(Range::size).sum();
+  }
+
+  @Override
   public Range acquire(long capacity) {
 
     int idx = max(0, log2Ceil(capacity) - log2Min);

@@ -2,6 +2,7 @@ package io.lacuna.bifurcan.durable.io;
 
 import io.lacuna.bifurcan.IDurableCollection.Fingerprint;
 import io.lacuna.bifurcan.ISet;
+import io.lacuna.bifurcan.durable.Bytes;
 import io.lacuna.bifurcan.durable.Dependencies;
 import io.lacuna.bifurcan.durable.Fingerprints;
 import io.lacuna.bifurcan.durable.Util;
@@ -59,7 +60,7 @@ public class FileOutput implements WritableByteChannel {
     assert !isOpen();
 
     try {
-      String hexHash = Util.toHexString(ByteBuffer.wrap(hash, 0, HASH_BYTES));
+      String hexHash = Bytes.toHexString(ByteBuffer.wrap(hash, 0, HASH_BYTES));
       Path newPath = directory.resolve(hexHash + ".bfn");
       Files.move(path, newPath, StandardCopyOption.REPLACE_EXISTING);
       return newPath;

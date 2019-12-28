@@ -1,5 +1,6 @@
 package io.lacuna.bifurcan.durable.io;
 
+import io.lacuna.bifurcan.durable.Bytes;
 import io.lacuna.bifurcan.durable.Util;
 
 import java.io.IOException;
@@ -23,7 +24,7 @@ public class BufferedChannel {
 
   public BufferedChannel(FileChannel channel, int bufferSize) {
     this.channel = channel;
-    this.buffer = Util.allocate(bufferSize);
+    this.buffer = Bytes.allocate(bufferSize);
 
     try {
       this.size = channel.size();

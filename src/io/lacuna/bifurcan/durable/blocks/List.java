@@ -50,7 +50,7 @@ public class List {
     });
   }
 
-  public static DurableList decode(DurableInput.Pool pool, IDurableCollection.Root root, IDurableEncoding.List encoding) {
+  public static DurableList decode(IDurableEncoding.List encoding, IDurableCollection.Root root, DurableInput.Pool pool) {
     DurableInput in = pool.instance();
 
     BlockPrefix prefix = in.readPrefix();
@@ -69,6 +69,4 @@ public class List {
 
     return new DurableList(pool, root, size, skipTable, elements, encoding);
   }
-
-
 }

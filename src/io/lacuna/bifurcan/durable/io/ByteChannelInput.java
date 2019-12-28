@@ -1,7 +1,7 @@
 package io.lacuna.bifurcan.durable.io;
 
 import io.lacuna.bifurcan.DurableInput;
-import io.lacuna.bifurcan.durable.Util;
+import io.lacuna.bifurcan.durable.Bytes;
 
 import java.io.EOFException;
 import java.nio.ByteBuffer;
@@ -14,12 +14,12 @@ public class ByteChannelInput implements DurableInput {
   private long position;
 
   public ByteChannelInput(BufferedChannel channel) {
-    this(channel, null);
+    this(channel, 0, channel.size, null);
   }
 
-  public ByteChannelInput(BufferedChannel channel, Runnable closeFn) {
+  public ByteChannelInput(BufferedChannel channel, long start, long end, Runnable closeFn) {
     this.channel = channel;
-    this.bounds = new Slice(null, 0, this.channel.size);
+    this.bounds = new Slice(null, start, end);
     this.closeFn = closeFn;
     this.position = 0;
   }
@@ -33,7 +33,7 @@ public class ByteChannelInput implements DurableInput {
 
   @Override
   public Pool pool() {
-    return () -> this.duplicate().seek(0);
+    return bufferSize -> this.duplicate().seek(0);
   }
 
   @Override
@@ -76,7 +76,7 @@ public class ByteChannelInput implements DurableInput {
 
   @Override
   public void readFully(byte[] b, int off, int len) throws EOFException {
-    assert (len < remaining());
+    assert (len <= remaining());
 
     preRead();
     if (len <= channel.remainingBuffer()) {
@@ -96,8 +96,8 @@ public class ByteChannelInput implements DurableInput {
   public int read(ByteBuffer dst) {
     preRead();
 
-    ByteBuffer trimmed = Util.slice(dst, 0, remaining());
-    int n = Util.transfer(channel.buffer, trimmed);
+    ByteBuffer trimmed = Bytes.slice(dst, 0, remaining());
+    int n = Bytes.transfer(channel.buffer, trimmed);
     if (trimmed.hasRemaining()) {
       n += Math.max(0, channel.read(trimmed));
     }

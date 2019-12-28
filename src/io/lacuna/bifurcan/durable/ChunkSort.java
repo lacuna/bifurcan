@@ -99,7 +99,7 @@ public class ChunkSort {
     }
 
     public CloseableIterator<T> sortedIterator() {
-      IList<DurableInput> bytes = LinearList.from(this.spilled);
+      IList<DurableInput> bytes = spilled;
       IList<Iterator<T>> iterators = bytes.stream().map(decode).collect(Lists.linearCollector());
       if (curr != null && curr.size > 0) {
         iterators.addLast(curr.entries());
@@ -107,7 +107,7 @@ public class ChunkSort {
       }
 
       while (iterators.size() > maxRealizedElements) {
-        LinearList<DurableInput> merged = new LinearList<>();
+        IList<DurableInput> merged = new LinearList<>();
         for (int i = 0; i < iterators.size(); i += maxRealizedElements) {
           merged.addLast(spill(iterators.slice(i, Math.min(iterators.size(), i + maxRealizedElements))));
         }

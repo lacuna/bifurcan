@@ -4,13 +4,13 @@ import io.lacuna.bifurcan.DurableInput;
 import io.lacuna.bifurcan.IEntry;
 import io.lacuna.bifurcan.IntMap;
 import io.lacuna.bifurcan.LinearList;
-import io.lacuna.bifurcan.durable.Util;
+import io.lacuna.bifurcan.durable.Bytes;
 
 import java.nio.ByteBuffer;
 
 public class ConcatInput implements DurableInput {
 
-  private static final ThreadLocal<ByteBuffer> SCRATCH_BUFFER = ThreadLocal.withInitial(() -> Util.allocate(8));
+  private static final ThreadLocal<ByteBuffer> SCRATCH_BUFFER = ThreadLocal.withInitial(() -> Bytes.allocate(8));
 
   private final Slice bounds;
   private final IntMap<DurableInput> inputs;
@@ -44,7 +44,7 @@ public class ConcatInput implements DurableInput {
 
   @Override
   public Pool pool() {
-    return () -> this.duplicate().seek(0);
+    return bufferSize -> this.duplicate().seek(0);
   }
 
   @Override
@@ -60,10 +60,6 @@ public class ConcatInput implements DurableInput {
   @Override
   public DurableInput slice(long start, long end) {
     if (start < 0 || end > size() || end < start) {
-      for (IEntry<Long, DurableInput> e : inputs) {
-        System.out.println(e.key() + " " + e.value() + " " + e.value().size());
-      }
-      System.out.println(bounds);
       throw new IllegalArgumentException(String.format("[%d, %d) is not within [0, %d)", start, end, size()));
     }
 
