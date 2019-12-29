@@ -3,6 +3,7 @@ package io.lacuna.bifurcan;
 import io.lacuna.bifurcan.diffs.DiffSet;
 
 import java.util.Iterator;
+import java.util.OptionalLong;
 import java.util.Spliterator;
 import java.util.Spliterators;
 import java.util.function.*;
@@ -30,7 +31,9 @@ public interface ISet<V> extends
   /**
    * @return true, if the set contains {@code value}
    */
-  boolean contains(V value);
+  default boolean contains(V value) {
+    return indexOf(value).isPresent();
+  }
 
   /**
    * @return an {@code IList} containing all the elements in the set
@@ -49,9 +52,9 @@ public interface ISet<V> extends
   }
 
   /**
-   * @return the position of {@code element} in {@code nth()}, or -1 if it is not present
+   * @return the position of {@code element} in {@code nth()}, if it's present
    */
-  long indexOf(V element);
+  OptionalLong indexOf(V element);
 
   /**
    * @return true if this set contains every element in {@code set}

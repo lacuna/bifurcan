@@ -95,6 +95,7 @@ public class DurableList<V> implements IDurableCollection, IList<V> {
 
   @Override
   public Iterator<V> iterator() {
+    // TODO: allow this to be consumed on different threads
     DurableInput elements = this.elements.instance();
     return Iterators.flatMap(
         Iterators.from(elements::hasRemaining, elements::slicePrefixedBlock),

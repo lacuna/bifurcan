@@ -4,6 +4,7 @@ import io.lacuna.bifurcan.diffs.Util;
 import io.lacuna.bifurcan.utils.Iterators;
 
 import java.util.Iterator;
+import java.util.OptionalLong;
 import java.util.function.BiPredicate;
 import java.util.function.ToIntFunction;
 
@@ -35,34 +36,23 @@ public interface IDiffSet<V> extends ISet<V>, IDiff<ISet<V>, V> {
   }
 
   @Override
-  default boolean contains(V value) {
-    if (added().contains(value)) {
-      return true;
-    } else if (underlying().contains(value)) {
-      return !removedIndices().contains(underlying().indexOf(value));
-    } else {
-      return false;
-    }
-  }
-
-  @Override
-  default long indexOf(V element) {
-    long addedIdx = added().indexOf(element);
-    if (addedIdx >= 0) {
-      return underlying().size() - removedIndices().size() + addedIdx;
+  default OptionalLong indexOf(V element) {
+    OptionalLong addedIdx = added().indexOf(element);
+    if (addedIdx.isPresent()) {
+      return OptionalLong.of(underlying().size() - removedIndices().size() + addedIdx.getAsLong());
     }
 
-    long underlyingIdx = underlying().indexOf(element);
-    if (underlyingIdx < 0) {
-      return -1;
+    OptionalLong underlyingIdx = underlying().indexOf(element);
+    if (!underlyingIdx.isPresent()) {
+      return underlyingIdx;
     }
 
-    long removed = Util.removedPredecessors(removedIndices(), underlyingIdx);
-    if (removed == -1) {
-      return -1;
+    OptionalLong predecessors = Util.removedPredecessors(removedIndices(), underlyingIdx.getAsLong());
+    if (!predecessors.isPresent()) {
+      return predecessors;
     }
 
-    return underlyingIdx - removed;
+    return OptionalLong.of(underlyingIdx.getAsLong() - predecessors.getAsLong());
   }
 
   @Override

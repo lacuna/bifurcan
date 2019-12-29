@@ -122,14 +122,14 @@
     .keys
     .iterator
     iterator-seq
-    (every? #(= % (.key (.nth m (.indexOf m %)))))))
+    (every? #(= % (->> (.indexOf m %) .getAsLong (.nth m) .key)))))
 
-(defn valid-set-indices? [^ISet m]
-  (->> m
+(defn valid-set-indices? [^ISet s]
+  (->> s
     .elements
     .iterator
     iterator-seq
-    (every? #(= % (.nth m (.indexOf m %))))))
+    (every? #(= % (->> (.indexOf s %) .getAsLong (.nth s))))))
 
 ;;;
 

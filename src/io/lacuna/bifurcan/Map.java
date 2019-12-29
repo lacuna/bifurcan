@@ -6,6 +6,7 @@ import io.lacuna.bifurcan.nodes.MapNodes.Node;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.function.*;
 
 /**
@@ -173,8 +174,9 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
   }
 
   @Override
-  public long indexOf(K key) {
-    return root.indexOf(0, keyHash(key), key, keyEquality());
+  public OptionalLong indexOf(K key) {
+    long idx = root.indexOf(0, keyHash(key), key, keyEquality());
+    return idx < 0 ? OptionalLong.empty() : OptionalLong.of(idx);
   }
 
   @Override

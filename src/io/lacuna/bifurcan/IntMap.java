@@ -324,16 +324,16 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
   }
 
   @Override
-  public long indexOf(Long key) {
+  public OptionalLong indexOf(Long key) {
     return indexOf((long) key);
   }
 
-  public long indexOf(long key) {
+  public OptionalLong indexOf(long key) {
     if (key < 0) {
       return neg.indexOf(key);
     } else {
-      long index = pos.indexOf(key);
-      return index < 0 ? index - neg.size() : index + neg.size();
+      OptionalLong index = pos.indexOf(key);
+      return index.isPresent() ? OptionalLong.of(index.getAsLong() + neg.size) : index;
     }
   }
 

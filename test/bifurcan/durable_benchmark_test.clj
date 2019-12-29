@@ -315,7 +315,7 @@
     (.toPath (io/file dir))
     1e5))
 
-(defn benchmark-bifurcan [dir sizes create-fn get-fn]
+(defn benchmark-bifurcan [dir name sizes create-fn get-fn]
   (clear-directory dir)
   (try
     (zipmap
@@ -323,7 +323,7 @@
       (->> (cons 0 sizes)
         (map
           (fn [n]
-            (prn 'bifurcan n)
+            (prn name n)
             (time
               (let [m          (atom nil)
                     write      (io-stats
@@ -409,12 +409,12 @@
               nil))
           {"RocksDB"              (benchmark-rocks "/tmp/rocks" sizes)
            "Berkeley DB"          (benchmark-berkeley "tmp/bdb" sizes)
-           "bifurcan.DurableMap"  (benchmark-bifurcan "/tmp/bifurcan" sizes
+           "bifurcan.DurableMap"  (benchmark-bifurcan "/tmp/bifurcan" 'bifurcan-hash-map sizes
                                     #(create-hash-map %1 %2 1016)
                                     #(-> ^IMap %1
                                        (.get (->durable-input (hashed-key %2)))
                                        .get))
-           "bifurcan.DurableList" (benchmark-bifurcan "/tmp/bifurcan" sizes
+           "bifurcan.DurableList" (benchmark-bifurcan "/tmp/bifurcan" 'bifurcan-list sizes
                                     #(create-list %1 %2 1016)
                                     #(.nth ^IList %1 %2))})))))
 

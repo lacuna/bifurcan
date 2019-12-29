@@ -8,10 +8,7 @@ import io.lacuna.bifurcan.durable.blocks.HashMap;
 import io.lacuna.bifurcan.utils.Iterators;
 
 import java.nio.file.Path;
-import java.util.Iterator;
-import java.util.Optional;
-import java.util.Spliterator;
-import java.util.Spliterators;
+import java.util.*;
 import java.util.function.*;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -63,7 +60,7 @@ public interface IMap<K, V> extends
    * @return true if {@code key} is in the map, false otherwise
    */
   default boolean contains(K key) {
-    return indexOf(key) >= 0;
+    return indexOf(key).isPresent();
   }
 
   /**
@@ -74,15 +71,15 @@ public interface IMap<K, V> extends
   }
 
   /**
-   * @return the index of {@code key} within {@code nth()}, or a negative value if it is not present
+   * @return the index of {@code key} within {@code nth()}, if it's present
    */
-  long indexOf(K key);
+  OptionalLong indexOf(K key);
 
   /**
    * @return a set representing all keys in the map
    */
   default ISet<K> keys() {
-    return Sets.from(Lists.lazyMap(entries(), IEntry::key), this::contains, this::indexOf);
+    return Sets.from(Lists.lazyMap(entries(), IEntry::key), this::indexOf);
   }
 
   /**

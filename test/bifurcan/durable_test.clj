@@ -191,10 +191,7 @@
       (try
         (and
           (= m m')
-          (->> (range (.size m'))
-            (every?
-              (fn [^long i]
-                (= i (->> (.nth m' i) .key (.indexOf m'))))))
+          (coll/valid-map-indices? m')
           (free! in))))))
 
 ;;; DurableList

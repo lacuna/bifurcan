@@ -98,12 +98,12 @@ public class FloatMap<V> implements ISortedMap<Double, V>, Cloneable {
     return Lists.lazyMap(map.entries(), FloatMap::convertEntry);
   }
 
-  public long indexOf(double key) {
+  public OptionalLong indexOf(double key) {
     return map.indexOf(doubleToLong(key));
   }
 
   @Override
-  public long indexOf(Double key) {
+  public OptionalLong indexOf(Double key) {
     return indexOf((double) key);
   }
 

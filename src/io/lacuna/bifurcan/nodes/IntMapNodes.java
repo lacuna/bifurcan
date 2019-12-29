@@ -8,6 +8,7 @@ import io.lacuna.bifurcan.utils.Bits;
 import io.lacuna.bifurcan.utils.Iterators;
 
 import java.util.Iterator;
+import java.util.OptionalLong;
 import java.util.PrimitiveIterator;
 import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
@@ -96,7 +97,7 @@ public class IntMapNodes {
       throw new IndexOutOfBoundsException();
     }
 
-    public long indexOf(long key) {
+    public OptionalLong indexOf(long key) {
       Node<V> n = this;
       long idx = 0;
 
@@ -108,7 +109,7 @@ public class IntMapNodes {
             int m = masks.next();
             if (mask == m) {
               if (n.isEntry(mask)) {
-                return idx;
+                return OptionalLong.of(idx);
               } else {
                 n = n.node(mask);
                 break;
@@ -118,7 +119,7 @@ public class IntMapNodes {
             }
           }
         } else {
-          return -1;
+          return OptionalLong.empty();
         }
       }
     }

@@ -190,7 +190,7 @@ public class Maps {
       }
 
       @Override
-      public long indexOf(K key) {
+      public OptionalLong indexOf(K key) {
         return keys.indexOf(key);
       }
 

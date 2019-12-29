@@ -2,6 +2,8 @@ package io.lacuna.bifurcan.diffs;
 
 import io.lacuna.bifurcan.*;
 
+import java.util.OptionalLong;
+
 public class DiffSet<V> implements IDiffSet<V> {
 
   private final ISet<V> underlying;
@@ -49,8 +51,8 @@ public class DiffSet<V> implements IDiffSet<V> {
       ISet<V> addedPrime = added.remove(value);
       return isLinear() ? this : new DiffSet<>(underlying, addedPrime, removedIndices);
     } else {
-      long idx = underlying.indexOf(value);
-      ISortedSet<Long> removedIndicesPrime = idx >= 0 ? removedIndices.add(idx) : removedIndices;
+      OptionalLong idx = underlying.indexOf(value);
+      ISortedSet<Long> removedIndicesPrime = idx.isPresent() ? removedIndices.add(idx.getAsLong()) : removedIndices;
       return isLinear() ? this : new DiffSet<>(underlying, added, removedIndicesPrime);
     }
   }

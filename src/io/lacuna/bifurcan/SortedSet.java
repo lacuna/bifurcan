@@ -2,6 +2,7 @@ package io.lacuna.bifurcan;
 
 import java.util.Comparator;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.ToIntFunction;
@@ -101,7 +102,7 @@ public class SortedSet<V> implements ISortedSet<V> {
   }
 
   @Override
-  public long indexOf(V element) {
+  public OptionalLong indexOf(V element) {
     return m.indexOf(element);
   }
 

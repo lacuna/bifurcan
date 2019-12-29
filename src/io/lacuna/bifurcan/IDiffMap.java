@@ -3,6 +3,8 @@ package io.lacuna.bifurcan;
 import io.lacuna.bifurcan.diffs.Util;
 import io.lacuna.bifurcan.utils.Iterators;
 
+import javax.swing.text.html.Option;
+import java.util.OptionalLong;
 import java.util.function.BiPredicate;
 import java.util.function.ToIntFunction;
 
@@ -39,33 +41,33 @@ public interface IDiffMap<K, V> extends IMap<K, V>, IDiff<IMap<K, V>, IEntry<K, 
     if (v != defaultValue) {
       return v;
     } else  {
-      long idx = underlying().indexOf(key);
-      if (idx < 0 || Util.removedPredecessors(removedIndices(), idx) < 0) {
+      OptionalLong idx = underlying().indexOf(key);
+      if (!idx.isPresent() || removedIndices().contains(idx.getAsLong())) {
         return defaultValue;
       } else {
-        return underlying().nth(idx).value();
+        return underlying().nth(idx.getAsLong()).value();
       }
     }
   }
 
   @Override
-  default long indexOf(K key) {
-    long addedIdx = added().indexOf(key);
-    if (addedIdx >= 0) {
-      return underlying().size() - removedIndices().size() + addedIdx;
+  default OptionalLong indexOf(K key) {
+    OptionalLong addedIdx = added().indexOf(key);
+    if (addedIdx.isPresent()) {
+      return OptionalLong.of(underlying().size() - removedIndices().size() + addedIdx.getAsLong());
     }
 
-    long underlyingIdx = underlying().indexOf(key);
-    if (underlyingIdx < 0) {
-      return -1;
+    OptionalLong underlyingIdx = underlying().indexOf(key);
+    if (!underlyingIdx.isPresent()) {
+      return underlyingIdx;
     }
 
-    long removed = Util.removedPredecessors(removedIndices(), underlyingIdx);
-    if (removed == -1) {
-      return -1;
+    OptionalLong predecessors = Util.removedPredecessors(removedIndices(), underlyingIdx.getAsLong());
+    if (!predecessors.isPresent()) {
+      return predecessors;
     }
 
-    return underlyingIdx - removed;
+    return OptionalLong.of(underlyingIdx.getAsLong() - predecessors.getAsLong());
   }
 
   @Override

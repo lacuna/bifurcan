@@ -576,7 +576,7 @@ public class Graphs {
 
       for (V seed : subgraph.vertices()) {
 
-        long threshold = subgraph.indexOf(seed);
+        long threshold = subgraph.indexOf(seed).getAsLong();
 
         path.addLast(seed);
         branches.addLast(subgraph.out(seed).iterator());
@@ -589,7 +589,7 @@ public class Graphs {
           // traverse deeper
           if (branches.last().hasNext()) {
             V v = branches.last().next();
-            if (subgraph.indexOf(v) < threshold) {
+            if (subgraph.indexOf(v).getAsLong() < threshold) {
               continue;
             }
 

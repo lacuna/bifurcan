@@ -5,6 +5,7 @@ import io.lacuna.bifurcan.utils.Iterators;
 
 import java.util.Iterator;
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.ToIntFunction;
@@ -154,7 +155,7 @@ public class LinearSet<V> implements ISet<V>, Cloneable {
   }
 
   @Override
-  public long indexOf(V element) {
+  public OptionalLong indexOf(V element) {
     return map.indexOf(element);
   }
 

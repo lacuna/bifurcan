@@ -3,16 +3,20 @@ package io.lacuna.bifurcan.diffs;
 import io.lacuna.bifurcan.ISortedSet;
 
 import java.util.Iterator;
+import java.util.OptionalLong;
 import java.util.PrimitiveIterator;
 
 public class Util {
 
-  public static long removedPredecessors(ISortedSet<Long> removedIndices, long idx) {
+  /**
+   * @return the number of removed entries before the idx, unless {@code idx} itself is removed
+   */
+  public static OptionalLong removedPredecessors(ISortedSet<Long> removedIndices, long idx) {
     Long floor = removedIndices.floor(idx);
     if (floor == null) {
-      return 0;
+      return OptionalLong.of(0);
     } else if (floor == idx) {
-      return -1;
+      return OptionalLong.empty();
     } else {
       return removedIndices.indexOf(floor);
     }
@@ -23,7 +27,7 @@ public class Util {
     if (floor == null) {
       return idx;
     } else {
-      return idx + removedIndices.indexOf(floor);
+      return idx + removedIndices.indexOf(floor).getAsLong();
     }
   }
 

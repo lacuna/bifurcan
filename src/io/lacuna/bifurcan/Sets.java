@@ -1,7 +1,5 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.utils.Iterators;
-
 import java.lang.reflect.Array;
 import java.util.*;
 import java.util.function.*;
@@ -129,15 +127,15 @@ public class Sets {
     };
   }
 
-  public static <V> ISet<V> from(IList<V> elements, Predicate<V> contains, ToLongFunction<V> indexOf) {
-    return from(elements, contains, indexOf, elements::iterator);
+  public static <V> ISet<V> from(IList<V> elements, Function<V, OptionalLong> indexOf) {
+    return from(elements, indexOf, elements::iterator);
   }
 
-  public static <V> ISet<V> from(IList<V> elements, Predicate<V> contains, ToLongFunction<V> indexOf, Supplier<Iterator<V>> iterator) {
+  public static <V> ISet<V> from(IList<V> elements, Function<V, OptionalLong> indexOf, Supplier<Iterator<V>> iterator) {
     return new ISet<V>() {
       @Override
       public boolean contains(V value) {
-        return contains.test(value);
+        return indexOf(value).isPresent();
       }
 
       @Override
@@ -151,8 +149,8 @@ public class Sets {
       }
 
       @Override
-      public long indexOf(V element) {
-        return indexOf.applyAsLong(element);
+      public OptionalLong indexOf(V element) {
+        return indexOf.apply(element);
       }
 
       @Override

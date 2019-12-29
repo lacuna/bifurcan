@@ -8,6 +8,7 @@ import io.lacuna.bifurcan.utils.Iterators;
 
 import java.nio.file.Path;
 import java.util.Iterator;
+import java.util.OptionalLong;
 import java.util.function.BiPredicate;
 import java.util.function.ToIntFunction;
 
@@ -108,12 +109,12 @@ public class DurableMap<K, V> implements IDurableCollection, IMap<K, V> {
   }
 
   @Override
-  public long indexOf(K key) {
+  public OptionalLong indexOf(K key) {
     int hash = keyHash().applyAsInt(key);
     HashSkipTable.Entry blockEntry = hashTable == null ? HashSkipTable.Entry.ORIGIN : hashTable.floor(hash);
 
     return blockEntry == null
-        ? -1
+        ? OptionalLong.empty()
         : HashMapEntries.indexOf(chunkedEntries(blockEntry.offset), hash, key);
   }
 

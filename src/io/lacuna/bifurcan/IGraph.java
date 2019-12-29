@@ -1,6 +1,7 @@
 package io.lacuna.bifurcan;
 
 import java.util.Iterator;
+import java.util.OptionalLong;
 import java.util.function.BiPredicate;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
@@ -71,7 +72,10 @@ public interface IGraph<V, E> extends ICollection<IGraph<V, E>, V> {
 
   <U> IGraph<V, U> mapEdges(Function<IEdge<V, E>, U> f);
 
-  default long indexOf(V vertex) {
+  /**
+   * @return the index of {@code vertex}, if it's present
+   */
+  default OptionalLong indexOf(V vertex) {
     return vertices().indexOf(vertex);
   }
 

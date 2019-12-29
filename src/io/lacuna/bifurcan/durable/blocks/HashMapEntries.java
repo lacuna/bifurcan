@@ -8,6 +8,7 @@ import io.lacuna.bifurcan.durable.Util;
 import io.lacuna.bifurcan.utils.Iterators;
 
 import java.util.Iterator;
+import java.util.OptionalLong;
 import java.util.PrimitiveIterator;
 import java.util.function.BiPredicate;
 
@@ -67,7 +68,7 @@ public class HashMapEntries {
     return defaultValue;
   }
 
-  public static long indexOf(Iterator<HashMapEntries> it, int hash, Object key) {
+  public static OptionalLong indexOf(Iterator<HashMapEntries> it, int hash, Object key) {
     while (it.hasNext()) {
       HashMapEntries entries = it.next();
       HashDeltas.IndexRange candidates = entries.hashes.candidateIndices(hash);
@@ -75,11 +76,11 @@ public class HashMapEntries {
       int keyIndex = entries.localIndexOf(candidates, key);
       if (keyIndex == -1 && candidates.isBounded) {
       } else if (keyIndex != -1) {
-        return entries.entryOffset + keyIndex;
+        return OptionalLong.of(entries.entryOffset + keyIndex);
       }
     }
 
-    return -1;
+    return OptionalLong.empty();
   }
 
   public final long entryOffset;

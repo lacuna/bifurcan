@@ -246,9 +246,9 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
   }
 
   @Override
-  public long indexOf(K key) {
+  public OptionalLong indexOf(K key) {
     int idx = tableIndex(keyHash(key), key);
-    return idx >= 0 ? Row.keyIndex(table[idx]) >> 1 : -1;
+    return idx >= 0 ? OptionalLong.of(Row.keyIndex(table[idx]) >> 1) : OptionalLong.empty();
   }
 
   @Override

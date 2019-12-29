@@ -5,6 +5,7 @@ import io.lacuna.bifurcan.nodes.SortedMapNodes.Node;
 
 import java.util.Comparator;
 import java.util.Iterator;
+import java.util.OptionalLong;
 import java.util.function.*;
 
 /**
@@ -158,8 +159,9 @@ public class SortedMap<K, V> implements ISortedMap<K, V> {
   }
 
   @Override
-  public long indexOf(K key) {
-    return SortedMapNodes.indexOf(root, key, comparator);
+  public OptionalLong indexOf(K key) {
+    long idx = SortedMapNodes.indexOf(root, key, comparator);
+    return idx < 0 ? OptionalLong.empty() : OptionalLong.of(idx);
   }
 
   @Override
