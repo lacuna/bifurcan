@@ -10,7 +10,7 @@ import static java.lang.System.arraycopy;
 public class ListNodes {
 
   private static final int SHIFT_INCREMENT = 5;
-  private static final int MAX_BRANCHES = 1 << SHIFT_INCREMENT;
+  public static final int MAX_BRANCHES = 1 << SHIFT_INCREMENT;
   private static final int BRANCH_MASK = MAX_BRANCHES - 1;
 
   public static Object slice(Object node, Object editor, int start, int end) {
@@ -39,7 +39,7 @@ public class ListNodes {
 
   public static class Node {
 
-    public final static Node EMPTY = new Node(new Object(), 5);
+    public final static Node EMPTY = new Node(new Object(), SHIFT_INCREMENT);
 
     public final byte shift;
     public boolean isStrict;
@@ -74,6 +74,19 @@ public class ListNodes {
       return new Node(editor, SHIFT_INCREMENT).pushLast(child, editor);
     }
 
+    // invariants
+
+    public void assertInvariants() {
+      if (shift == SHIFT_INCREMENT) {
+        for (int i = 0; i < numNodes; i++) {
+          assert nodes[i] instanceof Object[];
+        }
+      } else {
+        for (int i = 0; i < numNodes; i++) {
+          assert ((Node) nodes[i]).shift == (shift - SHIFT_INCREMENT);
+        }
+      }
+    }
 
     // lookup
 
@@ -219,7 +232,7 @@ public class ListNodes {
       int startIdx = indexOf(start);
       int endIdx = indexOf(end - 1);
 
-      Node rn = new Node(editor, shift);
+      Node rn = EMPTY;
 
       // we're slicing within a single node
       if (startIdx == endIdx) {
@@ -270,8 +283,8 @@ public class ListNodes {
       // we need to grow a parent
       if (stack[stack.length - 1].numNodes == MAX_BRANCHES) {
         return numNodes == MAX_BRANCHES
-          ? new Node(editor, shift + SHIFT_INCREMENT).pushLast(this, editor).pushLast(chunk, editor)
-          : pushLast(new Node(editor, SHIFT_INCREMENT).pushLast(chunk, editor), editor);
+            ? new Node(editor, shift + SHIFT_INCREMENT).pushLast(this, editor).pushLast(chunk, editor)
+            : pushLast(from(editor, chunk), editor);
       }
 
       for (int i = 0; i < stack.length; i++) {
@@ -314,8 +327,8 @@ public class ListNodes {
       // we need to grow a parent
       if (stack[stack.length - 1].numNodes == MAX_BRANCHES) {
         return numNodes == MAX_BRANCHES
-          ? new Node(editor, shift + SHIFT_INCREMENT).pushLast(chunk, editor).pushLast(this, editor)
-          : pushFirst(new Node(editor, SHIFT_INCREMENT).pushLast(chunk, editor), editor);
+            ? new Node(editor, shift + SHIFT_INCREMENT).pushLast(chunk, editor).pushLast(this, editor)
+            : pushFirst(from(editor, chunk), editor);
       }
 
       for (int i = 0; i < stack.length; i++) {
@@ -351,25 +364,19 @@ public class ListNodes {
         return this;
       }
 
+      // make sure `node` is properly nested
+      if (size() == 0 && (shift - node.shift) > SHIFT_INCREMENT) {
+        return pushLast(from(editor, node.shift + SHIFT_INCREMENT, node), editor);
+      }
+
       if (shift < node.shift) {
         return node.pushFirst(this, editor);
       } else if (shift == node.shift) {
         return from(editor, shift + SHIFT_INCREMENT, this, node);
       }
 
-      Node[] stack = new Node[(shift - node.shift) / SHIFT_INCREMENT];
+      Node[] stack = new Node[numNodes == 0 ? 1 : (shift - node.shift) / SHIFT_INCREMENT];
       stack[0] = this;
-      if (stack.length > 1 && stack[0].numNodes == 0) {
-	// The existing tree is empty beneath Node this.  We need to
-	// create a path of new nodes from node 'this' to the new one
-	// 'node'.
-        for (int i = stack.length - 1; i >= 0; i--) {
-	  Node n = from(editor, shift - i * SHIFT_INCREMENT,
-                        (i == stack.length - 1) ? node : stack[i+1]);
-	  stack[i] = n;
-        }
-	return stack[0];
-      }
       for (int i = 1; i < stack.length; i++) {
         Node n = stack[i - 1];
         stack[i] = (Node) n.nodes[n.numNodes - 1];
@@ -399,6 +406,7 @@ public class ListNodes {
         Node n = stack[i];
         int lastIdx = n.numNodes - 1;
         n.nodes[lastIdx] = i == stack.length - 1 ? node : stack[i + 1];
+        assertInvariants();
         n.offsets[lastIdx] += nSize;
         n.updateStrict();
       }
@@ -408,17 +416,22 @@ public class ListNodes {
 
     public Node pushFirst(Node node, Object editor) {
 
+      // pushLast() has special code for the empty node case
+      assert (size() > 0);
+
       if (node.size() == 0) {
         return this;
       }
 
+      // we're below this node
       if (shift < node.shift) {
         return node.pushLast(this, editor);
       } else if (shift == node.shift) {
         return from(editor, shift + SHIFT_INCREMENT, node, this);
       }
 
-      Node[] stack = new Node[(shift - node.shift) / SHIFT_INCREMENT];
+      // extract the path of all nodes between the root and the node we're prepending
+      Node[] stack = new Node[numNodes == 0 ? 1 : (shift - node.shift) / SHIFT_INCREMENT];
       stack[0] = this;
       for (int i = 1; i < stack.length; i++) {
         Node n = stack[i - 1];
@@ -430,6 +443,7 @@ public class ListNodes {
         return pushFirst(from(editor, node.shift + SHIFT_INCREMENT, node), editor);
       }
 
+      // clone all nodes that don't share our editor, giving us free reign to edit them
       for (int i = 0; i < stack.length; i++) {
         if (stack[i].editor != editor) {
           stack[i] = stack[i].clone(editor);
@@ -482,14 +496,18 @@ public class ListNodes {
 
           // shift everything left
           n.numNodes--;
-          if (i == 0 && n.numNodes == 1 && n.shift > SHIFT_INCREMENT) {
-            return (Node) n.nodes[1];
-          }
-
           arraycopy(n.nodes, 1, n.nodes, 0, n.numNodes);
           arraycopy(n.offsets, 1, n.offsets, 0, n.numNodes);
           n.nodes[n.numNodes] = null;
           n.offsets[n.numNodes] = 0;
+          n.updateStrict();
+
+          // if we have a single child at the top, de-nest the tree
+          if (i == 0) {
+            while (stack[0].shift > SHIFT_INCREMENT && stack[0].numNodes == 1) {
+              stack[0] = (Node) stack[0].nodes[0];
+            }
+          }
 
           // no need to go any deeper
           break;
@@ -525,13 +543,16 @@ public class ListNodes {
 
           // lop off the rightmost node
           n.numNodes--;
-          if (i == 0 && n.numNodes == 1 && n.shift > SHIFT_INCREMENT) {
-            return (Node) n.nodes[0];
-          }
-
           n.nodes[n.numNodes] = null;
           n.offsets[n.numNodes] = 0;
           n.updateStrict();
+
+          // if we have a single child at the top, de-nest the tree
+          if (i == 0) {
+            while (stack[0].shift > SHIFT_INCREMENT && stack[0].numNodes == 1) {
+              stack[0] = (Node) stack[0].nodes[0];
+            }
+          }
 
           // no need to go any further
           break;
@@ -558,7 +579,7 @@ public class ListNodes {
     }
 
     private void updateStrict() {
-      isStrict = numNodes <= 1 || offset(numNodes - 1) == (numNodes - 1) * (1 << shift);
+      isStrict = numNodes <= 1 || offset(numNodes - 1) == (numNodes - 1) * (1L << shift);
     }
 
     private Node clone(Object editor) {

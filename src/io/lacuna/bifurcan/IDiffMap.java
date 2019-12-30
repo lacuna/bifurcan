@@ -4,6 +4,7 @@ import io.lacuna.bifurcan.diffs.Util;
 import io.lacuna.bifurcan.utils.Iterators;
 
 import javax.swing.text.html.Option;
+import java.util.Iterator;
 import java.util.OptionalLong;
 import java.util.function.BiPredicate;
 import java.util.function.ToIntFunction;
@@ -86,10 +87,9 @@ public interface IDiffMap<K, V> extends IMap<K, V>, IDiff<IMap<K, V>, IEntry<K, 
   }
 
   @Override
-  default IList<IEntry<K, V>> entries() {
-    return Lists.from(size(), this::nth, () ->
-        Iterators.concat(
-            Util.skipIndices(underlying().entries().iterator(), removedIndices().iterator()),
-            added().entries().iterator()));
+  default Iterator<IEntry<K, V>> iterator() {
+    return Iterators.concat(
+        Util.skipIndices(underlying().entries().iterator(), removedIndices().iterator()),
+        added().entries().iterator());
   }
 }

@@ -280,9 +280,18 @@ public interface IMap<K, V> extends
     return Maps.equals(this, m, equals);
   }
 
+  /**
+   * @return the corresponding value
+   * @throws IllegalArgumentException if no such key is inside the map
+   */
   @Override
   default V apply(K k) {
-    return get(k).orElseThrow(IllegalArgumentException::new);
+    V defaultVal = (V) new Object();
+    V val = get(k, defaultVal);
+    if (val == defaultVal) {
+      throw new IllegalArgumentException("key not found");
+    }
+    return val;
   }
 
   @Override

@@ -980,10 +980,6 @@
 
 (defn benchmark-iteration [n {:keys [base entries construct iterator consume] :as m}]
   (let [c (construct (base) (entries n))]
-    (benchmark n (consume (iterator c)))))
-
-(defn benchmark-iteration [n {:keys [base entries construct iterator consume] :as m}]
-  (let [c (construct (base) (entries n))]
     (benchmark n #(consume (iterator c)))))
 
 (defn benchmark-concat [n {:keys [base entries construct concat]}]

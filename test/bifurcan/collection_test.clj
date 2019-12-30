@@ -110,9 +110,6 @@
     (->> b ->set (filter #(.contains b %)) (into #{}))))
 
 (defn list= [a ^IList b]
-  #_(prn (seq a)
-    (-> b .iterator iterator-seq)
-    (->> (.size b) range (map #(.nth b %)) seq))
   (= (seq a)
     (-> b .iterator iterator-seq)
     (->> (.size b) range (map #(.nth b %)) seq)))

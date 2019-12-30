@@ -1,5 +1,6 @@
 package io.lacuna.bifurcan;
 
+import io.lacuna.bifurcan.nodes.ListNodes;
 import io.lacuna.bifurcan.nodes.ListNodes.Node;
 
 import java.util.Iterator;
@@ -297,6 +298,8 @@ public class List<V> implements IList<V>, Cloneable {
 
   ///
 
+  private static final int MAX_CHUNK_SIZE = ListNodes.MAX_BRANCHES;
+
   private Object[] suffixArray() {
     Object[] suf = new Object[suffixLen];
     arraycopy(suffix, 0, suf, 0, suf.length);
@@ -337,7 +340,7 @@ public class List<V> implements IList<V>, Cloneable {
     if (prefix == null) {
       prefix = new Object[2];
     } else if (prefixLen == prefix.length) {
-      Object[] newPrefix = new Object[min(32, prefix.length << 1)];
+      Object[] newPrefix = new Object[min(MAX_CHUNK_SIZE, prefix.length << 1)];
       arraycopy(prefix, 0, newPrefix, newPrefix.length - prefixLen, prefixLen);
       prefix = newPrefix;
     }
@@ -345,7 +348,7 @@ public class List<V> implements IList<V>, Cloneable {
     prefix[pIdx(-1)] = value;
     prefixLen++;
 
-    if (prefixLen == 32) {
+    if (prefixLen == MAX_CHUNK_SIZE) {
       Object editor = isLinear() ? this.editor : new Object();
       root = root.pushFirst(prefix, editor);
       prefix = null;
@@ -360,14 +363,14 @@ public class List<V> implements IList<V>, Cloneable {
     if (suffix == null) {
       suffix = new Object[2];
     } else if (suffixLen == suffix.length) {
-      Object[] newSuffix = new Object[min(32, suffix.length << 1)];
+      Object[] newSuffix = new Object[min(MAX_CHUNK_SIZE, suffix.length << 1)];
       arraycopy(suffix, 0, newSuffix, 0, suffix.length);
       suffix = newSuffix;
     }
 
     suffix[suffixLen++] = value;
 
-    if (suffixLen == 32) {
+    if (suffixLen == MAX_CHUNK_SIZE) {
       Object editor = isLinear() ? this.editor : new Object();
       root = root.pushLast(suffix, editor);
       suffix = null;

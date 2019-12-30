@@ -259,7 +259,7 @@
 (def binary-encoding
   (DurableEncodings/primitive
     "binary"
-    2
+    3
     (u/->to-int-fn
       (fn [^DurableInput in]
         (PerlHash/hash 0 (.duplicate in))))
@@ -274,7 +274,7 @@
         false))
     (DurableEncodings$Codec/undelimited
       (u/->bi-consumer
-        (fn [^DurableInput in ^DurableOutput out]
+        (fn [^DurableInput n ^DurableOutput out]
           (.transferFrom out (-> in .duplicate (.seek 0)))))
       (u/->bi-fn
         (fn [^DurableInput in root]
@@ -408,15 +408,21 @@
             (catch Exception e
               nil))
           {"RocksDB"              (benchmark-rocks "/tmp/rocks" sizes)
-           "Berkeley DB"          (benchmark-berkeley "tmp/bdb" sizes)
-           "bifurcan.DurableMap"  (benchmark-bifurcan "/tmp/bifurcan" 'bifurcan-hash-map sizes
-                                    #(create-hash-map %1 %2 1016)
-                                    #(-> ^IMap %1
-                                       (.get (->durable-input (hashed-key %2)))
-                                       .get))
-           "bifurcan.DurableList" (benchmark-bifurcan "/tmp/bifurcan" 'bifurcan-list sizes
-                                    #(create-list %1 %2 1016)
-                                    #(.nth ^IList %1 %2))})))))
+           "Berkeley DB"          (benchmark-berkeley "/tmp/bdb" sizes)
+           "bifurcan.DurableMap"  (comment
+                                    (benchmark-bifurcan "/tmp/bifurcan"
+                                      'bifurcan-hash-map
+                                      sizes
+                                      #(create-hash-map %1 %2 1016)
+                                      #(-> ^IMap %1
+                                         (.get (->durable-input (hashed-key %2)))
+                                         .get)))
+           "bifurcan.DurableList" (comment
+                                    (benchmark-bifurcan "/tmp/bifurcan"
+                                      'bifurcan-list
+                                      sizes
+                                      #(create-list %1 %2 1024)
+                                      #(.nth ^IList %1 %2)))})))))
 
 (def benchmark-csvs
   {"durable_write_amplification"
@@ -453,7 +459,8 @@
         dbs   (keys data)
         sizes (-> data
                 (get (first dbs))
-                keys)]
+                keys
+                sort)]
     (doseq [[n f] benchmark-csvs]
       (let [db->size->data (reduce
                              #(assoc-in %1 %2 (f (get-in data %2)))

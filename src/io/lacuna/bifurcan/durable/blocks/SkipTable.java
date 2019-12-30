@@ -117,7 +117,11 @@ public class SkipTable {
         return;
       }
 
-      assert (index > lastIndex & offset >= lastOffset);
+      if (index <= lastIndex) {
+        throw new IllegalArgumentException(String.format("index must be monotonically increasing, %d <= %d", index, lastIndex));
+      } else if (offset < lastOffset) {
+        throw new IllegalArgumentException(String.format("offset must not decrease, %d < %d", offset, lastOffset));
+      }
 
       if ((count & BIT_MASK) == BIT_MASK) {
         if (parent == null) {

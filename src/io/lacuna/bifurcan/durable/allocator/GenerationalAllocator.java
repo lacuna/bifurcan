@@ -179,7 +179,7 @@ public class GenerationalAllocator {
       spilled.remove(b.start);
       long end = end();
 //      System.out.println("freeing " + (b.size() / (1 << 20)));
-      if ((fileSize - end) >= TRIM_THRESHOLD) {
+      if ((fileSize - end) >= TRIM_THRESHOLD || end == 0) {
         System.out.println("truncating " + (end / (1 << 20)));
         channel.truncate(end);
         fileSize = end;

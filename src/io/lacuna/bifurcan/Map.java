@@ -119,12 +119,7 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
     Object val = MapNodes.get(root, 0, keyHash(key), key, equalsFn, DEFAULT_VALUE);
     return val == DEFAULT_VALUE ? defaultValue : (V) val;
   }
-
-  @Override
-  public Map<K, V> put(K key, V value) {
-    return put(key, value, (BinaryOperator<V>) Maps.MERGE_LAST_WRITE_WINS);
-  }
-
+  
   @Override
   public Map<K, V> put(K key, V value, BinaryOperator<V> merge) {
     return put(key, value, merge, isLinear() ? editor : new Object());
