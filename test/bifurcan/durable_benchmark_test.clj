@@ -274,7 +274,7 @@
         false))
     (DurableEncodings$Codec/undelimited
       (u/->bi-consumer
-        (fn [^DurableInput n ^DurableOutput out]
+        (fn [^DurableInput in ^DurableOutput out]
           (.transferFrom out (-> in .duplicate (.seek 0)))))
       (u/->bi-fn
         (fn [^DurableInput in root]
