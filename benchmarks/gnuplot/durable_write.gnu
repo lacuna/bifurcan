@@ -2,7 +2,7 @@ load "durable_common.gnu"
 
 data = "../data/durable_write_amplification.csv"
 set output dir."durable_write".ext
-set title "database construction"
+set title "construction read/write amplification"
 set ylabel "amplification factor"
 set format y "%.1fx"
 

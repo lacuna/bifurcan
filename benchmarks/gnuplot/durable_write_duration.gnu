@@ -2,7 +2,7 @@ load "durable_common.gnu"
 
 data = "../data/durable_write_duration.csv"
 set output dir."durable_write_duration".ext
-set title "database construction duration"
+set title "construction duration"
 set ylabel "microseconds per entry stored"
 set format y "%.1fus"
 

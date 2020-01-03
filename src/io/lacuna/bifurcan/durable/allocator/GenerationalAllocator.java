@@ -20,27 +20,80 @@ import java.util.UUID;
 
 public class GenerationalAllocator {
 
-  private static final long MAX_FILE_SIZE = 4L << 30;
+  private static final long FILE_BUFFER_SIZE = 4L << 30;
+  private static final long MIN_FILE_ALLOCATION = 128 << 10;
   private static final long TRUNCATE_THRESHOLD = 1 << 30;
 
   private static final int MIN_ALLOCATION_SIZE = 1 << 10;
   private static final int BUFFER_SIZE = 128 << 20;
 
+  private static class FileAllocator {
+    public final Instance instance;
+    public final IAllocator allocator;
+    public final BufferedChannel channel;
+
+    public FileAllocator(Instance instance, IAllocator allocator, BufferedChannel channel) {
+      this.instance = instance;
+      this.allocator = allocator;
+      this.channel = channel;
+    }
+
+    public long end() {
+      return allocator.acquired().last().value().end;
+    }
+
+    public long size() {
+      return channel.size();
+    }
+
+    public void truncate() {
+      channel.truncate(end());
+    }
+
+    public long allocated() {
+      return allocator.acquired().values().stream().mapToLong(Range::size).sum();
+    }
+
+    public void free() {
+      channel.free();
+    }
+
+    public void release(FileBuffer buf) {
+      allocator.release(buf.range);
+      long end = end();
+      if (end == 0 || (size() - end) >= TRUNCATE_THRESHOLD) {
+        instance.truncate(this);
+      }
+    }
+
+    public FileBuffer spill(Iterable<ByteBuffer> buffers) {
+      long size = Iterators.toStream(buffers.iterator()).mapToLong(ByteBuffer::remaining).sum();
+      assert size <= FILE_BUFFER_SIZE;
+
+      Range r = allocator.acquire(size);
+      if (r == null) {
+        return null;
+      }
+
+      long pos = r.start;
+      for (ByteBuffer b : buffers) {
+        int s = b.remaining();
+        channel.write(b, pos);
+        pos += s;
+      }
+
+      return new FileBuffer(this, size, r);
+    }
+  }
+
   private static class FileBuffer implements IBuffer {
-    private final Instance instance;
-    private final BufferedChannel channel;
+    private final FileAllocator allocator;
     private final long size;
-    private final IAllocator allocator;
     private final Range range;
 
-    private boolean freed = false;
-
-
-    public FileBuffer(Instance instance, BufferedChannel channel, long size, IAllocator allocator, Range range) {
-      this.instance = instance;
-      this.channel = channel;
-      this.size = size;
+    public FileBuffer(FileAllocator allocator, long size, Range range) {
       this.allocator = allocator;
+      this.size = size;
       this.range = range;
     }
 
@@ -51,7 +104,7 @@ public class GenerationalAllocator {
 
     @Override
     public DurableInput toInput() {
-      return new BufferedChannelInput(channel, range.start, range.start + size, this::free);
+      return new BufferedChannelInput(allocator.channel, range.start, range.start + size, this::free);
     }
 
     @Override
@@ -66,18 +119,16 @@ public class GenerationalAllocator {
 
     @Override
     public void transferTo(WritableByteChannel target) {
-      assert !freed;
       if (target instanceof FileOutput) {
-        ((FileOutput) target).transferFrom(channel, range.start, range.start + size);
+        ((FileOutput) target).transferFrom(allocator.channel, range.start, range.start + size);
       } else {
-        channel.transferTo(range.start, range.start + size, target);
+        allocator.channel.transferTo(range.start, range.start + size, target);
       }
     }
 
     @Override
     public void free() {
-      freed = true;
-      instance.free(this);
+      allocator.release(this);
     }
 
     @Override
@@ -86,43 +137,77 @@ public class GenerationalAllocator {
     }
   }
 
+  public static class MemoryAllocator {
+    public final Instance instance;
+    public final IAllocator allocator;
+    public final ByteBuffer buffer;
+
+    MemoryAllocator(Instance instance, IAllocator allocator, ByteBuffer buffer) {
+      this.instance = instance;
+      this.allocator = allocator;
+      this.buffer = buffer;
+    }
+
+    boolean isAcquired() {
+      return allocator.acquired().size() > 0;
+    }
+
+    long acquired() {
+      return allocator.acquired().values().stream().mapToLong(Range::size).sum();
+    }
+
+    void release(MemoryBuffer buffer) {
+      allocator.release(buffer.range);
+      if (!isAcquired()) {
+        instance.free(this);
+      }
+    }
+
+    public MemoryBuffer acquire(int bytes) {
+      Range r = allocator.acquire(bytes);
+      return r == null
+          ? null
+          : new MemoryBuffer(instance, Bytes.slice(buffer, r.start, r.end), this, r);
+    }
+  }
+
   private static class MemoryBuffer implements IBuffer {
     private final Instance instance;
     private final ByteBuffer buffer;
-    private final IAllocator allocator;
+    private final MemoryAllocator allocator;
     private final Range range;
 
-    public MemoryBuffer(ByteBuffer buffer, Instance instance, IAllocator allocator, Range range) {
-      this.buffer = buffer;
+    public MemoryBuffer(Instance instance, ByteBuffer buffer, MemoryAllocator allocator, Range range) {
       this.instance = instance;
+      this.buffer = buffer;
       this.allocator = allocator;
       this.range = range;
     }
 
     @Override
     public long size() {
-      return buffer.remaining();
+      return range.size();
     }
 
     @Override
     public DurableInput toInput() {
-      return new BufferInput(Bytes.duplicate(buffer), this::free);
+      return new BufferInput(buffer.duplicate(), this::free);
     }
 
     @Override
     public ByteBuffer bytes() {
-      return Bytes.duplicate(buffer);
+      return buffer.duplicate();
     }
 
     @Override
     public IBuffer close(int length, boolean spill) {
-      ByteBuffer trimmed = Bytes.slice(buffer, 0, length);
+      ByteBuffer trimmed = Bytes.slice(bytes(), 0, length);
       if (spill) {
         IBuffer result = instance.spill(LinearList.of(trimmed));
         free();
         return result;
       } else {
-        return new MemoryBuffer(trimmed, instance, allocator, range);
+        return new MemoryBuffer(instance, trimmed, allocator, range);
       }
     }
 
@@ -137,9 +222,7 @@ public class GenerationalAllocator {
 
     @Override
     public void free() {
-      if (instance != null) {
-        instance.free(this);
-      }
+      allocator.release(this);
     }
 
     @Override
@@ -149,15 +232,12 @@ public class GenerationalAllocator {
   }
 
   private static class Instance {
-    private BufferedChannel channel;
-    private IAllocator fileAllocator;
     private Path directory;
+    private FileAllocator currFileAllocator;
+    private MemoryAllocator currMemAllocator;
 
-    private ByteBuffer buffer;
-    private IAllocator allocator;
-
-    private final LinearSet<IAllocator> allocators = new LinearSet<>();
-    private final LinearSet<IAllocator> fileAllocators = new LinearSet<>();
+    private final LinearSet<MemoryAllocator> memAllocators = new LinearSet<>();
+    private final LinearSet<FileAllocator> fileAllocators = new LinearSet<>();
 
     Instance() {
       try {
@@ -171,93 +251,75 @@ public class GenerationalAllocator {
     }
 
     private void cycleMemoryBuffer() {
-      this.buffer = Bytes.allocate(BUFFER_SIZE);
-      this.allocator = new BuddyAllocator(MIN_ALLOCATION_SIZE, BUFFER_SIZE);
-      allocators.add(allocator);
+      currMemAllocator = new MemoryAllocator(
+          this,
+          new BuddyAllocator(MIN_ALLOCATION_SIZE, BUFFER_SIZE),
+          Bytes.allocate(BUFFER_SIZE));
+      memAllocators.add(currMemAllocator);
     }
 
     private void cycleFileAllocator() {
-      this.fileAllocator = new BuddyAllocator(1 << 20, MAX_FILE_SIZE);
-      fileAllocators.add(fileAllocator);
-
       try {
         Path path = directory.resolve(UUID.randomUUID() + ".swap");
-        this.channel = new BufferedChannel(path,
+        IAllocator allocator = new BuddyAllocator(MIN_FILE_ALLOCATION, FILE_BUFFER_SIZE);
+        BufferedChannel channel = new BufferedChannel(path,
             FileChannel.open(path,
                 StandardOpenOption.CREATE_NEW,
                 StandardOpenOption.READ,
                 StandardOpenOption.WRITE,
                 StandardOpenOption.SPARSE));
+
+        this.currFileAllocator = new FileAllocator(this, allocator, channel);
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
     }
 
     FileBuffer spill(Iterable<ByteBuffer> buffers) {
-      long size = Iterators.toStream(buffers.iterator()).mapToLong(ByteBuffer::remaining).sum();
-
-      Range r = fileAllocator.acquire(size);
-      if (r == null) {
+      FileBuffer b = currFileAllocator.spill(buffers);
+      if (b == null) {
         cycleFileAllocator();
-        r = fileAllocator.acquire(size);
-        logAllocation("new file");
+        b = currFileAllocator.spill(buffers);
+        logStatus("new file");
       }
-
-      long pos = r.start;
-      for (ByteBuffer b : buffers) {
-        int s = b.remaining();
-        channel.write(b, pos);
-        pos += s;
-      }
-
-      return new FileBuffer(this, channel, size, fileAllocator, r);
+      return b;
     }
 
-    void free(FileBuffer b) {
-      IAllocator fileAllocator = b.allocator;
-      fileAllocator.release(b.range);
-      IntMap<Range> acquired = fileAllocator.acquired();
-
-      if (acquired.size() == 0) {
-        if (this.fileAllocator != fileAllocator) {
-          fileAllocators.remove(fileAllocator);
-          b.channel.free();
-          logAllocation("delete");
-        } else {
-          b.channel.truncate(0);
-          logAllocation("clear");
-        }
+    void truncate(FileAllocator allocator) {
+      if (allocator == currFileAllocator || allocator.end() > 0) {
+        allocator.truncate();
+        logStatus("truncate " + allocator.size());
       } else {
-        if ((b.channel.size() - acquired.last().value().end) >= TRUNCATE_THRESHOLD) {
-          b.channel.truncate(acquired.last().value().end);
-          logAllocation("truncate " + (acquired.last().value().end / (1 << 20)));
-        }
+        fileAllocators.remove(allocator);
+        allocator.free();
+        logStatus("delete");
       }
     }
 
-    void free(MemoryBuffer b) {
-      b.allocator.release(b.range);
-      if (b.allocator != this.allocator && b.allocator.acquired().size() == 0) {
-        allocators.remove(b.allocator);
+    void free(MemoryAllocator allocator) {
+      if (allocator != currMemAllocator) {
+        memAllocators.remove(allocator);
       }
     }
 
     MemoryBuffer allocate(int bytes) {
-      bytes = Math.min(BUFFER_SIZE / 2, bytes);
-
-      Range range = allocator.acquire(bytes);
-      if (range == null) {
+      MemoryBuffer b = currMemAllocator.acquire(bytes);
+      if (b == null) {
         cycleMemoryBuffer();
-        range = allocator.acquire(bytes);
-        logAllocation("new mem buffer");
+        b = currMemAllocator.acquire(bytes);
+        logStatus("new mem buffer");
       }
-
-      return new MemoryBuffer(Bytes.slice(buffer, range.start, range.end), this, allocator, range);
+      return b;
     }
   }
 
-  public static void logAllocation(String action) {
-    System.out.printf("%s: disk %d, mem %d\n", action, diskAllocations() / (1 << 20), memoryAllocations() / (1 << 20));
+  public static void logStatus(String action) {
+    System.out.printf("%s: mem %d, disk utilized %d, total disk %d, utilization %.3f\n",
+        action,
+        memoryAllocations() / (1 << 20),
+        diskAllocations() / (1 << 20),
+        fileSize() / (1 << 20),
+        (double) diskAllocations() / fileSize());
   }
 
   private static final ThreadLocal<Instance> INSTANCES = ThreadLocal.withInitial(Instance::new);
@@ -266,18 +328,16 @@ public class GenerationalAllocator {
     return INSTANCES.get().allocate(bytes);
   }
 
+  public static long fileSize() {
+    return INSTANCES.get().fileAllocators.stream().mapToLong(FileAllocator::size).sum();
+  }
+
   public static long diskAllocations() {
-    return INSTANCES.get().fileAllocators
-        .stream()
-        .mapToLong(a -> a.acquired().values().stream().mapToLong(Range::size).sum())
-        .sum();
+    return INSTANCES.get().fileAllocators.stream().mapToLong(FileAllocator::allocated).sum();
   }
 
   public static long memoryAllocations() {
-    return INSTANCES.get().allocators
-        .stream()
-        .mapToLong(a -> a.acquired().values().stream().mapToLong(Range::size).sum())
-        .sum();
+    return INSTANCES.get().memAllocators.stream().mapToLong(MemoryAllocator::acquired).sum();
   }
 
   public static FileBuffer spill(IList<IBuffer> buffers) {

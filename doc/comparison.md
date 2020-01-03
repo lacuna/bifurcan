@@ -20,31 +20,31 @@ Often, our updates to a data structure are done as a batch.  If we don't care ab
 
 If a given set of data has a predictable tree structure, we can speed up operations on two functional data structures (equality, union, intersection, difference, etc) by operating on the trees rather than the individual elements.  This can make operations which are typically `O(N)` significantly faster, sometimes even constant time.
 
-## the libraries
+## the libraries [and versions]
 
-### clojure
+### clojure [1.10.0]
 
 [Clojure](https://github.com/clojure/clojure) uses Bagwell's HAMTs for its `PersistentHashMap` and `PersistentHashSet`, a closely related data structure for its `PersistentVector`, and [red-black trees](https://en.wikipedia.org/wiki/Red%E2%80%93black_tree) for its `PersistentTreeMap`.  Its performance is undercut by its custom equality semantics, which make hash calculation and equality checks more expensive than their Java counterparts.
 
-### paguro
+### paguro [3.1.2]
 
 [Paguro](https://github.com/GlenKPeterson/Paguro) is a port of Clojure's data structures, which cleans up the API and reverts back to Java's equality semantics.  It also provides an implementation of an [RRB tree](https://infoscience.epfl.ch/record/169879/files/RMTrees.pdf), which provides `O(log N)` slices and concatenation.
   
-### capsule
+### capsule [0.6.3]
 
 [Capsule](https://github.com/usethesource/capsule) is the reference implementation for [CHAMP trees](https://michael.steindorfer.name/publications/oopsla15.pdf), introduced by Steindorfer in 2015.  Unfortunately, the performance gains described in the paper are exaggerated, as it is compared to Clojure's maps without accounting for the different equality semantics.  It does, however, provide a canonical structure and meaningful improvements in iteration performance.
 
 Unlike the other libraries included here, this library only provides implementations of hash maps and sets.  
 
-### scala
+### scala [2.13.1]
 
 [Scala](https://github.com/scala/scala) uses CHAMP trees for its hash maps and sets, and otherwise uses similar data structures to Clojure.  We also include its `LongMap`, which is a special case sorted map structure based on Okasaki's [Fast Mergeable Int Maps](http://ittc.ku.edu/~andygill/papers/IntMap98.pdf).  Its performance is undercut by a lack of temporary mutability.
 
-### vavr
+### vavr [0.10.2]
 
 [Vavr](https://github.com/vavr-io/vavr) is "an object-functional language extension to Java 11, which aims to increase code quality and readability."  It provides its own implementation of the same data structures used in Clojure, but does not support temporary mutability.
 
-### pcollections
+### pcollections [3.1.2]
 
 [PCollections](https://github.com/hrldcpr/pcollections) is the most venerable of all the functional data structure libraries.  Unfortunately, it is also by far the slowest, so much so that it is omitted from the graphs below.
 
@@ -52,7 +52,7 @@ Unlike the other libraries included here, this library only provides implementat
 
 For comparison, I've included Java's mutable `HashMap`, `HashSet`, `TreeMap`, and `ArrayList` as a baseline for the performance of the other libraries.
 
-### bifurcan
+### bifurcan [0.2.0]
 
 [My own library](https://github.com/lacuna/bifurcan), which uses RRB trees for its `List`, red-black trees for its `SortedMap`, and CHAMP trees for its `Map`, `IntMap`, and `Set`.  Also included are `LinearMap` and `LinearSet`, which are mutable data structures that share the same API as their immutable counterparts.
 

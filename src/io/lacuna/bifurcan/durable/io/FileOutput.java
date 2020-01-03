@@ -77,7 +77,6 @@ public class FileOutput implements WritableByteChannel {
     if (len != (end - start)) {
       throw new IllegalStateException(String.format("truncated input from [%d, %d), %d != %d", start, end, end - start, len));
     }
-    assert (len == (end - start));
 
     IBuffer buf = GenerationalAllocator.allocate((int) Math.min(8 << 20, end - start));
     ByteBuffer bytes = buf.bytes();

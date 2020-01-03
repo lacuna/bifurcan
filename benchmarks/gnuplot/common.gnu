@@ -1,8 +1,8 @@
-set terminal pngcairo enhanced font 'arial,22' fontscale 1.0 size 1500, 1000 linewidth 2
+set terminal pngcairo enhanced font 'helvetica,14' fontscale 1.0 size 1500, 1000 linewidth 2
 set xtics nomirror 
 set key autotitle columnhead outside right
 set style data linespoints 
-set title font 'arial,32'
+set title font 'helvetica,26'
 set xlabel "number of elements"
 set ylabel "time per element, in nanoseconds"
 # set logscale y
