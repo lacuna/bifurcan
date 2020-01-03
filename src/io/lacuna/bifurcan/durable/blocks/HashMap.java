@@ -4,6 +4,7 @@ import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.durable.BlockPrefix;
 import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
 import io.lacuna.bifurcan.durable.ChunkSort;
+import io.lacuna.bifurcan.durable.allocator.GenerationalAllocator;
 import io.lacuna.bifurcan.durable.io.DurableBuffer;
 import io.lacuna.bifurcan.durable.Util;
 import io.lacuna.bifurcan.utils.Iterators;
@@ -51,14 +52,19 @@ public class HashMap {
     }
   }
 
+  private static final IDurableEncoding.Primitive MAP_INDEX_ENCODING =
+    DurableEncodings.primitive("MapIndex", 32,
+        DurableEncodings.Codec.from(
+            (l, out) -> l.forEach(e -> MapIndex.encode((MapIndex) e, out)),
+            (in, root) -> Iterators.skippable(Iterators.from(in::hasRemaining, () -> MapIndex.decode(in)))));
+
   public static <K, V> Iterator<IEntry.WithHash<K, V>> sortIndexedEntries(ICollection<?, IEntry<K, V>> entries, ToIntFunction<K> keyHash) {
     AtomicLong index = new AtomicLong(0);
     return Iterators.map(
         ChunkSort.sortedEntries(
             Iterators.map(entries.iterator(), e -> new MapIndex(keyHash.applyAsInt(e.key()), index.getAndIncrement())),
-            (it, out) -> it.forEachRemaining(e -> MapIndex.encode(e, out)),
-            in -> Iterators.from(in::hasRemaining, () -> MapIndex.decode(in)),
             Comparator.comparingInt((MapIndex e) -> e.hash),
+            MAP_INDEX_ENCODING,
             1 << 16),
         i -> {
           IEntry<K, V> e = entries.nth(i.index);
@@ -66,7 +72,7 @@ public class HashMap {
         });
   }
 
-  public static <K, V> ChunkSort.CloseableIterator<IEntry.WithHash<K, V>> sortEntries(Iterator<IEntry<K, V>> entries, IDurableEncoding.Map encoding, int maxRealizedEntries) {
+  public static <K, V> Iterator<IEntry.WithHash<K, V>> sortEntries(Iterator<IEntry<K, V>> entries, IDurableEncoding.Map encoding, int maxRealizedEntries) {
     IDurableEncoding hashEncoding = DurableEncodings.primitive("int32", 1024,
         DurableEncodings.Codec.selfDelimited(
             (o, out) -> out.writeInt((int) o),
@@ -77,16 +83,15 @@ public class HashMap {
     return ChunkSort.sortedEntries(
         Iterators.map(entries, e -> IEntry.of(hashFn.applyAsInt(e.key()), e.key(), e.value())),
         Comparator.comparingInt(IEntry.WithHash::keyHash),
-        DurableEncodings.list(
-            DurableEncodings.tuple(
-                o -> {
-                  IEntry.WithHash<Object, Object> e = (IEntry.WithHash<Object, Object>) o;
-                  return new Object[]{e.keyHash(), e.key(), e.value()};
-                },
-                ary -> IEntry.of((int) ary[0], ary[1], ary[2]),
-                hashEncoding,
-                encoding.keyEncoding(),
-                encoding.valueEncoding())),
+        DurableEncodings.tuple(
+            o -> {
+              IEntry.WithHash<Object, Object> e = (IEntry.WithHash<Object, Object>) o;
+              return new Object[]{e.keyHash(), e.key(), e.value()};
+            },
+            ary -> IEntry.of((int) ary[0], ary[1], ary[2]),
+            hashEncoding,
+            encoding.keyEncoding(),
+            encoding.valueEncoding()),
         maxRealizedEntries);
   }
 
@@ -123,6 +128,8 @@ public class HashMap {
       index += b.size();
     }
 
+    TempStream.release();
+
     // flush everything to the provided sink
     long size = index;
     DurableBuffer.flushTo(out, BlockType.HASH_MAP, acc -> {
@@ -150,10 +157,6 @@ public class HashMap {
 
       entries.flushTo(acc);
     });
-
-    if (sortedEntries instanceof ChunkSort.CloseableIterator) {
-      ((ChunkSort.CloseableIterator<IEntry.WithHash<K,V>>) sortedEntries).close();
-    }
   }
 
   /// decoding

@@ -60,7 +60,7 @@ public class SkipTable {
   public final int tiers;
 
   public SkipTable(DurableInput.Pool pool, int tiers) {
-    this.pool = pool;
+    this.pool = pool.instance().cached().pool();
     this.tiers = tiers;
   }
 

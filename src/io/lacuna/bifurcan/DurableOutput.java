@@ -3,7 +3,6 @@ package io.lacuna.bifurcan;
 import io.lacuna.bifurcan.durable.allocator.IBuffer;
 import io.lacuna.bifurcan.durable.io.ByteChannelOutput;
 import io.lacuna.bifurcan.durable.Util;
-import io.lacuna.bifurcan.durable.allocator.SlabAllocator;
 
 import java.io.*;
 import java.nio.ByteBuffer;

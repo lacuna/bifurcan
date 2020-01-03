@@ -1,30 +1,30 @@
 package io.lacuna.bifurcan.durable.io;
 
 import io.lacuna.bifurcan.durable.Bytes;
-import io.lacuna.bifurcan.durable.Util;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.WritableByteChannel;
+import java.nio.file.Path;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class BufferedChannel {
-  private static final int DEFAULT_BUFFER_SIZE = 4 << 10;
+  public static final AtomicLong PAGES_READ = new AtomicLong();
 
+  private static final int PAGE_SIZE = 4 << 10;
+
+  public final Path path;
   private final FileChannel channel;
+  private long size;
 
-  public final ByteBuffer buffer;
-  public final long size;
+  private final ByteBuffer buffer;
+  private long bufferOffset;
 
-  private long channelPosition, bufferOriginPosition;
-
-  public BufferedChannel(FileChannel channel) {
-    this(channel, DEFAULT_BUFFER_SIZE);
-  }
-
-  public BufferedChannel(FileChannel channel, int bufferSize) {
+  public BufferedChannel(Path path, FileChannel channel) {
+    this.path = path;
     this.channel = channel;
-    this.buffer = Bytes.allocate(bufferSize);
+    this.buffer = Bytes.allocate(PAGE_SIZE * 2);
 
     try {
       this.size = channel.size();
@@ -32,13 +32,17 @@ public class BufferedChannel {
       throw new RuntimeException(e);
     }
 
-    this.buffer.limit(0);
-    this.channelPosition = 0;
-    this.bufferOriginPosition = 0;
+    clearBuffer(0);
   }
 
-  public int remainingBuffer() {
-    return buffer.remaining();
+  public void free() {
+    try {
+      channel.truncate(0);
+      channel.close();
+      path.toFile().delete();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   public void close() {
@@ -48,7 +52,11 @@ public class BufferedChannel {
       throw new RuntimeException(e);
     }
   }
-  
+
+  public long size() {
+    return size;
+  }
+
   public long transferTo(long start, long end, WritableByteChannel dst) {
     try {
       return channel.transferTo(start, end - start, dst);
@@ -59,78 +67,113 @@ public class BufferedChannel {
 
   public void truncate(long size) {
     try {
+      this.size = size;
       channel.truncate(size);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
   }
 
-  public long position() {
-    return bufferOriginPosition + buffer.position();
+  public byte readByte(long position) {
+    return ensureAvailable(1, position).get();
   }
 
-  /**
-   * Updates the buffer such that it reflects the current position.
-   */
-  public void seek(long position) {
-    if (position >= bufferOriginPosition && position < (bufferOriginPosition + buffer.limit())) {
-      buffer.position((int) (position - bufferOriginPosition));
+  public short readShort(long position) {
+    return ensureAvailable(2, position).getShort();
+  }
 
-      // the position doesn't fall within the current buffer, so just empty it
+  public char readChar(long position) {
+    return ensureAvailable(2, position).getChar();
+  }
+
+  public int readInt(long position) {
+    return ensureAvailable(4, position).getInt();
+  }
+
+  public long readLong(long position) {
+    return ensureAvailable(8, position).getLong();
+  }
+
+  public float readFloat(long position) {
+    return ensureAvailable(4, position).getFloat();
+  }
+
+  public double readDouble(long position) {
+    return ensureAvailable(8, position).getDouble();
+  }
+
+  public void write(ByteBuffer buf, long position) {
+    try {
+      int size = buf.remaining();
+      this.size = Math.max(this.size, position + size);
+
+      while (buf.hasRemaining()) {
+        int bytes = channel.write(buf, position);
+        if (buf.hasRemaining()) {
+          System.out.println(String.format("wrote %d bytes, %d left over", bytes, buf.remaining()));
+        }
+      }
+
+      // if our write overlapped with our buffer, just clear it out
+      if (position < (bufferOffset + buffer.limit()) && bufferOffset < (position + size)) {
+        clearBuffer(0);
+      }
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  public int read(ByteBuffer dst, long position) {
+    if (dst.remaining() < PAGE_SIZE) {
+       return Bytes.transfer(ensureAvailable(dst.remaining(), position), dst);
     } else {
-      buffer.position(0).limit(0);
-      bufferOriginPosition = position;
-    }
-  }
-
-  public int write(ByteBuffer buf) {
-    try {
-      if (position() != channelPosition) {
-        channel.position(position());
+      try {
+        seekBuffer(position);
+        int bytes = Bytes.transfer(buffer, dst);
+        if (dst.hasRemaining()) {
+          int read = Math.max(0, channel.read(dst, position + bytes));
+          PAGES_READ.addAndGet(((pageFloor(position + read) - pageFloor(position)) / PAGE_SIZE) + 1);
+          bytes += read;
+        }
+        return bytes;
+      } catch (IOException e) {
+        throw new RuntimeException(e);
       }
-      int bytes = channel.write(buf);
-      channelPosition += bytes;
-
-      buffer.position(0).limit(0);
-      bufferOriginPosition = channelPosition;
-
-//      // if our write overlapped with our buffer, just clear it out
-//      if ((channelPosition - bytes) < (bufferOriginPosition + buffer.limit()) && bufferOriginPosition < channelPosition) {
-//        buffer.position(0).limit(0);
-//        bufferOriginPosition = channelPosition;
-//      }
-
-      return bytes;
-    } catch (IOException e) {
-      throw new RuntimeException(e);
     }
   }
 
-  /**
-   * Reads directly from the file into the buffer.
-   */
-  public int read(ByteBuffer buf) {
-    try {
-      if (position() != channelPosition) {
-        channel.position(position());
+  ///
+
+  private long pageFloor(long position) {
+    return position & ~(PAGE_SIZE - 1);
+  }
+
+  private void clearBuffer(long position) {
+    buffer.position(0).limit(0);
+    bufferOffset = position;
+  }
+
+  private void seekBuffer(long position) {
+    if (position >= bufferOffset && position < (bufferOffset + buffer.limit())) {
+      buffer.position((int) (position - bufferOffset));
+    } else {
+      clearBuffer(position);
+    }
+  }
+
+  private ByteBuffer ensureAvailable(int bytes, long position) {
+    seekBuffer(position);
+    if (buffer.remaining() < bytes) {
+      bufferOffset = pageFloor(position);
+      buffer.position(0).limit((position + bytes) - bufferOffset > PAGE_SIZE ? PAGE_SIZE * 2 : PAGE_SIZE);
+      try {
+        PAGES_READ.addAndGet(buffer.remaining() / PAGE_SIZE);
+        channel.read(buffer, bufferOffset);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
       }
-
-      int bytes = Math.max(0, channel.read(buf));
-      channelPosition += bytes;
-      return bytes;
-    } catch (IOException e) {
-      throw new RuntimeException(e);
+      buffer.flip().position((int) (position - bufferOffset));
     }
-  }
-
-  /**
-   * Fills the remainder of the buffer from the file.
-   */
-  public int readToBuffer() {
-    bufferOriginPosition += buffer.position();
-    buffer.compact().limit(buffer.capacity());
-    int bytes = read(buffer);
-    buffer.flip();
-    return bytes;
+    return buffer;
   }
 }

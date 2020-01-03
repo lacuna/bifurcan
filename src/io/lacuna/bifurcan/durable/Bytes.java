@@ -1,6 +1,8 @@
 package io.lacuna.bifurcan.durable;
 
 import io.lacuna.bifurcan.DurableInput;
+import io.lacuna.bifurcan.durable.allocator.GenerationalAllocator;
+import io.lacuna.bifurcan.durable.allocator.IBuffer;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -64,24 +66,35 @@ public class Bytes {
     a = a.duplicate();
     b = b.duplicate();
 
-    while (a.hasRemaining() && b.hasRemaining()) {
-      int d = a.readUnsignedByte() - b.readUnsignedByte();
-      if (d != 0) {
-        return d;
+    IBuffer
+        ia = GenerationalAllocator.allocate(1 << 10),
+        ib = GenerationalAllocator.allocate(1 << 10);
+
+    try {
+      while (a.hasRemaining() || b.hasRemaining()) {
+        ByteBuffer ba = ia.bytes();
+        ByteBuffer bb = ib.bytes();
+        a.read(ba);
+        b.read(bb);
+        int cmp = compareBuffers((ByteBuffer) ba.flip(), (ByteBuffer) bb.flip());
+        if (cmp != 0) {
+          return cmp;
+        }
       }
+    } finally {
+      ia.free();
+      ib.free();
     }
 
-    if (a.hasRemaining()) {
-      return 1;
-    } else if (b.hasRemaining()) {
-      return -1;
-    } else {
-      return 0;
-    }
+    return 0;
   }
 
   public static ByteBuffer slice(ByteBuffer b, long start, long end) {
-    return ((ByteBuffer) b.duplicate().position((int) start).limit((int) end)).slice().order(ByteOrder.BIG_ENDIAN);
+    return ((ByteBuffer) b.duplicate()
+        .position((int) start)
+        .limit((int) end))
+        .slice()
+        .order(ByteOrder.BIG_ENDIAN);
   }
 
   public static ByteBuffer allocate(int n) {

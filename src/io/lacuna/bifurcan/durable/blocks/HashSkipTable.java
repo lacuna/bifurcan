@@ -48,11 +48,9 @@ public class HashSkipTable {
     private final SkipTable.Writer table = new SkipTable.Writer();
 
     public void append(IntStream hashes, long offset) {
-      int[] ary = hashes.toArray();
-      PrimitiveIterator.OfLong it = IntStream.of(ary).mapToLong(n -> ((long) n) + HASH_OFFSET).iterator();
+      PrimitiveIterator.OfLong it = hashes.mapToLong(n -> ((long) n) + HASH_OFFSET).iterator();
       long h = it.nextLong();
       if (prevHash > h) {
-        System.out.println(ary[0]);
         throw new IllegalStateException(String.format("out-of-order hashes: %d > %d", prevHash, h));
       }
 

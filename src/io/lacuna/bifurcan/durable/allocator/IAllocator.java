@@ -1,5 +1,7 @@
 package io.lacuna.bifurcan.durable.allocator;
 
+import io.lacuna.bifurcan.IntMap;
+
 /**
  * @author ztellman
  */
@@ -42,9 +44,7 @@ public interface IAllocator {
 
   void release(Range range);
 
-  boolean isAcquired();
-
-  long acquired();
+  IntMap<Range> acquired();
 
   Iterable<Range> available();
 

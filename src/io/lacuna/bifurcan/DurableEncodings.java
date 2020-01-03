@@ -226,7 +226,18 @@ public class DurableEncodings {
       Function<Object, Object[]> preEncode,
       Function<Object[], Object> postDecode,
       IDurableEncoding... encodings) {
-    int blockSize = Arrays.stream(encodings).mapToInt(IDurableEncoding::blockSize).min().getAsInt();
+    return tuple(
+        preEncode,
+        postDecode,
+        Arrays.stream(encodings).mapToInt(IDurableEncoding::blockSize).min().getAsInt(),
+        encodings);
+  }
+
+  public static IDurableEncoding.Primitive tuple(
+      Function<Object, Object[]> preEncode,
+      Function<Object[], Object> postDecode,
+      int blockSize,
+      IDurableEncoding... encodings) {
     return new IDurableEncoding.Primitive() {
 
       @Override

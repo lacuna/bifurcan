@@ -21,6 +21,11 @@
     (test [_ x]
       (f x))))
 
+(defn ->consumer [f]
+  (reify java.util.function.Consumer
+    (accept [_ a]
+      (f a))))
+
 (defn ->bi-consumer [f]
   (reify java.util.function.BiConsumer
     (accept [_ a b]

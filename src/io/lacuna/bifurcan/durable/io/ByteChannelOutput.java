@@ -39,7 +39,6 @@ public class ByteChannelOutput implements DurableOutput {
 
   ///
 
-
   @Override
   public void transferFrom(DurableInput in) {
     while (in.hasRemaining()) {
@@ -70,9 +69,10 @@ public class ByteChannelOutput implements DurableOutput {
       try {
         this.position = position + buffer.position();
         buffer.flip();
-        channel.write(buffer);
+        while (buffer.hasRemaining()) {
+          channel.write(buffer);
+        }
         buffer.clear();
-
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
@@ -96,10 +96,14 @@ public class ByteChannelOutput implements DurableOutput {
 
   @Override
   public int write(ByteBuffer src) {
-    checkRemaining(src.remaining());
-    if (src.remaining() > buffer.capacity()) {
+    int size = src.remaining();
+    checkRemaining(size);
+    if (size > buffer.capacity()) {
       try {
-        return channel.write(src);
+        while (src.hasRemaining()) {
+          channel.write(src);
+        }
+        return size;
       } catch (IOException e) {
         throw new RuntimeException(e);
       }

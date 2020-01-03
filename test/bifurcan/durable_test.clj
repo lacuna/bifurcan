@@ -26,7 +26,6 @@
     DurableEncodings
     DurableEncodings$Codec]
    [io.lacuna.bifurcan.durable.allocator
-    SlabAllocator
     GenerationalAllocator]
    [io.lacuna.bifurcan.hash
     PerlHash]

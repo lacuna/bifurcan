@@ -75,6 +75,7 @@ public class HashMapEntries {
 
       int keyIndex = entries.localIndexOf(candidates, key);
       if (keyIndex == -1 && candidates.isBounded) {
+        return OptionalLong.empty();
       } else if (keyIndex != -1) {
         return OptionalLong.of(entries.entryOffset + keyIndex);
       }

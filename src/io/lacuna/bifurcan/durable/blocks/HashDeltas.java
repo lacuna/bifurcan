@@ -109,11 +109,13 @@ public class HashDeltas {
     int start = -1, end = -1;
     OfInt it = iterator();
 
-    int currHash = Integer.MIN_VALUE;
-    for (int i = 0; currHash < hash && it.hasNext(); i++) {
-      if (it.nextInt() == hash) {
+    for (int i = 0; it.hasNext(); i++) {
+      int curr = it.nextInt();
+      if (curr == hash) {
         start = i;
         break;
+      } else if (curr > hash) {
+        return new IndexRange(-1, -1, true);
       }
     }
 

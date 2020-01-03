@@ -12,14 +12,8 @@ import java.util.Iterator;
 
 public interface DurableInput extends DataInput, Closeable, AutoCloseable {
 
-  int DEFAULT_BUFFER_SIZE = 4 << 10;
-
   interface Pool {
-    default DurableInput instance() {
-      return instance(DEFAULT_BUFFER_SIZE);
-    }
-
-    DurableInput instance(int bufferSize);
+    DurableInput instance();
   }
 
   class Slice {
@@ -107,6 +101,17 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
   long remaining();
 
   Pool pool();
+
+  // TODO: make this part of Root
+  default DurableInput cached() {
+    if (size() <= Integer.MAX_VALUE) {
+      ByteBuffer buf = Bytes.allocate((int) size());
+      read(buf);
+      return new BufferInput((ByteBuffer) buf.flip());
+    } else {
+      return this;
+    }
+  }
 
   default boolean hasRemaining() {
     return remaining() > 0;

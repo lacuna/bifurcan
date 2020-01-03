@@ -3,6 +3,7 @@ package io.lacuna.bifurcan;
 import io.lacuna.bifurcan.durable.Bytes;
 import io.lacuna.bifurcan.durable.Util;
 
+import java.io.Closeable;
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
 
@@ -23,6 +24,8 @@ public interface IDurableCollection {
   }
 
   interface Root {
+    void close();
+
     Path path();
 
     DurableInput.Pool bytes();

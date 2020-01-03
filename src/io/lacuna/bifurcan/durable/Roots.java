@@ -1,11 +1,13 @@
 package io.lacuna.bifurcan.durable;
 
-import io.lacuna.bifurcan.*;
+import io.lacuna.bifurcan.DurableInput;
 import io.lacuna.bifurcan.IDurableCollection.Fingerprint;
 import io.lacuna.bifurcan.IDurableCollection.Root;
-import io.lacuna.bifurcan.durable.allocator.SlabAllocator.SlabBuffer;
+import io.lacuna.bifurcan.IMap;
+import io.lacuna.bifurcan.LinearList;
+import io.lacuna.bifurcan.durable.io.BufferInput;
 import io.lacuna.bifurcan.durable.io.BufferedChannel;
-import io.lacuna.bifurcan.durable.io.ByteChannelInput;
+import io.lacuna.bifurcan.durable.io.BufferedChannelInput;
 import io.lacuna.bifurcan.durable.io.FileOutput;
 import io.lacuna.bifurcan.utils.Functions;
 
@@ -19,8 +21,8 @@ import java.util.function.Function;
 
 public class Roots {
 
-  private static SlabBuffer map(FileChannel file, long offset, long size) throws IOException {
-    return new SlabBuffer(file.map(FileChannel.MapMode.READ_ONLY, offset, size));
+  private static DurableInput map(FileChannel file, long offset, long size) throws IOException {
+    return new BufferInput(file.map(FileChannel.MapMode.READ_ONLY, offset, size));
   }
 
   public static Root open(Path path) {
@@ -31,23 +33,24 @@ public class Roots {
 
   private static Root open(Path path, Function<Fingerprint, Root> roots) {
     try {
-      BufferedChannel channel = new BufferedChannel(FileChannel.open(path, StandardOpenOption.READ));
-      DurableInput file = new ByteChannelInput(channel);
+      FileChannel fc = FileChannel.open(path, StandardOpenOption.READ);
+      BufferedChannel channel = new BufferedChannel(path, fc);
+      DurableInput file = new BufferedChannelInput(channel);
 
       // check magic bytes
       ByteBuffer magicBytes = FileOutput.MAGIC_BYTES.duplicate();
       while (magicBytes.hasRemaining()) {
-        assert magicBytes.get() == file.readByte();
+        byte b = file.readByte();
+        assert magicBytes.get() == b;
       }
 
       // read in header
       Fingerprint fingerprint = Fingerprints.decode(file);
       IMap<Fingerprint, Root> dependencies = Dependencies.decode(file).zip(roots);
 
-
       // map over the file
 //      long size = file.size();
-//      LinearList<SlabBuffer> bufs = new LinearList<>();
+//      LinearList<DurableInput> bufs = new LinearList<>();
 //      long offset = 0;
 //      while (offset < size) {
 //        long len = Math.min(Integer.MAX_VALUE, size - offset);
@@ -59,6 +62,21 @@ public class Roots {
 
       final DurableInput.Pool contents = file.slice(file.position(), file.size()).pool();
       return new Root() {
+
+        @Override
+        protected void finalize() {
+          close();
+        }
+
+        @Override
+        public void close() {
+          try {
+            fc.close();
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        }
+
         @Override
         public Path path() {
           return path;

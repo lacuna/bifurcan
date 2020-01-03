@@ -16,7 +16,8 @@ public class BuddyAllocator implements IAllocator {
 
   private final int log2Min;
   private final long capacity;
-  private final IList<ISet<Range>> ranges = new LinearList<>();
+  private final IList<IntMap<Range>> ranges = new LinearList<>();
+  private final IntMap<Range> acquired = new IntMap<Range>().linear();
 
   public BuddyAllocator(long blockSize, long capacity) {
 
@@ -33,36 +34,35 @@ public class BuddyAllocator implements IAllocator {
     int log2Max = Bits.log2Floor(capacity);
 
     for (int i = 0; i <= (log2Max - log2Min); i++) {
-      ranges.addLast(new LinearSet<>());
+      ranges.addLast(new IntMap<Range>().linear());
     }
 
-    ranges.last().add(new Range(0, capacity));
+    ranges.last().put(0, new Range(0, capacity));
   }
 
   @Override
-  public boolean isAcquired() {
-    return ranges.last().size() == 0;
-  }
-
-  @Override
-  public long acquired() {
-    return capacity - ranges.stream().flatMap(s -> s.elements().stream()).mapToLong(Range::size).sum();
+  public IntMap<Range> acquired() {
+    return acquired;
   }
 
   @Override
   public Range acquire(long capacity) {
 
     int idx = max(0, log2Ceil(capacity) - log2Min);
-    ISet<Range> s = ranges.nth(idx);
+    IntMap<Range> m = ranges.nth(idx);
 
-    if (s.size() == 0) {
+    if (m.size() == 0) {
       split(idx);
     }
 
     Range r = null;
-    if (s.size() > 0) {
-      r = s.nth(s.size() - 1);
-      s.remove(r);
+    if (m.size() > 0) {
+      r = m.last().value();
+      m.remove(r.start);
+    }
+
+    if (r != null) {
+      acquired.put(r.start, r);
     }
 
     return r;
@@ -70,16 +70,18 @@ public class BuddyAllocator implements IAllocator {
 
   @Override
   public void release(Range range) {
+    acquired.remove(range.start);
+
     for (; ; ) {
       int idx = bitOffset(range.end - range.start) - log2Min;
       Range sibling = sibling(range);
 
-      ISet<Range> s = ranges.nth(idx);
-      if (s.contains(sibling)) {
-        s.remove(sibling);
+      IntMap<Range> m = ranges.nth(idx);
+      if (m.contains(sibling.start)) {
+        m.remove(sibling.start);
         range = new Range(min(range.start, sibling.start), max(range.end, sibling.end));
       } else {
-        s.add(range);
+        m.put(range.start, range);
         return;
       }
     }
@@ -87,7 +89,7 @@ public class BuddyAllocator implements IAllocator {
 
   @Override
   public Iterable<Range> available() {
-    return ranges.stream().flatMap(s -> s.elements().stream()).collect(Lists.linearCollector());
+    return ranges.stream().flatMap(m -> m.values().stream()).collect(Lists.linearCollector());
   }
 
   @Override
@@ -114,15 +116,15 @@ public class BuddyAllocator implements IAllocator {
 
     if (n < ranges.size()) {
       for (int i = n; i > idx; i--) {
-        ISet<Range> s = ranges.nth(i);
-        Range r = s.nth(s.size() - 1);
-        s.remove(r);
+        IntMap<Range> m = ranges.nth(i);
+        Range r = m.last().value();
+        m.remove(r.start);
 
         long mid = r.start + ((r.end - r.start) >> 1);
         Range a = new Range(r.start, mid);
         Range b = new Range(mid, r.end);
 
-        ranges.nth(i - 1).add(b).add(a);
+        ranges.nth(i - 1).put(a.start, a).put(b.start, b);
       }
     }
   }

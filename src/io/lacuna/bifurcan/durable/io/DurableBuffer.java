@@ -3,6 +3,7 @@ package io.lacuna.bifurcan.durable.io;
 import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.durable.BlockPrefix;
 import io.lacuna.bifurcan.durable.Bytes;
+import io.lacuna.bifurcan.durable.Util;
 import io.lacuna.bifurcan.durable.allocator.GenerationalAllocator;
 import io.lacuna.bifurcan.durable.allocator.IBuffer;
 
@@ -11,8 +12,6 @@ import java.util.Iterator;
 import java.util.function.Consumer;
 
 public class DurableBuffer implements DurableOutput {
-
-  private static final int BUFFER_SPILL_THRESHOLD = 1 << 20;
 
   private final LinearList<IBuffer> flushed = new LinearList<>();
   private long flushedBytes = 0;
@@ -50,6 +49,11 @@ public class DurableBuffer implements DurableOutput {
   public DurableInput toInput() {
     close();
     return DurableInput.from(flushed.stream().map(IBuffer::toInput).collect(Lists.linearCollector()));
+  }
+
+  public IList<IBuffer> toBuffers() {
+    close();
+    return flushed;
   }
 
   public void flushTo(DurableOutput out, BlockPrefix.BlockType type) {
@@ -156,14 +160,25 @@ public class DurableBuffer implements DurableOutput {
   //
 
   private static final int MIN_BUFFER_SIZE = 4 << 10;
-  private static final int MAX_BUFFER_SIZE = 16 << 20;
+  private static final int MAX_BUFFER_SIZE = 32 << 20;
+
+  private static final int BUFFER_SPILL_THRESHOLD = 4 << 20;
+  private static final int MIN_DURABLE_BUFFER_SIZE = 1 << 20;
+
 
   private int bufferSize() {
-    return curr == null ? MIN_BUFFER_SIZE : (int) Math.min(MAX_BUFFER_SIZE, written() / 4);
+    if (curr == null) {
+      return MIN_BUFFER_SIZE;
+    }
+
+    int size = (int) Math.min(MAX_BUFFER_SIZE, written() / 4);
+    if (written() > BUFFER_SPILL_THRESHOLD) {
+      size = Math.max(MIN_DURABLE_BUFFER_SIZE, size);
+    }
+    return size;
   }
 
   private IBuffer allocate(int n) {
-//    return SlabAllocator.allocate(n);
     return GenerationalAllocator.allocate(n);
   }
 
@@ -177,12 +192,26 @@ public class DurableBuffer implements DurableOutput {
   }
 
   private void flushCurrentBuffer(boolean isClosed) {
-    int size = bytes.position();
-    boolean spill = size > 0 && (size >= BUFFER_SPILL_THRESHOLD || (flushed.size() > 0 && flushed.last().isDurable()));
-    appendBuffer(curr.close(size, spill));
+    boolean spill = written() >= BUFFER_SPILL_THRESHOLD || (flushed.size() > 0 && flushed.last().isDurable());
+
+    if (spill && !flushed.first().isDurable()) {
+      LinearList<IBuffer> prefix = new LinearList<>();
+      while (flushed.size() > 0 && !flushed.first().isDurable()) {
+        prefix.addLast(flushed.popFirst());
+      }
+      flushed.addFirst(GenerationalAllocator.spill(prefix));
+      prefix.forEach(IBuffer::free);
+    }
+
+    IBuffer closed = curr.close(bytes.position(), spill);
+    appendBuffer(closed);
+
     if (!isClosed) {
       curr = allocate(bufferSize());
       bytes = curr.bytes();
+    } else {
+      curr = null;
+      bytes = null;
     }
   }
 

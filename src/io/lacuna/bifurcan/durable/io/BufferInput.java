@@ -34,7 +34,7 @@ public class BufferInput implements DurableInput {
 
   @Override
   public Pool pool() {
-    return bufferSize -> this.duplicate().seek(0);
+    return () -> this.duplicate().seek(0);
   }
 
   @Override

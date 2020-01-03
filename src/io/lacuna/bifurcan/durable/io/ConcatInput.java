@@ -13,7 +13,7 @@ public class ConcatInput implements DurableInput {
   private static final ThreadLocal<ByteBuffer> SCRATCH_BUFFER = ThreadLocal.withInitial(() -> Bytes.allocate(8));
 
   private final Slice bounds;
-  private final IntMap<DurableInput> inputs;
+  public final IntMap<DurableInput> inputs;
   private final long size;
 
   private long offset = 0;
@@ -38,13 +38,13 @@ public class ConcatInput implements DurableInput {
 
     this.bounds = bounds;
     this.size = size;
-    this.inputs = m.forked();
+    this.inputs = m;
     this.curr = this.inputs.first().value().duplicate();
   }
 
   @Override
   public Pool pool() {
-    return bufferSize -> this.duplicate().seek(0);
+    return () -> this.duplicate().seek(0);
   }
 
   @Override
