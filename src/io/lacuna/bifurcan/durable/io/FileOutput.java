@@ -21,8 +21,8 @@ import java.security.MessageDigest;
 public class FileOutput implements WritableByteChannel {
 
   // `version` encompasses the algorithm, but not necessarily the number of bytes we use
-  private static final String ALGORITHM = "SHA-512";
-  private static final int HASH_BYTES = 32;
+  private static final String ALGORITHM = "SHA-1";
+  private static final int HASH_BYTES = 20;
 
   public static final ByteBuffer MAGIC_BYTES = (ByteBuffer)
       ByteBuffer.allocate(4)
@@ -37,19 +37,21 @@ public class FileOutput implements WritableByteChannel {
   private final Path path;
   private final MessageDigest digest;
   private final FileChannel file;
+  private final IBuffer buffer;
+
   private byte[] hash;
 
   public FileOutput(ISet<Fingerprint> dependencies) {
     try {
       this.path = Files.createTempFile("bifurcan-", ".draft");
       this.digest = MessageDigest.getInstance(ALGORITHM);
+      this.buffer = GenerationalAllocator.allocate(16 << 20);
 
       this.file = FileChannel.open(path, StandardOpenOption.WRITE);
       path.toFile().deleteOnExit();
 
       // skip over prefix, to fill in later
       file.position(PREFIX_LENGTH);
-
       ByteChannelOutput.wrap(this, out -> Dependencies.encode(dependencies, out));
 
     } catch (Exception e) {
@@ -72,28 +74,19 @@ public class FileOutput implements WritableByteChannel {
   }
 
   public long transferFrom(BufferedChannel channel, long start, long end) {
-    // copy the files over
-    long len = channel.transferTo(start, end, this.file);
-    if (len != (end - start)) {
-      throw new IllegalStateException(String.format("truncated input from [%d, %d), %d != %d", start, end, end - start, len));
+    ByteBuffer buf = this.buffer.bytes();
+
+    try {
+      long pos = start;
+      while (pos < end) {
+        pos += channel.read((ByteBuffer) buf.clear().limit((int) Math.min(buf.capacity(), end - pos)), pos);
+        write((ByteBuffer) buf.flip());
+      }
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     }
 
-    IBuffer buf = GenerationalAllocator.allocate((int) Math.min(8 << 20, end - start));
-    ByteBuffer bytes = buf.bytes();
-
-    // update the hash
-    long remaining = len;
-    while (remaining > 0) {
-      bytes.position(0).limit((int) Math.min(bytes.capacity(), len));
-      channel.read(bytes, start + len - remaining);
-      bytes.flip();
-      remaining -= bytes.remaining();
-      digest.update(bytes);
-    }
-
-    buf.free();
-
-    return len;
+    return end - start;
   }
 
   @Override
@@ -101,12 +94,8 @@ public class FileOutput implements WritableByteChannel {
     int size = src.remaining();
 
     digest.update(src.duplicate());
-    while (src.hasRemaining()) {
-      file.write(src);
-      if (src.hasRemaining()) {
-        System.out.println(String.format("wrote %d bytes, %d left over", size, src.remaining()));
-      }
-    }
+    file.write(src);
+    assert !src.hasRemaining();
 
     return size;
   }
@@ -119,6 +108,7 @@ public class FileOutput implements WritableByteChannel {
   @Override
   public void close() {
     this.hash = digest.digest();
+    this.buffer.free();
 
     try {
       file.position(0);

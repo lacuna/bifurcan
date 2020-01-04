@@ -13,6 +13,7 @@ public class BufferedChannel {
   public static final AtomicLong PAGES_READ = new AtomicLong();
 
   private static final int PAGE_SIZE = 4 << 10;
+  private static final int READ_AHEAD = 256;
 
   public final Path path;
   private final FileChannel channel;
@@ -107,12 +108,8 @@ public class BufferedChannel {
       int size = buf.remaining();
       this.size = Math.max(this.size, position + size);
 
-      while (buf.hasRemaining()) {
-        int bytes = channel.write(buf, position);
-        if (buf.hasRemaining()) {
-          System.out.println(String.format("wrote %d bytes, %d left over", bytes, buf.remaining()));
-        }
-      }
+      int bytes = channel.write(buf, position);
+      assert !buf.hasRemaining();
 
       // if our write overlapped with our buffer, just clear it out
       if (position < (bufferOffset + buffer.limit()) && bufferOffset < (position + size)) {
@@ -125,14 +122,17 @@ public class BufferedChannel {
 
   public int read(ByteBuffer dst, long position) {
     if (dst.remaining() < PAGE_SIZE) {
-       return Bytes.transfer(ensureAvailable(dst.remaining(), position), dst);
+      return Bytes.transfer(ensureAvailable(dst.remaining(), position), dst);
     } else {
       try {
         seekBuffer(position);
         int bytes = Bytes.transfer(buffer, dst);
         if (dst.hasRemaining()) {
-          int read = Math.max(0, channel.read(dst, position + bytes));
-          PAGES_READ.addAndGet(((pageFloor(position + read) - pageFloor(position)) / PAGE_SIZE) + 1);
+          int read = channel.read(dst, position + bytes);
+          if (read < 0) {
+            return bytes;
+          }
+          markRead(position, position + read);
           bytes += read;
         }
         return bytes;
@@ -144,8 +144,13 @@ public class BufferedChannel {
 
   ///
 
+  private void markRead(long start, long end) {
+    long pages = ((pageFloor(end - 1) - pageFloor(start)) / PAGE_SIZE) + 1;
+    PAGES_READ.addAndGet(pages);
+  }
+
   private long pageFloor(long position) {
-    return position & ~(PAGE_SIZE - 1);
+    return (position & ~(PAGE_SIZE - 1));
   }
 
   private void clearBuffer(long position) {
@@ -165,10 +170,11 @@ public class BufferedChannel {
     seekBuffer(position);
     if (buffer.remaining() < bytes) {
       bufferOffset = pageFloor(position);
-      buffer.position(0).limit((position + bytes) - bufferOffset > PAGE_SIZE ? PAGE_SIZE * 2 : PAGE_SIZE);
+      int pages = bufferOffset != pageFloor(position + bytes + READ_AHEAD - 1) ? 2 : 1;
       try {
-        PAGES_READ.addAndGet(buffer.remaining() / PAGE_SIZE);
-        channel.read(buffer, bufferOffset);
+        buffer.position(0).limit(pages * PAGE_SIZE);
+        int read = channel.read(buffer, bufferOffset);
+        markRead(bufferOffset, bufferOffset + read);
       } catch (IOException e) {
         throw new RuntimeException(e);
       }

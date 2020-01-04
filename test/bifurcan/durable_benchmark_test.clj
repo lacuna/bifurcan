@@ -167,9 +167,11 @@
   "Measures how much actual disk usage was perfomed by `body`."
   [& body]
   (if-not (pidstat?)
-    `(let [start# (System/nanoTime)]
+    `(let [pages-read# (.set BufferedChannel/PAGES_READ 0)
+           start#      (System/nanoTime)]
        ~@body
-       {:duration (/ (- (System/nanoTime) start#) 1e9)})
+       {:duration   (/ (- (System/nanoTime) start#) 1e9)
+        :pages-read (.getAndSet BufferedChannel/PAGES_READ 0)})
     `(let [pid#       (pid)
            p#         (.exec (Runtime/getRuntime) (into-array ["pidstat" "-d" "-p" pid# "1"]))
            pid-stats# (->> p#
@@ -200,8 +202,9 @@
        (while (not @ref#)
          (Thread/sleep 1))
 
-       (let [init# (first @ref#)
-             start# (System/nanoTime)]
+       (let [init#       (first @ref#)
+             pages-read# (.set BufferedChannel/PAGES_READ 0)
+             start#      (System/nanoTime)]
 
          (try
 
@@ -216,7 +219,8 @@
                (Thread/sleep 1))
 
              (assoc (merge-with - (first @ref#) init#)
-               :duration (/ (- end# start#) 1e9)))
+               :duration (/ (- end# start#) 1e9)
+               :pages-read (.getAndSet BufferedChannel/PAGES_READ 0)))
 
            (finally
              (.destroy p#)))))))
@@ -228,9 +232,10 @@
 
 (def random-subsample 0.05)
 
-(defn scale-stats [{:keys [kbs-read kbs-written duration]} entries]
+(defn scale-stats [{:keys [kbs-read kbs-written duration pages-read]} entries]
   {:read-amplification (when kbs-read (double (/ kbs-read entries)))
    :write-amplification (when kbs-written (double (/ kbs-written entries)))
+   :pages-per-entry (double (/ pages-read entries))
    :us-per-entry (* 1e6 (/ duration entries))})
 
 (defn hashed-key [n]
@@ -335,7 +340,7 @@
       binary-encoding
       binary-encoding)
     (.toPath (io/file dir))
-    2e5))
+    1e5))
 
 (defn benchmark-bifurcan [dir name sizes create-fn get-fn]
   (clear-directory dir)
@@ -369,6 +374,18 @@
       (clear-directory dir))))
 
 ;;;
+
+(defn find-expensive-lookup [^IMap m]
+  (->> (range (.size m))
+    (map
+      (fn [_]
+        (let [i (rand-int (.size m))]
+          (assoc (io-stats (.get m (->durable-input (hashed-key i))))
+            :key i))))
+    (filter
+      (fn [{:keys [pages-read kbs-read]}]
+        (< (* 4 pages-read) kbs-read)))
+    first))
 
 (defn benchmark-rocks [dir sizes]
   (clear-directory dir)
@@ -423,12 +440,11 @@
             (catch Exception e
               nil))
           {"RocksDB"
-           (comment
-             (benchmark-rocks "/tmp/rocks" sizes))
+           (benchmark-rocks "/tmp/rocks" sizes)
 
            ;; the storage amplification is too high for benchmarks at the larger sizes
-           #_ "Berkeley DB"
-           #_ (benchmark-berkeley "/tmp/bdb" sizes)
+           #_"Berkeley DB"
+           #_(benchmark-berkeley "/tmp/bdb" sizes)
 
            "bifurcan.DurableMap"
            (benchmark-bifurcan "/tmp/bifurcan"
@@ -458,7 +474,9 @@
 
    "durable_random_read_amplification"
    (fn [db-data]
-     {"" (-> db-data :random :read-amplification)})
+     {""       (-> db-data :random :read-amplification)
+      #_" pages" #_(-> db-data :random :pages-per-entry)
+      })
 
    "durable_random_read_duration"
    (fn [db-data]

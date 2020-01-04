@@ -117,6 +117,6 @@ This separation of concerns provides greater flexibility, but also requires more
 
 ### license
 
-Copyright © 2016-2018 Zachary Tellman
+Copyright © 2016-2020 Zachary Tellman
 
 Distributed under the MIT License
