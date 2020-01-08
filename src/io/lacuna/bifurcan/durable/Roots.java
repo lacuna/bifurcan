@@ -4,11 +4,8 @@ import io.lacuna.bifurcan.DurableInput;
 import io.lacuna.bifurcan.IDurableCollection.Fingerprint;
 import io.lacuna.bifurcan.IDurableCollection.Root;
 import io.lacuna.bifurcan.IMap;
-import io.lacuna.bifurcan.LinearList;
-import io.lacuna.bifurcan.durable.io.BufferInput;
-import io.lacuna.bifurcan.durable.io.BufferedChannel;
-import io.lacuna.bifurcan.durable.io.BufferedChannelInput;
-import io.lacuna.bifurcan.durable.io.FileOutput;
+import io.lacuna.bifurcan.IntMap;
+import io.lacuna.bifurcan.durable.io.*;
 import io.lacuna.bifurcan.utils.Functions;
 
 import java.io.IOException;
@@ -23,6 +20,12 @@ public class Roots {
 
   private static DurableInput map(FileChannel file, long offset, long size) throws IOException {
     return new BufferInput(file.map(FileChannel.MapMode.READ_ONLY, offset, size));
+  }
+
+  public static DurableInput cachedInput(DurableInput in) {
+    ByteBuffer bytes = Bytes.allocate((int) in.size());
+    in.duplicate().read(bytes);
+    return new BufferInput((ByteBuffer) bytes.flip());
   }
 
   public static Root open(Path path) {
@@ -40,8 +43,9 @@ public class Roots {
       // check magic bytes
       ByteBuffer magicBytes = FileOutput.MAGIC_BYTES.duplicate();
       while (magicBytes.hasRemaining()) {
-        byte b = file.readByte();
-        assert magicBytes.get() == b;
+        if (file.readByte() != magicBytes.get()) {
+          throw new IllegalArgumentException("not a valid collection file");
+        }
       }
 
       // read in header
@@ -60,6 +64,8 @@ public class Roots {
 //      file.close();
 //      final DurableInput.Pool contents = DurableInput.from(bufs).slice(file.position(), size).pool();
 
+      AtomicReference<IntMap<DurableInput>> cachedBuffers = new AtomicReference<>(new IntMap<>());
+
       final DurableInput.Pool contents = file.slice(file.position(), file.size()).pool();
       return new Root() {
 
@@ -72,6 +78,7 @@ public class Roots {
         public void close() {
           try {
             fc.close();
+            cachedBuffers.set(null);
           } catch (IOException e) {
             throw new RuntimeException(e);
           }
@@ -80,6 +87,22 @@ public class Roots {
         @Override
         public Path path() {
           return path;
+        }
+
+        @Override
+        public DurableInput cached(DurableInput in) {
+          long start = in.bounds().absolute().start;
+          DurableInput cached = cachedBuffers.get().get(start, null);
+          if (cached == null) {
+            cached = cachedBuffers
+                .updateAndGet(map -> map.update(start, i -> i == null ? cachedInput(in) : i))
+                .get(start)
+                .get();
+            System.out.println("total cached bytes: " + cachedBuffers.get().values().stream().mapToLong(DurableInput::size).sum());
+          }
+
+          assert cached.remaining() == in.size();
+          return cached.duplicate();
         }
 
         @Override

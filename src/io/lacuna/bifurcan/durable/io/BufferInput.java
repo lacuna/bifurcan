@@ -5,21 +5,26 @@ import io.lacuna.bifurcan.durable.Bytes;
 
 import java.nio.ByteBuffer;
 
+/**
+ * An implementation of {@code DurableInput} atop {@code ByteBuffer}.
+ *
+ * @author ztellman
+ */
 public class BufferInput implements DurableInput {
 
   private final ByteBuffer buffer;
-  private final Slice bounds;
+  private final Bounds bounds;
   private final Runnable closeFn;
 
   public BufferInput(ByteBuffer buffer) {
-    this(buffer, new Slice(null, 0, buffer.remaining()), null);
+    this(buffer, new Bounds(null, 0, buffer.remaining()), null);
   }
 
   public BufferInput(ByteBuffer buffer, Runnable closeFn) {
-    this(buffer, new Slice(null, 0, buffer.remaining()), closeFn);
+    this(buffer, new Bounds(null, 0, buffer.remaining()), closeFn);
   }
 
-  public BufferInput(ByteBuffer buffer, Slice bounds, Runnable closeFn) {
+  public BufferInput(ByteBuffer buffer, Bounds bounds, Runnable closeFn) {
     this.buffer = buffer;
     this.bounds = bounds;
     this.closeFn = closeFn;
@@ -38,7 +43,7 @@ public class BufferInput implements DurableInput {
   }
 
   @Override
-  public Slice bounds() {
+  public Bounds bounds() {
     return bounds;
   }
 
@@ -48,7 +53,7 @@ public class BufferInput implements DurableInput {
       throw new IllegalArgumentException(String.format("[%d, %d) is not within [0, %d)", start, end, size()));
     }
 
-    return new BufferInput(Bytes.slice(buffer, start, end), new Slice(bounds, start, end), null);
+    return new BufferInput(Bytes.slice(buffer, start, end), new Bounds(bounds, start, end), null);
   }
 
   @Override

@@ -4,15 +4,16 @@ import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.durable.BlockPrefix;
 import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
 import io.lacuna.bifurcan.durable.ChunkSort;
-import io.lacuna.bifurcan.durable.allocator.GenerationalAllocator;
-import io.lacuna.bifurcan.durable.io.DurableBuffer;
 import io.lacuna.bifurcan.durable.Util;
+import io.lacuna.bifurcan.durable.io.DurableBuffer;
 import io.lacuna.bifurcan.utils.Iterators;
 
 import java.util.Comparator;
 import java.util.Iterator;
+import java.util.PrimitiveIterator;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.ToIntFunction;
+import java.util.stream.IntStream;
 
 /**
  * The underlying encode/decode logic for DurableMap.
@@ -42,12 +43,12 @@ public class HashMap {
 
     static void encode(MapIndex e, DurableOutput out) {
       out.writeInt(e.hash);
-      out.writeVLQ(e.index);
+      out.writeUVLQ(e.index);
     }
 
     static MapIndex decode(DurableInput in) {
       int hash = in.readInt();
-      long index = in.readVLQ();
+      long index = in.readUVLQ();
       return new MapIndex(hash, index);
     }
   }
@@ -104,8 +105,8 @@ public class HashMap {
   public static <K, V> void encodeSortedEntries(Iterator<IEntry.WithHash<K, V>> sortedEntries, IDurableEncoding.Map encoding, DurableOutput out) {
     // two tables and actual entries
     DurableBuffer entries = new DurableBuffer();
-    SkipTable.Writer skipTable = new SkipTable.Writer();
-    HashSkipTable.Writer hashTable = new HashSkipTable.Writer();
+    SkipTable.Writer indexTable = new SkipTable.Writer();
+    SkipTable.Writer hashTable = new SkipTable.Writer();
 
     // chunk up the entries so that collections are always singletons
     Iterator<IList<IEntry.WithHash<K, V>>> entryBlocks =
@@ -115,13 +116,26 @@ public class HashMap {
             e -> encoding.keyEncoding().isSingleton(e.key()) || encoding.valueEncoding().isSingleton(e.value()));
 
     long index = 0;
+    int prevHash = Integer.MAX_VALUE;
     while (entryBlocks.hasNext()) {
       IList<IEntry.WithHash<K, V>> b = entryBlocks.next();
 
-      // update the tables
       long offset = entries.written();
-      skipTable.append(index, offset);
-      hashTable.append(b.stream().mapToInt(IEntry.WithHash::keyHash), offset);
+
+      // update nth() lookup
+      indexTable.append(index, offset);
+
+      // update get() lookup
+      PrimitiveIterator.OfInt hashes = b.stream().mapToInt(IEntry.WithHash::keyHash).iterator();
+      int firstHash = hashes.nextInt();
+      if (firstHash != prevHash) {
+        hashTable.append(firstHash, offset);
+      }
+
+      // if this block has a given hash, don't let the next block claim it
+      while (hashes.hasNext()) {
+        prevHash = hashes.nextInt();
+      }
 
       // write the entries
       HashMapEntries.encode(index, b, encoding, entries);
@@ -133,10 +147,10 @@ public class HashMap {
     // flush everything to the provided sink
     long size = index;
     DurableBuffer.flushTo(out, BlockType.HASH_MAP, acc -> {
-      acc.writeVLQ(size);
+      acc.writeUVLQ(size);
 
       // skip table metadata
-      int tiers = skipTable.tiers();
+      int tiers = indexTable.tiers();
       acc.writeUnsignedByte(tiers);
 
       // hash table metadata
@@ -144,9 +158,9 @@ public class HashMap {
       acc.writeUnsignedByte(bytesPerEntry);
 
       if (tiers > 0) {
-        skipTable.flushTo(acc);
+        indexTable.flushTo(acc);
       } else {
-        skipTable.free();
+        indexTable.free();
       }
 
       if (bytesPerEntry > 0) {
@@ -168,18 +182,20 @@ public class HashMap {
     assert (prefix.type == BlockType.HASH_MAP);
     long pos = in.position();
 
-    long size = in.readVLQ();
+    long size = in.readUVLQ();
     int skipTableTiers = in.readUnsignedByte();
     int hashTableTiers = in.readUnsignedByte();
 
     SkipTable skipTable = null;
     if (skipTableTiers > 0) {
-      skipTable = new SkipTable(in.sliceBlock(BlockType.TABLE).pool(), skipTableTiers);
+      DurableInput skipIn = in.sliceBlock(BlockType.TABLE);
+      skipTable = new SkipTable(root == null ? skipIn.pool() : () -> root.cached(skipIn), skipTableTiers);
     }
 
-    HashSkipTable hashTable = null;
+    SkipTable hashTable = null;
     if (hashTableTiers > 0) {
-      hashTable = new HashSkipTable(in.sliceBlock(BlockType.TABLE).pool(), hashTableTiers);
+      DurableInput hashIn = in.sliceBlock(BlockType.TABLE);
+      hashTable = new SkipTable(root == null ? hashIn.pool() : () -> root.cached(hashIn), hashTableTiers);
     }
 
     DurableInput.Pool entries = in.sliceBytes((pos + prefix.length) - in.position()).pool();

@@ -65,6 +65,10 @@ public interface DurableOutput extends DataOutput, Flushable, Closeable, AutoClo
     Util.writeVLQ(n, this);
   }
 
+  default void writeUVLQ(long n) {
+    Util.writeUVLQ(n, this);
+  }
+
   default void write(int b) {
     writeByte(b);
   }

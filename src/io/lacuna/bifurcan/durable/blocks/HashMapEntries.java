@@ -31,7 +31,7 @@ public class HashMapEntries {
       IDurableEncoding.Map mapEncoding,
       DurableOutput out) {
     DurableBuffer.flushTo(out, BLOCK_TYPE, acc -> {
-      acc.writeVLQ(offset);
+      acc.writeUVLQ(offset);
 
       HashDeltas.Writer hashes = new HashDeltas.Writer();
       block.forEach(e -> hashes.append(e.keyHash()));
@@ -44,7 +44,7 @@ public class HashMapEntries {
 
   public static HashMapEntries decode(DurableInput in, Root root, IDurableEncoding.Map mapEncoding) {
     DurableInput entries = in.sliceBlock(BLOCK_TYPE);
-    long entryOffset = entries.readVLQ();
+    long entryOffset = entries.readUVLQ();
     HashDeltas deltas = HashDeltas.decode(entries);
     DurableInput keys = entries.slicePrefixedBlock();
     DurableInput values = entries.slicePrefixedBlock();

@@ -1,5 +1,7 @@
 package io.lacuna.bifurcan;
 
+import io.lacuna.bifurcan.diffs.Util;
+
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.OptionalLong;
@@ -21,7 +23,7 @@ public interface IDiffSortedMap<K, V> extends ISortedMap<K, V> {
   /**
    * The indices of the added keys within the combined data structure.
    */
-  IMap<Long, K> addedKeys();
+  ISortedMap<Long, K> addedKeys();
 
   /**
    * Indices which have been removed or shadowed from the underlying data structure.
@@ -75,7 +77,12 @@ public interface IDiffSortedMap<K, V> extends ISortedMap<K, V> {
 
   @Override
   default IEntry<K, V> nth(long index) {
-    return null;
+    IEntry<Long, K> addedFloor = addedKeys().floor(index);
+    if (addedFloor.key() == index) {
+      return IEntry.of(addedFloor.value(), added().get(addedFloor.value()).get());
+    } else {
+      return underlying().nth(Util.offsetIndex(removedIndices(), index - addedFloor.key()));
+    }
   }
 
   @Override

@@ -3,8 +3,8 @@ package io.lacuna.bifurcan.durable.blocks;
 import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.durable.BlockPrefix;
 import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
-import io.lacuna.bifurcan.durable.io.DurableBuffer;
 import io.lacuna.bifurcan.durable.Util;
+import io.lacuna.bifurcan.durable.io.DurableBuffer;
 
 import java.util.Iterator;
 
@@ -37,7 +37,7 @@ public class List {
 
     long size = index;
     DurableBuffer.flushTo(out, BlockType.LIST, acc -> {
-      acc.writeVLQ(size);
+      acc.writeUVLQ(size);
       acc.writeUnsignedByte(skipTable.tiers());
 
       if (skipTable.tiers() > 0) {
@@ -57,12 +57,13 @@ public class List {
     assert (prefix.type == BlockType.LIST);
     long pos = in.position();
 
-    long size = in.readVLQ();
+    long size = in.readUVLQ();
     int skipTableTiers = in.readUnsignedByte();
 
     SkipTable skipTable = null;
     if (skipTableTiers > 0) {
-      skipTable = new SkipTable(in.sliceBlock(BlockType.TABLE).pool(), skipTableTiers);
+      DurableInput skipIn = in.sliceBlock(BlockType.TABLE);
+      skipTable = new SkipTable(root == null ? skipIn.pool() : () -> root.cached(skipIn), skipTableTiers);
     }
 
     DurableInput.Pool elements = in.sliceBytes((pos + prefix.length) - in.position()).pool();

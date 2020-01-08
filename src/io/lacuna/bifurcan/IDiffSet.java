@@ -1,81 +1,45 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.diffs.Util;
-import io.lacuna.bifurcan.utils.Iterators;
-
-import java.util.Iterator;
 import java.util.OptionalLong;
 import java.util.function.BiPredicate;
 import java.util.function.ToIntFunction;
 
-public interface IDiffSet<V> extends ISet<V>, IDiff<ISet<V>, V> {
+public interface IDiffSet<V> extends ISet<V>, IDiff<IMap<V, Void>, IEntry<V, Void>> {
 
-  /**
-   * The baseline data structure.
-   */
-  ISet<V> underlying();
+  IDiffMap<V, Void> diffMap();
 
-  /**
-   * Entries which have been added to the underlying data structure
-   */
-  ISet<V> added();
-
-  /**
-   * Indices which have been removed from the underlying data structure.
-   */
-  ISortedSet<Long> removedIndices();
+  default IMap<V, Void> underlying() {
+    return diffMap().underlying();
+  }
 
   @Override
   default ToIntFunction<V> valueHash() {
-    return underlying().valueHash();
+    return underlying().keyHash();
   }
 
   @Override
   default BiPredicate<V, V> valueEquality() {
-    return underlying().valueEquality();
+    return underlying().keyEquality();
   }
 
   @Override
   default OptionalLong indexOf(V element) {
-    OptionalLong addedIdx = added().indexOf(element);
-    if (addedIdx.isPresent()) {
-      return OptionalLong.of(underlying().size() - removedIndices().size() + addedIdx.getAsLong());
-    }
-
-    OptionalLong underlyingIdx = underlying().indexOf(element);
-    if (!underlyingIdx.isPresent()) {
-      return underlyingIdx;
-    }
-
-    OptionalLong predecessors = Util.removedPredecessors(removedIndices(), underlyingIdx.getAsLong());
-    if (!predecessors.isPresent()) {
-      return predecessors;
-    }
-
-    return OptionalLong.of(underlyingIdx.getAsLong() - predecessors.getAsLong());
+    return diffMap().indexOf(element);
   }
 
   @Override
   default long size() {
-    return underlying().size() + added().size() - removedIndices().size();
+    return diffMap().size();
   }
 
   @Override
   default V nth(long index) {
-    long underlyingSize = underlying().size() - removedIndices().size();
-    if (index < underlyingSize) {
-      return underlying().nth(Util.offsetIndex(removedIndices(), index));
-    } else {
-      return added().nth(index - underlyingSize);
-    }
+    return diffMap().nth(index).key();
   }
 
   @Override
   default IList<V> elements() {
-    return Lists.from(size(), this::nth, () ->
-        Iterators.concat(
-            Util.skipIndices(underlying().elements().iterator(), removedIndices().iterator()),
-            added().elements().iterator()));
+    return Lists.lazyMap(diffMap().entries(), IEntry::key);
   }
 
   @Override

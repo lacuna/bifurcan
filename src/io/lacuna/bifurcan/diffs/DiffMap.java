@@ -5,6 +5,10 @@ import io.lacuna.bifurcan.*;
 import java.util.OptionalLong;
 import java.util.function.BinaryOperator;
 
+/**
+ *
+ * @author ztellman
+ */
 public class DiffMap<K, V> implements IDiffMap<K, V> {
 
   private final IMap<K, V> underlying, added;
@@ -21,7 +25,7 @@ public class DiffMap<K, V> implements IDiffMap<K, V> {
   }
 
   @Override
-  public IMap<K, V> put(K key, V value, BinaryOperator<V> merge) {
+  public DiffMap<K, V> put(K key, V value, BinaryOperator<V> merge) {
     long addedSize = added.size();
     OptionalLong idx = underlying.indexOf(key);
     IMap<K, V> addedPrime = idx.isPresent() && !added.contains(key)
@@ -37,7 +41,7 @@ public class DiffMap<K, V> implements IDiffMap<K, V> {
   }
 
   @Override
-  public IMap<K, V> remove(K key) {
+  public DiffMap<K, V> remove(K key) {
     IMap<K, V> addedPrime = added.remove(key);
     OptionalLong idx = underlying.indexOf(key);
     ISortedSet<Long> removedIndicesPrime = idx.isPresent() ? removedIndices.add(idx.getAsLong()) : removedIndices;
@@ -50,12 +54,12 @@ public class DiffMap<K, V> implements IDiffMap<K, V> {
   }
 
   @Override
-  public IMap<K, V> forked() {
+  public DiffMap<K, V> forked() {
     return isLinear() ? new DiffMap<>(underlying, added.forked(), removedIndices.forked()) : this;
   }
 
   @Override
-  public IMap<K, V> linear() {
+  public DiffMap<K, V> linear() {
     return isLinear() ? this : new DiffMap<>(underlying, added.linear(), removedIndices.linear());
   }
 

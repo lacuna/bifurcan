@@ -61,7 +61,7 @@ public class List<V> implements IList<V>, Cloneable {
     this.suffix = null;
   }
 
-  List(boolean linear, Node root, int prefixLen, Object[] prefix, int suffixLen, Object[] suffix) {
+  protected List(boolean linear, Node root, int prefixLen, Object[] prefix, int suffixLen, Object[] suffix) {
     this.editor = linear ? new Object() : null;
     this.root = root;
     this.prefixLen = (byte) prefixLen;

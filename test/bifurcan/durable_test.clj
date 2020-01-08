@@ -35,12 +35,14 @@
     SkipTable$Writer
     SkipTable$Entry]
    [io.lacuna.bifurcan.durable.io
-    DurableBuffer]
+    DurableBuffer
+    BufferInput]
    [io.lacuna.bifurcan.durable
     Util
     BlockPrefix
     BlockPrefix$BlockType
-    ChunkSort]))
+    ChunkSort
+    Bytes]))
 
 (set! *warn-on-reflection* true)
 
@@ -88,7 +90,7 @@
 ;;; Util
 
 (defspec test-vlq-roundtrip iterations
-  (prop/for-all [n gen-pos-int]
+  (prop/for-all [n gen/large-integer]
     (let [out (doto (DurableBuffer.)
                 (.writeVLQ n))
           in  (.toInput out)]
@@ -101,10 +103,10 @@
   (prop/for-all [n gen-pos-int
                  bits (gen/choose 0 6)]
     (let [out (DurableBuffer.)
-          _   (Util/writePrefixedVLQ 0 bits n out)
+          _   (Util/writePrefixedUVLQ 0 bits n out)
           in  (.toInput out)]
       (try
-        (= n (Util/readPrefixedVLQ (.readByte in) bits in))
+        (= n (Util/readPrefixedUVLQ (.readByte in) bits in))
         (finally
           (free! in))))))
 
@@ -130,25 +132,29 @@
 
 ;; SkipTable
 
-(defn create-skip-table [entry-offsets]
-  (let [writer  (SkipTable$Writer.)
-        entries (reductions #(map + %1 %2) entry-offsets)
-        _       (doseq [[index offset] entries]
-                  (.append writer index offset))
-        out     (DurableBuffer.)
-        _       (.flushTo writer out)
-        in      (-> out .toInput)]
-    [in (SkipTable. (-> in (.sliceBlock BlockPrefix$BlockType/TABLE) .pool) (.tiers writer))]))
+(defn create-skip-table [entries]
+  (let [writer   (SkipTable$Writer.)
+        _        (doseq [[index offset] entries]
+                   (.append writer index offset))
+        out      (DurableBuffer.)
+        _        (.flushTo writer out)
+        in       (.toInput out)
+        contents (.sliceBlock in BlockPrefix$BlockType/TABLE)
+        buf      (Bytes/allocate (.size contents))
+        _        (.read contents buf)]
+    [in (SkipTable. (.pool (BufferInput. (.flip buf))) (.tiers writer))]))
 
 (defn print-skip-table [^DurableInput in]
   (->> (repeatedly #(when (pos? (.remaining in)) (.readVLQ in)))
     (take-while identity)))
 
 (defspec test-durable-skip-table iterations
-  (prop/for-all [entry-offsets (gen/such-that
+  (prop/for-all [init-entry (gen/tuple gen/int gen/int)
+                 entry-offsets (gen/such-that
                                  (complement empty?)
-                                 (gen/list (gen/tuple gen-small-pos-int gen-small-pos-int)))]
-    (let [[in t] (create-skip-table entry-offsets)]
+                                 (gen/list (gen/tuple gen-small-pos-int gen/int)))]
+    (let [entries (reductions #(map + %1 %2) init-entry entry-offsets)
+          [in t]  (create-skip-table entries)]
       (try
         (every?
           (fn [[index offset]]
@@ -156,7 +162,7 @@
               (and
                 (= index (.index e))
                 (= offset (.offset e)))))
-          (reductions #(map + %1 %2) entry-offsets))
+          entries)
         (finally
           (free! in))))))
 

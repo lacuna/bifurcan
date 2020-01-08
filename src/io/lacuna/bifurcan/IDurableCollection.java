@@ -2,6 +2,8 @@ package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.durable.Bytes;
 import io.lacuna.bifurcan.durable.Util;
+import io.lacuna.bifurcan.durable.io.BufferInput;
+import io.lacuna.bifurcan.durable.io.DurableBuffer;
 
 import java.io.Closeable;
 import java.nio.ByteBuffer;
@@ -31,6 +33,8 @@ public interface IDurableCollection {
     DurableInput.Pool bytes();
 
     Fingerprint fingerprint();
+
+    DurableInput cached(DurableInput in);
 
     IMap<Fingerprint, Root> dependencies();
   }

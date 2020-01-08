@@ -5,6 +5,10 @@ import io.lacuna.bifurcan.IList;
 import io.lacuna.bifurcan.List;
 import io.lacuna.bifurcan.Lists;
 
+/**
+ *
+ * @author ztellman
+ */
 public class DiffList<V> implements IDiffList<V> {
 
   private final IList<V> underlying;

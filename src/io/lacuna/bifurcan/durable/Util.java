@@ -86,6 +86,21 @@ public class Util {
   }
 
   public static void writeVLQ(long val, DurableOutput out) {
+    if (val < 0) {
+      writePrefixedUVLQ(1, 1, -val, out);
+    } else {
+      writePrefixedUVLQ(0, 1, val, out);
+    }
+  }
+
+  public static long readVLQ(DurableInput in) {
+    int b = in.readByte() & 0xFF;
+    long val = readPrefixedUVLQ(b, 1, in);
+    return (b & 128) > 0 ? -val : val;
+
+  }
+
+  public static void writeUVLQ(long val, DurableOutput out) {
     assert (val >= 0);
 
     int shift = Math.floorDiv(Bits.log2Ceil(val), 7) * 7;
@@ -100,11 +115,11 @@ public class Util {
     }
   }
 
-  public static long readVLQ(DurableInput in) {
-    return readVLQ(0, in);
+  public static long readUVLQ(DurableInput in) {
+    return readUVLQ(0, in);
   }
 
-  public static long readVLQ(long result, DurableInput in) {
+  public static long readUVLQ(long result, DurableInput in) {
     for (; ; ) {
       long b = in.readByte() & 0xFFL;
       result = (result << 7) | (b & 127);
@@ -117,16 +132,16 @@ public class Util {
     return result;
   }
 
-  public static long readPrefixedVLQ(int firstByte, int prefixLength, DurableInput in) {
+  public static long readPrefixedUVLQ(int firstByte, int prefixLength, DurableInput in) {
     int continueOffset = 7 - prefixLength;
 
     long result = firstByte & Bits.maskBelow(continueOffset);
     return Bits.test(firstByte, continueOffset)
-        ? readVLQ(result, in)
+        ? readUVLQ(result, in)
         : result;
   }
 
-  public static void writePrefixedVLQ(int prefix, int prefixLength, long n, DurableOutput out) {
+  public static void writePrefixedUVLQ(int prefix, int prefixLength, long n, DurableOutput out) {
     prefix <<= 8 - prefixLength;
 
     int continueBit = 1 << (7 - prefixLength);
@@ -134,7 +149,7 @@ public class Util {
       out.writeByte(prefix | (int) n);
     } else {
       out.writeByte(prefix | continueBit);
-      writeVLQ(n, out);
+      writeUVLQ(n, out);
     }
   }
 

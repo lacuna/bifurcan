@@ -3,12 +3,11 @@ package io.lacuna.bifurcan.durable;
 import io.lacuna.bifurcan.DurableInput;
 import io.lacuna.bifurcan.DurableOutput;
 
-import java.util.EnumSet;
 import java.util.Objects;
 
 import static io.lacuna.bifurcan.durable.BlockPrefix.BlockType.*;
-import static io.lacuna.bifurcan.durable.Util.readPrefixedVLQ;
-import static io.lacuna.bifurcan.durable.Util.writePrefixedVLQ;
+import static io.lacuna.bifurcan.durable.Util.readPrefixedUVLQ;
+import static io.lacuna.bifurcan.durable.Util.writePrefixedUVLQ;
 
 public class BlockPrefix {
 
@@ -85,17 +84,17 @@ public class BlockPrefix {
 
     int root = (firstByte & 0b11000000) >> 6;
     if (root < DIFF.ordinal()) {
-      return new BlockPrefix(readPrefixedVLQ(firstByte, 2, in), TYPES[root]);
+      return new BlockPrefix(readPrefixedUVLQ(firstByte, 2, in), TYPES[root]);
     } else if (root == DIFF.ordinal()) {
       int diff = (firstByte & 0b00111000) >> 3;
-      return new BlockPrefix(readPrefixedVLQ(firstByte, 5, in), TYPES[diff + DIFF_HASH_MAP.ordinal()]);
+      return new BlockPrefix(readPrefixedUVLQ(firstByte, 5, in), TYPES[diff + DIFF_HASH_MAP.ordinal()]);
     } else {
       int collection = (firstByte & 0b00111000) >> 3;
       if (collection + HASH_MAP.ordinal() == EXTENDED.ordinal()) {
         int extended = firstByte & 0b00000111;
-        return new BlockPrefix(in.readVLQ(), TYPES[extended + DIRECTED_GRAPH.ordinal()]);
+        return new BlockPrefix(in.readUVLQ(), TYPES[extended + DIRECTED_GRAPH.ordinal()]);
       } else {
-        return new BlockPrefix(readPrefixedVLQ(firstByte, 5, in), TYPES[collection + HASH_MAP.ordinal()]);
+        return new BlockPrefix(readPrefixedUVLQ(firstByte, 5, in), TYPES[collection + HASH_MAP.ordinal()]);
       }
     }
   }
@@ -103,13 +102,13 @@ public class BlockPrefix {
   public void encode(DurableOutput out) {
     if (type.ordinal() >= DIRECTED_GRAPH.ordinal()) {
       out.writeByte(0b11111000 | (type.ordinal() - DIRECTED_GRAPH.ordinal()));
-      out.writeVLQ(length);
+      out.writeUVLQ(length);
     } else if (type.ordinal() >= DIFF_HASH_MAP.ordinal()) {
-      writePrefixedVLQ(0b10000 | (type.ordinal() - DIFF_HASH_MAP.ordinal()), 5, length, out);
+      writePrefixedUVLQ(0b10000 | (type.ordinal() - DIFF_HASH_MAP.ordinal()), 5, length, out);
     } else if (type.ordinal() >= HASH_MAP.ordinal()) {
-      writePrefixedVLQ(0b11000 | (type.ordinal() - HASH_MAP.ordinal()), 5, length, out);
+      writePrefixedUVLQ(0b11000 | (type.ordinal() - HASH_MAP.ordinal()), 5, length, out);
     } else {
-      writePrefixedVLQ(type.ordinal(), 2, length, out);
+      writePrefixedUVLQ(type.ordinal(), 2, length, out);
     }
   }
 }

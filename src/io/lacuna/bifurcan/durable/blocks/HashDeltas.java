@@ -27,10 +27,10 @@ public class HashDeltas {
 
     public void append(int hash) {
       if (init) {
-        acc.writeVLQ((long) hash - (long) prevHash);
+        acc.writeUVLQ((long) hash - (long) prevHash);
       } else {
         init = true;
-        acc.writeInt(hash);
+        acc.writeVLQ(hash);
       }
       prevHash = hash;
     }
@@ -85,13 +85,13 @@ public class HashDeltas {
 
     return new OfInt() {
       boolean hasNext = true;
-      int next = in.readInt();
+      int next = (int) in.readVLQ();
 
       @Override
       public int nextInt() {
         int result = next;
         if (in.remaining() > 0) {
-          next += (int) in.readVLQ();
+          next += (int) in.readUVLQ();
         } else {
           hasNext = false;
         }

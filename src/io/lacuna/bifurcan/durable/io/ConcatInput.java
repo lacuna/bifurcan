@@ -8,25 +8,28 @@ import io.lacuna.bifurcan.durable.Bytes;
 
 import java.nio.ByteBuffer;
 
+/**
+ * An implementation of {@code DurableInput} atop a series of {@code DurableInput}s.
+ */
 public class ConcatInput implements DurableInput {
 
   private static final ThreadLocal<ByteBuffer> SCRATCH_BUFFER = ThreadLocal.withInitial(() -> Bytes.allocate(8));
 
-  private final Slice bounds;
+  private final Bounds bounds;
   public final IntMap<DurableInput> inputs;
   private final long size;
 
   private long offset = 0;
   private DurableInput curr;
 
-  private ConcatInput(IntMap<DurableInput> inputs, Slice bounds, long position, long size) {
+  private ConcatInput(IntMap<DurableInput> inputs, Bounds bounds, long position, long size) {
     this.bounds = bounds;
     this.inputs = inputs;
     this.size = size;
     seek(position);
   }
 
-  public ConcatInput(Iterable<DurableInput> inputs, Slice bounds) {
+  public ConcatInput(Iterable<DurableInput> inputs, Bounds bounds) {
     IntMap<DurableInput> m = new IntMap<DurableInput>().linear();
 
     long size = 0;
@@ -48,7 +51,7 @@ public class ConcatInput implements DurableInput {
   }
 
   @Override
-  public Slice bounds() {
+  public Bounds bounds() {
     return bounds;
   }
 
@@ -64,7 +67,7 @@ public class ConcatInput implements DurableInput {
     }
 
     long length = end - start;
-    Slice bounds = new Slice(this.bounds, start, end);
+    Bounds bounds = new Bounds(this.bounds, start, end);
 
     IEntry<Long, DurableInput> fe = inputs.floor(start);
     DurableInput f = fe.value().slice(start - fe.key(), fe.value().size());

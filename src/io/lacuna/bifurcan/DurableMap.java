@@ -1,6 +1,7 @@
 package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.durable.Dependencies;
+import io.lacuna.bifurcan.durable.io.BufferedChannel;
 import io.lacuna.bifurcan.durable.io.FileOutput;
 import io.lacuna.bifurcan.durable.io.DurableBuffer;
 import io.lacuna.bifurcan.durable.blocks.*;
@@ -18,7 +19,7 @@ public class DurableMap<K, V> implements IDurableCollection, IMap<K, V> {
   private final DurableInput.Pool bytes;
 
   private final long size;
-  private final HashSkipTable hashTable;
+  private final SkipTable hashTable;
   private final SkipTable indexTable;
   private final DurableInput.Pool entries;
 
@@ -26,7 +27,7 @@ public class DurableMap<K, V> implements IDurableCollection, IMap<K, V> {
       DurableInput.Pool bytes,
       Root root,
       long size,
-      HashSkipTable hashTable,
+      SkipTable hashTable,
       SkipTable indexTable,
       DurableInput.Pool entries,
       IDurableEncoding.Map encoding) {
@@ -52,6 +53,7 @@ public class DurableMap<K, V> implements IDurableCollection, IMap<K, V> {
   }
 
   public static <K, V> DurableMap<K, V> from(Iterator<IEntry<K, V>> entries, IDurableEncoding.Map encoding, Path directory, int maxRealizedEntries) {
+    BufferedChannel.VERBOSE = false;
     Dependencies.enter();
     DurableBuffer acc = new DurableBuffer();
     encode(entries, encoding, maxRealizedEntries, acc);
@@ -62,6 +64,7 @@ public class DurableMap<K, V> implements IDurableCollection, IMap<K, V> {
     out.close();
 
     Path path = file.moveTo(directory);
+    BufferedChannel.VERBOSE = true;
     return (DurableMap<K, V>) DurableCollections.open(path, encoding);
   }
 
@@ -101,7 +104,7 @@ public class DurableMap<K, V> implements IDurableCollection, IMap<K, V> {
   @Override
   public V get(K key, V defaultValue) {
     int hash = keyHash().applyAsInt(key);
-    HashSkipTable.Entry blockEntry = hashTable == null ? HashSkipTable.Entry.ORIGIN : hashTable.floor(hash);
+    SkipTable.Entry blockEntry = hashTable == null ? SkipTable.Entry.ORIGIN : hashTable.floor(hash);
 
     return blockEntry == null
         ? defaultValue
@@ -111,7 +114,7 @@ public class DurableMap<K, V> implements IDurableCollection, IMap<K, V> {
   @Override
   public OptionalLong indexOf(K key) {
     int hash = keyHash().applyAsInt(key);
-    HashSkipTable.Entry blockEntry = hashTable == null ? HashSkipTable.Entry.ORIGIN : hashTable.floor(hash);
+    SkipTable.Entry blockEntry = hashTable == null ? SkipTable.Entry.ORIGIN : hashTable.floor(hash);
 
     return blockEntry == null
         ? OptionalLong.empty()

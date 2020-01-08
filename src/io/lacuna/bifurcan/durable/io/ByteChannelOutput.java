@@ -14,6 +14,8 @@ import java.nio.channels.WritableByteChannel;
 import java.util.function.Consumer;
 
 /**
+ * An implementation of {@code DurableOutput} atop {@code WritableByteChannel}.
+ *
  * @author ztellman
  */
 public class ByteChannelOutput implements DurableOutput {

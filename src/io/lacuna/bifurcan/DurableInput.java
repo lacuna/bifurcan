@@ -1,12 +1,15 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.durable.*;
-import io.lacuna.bifurcan.durable.allocator.IBuffer;
-import io.lacuna.bifurcan.durable.io.BufferInput;
+import io.lacuna.bifurcan.durable.BlockPrefix;
+import io.lacuna.bifurcan.durable.Bytes;
+import io.lacuna.bifurcan.durable.Util;
 import io.lacuna.bifurcan.durable.io.ConcatInput;
 import io.lacuna.bifurcan.utils.Iterators;
 
-import java.io.*;
+import java.io.Closeable;
+import java.io.DataInput;
+import java.io.EOFException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
 
@@ -16,13 +19,13 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
     DurableInput instance();
   }
 
-  class Slice {
-    public final Slice parent;
+  class Bounds {
+    public final Bounds parent;
     public final long start, end;
 
-    private Slice root;
+    private Bounds root;
 
-    public Slice(Slice parent, long start, long end) {
+    public Bounds(Bounds parent, long start, long end) {
       assert (start <= end);
 
       this.parent = parent;
@@ -34,10 +37,10 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
       }
     }
 
-    public Slice absolute() {
+    public Bounds absolute() {
       if (root == null) {
-        Slice parentRoot = parent.absolute();
-        root = new Slice(null, start + parentRoot.start, end + parentRoot.start);
+        Bounds parentRoot = parent.absolute();
+        root = new Bounds(null, start + parentRoot.start, end + parentRoot.start);
       }
       return root;
     }
@@ -57,7 +60,7 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
     Iterator<DurableInput> it = inputs.iterator();
     DurableInput in = it.next();
     return it.hasNext()
-        ? new ConcatInput(inputs, new Slice(null, 0, Iterators.toStream(inputs.iterator()).mapToLong(DurableInput::size).sum()))
+        ? new ConcatInput(inputs, new Bounds(null, 0, Iterators.toStream(inputs.iterator()).mapToLong(DurableInput::size).sum()))
         : in;
   }
 
@@ -92,7 +95,7 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
     return Bytes.toHexTable(this.duplicate().seek(0));
   }
 
-  Slice bounds();
+  Bounds bounds();
 
   DurableInput duplicate();
 
@@ -101,17 +104,6 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
   long remaining();
 
   Pool pool();
-
-  // TODO: make this part of Root
-  default DurableInput cached() {
-    if (size() <= Integer.MAX_VALUE) {
-      ByteBuffer buf = Bytes.allocate((int) size());
-      read(buf);
-      return new BufferInput((ByteBuffer) buf.flip());
-    } else {
-      return this;
-    }
-  }
 
   default boolean hasRemaining() {
     return remaining() > 0;
@@ -163,6 +155,10 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
 
   default long readVLQ() {
     return Util.readVLQ(this);
+  }
+
+  default long readUVLQ() {
+    return Util.readUVLQ(this);
   }
 
   default boolean readBoolean() {

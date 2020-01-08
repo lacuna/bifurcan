@@ -42,7 +42,7 @@
       (f a b))))
 
 (defn log-steps [n exponent steps]
-  (let [log (/ (Math/log n) (Math/log exponent))]
+  (let [log (int (/ (Math/log n) (Math/log exponent)))]
     (->> log
       (* steps)
       inc

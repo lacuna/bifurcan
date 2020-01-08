@@ -6,6 +6,11 @@ import java.util.Iterator;
 import java.util.OptionalLong;
 import java.util.PrimitiveIterator;
 
+/**
+ *
+ *
+ * @author ztellman
+ */
 public class Util {
 
   /**

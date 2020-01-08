@@ -48,6 +48,8 @@
     Options
     FlushOptions]))
 
+#_(set! *warn-on-reflection* true)
+
 (RocksDB/loadLibrary)
 
 ;;;
@@ -185,10 +187,12 @@
                                    (remove empty?)
                                    (drop-while #(not= pid# %))
                                    (drop 1)
-                                   (take 2)
-                                   (map read-string)
+                                   (take 3)
+                                   (#(let [[read# written# cancelled#] (map read-string %)]
+                                       [read# (- written# cancelled#)]))
                                    (zipmap [:kbs-read :kbs-written]))
                                  (catch Throwable e#
+                                   (.printStackTrace e#)
                                    nil))))
                         (remove nil?)
                         (reductions #(merge-with + %1 %2))
@@ -352,40 +356,30 @@
           (fn [n]
             (prn name n)
             (time
-              (let [m          (atom nil)
-                    write      (io-stats
-                                 (reset! m
-                                   (create-fn dir n)))
-                    sequential (io-stats
-                                 (doit [e @m]
-                                   e))
-                    random     (io-stats
-                                 (let [^IMap m @m]
-                                   (dotimes [_ (* n random-subsample)]
-                                     (get-fn m (rand-int n)))))
-                    size       (directory-size dir)]
+              (let [m              (atom nil)
+                    write          (io-stats
+                                     (reset! m
+                                       (create-fn dir n)))
+                    sequential     (io-stats
+                                     (doit [e @m]
+                                       e))
+                    random-samples (int (max 1e6 (* n random-subsample)))
+                    random         (io-stats
+                                     (let [^IMap m @m]
+                                       (dotimes [_ random-samples]
+                                         (get-fn m (rand-int n)))))
+                    size           (directory-size dir)]
                 (-> @m .root .close)
                 (clear-directory dir)
+                (System/gc)
                 {:write                 (scale-stats write n)
-                 :random                (scale-stats random (int (* n random-subsample)))
+                 :random                (scale-stats random random-samples)
                  :sequential            (scale-stats sequential n)
                  :storage-amplification (double (/ size n))}))))))
     (finally
       (clear-directory dir))))
 
 ;;;
-
-(defn find-expensive-lookup [^IMap m]
-  (->> (range (.size m))
-    (map
-      (fn [_]
-        (let [i (rand-int (.size m))]
-          (assoc (io-stats (.get m (->durable-input (hashed-key i))))
-            :key i))))
-    (filter
-      (fn [{:keys [pages-read kbs-read]}]
-        (< (* 4 pages-read) kbs-read)))
-    first))
 
 (defn benchmark-rocks [dir sizes]
   (clear-directory dir)
@@ -440,20 +434,22 @@
             (catch Exception e
               nil))
           {"RocksDB"
-           (benchmark-rocks "/tmp/rocks" sizes)
+           (comment
+             (benchmark-rocks "/tmp/rocks" sizes))
 
            ;; the storage amplification is too high for benchmarks at the larger sizes
            #_"Berkeley DB"
            #_(benchmark-berkeley "/tmp/bdb" sizes)
 
            "bifurcan.DurableMap"
-           (benchmark-bifurcan "/tmp/bifurcan"
-             'bifurcan-hash-map
-             sizes
-             #(create-hash-map %1 %2 1016)
-             #(-> ^IMap %1
-                (.get (->durable-input (hashed-key %2)))
-                .get))
+           (comment
+             (benchmark-bifurcan "/tmp/bifurcan"
+               'bifurcan-hash-map
+               sizes
+               #(create-hash-map %1 %2 1016)
+               #(-> ^IMap %1
+                  (.get (->durable-input (hashed-key %2)))
+                  .get)))
 
            "bifurcan.DurableList"
            (benchmark-bifurcan "/tmp/bifurcan"
@@ -497,9 +493,10 @@
 (defn generate-csvs []
   (let [data  (read-string (slurp benchmark-edn))
         dbs   (keys data)
-        sizes (-> data
-                (get (first dbs))
+        sizes (->> data
                 keys
+                (mapcat #(-> data (get %) keys))
+                distinct
                 sort)]
     (doseq [[n f] benchmark-csvs]
       (let [db->size->data (reduce

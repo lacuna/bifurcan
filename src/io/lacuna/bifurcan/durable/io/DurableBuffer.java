@@ -11,6 +11,9 @@ import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.function.Consumer;
 
+/**
+ * A {@code DurableOutput} which will spill its contents to disk.
+ */
 public class DurableBuffer implements DurableOutput {
 
   private final LinearList<IBuffer> flushed = new LinearList<>();
@@ -39,7 +42,7 @@ public class DurableBuffer implements DurableOutput {
   }
 
   /**
-   * Writes the contents of the accumulator to `out`, and frees the associated buffers.
+   * Writes the contents of the accumulator to {@code out}, and frees the associated buffers.
    */
   public void flushTo(DurableOutput out) {
     close();
@@ -160,7 +163,7 @@ public class DurableBuffer implements DurableOutput {
   //
 
   private static final int MIN_BUFFER_SIZE = 4 << 10;
-  private static final int MAX_BUFFER_SIZE = 32 << 20;
+  public static final int MAX_BUFFER_SIZE = 16 << 20;
 
   private static final int BUFFER_SPILL_THRESHOLD = 4 << 20;
   private static final int MIN_DURABLE_BUFFER_SIZE = 1 << 20;

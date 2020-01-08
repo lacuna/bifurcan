@@ -7,6 +7,10 @@ import java.util.Iterator;
 
 import static java.lang.Math.min;
 
+/**
+ *
+ * @author ztellman
+ */
 public class ConcatList<V> implements IList<V> {
 
   final IntMap<IList<V>> lists;

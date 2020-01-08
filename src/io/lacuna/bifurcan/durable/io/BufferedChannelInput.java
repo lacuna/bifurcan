@@ -6,9 +6,14 @@ import io.lacuna.bifurcan.durable.Bytes;
 import java.io.EOFException;
 import java.nio.ByteBuffer;
 
+/**
+ * An implementation of {@code DurableInput} atop {@code BufferedChannel}.
+ *
+ * @author ztellman
+ */
 public class BufferedChannelInput implements DurableInput {
   private final BufferedChannel channel;
-  private final Slice bounds;
+  private final Bounds bounds;
   private final Runnable closeFn;
 
   private final long offset;
@@ -20,13 +25,13 @@ public class BufferedChannelInput implements DurableInput {
 
   public BufferedChannelInput(BufferedChannel channel, long start, long end, Runnable closeFn) {
     this.channel = channel;
-    this.bounds = new Slice(null, start, end);
+    this.bounds = new Bounds(null, start, end);
     this.closeFn = closeFn;
     this.position = 0;
     this.offset = bounds.absolute().start;
   }
 
-  private BufferedChannelInput(BufferedChannel channel, Slice bounds, Runnable closeFn, long position) {
+  private BufferedChannelInput(BufferedChannel channel, Bounds bounds, Runnable closeFn, long position) {
     this.channel = channel;
     this.bounds = bounds;
     this.closeFn = closeFn;
@@ -41,7 +46,7 @@ public class BufferedChannelInput implements DurableInput {
 
   @Override
   public DurableInput slice(long start, long end) {
-    return new BufferedChannelInput(channel, new Slice(bounds, start, end), null, 0);
+    return new BufferedChannelInput(channel, new Bounds(bounds, start, end), null, 0);
   }
 
   @Override
@@ -52,7 +57,7 @@ public class BufferedChannelInput implements DurableInput {
   }
 
   @Override
-  public Slice bounds() {
+  public Bounds bounds() {
     return bounds;
   }
 

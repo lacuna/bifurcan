@@ -18,12 +18,17 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 
+/**
+ * A special {@code WritableByteChannel} for a durable collection file, which will construct a hash as the file is written,
+ * and
+ */
 public class FileOutput implements WritableByteChannel {
 
   // `version` encompasses the algorithm, but not necessarily the number of bytes we use
-  private static final String ALGORITHM = "SHA-1";
-  private static final int HASH_BYTES = 20;
+  private static final String ALGORITHM = "SHA-512";
+  private static final int HASH_BYTES = 32;
 
+  // these will be the first four bytes of any valid collection file
   public static final ByteBuffer MAGIC_BYTES = (ByteBuffer)
       ByteBuffer.allocate(4)
           .put((byte) 0xB4) // B4 CA N
@@ -59,6 +64,10 @@ public class FileOutput implements WritableByteChannel {
     }
   }
 
+  /**
+   * Finalizes the collection after {@code close()} is called, moving the file to {@code directory}, with the hex-encoded
+   * hash for a name.
+   */
   public Path moveTo(Path directory) {
     assert !isOpen();
 

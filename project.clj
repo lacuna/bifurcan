@@ -12,41 +12,40 @@
                    :benchmark :benchmark
                    :stress    :stress
                    :all       (constantly true)}
-  :profiles {:travis {:jvm-opts ^:replace ["-server" "-Xmx2g"]}
-             :bench  {:jvm-opts ^:replace ["-server" "-Xmx10g" #_"-XX:+UseParallelGC"]}
-             :dev    {:dependencies [;; for tests
-                                     [org.clojure/clojure "1.10.0"]
-                                     [org.clojure/test.check "0.10.0"]
-                                     [criterium "0.4.5"]
-                                     [potemkin "0.4.5"]
-                                     [proteus "0.1.6"]
-                                     [byte-streams "0.2.4"]
-                                     [byte-transforms "0.1.4"]
-                                     [eftest "0.5.9"]
-                                     [virgil "0.1.9"]
+  :profiles {:low-mem {:jvm-opts ^:replace ["-server" "-Xmx1g" "-XX:MaxDirectMemorySize=2g" "-XX:+UseG1GC"]}
+             :bench   {:jvm-opts ^:replace ["-server" "-Xmx10g" "-XX:+UseG1GC"]}
+             :dev     {:dependencies [;; for tests
+                                      [org.clojure/clojure "1.10.0"]
+                                      [org.clojure/test.check "0.10.0"]
+                                      [criterium "0.4.5"]
+                                      [potemkin "0.4.5"]
+                                      [proteus "0.1.6"]
+                                      [byte-streams "0.2.4"]
+                                      [byte-transforms "0.1.4"]
+                                      [eftest "0.5.9"]
+                                      [virgil "0.1.9"]
 
-                                     ;; for comparative in-memory benchmarks
-                                     [io.usethesource/capsule "0.6.3"]
-                                     [org.pcollections/pcollections "3.1.2"]
-                                     [io.vavr/vavr "0.10.2"]
-                                     [org.scala-lang/scala-library "2.13.1"]
-                                     [org.functionaljava/functionaljava "4.8.1"]
-                                     [org.organicdesign/Paguro "3.1.2"]
+                                      ;; for comparative in-memory benchmarks
+                                      [io.usethesource/capsule "0.6.3"]
+                                      [org.pcollections/pcollections "3.1.2"]
+                                      [io.vavr/vavr "0.10.2"]
+                                      [org.scala-lang/scala-library "2.13.1"]
+                                      [org.functionaljava/functionaljava "4.8.1"]
+                                      [org.organicdesign/Paguro "3.1.2"]
 
-                                     ;; for comparative durable benchmarks
-                                     [org.rocksdb/rocksdbjni "6.4.6"]
-                                     [com.sleepycat/je "18.3.12"]
-                                     ]}}
+                                      ;; for comparative durable benchmarks
+                                      [org.rocksdb/rocksdbjni "6.4.6"]
+                                      [com.sleepycat/je "18.3.12"]
+                                      ]}}
   :aliases {"partest"              ["run" "-m" "bifurcan.run-tests"]
             "benchmark"            ["run" "-m" "bifurcan.benchmark-test" "benchmark"]
             "benchmark-collection" ["run" "-m" "bifurcan.benchmark-test" "benchmark-collection"]
-            "benchmark-databases"  ["run" "-m" "bifurcan.durable-benchmark-test" "benchmark"]
-            "benchmark-help"       ["run" "-m" "bifurcan.benchmark-test" "help"]}
+            "benchmark-databases"  ["with-profile" "low-mem,dev" "run" "-m" "bifurcan.durable-benchmark-test" "benchmark"]}
   :jvm-opts ^:replace ["-server"
                        "-XX:+UseG1GC"
                        "-XX:-OmitStackTraceInFastThrow"
                        "-ea:io.lacuna..."
-                       "-Xmx1g"
+                       "-Xmx4g"
 
                        #_"-XX:+UnlockDiagnosticVMOptions"
                        #_"-XX:+PrintAssembly"

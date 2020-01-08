@@ -3,16 +3,21 @@ package io.lacuna.bifurcan.durable.allocator;
 import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.utils.Bits;
 
+import java.nio.file.attribute.UserPrincipalLookupService;
+import java.util.function.Function;
+
 import static io.lacuna.bifurcan.utils.Bits.*;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
 
 /**
- * A simple "binary buddy" allocator.
+ * A simple "binary buddy" allocator (https://en.wikipedia.org/wiki/Buddy_memory_allocation)
  *
  * @author ztellman
  */
 public class BuddyAllocator implements IAllocator {
+
+  private static final Function<IntMap<Range>, Range> SELECTOR = m -> m.first().value();
 
   private final int log2Min;
   private final long capacity;
@@ -57,7 +62,7 @@ public class BuddyAllocator implements IAllocator {
 
     Range r = null;
     if (m.size() > 0) {
-      r = m.last().value();
+      r = SELECTOR.apply(m);
       m.remove(r.start);
     }
 
@@ -117,7 +122,7 @@ public class BuddyAllocator implements IAllocator {
     if (n < ranges.size()) {
       for (int i = n; i > idx; i--) {
         IntMap<Range> m = ranges.nth(i);
-        Range r = m.last().value();
+        Range r = SELECTOR.apply(m);
         m.remove(r.start);
 
         long mid = r.start + ((r.end - r.start) >> 1);

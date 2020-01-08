@@ -1,4 +1,4 @@
 language: clojure
-script: lein with-profile travis,dev do clean, partest 1e4
+script: lein with-profile low-mem,dev do clean, partest 1e4
 jdk:
   - openjdk8

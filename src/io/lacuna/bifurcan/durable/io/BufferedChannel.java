@@ -9,7 +9,13 @@ import java.nio.channels.WritableByteChannel;
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicLong;
 
+/**
+ *
+ * @author ztellman
+ */
 public class BufferedChannel {
+  public static boolean VERBOSE = false;
+
   public static final AtomicLong PAGES_READ = new AtomicLong();
 
   private static final int PAGE_SIZE = 4 << 10;
@@ -21,6 +27,7 @@ public class BufferedChannel {
 
   private final ByteBuffer buffer;
   private long bufferOffset;
+  private long threadId = Thread.currentThread().getId();
 
   public BufferedChannel(Path path, FileChannel channel) {
     this.path = path;
@@ -104,11 +111,13 @@ public class BufferedChannel {
   }
 
   public void write(ByteBuffer buf, long position) {
+    assertThreadLocal();
+
     try {
       int size = buf.remaining();
       this.size = Math.max(this.size, position + size);
 
-      int bytes = channel.write(buf, position);
+      channel.write(buf, position);
       assert !buf.hasRemaining();
 
       // if our write overlapped with our buffer, just clear it out
@@ -121,6 +130,8 @@ public class BufferedChannel {
   }
 
   public int read(ByteBuffer dst, long position) {
+    assertThreadLocal();
+
     if (dst.remaining() < PAGE_SIZE) {
       return Bytes.transfer(ensureAvailable(dst.remaining(), position), dst);
     } else {
@@ -144,6 +155,10 @@ public class BufferedChannel {
 
   ///
 
+  private void assertThreadLocal() {
+    assert Thread.currentThread().getId() == threadId;
+  }
+
   private void markRead(long start, long end) {
     long pages = ((pageFloor(end - 1) - pageFloor(start)) / PAGE_SIZE) + 1;
     PAGES_READ.addAndGet(pages);
@@ -166,7 +181,13 @@ public class BufferedChannel {
     }
   }
 
+  /**
+   *
+   */
   private ByteBuffer ensureAvailable(int bytes, long position) {
+    assertThreadLocal();
+    assert bytes <= PAGE_SIZE;
+
     seekBuffer(position);
     if (buffer.remaining() < bytes) {
       bufferOffset = pageFloor(position);
@@ -180,6 +201,8 @@ public class BufferedChannel {
       }
       buffer.flip().position((int) (position - bufferOffset));
     }
+
+    assert buffer.remaining() >= bytes;
     return buffer;
   }
 }
