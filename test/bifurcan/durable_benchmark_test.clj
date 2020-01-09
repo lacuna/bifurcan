@@ -462,35 +462,43 @@
 
 (def benchmark-csvs
   {"durable_write_amplification"
-   (fn [db-data]
-     {" writes" (-> db-data :write :write-amplification)
-      " reads"  (-> db-data :write :read-amplification)})
+   [identity
+    (fn [db-data]
+       {" writes" (-> db-data :write :write-amplification)
+        " reads"  (-> db-data :write :read-amplification)})]
 
    "durable_write_duration"
-   (fn [db-data]
-     {"" (-> db-data :write :us-per-entry)})
+   [identity
+    (fn [db-data]
+       {"" (-> db-data :write :us-per-entry)})]
 
    "durable_random_read_amplification"
-   (fn [db-data]
-     {""       (-> db-data :random :read-amplification)
-      #_" pages" #_(-> db-data :random :pages-per-entry)
-      })
+   [identity
+    (fn [db-data]
+       {""       (-> db-data :random :read-amplification)
+        #_" pages" #_(-> db-data :random :pages-per-entry)
+        })]
 
    "durable_random_read_duration"
-   (fn [db-data]
-     {"" (-> db-data :random :us-per-entry)})
+   [identity
+    (fn [db-data]
+       {"" (-> db-data :random :us-per-entry)})]
 
    "durable_sequential_read_amplification"
-   (fn [db-data]
-     {"" (-> db-data :sequential :read-amplification)})
+   [identity
+    (fn [db-data]
+       {"" (-> db-data :sequential :read-amplification)})]
 
    "durable_sequential_read_duration"
-   (fn [db-data]
-     {"" (-> db-data :sequential :us-per-entry)})
+   [identity
+    (fn [db-data]
+       {"" (-> db-data :sequential :us-per-entry)})]
 
-   "durable_storage_amplification"
-   (fn [db-data]
-     {"" (-> db-data :storage-amplification)})})
+   "durable_in_cache_random_read_duration"
+   ;; TODO: don't make this hard-coded
+   [(fn [sizes] (filter #(<= % 16) sizes))
+    (fn [db-data]
+      {"" (-> db-data :random :us-per-entry)})]})
 
 (defn generate-csvs []
   (let [data  (read-string (slurp benchmark-edn))
@@ -500,8 +508,9 @@
                 (mapcat #(-> data (get %) keys))
                 distinct
                 sort)]
-    (doseq [[n f] benchmark-csvs]
-      (let [db->size->data (reduce
+    (doseq [[n [size-filter f]] benchmark-csvs]
+      (let [sizes (size-filter sizes)
+            db->size->data (reduce
                              #(assoc-in %1 %2 (f (get-in data %2)))
                              {}
                              (for [db dbs, size sizes] [db size]))
