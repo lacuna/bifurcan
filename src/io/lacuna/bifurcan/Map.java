@@ -29,7 +29,7 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
   private static final Object DEFAULT_VALUE = new Object();
 
   private final BiPredicate<K, K> equalsFn;
-  private final ToIntFunction<K> hashFn;
+  private final ToLongFunction<K> hashFn;
   private Node<K, V> root;
   private int hash = -1;
   final Object editor;
@@ -82,7 +82,7 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
    * @param hashFn   a function which yields the hash value of keys
    * @param equalsFn a function which checks equality of keys
    */
-  public Map(ToIntFunction<K> hashFn, BiPredicate<K, K> equalsFn) {
+  public Map(ToLongFunction<K> hashFn, BiPredicate<K, K> equalsFn) {
     this(Node.EMPTY, hashFn, equalsFn, false);
   }
 
@@ -90,7 +90,7 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
     this(Node.EMPTY, Maps.DEFAULT_HASH_CODE, Maps.DEFAULT_EQUALS, false);
   }
 
-  private Map(Node<K, V> root, ToIntFunction<K> hashFn, BiPredicate<K, K> equalsFn, boolean linear) {
+  private Map(Node<K, V> root, ToLongFunction<K> hashFn, BiPredicate<K, K> equalsFn, boolean linear) {
     this.root = root;
     this.hashFn = hashFn;
     this.equalsFn = equalsFn;
@@ -105,7 +105,7 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
   }
 
   @Override
-  public ToIntFunction<K> keyHash() {
+  public ToLongFunction<K> keyHash() {
     return hashFn;
   }
 
@@ -119,7 +119,7 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
     Object val = MapNodes.get(root, 0, keyHash(key), key, equalsFn, DEFAULT_VALUE);
     return val == DEFAULT_VALUE ? defaultValue : (V) val;
   }
-  
+
   @Override
   public Map<K, V> put(K key, V value, BinaryOperator<V> merge) {
     return put(key, value, merge, isLinear() ? editor : new Object());
@@ -209,9 +209,9 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
   public List<Map<K, V>> split(int parts) {
     List<Map<K, V>> list = new List<Map<K, V>>().linear();
     MapNodes.split(new Object(), root, (int) Math.ceil(size() / (float) parts))
-      .stream()
-      .map(n -> new Map<K, V>(n, hashFn, equalsFn, false))
-      .forEach(list::addLast);
+        .stream()
+        .map(n -> new Map<K, V>(n, hashFn, equalsFn, false))
+        .forEach(list::addLast);
     return list.forked();
   }
 
@@ -320,7 +320,8 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
   }
 
   private int keyHash(K key) {
-    int hash = hashFn.applyAsInt(key);
+    long hash64 = hashFn.applyAsLong(key);
+    int hash = (int) ((hash64 >> 32) ^ hash64);
 
     // make sure we don't have too many collisions in the lower bits
     hash ^= (hash >>> 20) ^ (hash >>> 12);

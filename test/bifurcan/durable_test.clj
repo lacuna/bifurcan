@@ -25,6 +25,8 @@
     DurableList
     DurableEncodings
     DurableEncodings$Codec]
+   [io.lacuna.bifurcan.utils
+    Bits]
    [io.lacuna.bifurcan.durable.allocator
     GenerationalAllocator]
    [io.lacuna.bifurcan.hash
@@ -38,7 +40,7 @@
     DurableBuffer
     BufferInput]
    [io.lacuna.bifurcan.durable
-    Util
+    Encodings
     BlockPrefix
     BlockPrefix$BlockType
     ChunkSort
@@ -89,6 +91,16 @@
 
 ;;; Util
 
+(defspec test-uvlq-roundtrip iterations
+  (prop/for-all [n gen/large-integer]
+    (let [out (doto (DurableBuffer.)
+                (.writeUVLQ n))
+          in  (.toInput out)]
+      (try
+        (= n (.readUVLQ in))
+        (finally
+          (free! in))))))
+
 (defspec test-vlq-roundtrip iterations
   (prop/for-all [n gen/large-integer]
     (let [out (doto (DurableBuffer.)
@@ -103,10 +115,10 @@
   (prop/for-all [n gen-pos-int
                  bits (gen/choose 0 6)]
     (let [out (DurableBuffer.)
-          _   (Util/writePrefixedUVLQ 0 bits n out)
+          _   (Encodings/writePrefixedUVLQ 0 bits n out)
           in  (.toInput out)]
       (try
-        (= n (Util/readPrefixedUVLQ (.readByte in) bits in))
+        (= n (Encodings/readPrefixedUVLQ (.readByte in) bits in))
         (finally
           (free! in))))))
 
@@ -168,8 +180,7 @@
 
 ;;; SortedChunk
 
-(def hash-fn
-  (u/->to-int-fn hash))
+(def hash-fn (u/->to-long-fn hash))
 
 (defspec test-sort-map-entries iterations
   (prop/for-all [entries (gen/list (gen/tuple gen-pos-int gen-pos-int))]

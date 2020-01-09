@@ -2,6 +2,7 @@ package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.durable.BlockPrefix;
 import io.lacuna.bifurcan.durable.Bytes;
+import io.lacuna.bifurcan.durable.Encodings;
 import io.lacuna.bifurcan.durable.Util;
 import io.lacuna.bifurcan.durable.io.ConcatInput;
 import io.lacuna.bifurcan.utils.Iterators;
@@ -154,11 +155,11 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
   double readDouble();
 
   default long readVLQ() {
-    return Util.readVLQ(this);
+    return Encodings.readVLQ(this);
   }
 
   default long readUVLQ() {
-    return Util.readUVLQ(this);
+    return Encodings.readUVLQ(this);
   }
 
   default boolean readBoolean() {

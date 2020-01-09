@@ -5,10 +5,7 @@ import io.lacuna.bifurcan.utils.Iterators;
 import java.util.Iterator;
 import java.util.Objects;
 import java.util.OptionalLong;
-import java.util.function.BiPredicate;
-import java.util.function.BinaryOperator;
-import java.util.function.Function;
-import java.util.function.ToIntFunction;
+import java.util.function.*;
 
 /**
  * A set which builds atop {@code Map}, and shares the same performance characteristics.
@@ -70,7 +67,7 @@ public class Set<V> implements ISet<V>, Cloneable {
    * @param hashFn   the hash function used by the set
    * @param equalsFn the equality semantics used by the set
    */
-  public Set(ToIntFunction<V> hashFn, BiPredicate<V, V> equalsFn) {
+  public Set(ToLongFunction<V> hashFn, BiPredicate<V, V> equalsFn) {
     map = new Map<>(hashFn, equalsFn);
   }
 
@@ -86,7 +83,7 @@ public class Set<V> implements ISet<V>, Cloneable {
   }
 
   @Override
-  public ToIntFunction<V> valueHash() {
+  public ToLongFunction<V> valueHash() {
     return map.keyHash();
   }
 

@@ -22,7 +22,7 @@ import java.util.function.*;
  */
 public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
 
-  static final ToIntFunction<Long> HASH = n -> (int) (n ^ (n >>> 32));
+  static final ToLongFunction<Long> HASH = n -> n;
   private static final Object DEFAULT_VALUE = new Object();
 
   final Object editor;
@@ -94,7 +94,7 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
   }
 
   @Override
-  public ToIntFunction<Long> keyHash() {
+  public ToLongFunction<Long> keyHash() {
     return HASH;
   }
 

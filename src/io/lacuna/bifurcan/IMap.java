@@ -24,7 +24,7 @@ public interface IMap<K, V> extends
   /**
    * @return the hash function used by the map
    */
-  ToIntFunction<K> keyHash();
+  ToLongFunction<K> keyHash();
 
   /**
    * @return the key equality semantics used by the map

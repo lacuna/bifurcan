@@ -68,7 +68,7 @@ public class SkipTable {
     this.tiers = tiers;
   }
 
-  public Entry floor(long index) {
+  public Entry floor(long key) {
     DurableInput in = this.in.instance();
 
     long currKey = in.readVLQ();
@@ -95,7 +95,7 @@ public class SkipTable {
       while (in.position() < nextTier) {
         long keyDelta = in.readUVLQ();
 
-        if (keyDelta == 0 || (currKey + keyDelta) > index) {
+        if (keyDelta == 0 || (currKey + keyDelta) > key) {
           break;
         }
 

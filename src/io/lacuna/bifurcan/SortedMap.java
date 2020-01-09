@@ -209,7 +209,7 @@ public class SortedMap<K, V> implements ISortedMap<K, V> {
   }
 
   @Override
-  public ToIntFunction<K> keyHash() {
+  public ToLongFunction<K> keyHash() {
     return Maps.DEFAULT_HASH_CODE;
   }
 

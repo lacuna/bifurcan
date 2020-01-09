@@ -234,7 +234,8 @@
 
 ;;; benchmarking
 
-(def random-subsample 0.05)
+(defn random-samples [n]
+  (int (min 5e6 (max 1e6 (* n 0.05)))))
 
 (defn scale-stats [{:keys [kbs-read kbs-written duration pages-read]} entries]
   {:read-amplification (when kbs-read (double (/ kbs-read entries)))
@@ -261,8 +262,8 @@
     (put-fn db (hashed-key k) (rand-array val-size)))
   (flush-fn db))
 
-(defn random-reads [db get-fn n]
-  (dotimes [_ (* n random-subsample)]
+(defn random-reads [db get-fn n samples]
+  (dotimes [_ samples]
     (get-fn db (hashed-key (rand-int n)))))
 
 (defn benchmark-db [name dir db get-fn scan-fn put-fn flush-fn sizes]
@@ -278,10 +279,11 @@
             (time
               (let [write      (io-stats (populate! db put-fn flush-fn (range a b) 1016))
                     sequential (io-stats (scan-fn db))
-                    random     (io-stats (random-reads db get-fn b))
+                    samples    (random-samples b)
+                    random     (io-stats (random-reads db get-fn b samples))
                     size       (directory-size dir)]
                 {:write                 (scale-stats (swap! writes #(merge-with + % write)) b)
-                 :random                (scale-stats random (int (* b random-subsample)))
+                 :random                (scale-stats random samples)
                  :sequential            (scale-stats sequential b)
                  :storage-amplification (/ (double size) b)}))))))))
 
@@ -291,7 +293,7 @@
   (DurableEncodings/primitive
     "binary"
     2
-    (u/->to-int-fn
+    (u/->to-long-fn
       (fn [^DurableInput in]
         (PerlHash/hash 0 (.duplicate in))))
     (u/->bi-predicate
@@ -356,24 +358,24 @@
           (fn [n]
             (prn name n)
             (time
-              (let [m              (atom nil)
-                    write          (io-stats
-                                     (reset! m
-                                       (create-fn dir n)))
-                    sequential     (io-stats
-                                     (doit [e @m]
-                                       e))
-                    random-samples (int (max 1e6 (* n random-subsample)))
-                    random         (io-stats
-                                     (let [^IMap m @m]
-                                       (dotimes [_ random-samples]
-                                         (get-fn m (rand-int n)))))
-                    size           (directory-size dir)]
+              (let [m          (atom nil)
+                    write      (io-stats
+                                 (reset! m
+                                   (create-fn dir n)))
+                    sequential (io-stats
+                                 (doit [e @m]
+                                   e))
+                    samples    (random-samples n)
+                    random     (io-stats
+                                 (let [^IMap m @m]
+                                   (dotimes [_ samples]
+                                     (get-fn m (rand-int n)))))
+                    size       (directory-size dir)]
                 (-> @m .root .close)
                 (clear-directory dir)
                 (System/gc)
                 {:write                 (scale-stats write n)
-                 :random                (scale-stats random random-samples)
+                 :random                (scale-stats random samples)
                  :sequential            (scale-stats sequential n)
                  :storage-amplification (double (/ size n))}))))))
     (finally
@@ -444,12 +446,12 @@
            "bifurcan.DurableMap"
            (comment
              (benchmark-bifurcan "/tmp/bifurcan"
-               'bifurcan-hash-map
-               sizes
-               #(create-hash-map %1 %2 1016)
-               #(-> ^IMap %1
-                  (.get (->durable-input (hashed-key %2)))
-                  .get)))
+              'bifurcan-hash-map
+              sizes
+              #(create-hash-map %1 %2 1016)
+              #(-> ^IMap %1
+                 (.get (->durable-input (hashed-key %2)))
+                 .get)))
 
            "bifurcan.DurableList"
            (benchmark-bifurcan "/tmp/bifurcan"

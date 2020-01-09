@@ -1,10 +1,7 @@
 package io.lacuna.bifurcan;
 
 import java.util.Iterator;
-import java.util.function.BiPredicate;
-import java.util.function.BinaryOperator;
-import java.util.function.Function;
-import java.util.function.ToIntFunction;
+import java.util.function.*;
 
 import static io.lacuna.bifurcan.Graphs.MERGE_LAST_WRITE_WINS;
 
@@ -35,7 +32,7 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
     this(new DirectedGraph<>(), new Set<>(), new Set<>());
   }
 
-  public DirectedAcyclicGraph(ToIntFunction<V> hashFn, BiPredicate<V, V> equalsFn) {
+  public DirectedAcyclicGraph(ToLongFunction<V> hashFn, BiPredicate<V, V> equalsFn) {
     this(new DirectedGraph<>(hashFn, equalsFn), new Set<>(hashFn, equalsFn), new Set<>(hashFn, equalsFn));
   }
 
@@ -253,7 +250,7 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
   }
 
   @Override
-  public ToIntFunction<V> vertexHash() {
+  public ToLongFunction<V> vertexHash() {
     return graph.vertexHash();
   }
 

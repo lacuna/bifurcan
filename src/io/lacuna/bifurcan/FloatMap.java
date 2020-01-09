@@ -18,7 +18,7 @@ import static io.lacuna.bifurcan.utils.Encodings.longToDouble;
  */
 public class FloatMap<V> implements ISortedMap<Double, V>, Cloneable {
 
-  private static final ToIntFunction<Double> HASH = n -> IntMap.HASH.applyAsInt(Encodings.doubleToLong(n));
+  private static final ToLongFunction<Double> HASH = Encodings::doubleToLong;
 
   public IntMap<V> map;
 
@@ -80,7 +80,7 @@ public class FloatMap<V> implements ISortedMap<Double, V>, Cloneable {
   }
 
   @Override
-  public ToIntFunction<Double> keyHash() {
+  public ToLongFunction<Double> keyHash() {
     return HASH;
   }
 

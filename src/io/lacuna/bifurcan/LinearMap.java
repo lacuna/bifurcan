@@ -36,7 +36,7 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
   private static final int NONE = 0;
   private static final int FALLBACK = 1;
 
-  private final ToIntFunction<K> hashFn;
+  private final ToLongFunction<K> hashFn;
   private final BiPredicate<K, K> equalsFn;
 
   private int indexMask;
@@ -110,7 +110,7 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
    * @param hashFn   a function which yields the hash value of keys
    * @param equalsFn a function which checks equality of keys
    */
-  public LinearMap(ToIntFunction<K> hashFn, BiPredicate<K, K> equalsFn) {
+  public LinearMap(ToLongFunction<K> hashFn, BiPredicate<K, K> equalsFn) {
     this(16, hashFn, equalsFn);
   }
 
@@ -119,7 +119,7 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
    * @param hashFn          a function which yields the hash value of keys
    * @param equalsFn        a function which checks equality of keys
    */
-  public LinearMap(int initialCapacity, ToIntFunction<K> hashFn, BiPredicate<K, K> equalsFn) {
+  public LinearMap(int initialCapacity, ToLongFunction<K> hashFn, BiPredicate<K, K> equalsFn) {
     if (initialCapacity > MAX_CAPACITY) {
       throw new IllegalArgumentException("initialCapacity cannot be larger than " + MAX_CAPACITY);
     }
@@ -131,7 +131,7 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
     resize(initialCapacity);
   }
 
-  private LinearMap(int tableLength, int entriesLength, ToIntFunction<K> hashFn, BiPredicate<K, K> equalsFn) {
+  private LinearMap(int tableLength, int entriesLength, ToLongFunction<K> hashFn, BiPredicate<K, K> equalsFn) {
     this.hashFn = hashFn;
     this.equalsFn = equalsFn;
     this.size = 0;
@@ -142,7 +142,7 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
   /// Accessors
 
   @Override
-  public ToIntFunction<K> keyHash() {
+  public ToLongFunction<K> keyHash() {
     return hashFn;
   }
 
@@ -733,7 +733,8 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
   }
 
   private int keyHash(K key) {
-    int hash = hashFn.applyAsInt(key);
+    long hash64 = hashFn.applyAsLong(key);
+    int hash = (int) ((hash64 >> 32) ^ hash64);
 
     // make sure we don't have too many collisions in the lower bits
     hash ^= (hash >>> 20) ^ (hash >>> 12);

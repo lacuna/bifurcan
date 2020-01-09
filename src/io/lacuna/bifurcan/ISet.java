@@ -21,7 +21,7 @@ public interface ISet<V> extends
   /**
    * @return the hash function used by the set
    */
-  ToIntFunction<V> valueHash();
+  ToLongFunction<V> valueHash();
 
   /**
    * @return the equality semantics used by the set

@@ -2,7 +2,7 @@ package io.lacuna.bifurcan;
 
 import java.util.OptionalLong;
 import java.util.function.BiPredicate;
-import java.util.function.ToIntFunction;
+import java.util.function.ToLongFunction;
 
 public interface IDiffSet<V> extends ISet<V>, IDiff<IMap<V, Void>, IEntry<V, Void>> {
 
@@ -13,7 +13,7 @@ public interface IDiffSet<V> extends ISet<V>, IDiff<IMap<V, Void>, IEntry<V, Voi
   }
 
   @Override
-  default ToIntFunction<V> valueHash() {
+  default ToLongFunction<V> valueHash() {
     return underlying().keyHash();
   }
 

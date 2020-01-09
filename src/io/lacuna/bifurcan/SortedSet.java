@@ -6,6 +6,7 @@ import java.util.OptionalLong;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.ToIntFunction;
+import java.util.function.ToLongFunction;
 
 public class SortedSet<V> implements ISortedSet<V> {
 
@@ -87,7 +88,7 @@ public class SortedSet<V> implements ISortedSet<V> {
   }
 
   @Override
-  public ToIntFunction<V> valueHash() {
+  public ToLongFunction<V> valueHash() {
     return m.keyHash();
   }
 

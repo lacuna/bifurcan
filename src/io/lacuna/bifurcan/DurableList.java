@@ -1,6 +1,7 @@
 package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.durable.Dependencies;
+import io.lacuna.bifurcan.durable.Encodings;
 import io.lacuna.bifurcan.durable.Util;
 import io.lacuna.bifurcan.durable.blocks.List;
 import io.lacuna.bifurcan.durable.blocks.SkipTable;
@@ -88,7 +89,7 @@ public class DurableList<V> implements IDurableCollection, IList<V> {
       throw new IndexOutOfBoundsException(index + " must be within [0," + size() + ")");
     }
     SkipTable.Entry entry = skipTable == null ? SkipTable.Entry.ORIGIN : skipTable.floor(index);
-    return (V) Util.decodeBlock(elements.instance().seek(entry.offset), root, encoding.elementEncoding())
+    return (V) Encodings.decodeBlock(elements.instance().seek(entry.offset), root, encoding.elementEncoding())
         .skip(index - entry.index)
         .next();
   }
@@ -99,7 +100,7 @@ public class DurableList<V> implements IDurableCollection, IList<V> {
     DurableInput elements = this.elements.instance();
     return Iterators.flatMap(
         Iterators.from(elements::hasRemaining, elements::slicePrefixedBlock),
-        in -> (Iterator<V>) Util.decodeBlock(in, root, encoding.elementEncoding()));
+        in -> (Iterator<V>) Encodings.decodeBlock(in, root, encoding.elementEncoding()));
   }
 
   @Override

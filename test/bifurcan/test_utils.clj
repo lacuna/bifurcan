@@ -11,6 +11,11 @@
     (applyAsInt [_ x]
       (f x))))
 
+(defn ->to-long-fn [f]
+  (reify java.util.function.ToLongFunction
+    (applyAsLong [_ x]
+      (f x))))
+
 (defn ->fn [f]
   (reify java.util.function.Function
     (apply [_ x]

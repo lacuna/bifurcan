@@ -6,8 +6,8 @@ import io.lacuna.bifurcan.DurableOutput;
 import java.util.Objects;
 
 import static io.lacuna.bifurcan.durable.BlockPrefix.BlockType.*;
-import static io.lacuna.bifurcan.durable.Util.readPrefixedUVLQ;
-import static io.lacuna.bifurcan.durable.Util.writePrefixedUVLQ;
+import static io.lacuna.bifurcan.durable.Encodings.readPrefixedUVLQ;
+import static io.lacuna.bifurcan.durable.Encodings.writePrefixedUVLQ;
 
 public class BlockPrefix {
 

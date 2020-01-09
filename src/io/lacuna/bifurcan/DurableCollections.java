@@ -1,5 +1,6 @@
 package io.lacuna.bifurcan;
 
+import io.lacuna.bifurcan.durable.Encodings;
 import io.lacuna.bifurcan.durable.Roots;
 import io.lacuna.bifurcan.durable.Util;
 
@@ -10,7 +11,7 @@ public class DurableCollections {
   public static IDurableCollection open(Path path, IDurableEncoding encoding) {
     IDurableCollection.Root root = Roots.open(path);
     DurableInput.Pool pool = root.bytes();
-    return Util.decodeCollection(pool.instance().peekPrefix(), root, encoding, pool);
+    return Encodings.decodeCollection(pool.instance().peekPrefix(), root, encoding, pool);
   }
 
   public static IDurableCollection migrate(Path path, IDurableEncoding oldEncoding, IDurableEncoding newEncoding) {

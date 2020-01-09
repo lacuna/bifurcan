@@ -13,6 +13,7 @@ import java.util.Iterator;
 import java.util.PrimitiveIterator;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.ToIntFunction;
+import java.util.function.ToLongFunction;
 import java.util.stream.IntStream;
 
 /**
@@ -33,21 +34,21 @@ public class HashMap {
   /// sorting
 
   private static class MapIndex {
-    final int hash;
+    final long hash;
     final long index;
 
-    MapIndex(int hash, long index) {
+    MapIndex(long hash, long index) {
       this.hash = hash;
       this.index = index;
     }
 
     static void encode(MapIndex e, DurableOutput out) {
-      out.writeInt(e.hash);
+      out.writeVLQ(e.hash);
       out.writeUVLQ(e.index);
     }
 
     static MapIndex decode(DurableInput in) {
-      int hash = in.readInt();
+      long hash = in.readVLQ();
       long index = in.readUVLQ();
       return new MapIndex(hash, index);
     }
@@ -59,12 +60,12 @@ public class HashMap {
             (l, out) -> l.forEach(e -> MapIndex.encode((MapIndex) e, out)),
             (in, root) -> Iterators.skippable(Iterators.from(in::hasRemaining, () -> MapIndex.decode(in)))));
 
-  public static <K, V> Iterator<IEntry.WithHash<K, V>> sortIndexedEntries(ICollection<?, IEntry<K, V>> entries, ToIntFunction<K> keyHash) {
+  public static <K, V> Iterator<IEntry.WithHash<K, V>> sortIndexedEntries(ICollection<?, IEntry<K, V>> entries, ToLongFunction<K> keyHash) {
     AtomicLong index = new AtomicLong(0);
     return Iterators.map(
         ChunkSort.sortedEntries(
-            Iterators.map(entries.iterator(), e -> new MapIndex(keyHash.applyAsInt(e.key()), index.getAndIncrement())),
-            Comparator.comparingInt((MapIndex e) -> e.hash),
+            Iterators.map(entries.iterator(), e -> new MapIndex(keyHash.applyAsLong(e.key()), index.getAndIncrement())),
+            Comparator.comparingLong((MapIndex e) -> e.hash),
             MAP_INDEX_ENCODING,
             1 << 16),
         i -> {
@@ -74,22 +75,22 @@ public class HashMap {
   }
 
   public static <K, V> Iterator<IEntry.WithHash<K, V>> sortEntries(Iterator<IEntry<K, V>> entries, IDurableEncoding.Map encoding, int maxRealizedEntries) {
-    IDurableEncoding hashEncoding = DurableEncodings.primitive("int32", 1024,
+    IDurableEncoding hashEncoding = DurableEncodings.primitive("vlq", 1024,
         DurableEncodings.Codec.selfDelimited(
-            (o, out) -> out.writeInt((int) o),
-            (in, root) -> in.readInt()));
+            (o, out) -> out.writeVLQ((long) o),
+            (in, root) -> in.readVLQ()));
 
-    ToIntFunction<Object> hashFn = encoding.keyEncoding().hashFn();
+    ToLongFunction<Object> hashFn = encoding.keyEncoding().hashFn();
 
     return ChunkSort.sortedEntries(
-        Iterators.map(entries, e -> IEntry.of(hashFn.applyAsInt(e.key()), e.key(), e.value())),
-        Comparator.comparingInt(IEntry.WithHash::keyHash),
+        Iterators.map(entries, e -> IEntry.of(hashFn.applyAsLong(e.key()), e.key(), e.value())),
+        Comparator.comparingLong(IEntry.WithHash::keyHash),
         DurableEncodings.tuple(
             o -> {
               IEntry.WithHash<Object, Object> e = (IEntry.WithHash<Object, Object>) o;
               return new Object[]{e.keyHash(), e.key(), e.value()};
             },
-            ary -> IEntry.of((int) ary[0], ary[1], ary[2]),
+            ary -> IEntry.of((long) ary[0], ary[1], ary[2]),
             hashEncoding,
             encoding.keyEncoding(),
             encoding.valueEncoding()),
@@ -99,7 +100,7 @@ public class HashMap {
   /// encoding
 
   public static <K, V> void encodeUnsortedEntries(IList<IEntry<K, V>> entries, IDurableEncoding.Map encoding, DurableOutput out) {
-    encodeSortedEntries(sortIndexedEntries(entries, (ToIntFunction<K>) encoding.keyEncoding().hashFn()), encoding, out);
+    encodeSortedEntries(sortIndexedEntries(entries, (ToLongFunction<K>) encoding.keyEncoding().hashFn()), encoding, out);
   }
 
   public static <K, V> void encodeSortedEntries(Iterator<IEntry.WithHash<K, V>> sortedEntries, IDurableEncoding.Map encoding, DurableOutput out) {
@@ -116,7 +117,7 @@ public class HashMap {
             e -> encoding.keyEncoding().isSingleton(e.key()) || encoding.valueEncoding().isSingleton(e.value()));
 
     long index = 0;
-    int prevHash = Integer.MAX_VALUE;
+    long prevHash = Long.MAX_VALUE;
     while (entryBlocks.hasNext()) {
       IList<IEntry.WithHash<K, V>> b = entryBlocks.next();
 
@@ -126,15 +127,15 @@ public class HashMap {
       indexTable.append(index, offset);
 
       // update get() lookup
-      PrimitiveIterator.OfInt hashes = b.stream().mapToInt(IEntry.WithHash::keyHash).iterator();
-      int firstHash = hashes.nextInt();
+      PrimitiveIterator.OfLong hashes = b.stream().mapToLong(IEntry.WithHash::keyHash).iterator();
+      long firstHash = hashes.nextLong();
       if (firstHash != prevHash) {
         hashTable.append(firstHash, offset);
       }
 
       // if this block has a given hash, don't let the next block claim it
       while (hashes.hasNext()) {
-        prevHash = hashes.nextInt();
+        prevHash = hashes.nextLong();
       }
 
       // write the entries

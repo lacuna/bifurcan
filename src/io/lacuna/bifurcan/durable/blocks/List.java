@@ -8,6 +8,8 @@ import io.lacuna.bifurcan.durable.io.DurableBuffer;
 
 import java.util.Iterator;
 
+import static io.lacuna.bifurcan.durable.Encodings.encodeBlock;
+
 /**
  * An indexed list, encoded as:
  * - the number of elements [VLQ]
@@ -31,7 +33,7 @@ public class List {
     while (blocks.hasNext()) {
       IList<V> b = blocks.next();
       skipTable.append(index, elements.written());
-      Util.encodeBlock((IList<Object>) b, elementEncoding, elements);
+      encodeBlock((IList<Object>) b, elementEncoding, elements);
       index += b.size();
     }
 

@@ -1,9 +1,6 @@
 package io.lacuna.bifurcan;
 
-import java.util.function.BiPredicate;
-import java.util.function.BinaryOperator;
-import java.util.function.Function;
-import java.util.function.ToIntFunction;
+import java.util.function.*;
 
 import static io.lacuna.bifurcan.Graphs.MERGE_LAST_WRITE_WINS;
 
@@ -23,7 +20,7 @@ public class DirectedGraph<V, E> implements IGraph<V, E> {
     this(false, new Map<>(), new Map<>());
   }
 
-  public DirectedGraph(ToIntFunction<V> hashFn, BiPredicate<V, V> equalsFn) {
+  public DirectedGraph(ToLongFunction<V> hashFn, BiPredicate<V, V> equalsFn) {
     this(false, new Map<>(hashFn, equalsFn), new Map<>(hashFn, equalsFn));
   }
 
@@ -259,7 +256,7 @@ public class DirectedGraph<V, E> implements IGraph<V, E> {
   }
 
   @Override
-  public ToIntFunction<V> vertexHash() {
+  public ToLongFunction<V> vertexHash() {
     return out.keyHash();
   }
 

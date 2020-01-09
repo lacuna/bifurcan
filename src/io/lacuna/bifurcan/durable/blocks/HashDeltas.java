@@ -6,7 +6,9 @@ import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
 import io.lacuna.bifurcan.durable.io.DurableBuffer;
 import io.lacuna.bifurcan.utils.Iterators;
 
+import java.util.PrimitiveIterator;
 import java.util.PrimitiveIterator.OfInt;
+import java.util.PrimitiveIterator.OfLong;
 
 /**
  * A block representing a sorted sequence of 32-bit integers:
@@ -19,15 +21,15 @@ public class HashDeltas {
 
   public static class Writer {
     private final DurableBuffer acc = new DurableBuffer();
-    private int prevHash;
+    private long prevHash;
     private boolean init = false;
 
     public Writer() {
     }
 
-    public void append(int hash) {
+    public void append(long hash) {
       if (init) {
-        acc.writeUVLQ((long) hash - (long) prevHash);
+        acc.writeUVLQ(hash - prevHash);
       } else {
         init = true;
         acc.writeVLQ(hash);
@@ -74,22 +76,22 @@ public class HashDeltas {
     this.pool = pool;
   }
 
-  public int nth(long index) {
-    OfInt it = iterator();
+  public long nth(long index) {
+    OfLong it = iterator();
     Iterators.drop(it, index);
-    return it.nextInt();
+    return it.nextLong();
   }
 
-  public OfInt iterator() {
+  public OfLong iterator() {
     DurableInput in = pool.instance();
 
-    return new OfInt() {
+    return new OfLong() {
       boolean hasNext = true;
       int next = (int) in.readVLQ();
 
       @Override
-      public int nextInt() {
-        int result = next;
+      public long nextLong() {
+        long result = next;
         if (in.remaining() > 0) {
           next += (int) in.readUVLQ();
         } else {
@@ -105,12 +107,12 @@ public class HashDeltas {
     };
   }
 
-  public IndexRange candidateIndices(int hash) {
+  public IndexRange candidateIndices(long hash) {
     int start = -1, end = -1;
-    OfInt it = iterator();
+    OfLong it = iterator();
 
     for (int i = 0; it.hasNext(); i++) {
-      int curr = it.nextInt();
+      long curr = it.nextLong();
       if (curr == hash) {
         start = i;
         break;
@@ -120,7 +122,7 @@ public class HashDeltas {
     }
 
     for (end = start; it.hasNext(); end++) {
-      if (it.nextInt() > hash) {
+      if (it.nextLong() > hash) {
         return new IndexRange(start, end + 1, true);
       }
     }

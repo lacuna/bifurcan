@@ -12,6 +12,7 @@ import java.util.Iterator;
 import java.util.OptionalLong;
 import java.util.function.BiPredicate;
 import java.util.function.ToIntFunction;
+import java.util.function.ToLongFunction;
 
 public class DurableMap<K, V> implements IDurableCollection, IMap<K, V> {
   private final IDurableEncoding.Map encoding;
@@ -92,8 +93,8 @@ public class DurableMap<K, V> implements IDurableCollection, IMap<K, V> {
   }
 
   @Override
-  public ToIntFunction<K> keyHash() {
-    return (ToIntFunction<K>) encoding.keyEncoding().hashFn();
+  public ToLongFunction<K> keyHash() {
+    return (ToLongFunction<K>) encoding.keyEncoding().hashFn();
   }
 
   @Override
@@ -103,7 +104,7 @@ public class DurableMap<K, V> implements IDurableCollection, IMap<K, V> {
 
   @Override
   public V get(K key, V defaultValue) {
-    int hash = keyHash().applyAsInt(key);
+    long hash = keyHash().applyAsLong(key);
     SkipTable.Entry blockEntry = hashTable == null ? SkipTable.Entry.ORIGIN : hashTable.floor(hash);
 
     return blockEntry == null
@@ -113,7 +114,7 @@ public class DurableMap<K, V> implements IDurableCollection, IMap<K, V> {
 
   @Override
   public OptionalLong indexOf(K key) {
-    int hash = keyHash().applyAsInt(key);
+    long hash = keyHash().applyAsLong(key);
     SkipTable.Entry blockEntry = hashTable == null ? SkipTable.Entry.ORIGIN : hashTable.floor(hash);
 
     return blockEntry == null

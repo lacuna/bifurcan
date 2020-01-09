@@ -20,7 +20,7 @@ public class Maps {
 
   public static final BinaryOperator MERGE_LAST_WRITE_WINS = (a, b) -> b;
 
-  public static final ToIntFunction DEFAULT_HASH_CODE = Objects::hashCode;
+  public static final ToLongFunction DEFAULT_HASH_CODE = Objects::hashCode;
 
   public static final BiPredicate DEFAULT_EQUALS = Objects::equals;
 
@@ -62,17 +62,17 @@ public class Maps {
   }
 
   public static class HashEntry<K, V> implements IEntry.WithHash<K, V> {
-    private final int keyHash;
+    private final long keyHash;
     private final K key;
     private final V value;
 
-    public HashEntry(int keyHash, K key, V value) {
+    public HashEntry(long keyHash, K key, V value) {
       this.keyHash = keyHash;
       this.key = key;
       this.value = value;
     }
 
-    public int keyHash() {
+    public long keyHash() {
       return keyHash;
     }
 
@@ -129,8 +129,8 @@ public class Maps {
   }
 
   public static <K, V> long hash(IMap<K, V> m) {
-    ToIntFunction hashFn = m.keyHash();
-    return hash(m, e -> (hashFn.applyAsInt(e.key()) * 31) ^ Objects.hashCode(e.value()), (a, b) -> a + b);
+    ToLongFunction hashFn = m.keyHash();
+    return hash(m, e -> (hashFn.applyAsLong(e.key()) * 31) ^ Objects.hashCode(e.value()), (a, b) -> a + b);
   }
 
   public static <K, V> long hash(IMap<K, V> m, ToLongFunction<IEntry<K, V>> hash, LongBinaryOperator combiner) {
@@ -211,7 +211,7 @@ public class Maps {
       }
 
       @Override
-      public ToIntFunction<K> keyHash() {
+      public ToLongFunction<K> keyHash() {
         return keys.valueHash();
       }
 

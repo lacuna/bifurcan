@@ -121,4 +121,7 @@ public class Bits {
     return (n & (n - 1)) == 0;
   }
 
+  public static long slice(long n, int start, int end) {
+    return (n >> start) & maskBelow(end - start);
+  }
 }

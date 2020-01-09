@@ -5,6 +5,7 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.function.BiPredicate;
 import java.util.function.ToIntFunction;
+import java.util.function.ToLongFunction;
 
 public class IntSet implements ISortedSet<Long> {
 
@@ -89,7 +90,7 @@ public class IntSet implements ISortedSet<Long> {
   }
 
   @Override
-  public ToIntFunction<Long> valueHash() {
+  public ToLongFunction<Long> valueHash() {
     return m.keyHash();
   }
 

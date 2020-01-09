@@ -9,6 +9,7 @@ import java.util.OptionalLong;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.ToIntFunction;
+import java.util.function.ToLongFunction;
 
 /**
  * A set which builds atop {@code LinearMap}, and shares the same performance characteristics.
@@ -93,7 +94,7 @@ public class LinearSet<V> implements ISet<V>, Cloneable {
    * @param hashFn          the hash function used by the set
    * @param equalsFn        the equality semantics used by the set
    */
-  public LinearSet(int initialCapacity, ToIntFunction<V> hashFn, BiPredicate<V, V> equalsFn) {
+  public LinearSet(int initialCapacity, ToLongFunction<V> hashFn, BiPredicate<V, V> equalsFn) {
     map = new LinearMap<>(initialCapacity, hashFn, equalsFn);
   }
 
@@ -101,7 +102,7 @@ public class LinearSet<V> implements ISet<V>, Cloneable {
    * @param hashFn   the hash function used by the set
    * @param equalsFn the equality semantics used by the set
    */
-  public LinearSet(ToIntFunction<V> hashFn, BiPredicate<V, V> equalsFn) {
+  public LinearSet(ToLongFunction<V> hashFn, BiPredicate<V, V> equalsFn) {
     map = new LinearMap<>(8, hashFn, equalsFn);
   }
 
@@ -117,7 +118,7 @@ public class LinearSet<V> implements ISet<V>, Cloneable {
   }
 
   @Override
-  public ToIntFunction<V> valueHash() {
+  public ToLongFunction<V> valueHash() {
     return map.keyHash();
   }
 

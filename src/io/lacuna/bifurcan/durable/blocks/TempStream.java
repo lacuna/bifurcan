@@ -8,6 +8,14 @@ import io.lacuna.bifurcan.utils.Iterators;
 
 import java.util.Iterator;
 
+import static io.lacuna.bifurcan.durable.Encodings.decodeBlock;
+import static io.lacuna.bifurcan.durable.Encodings.encodeBlock;
+
+/**
+ * 
+ *
+ * @author ztellman
+ */
 public class TempStream {
 
   private static final ThreadLocal<LinearSet<TempIterator>> ITERATORS = ThreadLocal.withInitial(LinearSet::new);
@@ -30,7 +38,7 @@ public class TempStream {
 
     while (blocks.hasNext()) {
       IList<V> b = blocks.next();
-      Util.encodeBlock((IList<Object>) b, elementEncoding, acc);
+      encodeBlock((IList<Object>) b, elementEncoding, acc);
     }
 
     return acc.toBuffers();
@@ -40,7 +48,7 @@ public class TempStream {
     DurableInput in = DurableInput.from(buffers.stream().map(IBuffer::toInput).collect(Lists.linearCollector()));
     Iterator<V> it = Iterators.flatMap(
         Iterators.from(in::hasRemaining, in::slicePrefixedBlock),
-        block -> (Iterator<V>) Util.decodeBlock(block, null, elementEncoding));
+        block -> (Iterator<V>) decodeBlock(block, null, elementEncoding));
 
     int indexWindow = elementEncoding.blockSize() * 2;
 

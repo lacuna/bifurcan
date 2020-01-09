@@ -1,9 +1,6 @@
 package io.lacuna.bifurcan;
 
-import java.util.function.BiPredicate;
-import java.util.function.BinaryOperator;
-import java.util.function.Function;
-import java.util.function.ToIntFunction;
+import java.util.function.*;
 
 /**
  * @author ztellman
@@ -20,8 +17,8 @@ public class Graph<V, E> implements IGraph<V, E> {
       this.w = w;
     }
 
-    int hashCode(ToIntFunction<V> hashFn) {
-      return hashFn.applyAsInt(v) ^ hashFn.applyAsInt(w);
+    long hashCode(ToLongFunction<V> hashFn) {
+      return hashFn.applyAsLong(v) ^ hashFn.applyAsLong(w);
     }
 
     boolean equals(BiPredicate<V, V> equalsFn, VertexSet<V> t) {
@@ -37,7 +34,7 @@ public class Graph<V, E> implements IGraph<V, E> {
     this(Maps.DEFAULT_HASH_CODE, Maps.DEFAULT_EQUALS);
   }
 
-  public Graph(ToIntFunction<V> hashFn, BiPredicate<V, V> equalsFn) {
+  public Graph(ToLongFunction<V> hashFn, BiPredicate<V, V> equalsFn) {
     this(false, new Map<>(hashFn, equalsFn), new Map<>(t -> t.hashCode(hashFn), (a, b) -> a.equals(equalsFn, b)));
   }
 
@@ -204,7 +201,7 @@ public class Graph<V, E> implements IGraph<V, E> {
   }
 
   @Override
-  public ToIntFunction<V> vertexHash() {
+  public ToLongFunction<V> vertexHash() {
     return adjacent.keyHash();
   }
 

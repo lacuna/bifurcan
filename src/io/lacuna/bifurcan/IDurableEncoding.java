@@ -8,6 +8,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiPredicate;
 import java.util.function.ToIntFunction;
+import java.util.function.ToLongFunction;
 
 public interface IDurableEncoding {
 
@@ -17,7 +18,7 @@ public interface IDurableEncoding {
     return IDurableEncoding::defaultComparator;
   }
 
-  default ToIntFunction<Object> hashFn() {
+  default ToLongFunction<Object> hashFn() {
     return Objects::hashCode;
   }
 

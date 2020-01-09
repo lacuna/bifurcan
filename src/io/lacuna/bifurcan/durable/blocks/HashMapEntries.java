@@ -12,6 +12,9 @@ import java.util.OptionalLong;
 import java.util.PrimitiveIterator;
 import java.util.function.BiPredicate;
 
+import static io.lacuna.bifurcan.durable.Encodings.decodeBlock;
+import static io.lacuna.bifurcan.durable.Encodings.encodeBlock;
+
 /**
  * A block that represents zero or more key/value pairs in a HashMap.
  * <p>
@@ -37,8 +40,8 @@ public class HashMapEntries {
       block.forEach(e -> hashes.append(e.keyHash()));
       hashes.flushTo(acc);
 
-      Util.encodeBlock(Lists.lazyMap(block, IEntry::key), mapEncoding.keyEncoding(), acc);
-      Util.encodeBlock(Lists.lazyMap(block, IEntry::value), mapEncoding.valueEncoding(), acc);
+      encodeBlock(Lists.lazyMap(block, IEntry::key), mapEncoding.keyEncoding(), acc);
+      encodeBlock(Lists.lazyMap(block, IEntry::value), mapEncoding.valueEncoding(), acc);
     });
   }
 
@@ -52,7 +55,7 @@ public class HashMapEntries {
     return new HashMapEntries(root, entryOffset, deltas, keys, values, mapEncoding);
   }
 
-  public static Object get(Iterator<HashMapEntries> it, Root root, int hash, Object key, Object defaultValue) {
+  public static Object get(Iterator<HashMapEntries> it, Root root, long hash, Object key, Object defaultValue) {
     while (it.hasNext()) {
       HashMapEntries entries = it.next();
       HashDeltas.IndexRange candidates = entries.hashes.candidateIndices(hash);
@@ -61,14 +64,14 @@ public class HashMapEntries {
       if (keyIndex == -1 && candidates.isBounded) {
         return defaultValue;
       } else if (keyIndex != -1) {
-        return Util.decodeBlock(entries.values, root, entries.mapEncoding.valueEncoding()).skip(keyIndex).next();
+        return decodeBlock(entries.values, root, entries.mapEncoding.valueEncoding()).skip(keyIndex).next();
       }
     }
 
     return defaultValue;
   }
 
-  public static OptionalLong indexOf(Iterator<HashMapEntries> it, int hash, Object key) {
+  public static OptionalLong indexOf(Iterator<HashMapEntries> it, long hash, Object key) {
     while (it.hasNext()) {
       HashMapEntries entries = it.next();
       HashDeltas.IndexRange candidates = entries.hashes.candidateIndices(hash);
@@ -110,7 +113,7 @@ public class HashMapEntries {
       return -1;
     }
 
-    IDurableEncoding.SkippableIterator it = Util.decodeBlock(keys, root, mapEncoding.keyEncoding()).skip(candidates.start);
+    IDurableEncoding.SkippableIterator it = decodeBlock(keys, root, mapEncoding.keyEncoding()).skip(candidates.start);
     BiPredicate<Object, Object> keyEquals = mapEncoding.keyEncoding().equalityFn();
 
     for (int i = candidates.start; i < candidates.end; i++) {
@@ -124,16 +127,16 @@ public class HashMapEntries {
   }
 
   public IEntry.WithHash<Object, Object> nth(long index) {
-    Object key = Util.decodeBlock(keys, root, mapEncoding.keyEncoding()).skip(index).next();
-    Object value = Util.decodeBlock(values, root, mapEncoding.valueEncoding()).skip(index).next();
+    Object key = decodeBlock(keys, root, mapEncoding.keyEncoding()).skip(index).next();
+    Object value = decodeBlock(values, root, mapEncoding.valueEncoding()).skip(index).next();
 
     return IEntry.of(hashes.nth(index), key, value);
   }
 
   public Iterator<IEntry.WithHash<Object, Object>> entries(long dropped) {
-    PrimitiveIterator.OfInt hashes = (PrimitiveIterator.OfInt) Iterators.drop(this.hashes.iterator(), dropped);
-    IDurableEncoding.SkippableIterator keys = Util.decodeBlock(this.keys, root, mapEncoding.keyEncoding()).skip(dropped);
-    IDurableEncoding.SkippableIterator values = Util.decodeBlock(this.values, root, mapEncoding.valueEncoding()).skip(dropped);
-    return Iterators.from(hashes::hasNext, () -> IEntry.of(hashes.nextInt(), keys.next(), values.next()));
+    PrimitiveIterator.OfLong hashes = (PrimitiveIterator.OfLong) Iterators.drop(this.hashes.iterator(), dropped);
+    IDurableEncoding.SkippableIterator keys = decodeBlock(this.keys, root, mapEncoding.keyEncoding()).skip(dropped);
+    IDurableEncoding.SkippableIterator values = decodeBlock(this.values, root, mapEncoding.valueEncoding()).skip(dropped);
+    return Iterators.from(hashes::hasNext, () -> IEntry.of(hashes.nextLong(), keys.next(), values.next()));
   }
 }

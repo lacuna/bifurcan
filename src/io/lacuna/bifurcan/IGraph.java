@@ -2,10 +2,7 @@ package io.lacuna.bifurcan;
 
 import java.util.Iterator;
 import java.util.OptionalLong;
-import java.util.function.BiPredicate;
-import java.util.function.BinaryOperator;
-import java.util.function.Function;
-import java.util.function.ToIntFunction;
+import java.util.function.*;
 
 import static io.lacuna.bifurcan.Graphs.MERGE_LAST_WRITE_WINS;
 
@@ -135,7 +132,7 @@ public interface IGraph<V, E> extends ICollection<IGraph<V, E>, V> {
   /**
    * @return the hash function for vertices
    */
-  ToIntFunction<V> vertexHash();
+  ToLongFunction<V> vertexHash();
 
   /**
    * @return the equality check for vertices

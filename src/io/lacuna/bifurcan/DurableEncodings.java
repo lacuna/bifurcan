@@ -1,6 +1,7 @@
 package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.durable.BlockPrefix;
+import io.lacuna.bifurcan.durable.Encodings;
 import io.lacuna.bifurcan.durable.io.DurableBuffer;
 import io.lacuna.bifurcan.durable.Util;
 
@@ -174,7 +175,7 @@ public class DurableEncodings {
   public static IDurableEncoding.Primitive primitive(
       String description,
       int blockSize,
-      ToIntFunction<Object> valueHash,
+      ToLongFunction<Object> valueHash,
       BiPredicate<Object, Object> valueEquality,
       Comparator<Object> comparator,
       Predicate<Object> isSingleton,
@@ -186,7 +187,7 @@ public class DurableEncodings {
       }
 
       @Override
-      public ToIntFunction<Object> hashFn() {
+      public ToLongFunction<Object> hashFn() {
         return valueHash;
       }
 
@@ -276,7 +277,7 @@ public class DurableEncodings {
           DurableBuffer.flushTo(
               out,
               BlockPrefix.BlockType.PRIMITIVE,
-              inner -> Util.encodeBlock(Lists.lazyMap(arrays, t -> t[i]), e, inner));
+              inner -> Encodings.encodeBlock(Lists.lazyMap(arrays, t -> t[i]), e, inner));
         }
       }
 
@@ -284,7 +285,7 @@ public class DurableEncodings {
       public SkippableIterator decode(DurableInput in, IDurableCollection.Root root) {
         SkippableIterator[] iterators = new SkippableIterator[encodings.length];
         for (int i = 0; i < encodings.length; i++) {
-          iterators[i] = Util.decodeBlock(in.sliceBlock(BlockPrefix.BlockType.PRIMITIVE), root, encodings[i]);
+          iterators[i] = Encodings.decodeBlock(in.sliceBlock(BlockPrefix.BlockType.PRIMITIVE), root, encodings[i]);
         }
 
         return new SkippableIterator() {
@@ -355,7 +356,7 @@ public class DurableEncodings {
       }
 
       @Override
-      public ToIntFunction<Object> hashFn() {
+      public ToLongFunction<Object> hashFn() {
         return primitiveEncoding.hashFn();
       }
 

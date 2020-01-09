@@ -7,6 +7,7 @@ import java.util.Iterator;
 import java.util.OptionalLong;
 import java.util.function.BiPredicate;
 import java.util.function.ToIntFunction;
+import java.util.function.ToLongFunction;
 
 public interface IDiffSortedMap<K, V> extends ISortedMap<K, V> {
 
@@ -31,7 +32,7 @@ public interface IDiffSortedMap<K, V> extends ISortedMap<K, V> {
   ISortedSet<Long> removedIndices();
 
   @Override
-  default ToIntFunction<K> keyHash() {
+  default ToLongFunction<K> keyHash() {
     return underlying().keyHash();
   }
 
