@@ -51,8 +51,7 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
   }
 
   /**
-   * @param map a {@code java.util.Map}
-   * @return a forked map with the same entries
+   * @return a forked map with the same contents as {@code map}
    */
   public static <K, V> Map<K, V> from(java.util.Map<K, V> map) {
     return map.entrySet().stream().collect(Maps.collector(java.util.Map.Entry::getKey, java.util.Map.Entry::getValue));
@@ -175,11 +174,11 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
   }
 
   @Override
-  public IEntry<K, V> nth(long index) {
-    if (index < 0 || index >= size()) {
+  public IEntry<K, V> nth(long idx) {
+    if (idx < 0 || idx >= size()) {
       throw new IndexOutOfBoundsException();
     }
-    return root.nth(index);
+    return root.nth(idx);
   }
 
   @Override

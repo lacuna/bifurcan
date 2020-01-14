@@ -9,7 +9,7 @@ import io.lacuna.bifurcan.durable.Bytes;
 import java.nio.ByteBuffer;
 
 /**
- * An implementation of {@code DurableInput} atop a series of {@code DurableInput}s.
+ * An implementation of {@link DurableInput} atop a series of {@link DurableInput}s.
  */
 public class ConcatInput implements DurableInput {
 

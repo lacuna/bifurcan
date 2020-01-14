@@ -8,12 +8,12 @@ import java.util.*;
 import static io.lacuna.bifurcan.utils.Bits.log2Ceil;
 
 /**
- * A simple implementation of a mutable list combining the best characteristics of {@code java.util.ArrayList} and
- * {@code java.util.ArrayDeque}, allowing elements to be added and removed from both ends of the collection <i>and</i>
+ * A simple implementation of a mutable list combining the best characteristics of {@link java.util.ArrayList} and
+ * {@link java.util.ArrayDeque}, allowing elements to be added and removed from both ends of the collection <i>and</i>
  * allowing random-access reads and updates.
  * <p>
- * Calls to {@code concat()}, {@code slice()}, and {@code split()} create virtual collections which retain a reference
- * to the whole underlying collection, and are somewhat less efficient than {@code LinearList}.
+ * Calls to {@link #concat(IList)}, {@link #slice(long, long)}, and {@link #split(int)} create virtual collections which
+ * retain a reference to the whole underlying collection, and are somewhat less efficient than {@code LinearList}.
  *
  * @author ztellman
  */
@@ -36,24 +36,21 @@ public class LinearList<V> implements IList<V>, Cloneable {
   }
 
   /**
-   * @param collection a {@code java.util.Collection}
-   * @return a list containing the entries of the collection
+   * @return a list containing the entries of {@code collection}
    */
   public static <V> LinearList<V> from(Collection<V> collection) {
     return collection.stream().collect(Lists.linearCollector(collection.size()));
   }
 
   /**
-   * @param iterable an {@code Iterable} object
-   * @return a list containing the elements of the iterator
+   * @return a list containing the elements of {@code iterable}
    */
   public static <V> LinearList<V> from(Iterable<V> iterable) {
     return from(iterable.iterator());
   }
 
   /**
-   * @param iterator an {@code java.util.Iterator}
-   * @return a list containing all remaining elements of the iterator
+   * @return a list containing all remaining elements of {@code iterator}
    */
   public static <V> LinearList<V> from(Iterator<V> iterator) {
     LinearList<V> list = new LinearList<V>();
@@ -62,8 +59,7 @@ public class LinearList<V> implements IList<V>, Cloneable {
   }
 
   /**
-   * @param list another list
-   * @return a {@code LinearList} containing all the elements of the list
+   * @return a list containing the elements of {@code list}
    */
   public static <V> LinearList<V> from(IList<V> list) {
     if (list.size() > Integer.MAX_VALUE) {
@@ -75,16 +71,11 @@ public class LinearList<V> implements IList<V>, Cloneable {
     }
   }
 
-  /**
-   * Creates a new {@code LinearList}.
-   */
   public LinearList() {
     this(DEFAULT_CAPACITY);
   }
 
   /**
-   * Creates a new {@code LinearList}.
-   *
    * @param capacity the initial capacity of the list
    */
   public LinearList(int capacity) {

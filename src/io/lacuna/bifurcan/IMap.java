@@ -37,7 +37,7 @@ public interface IMap<K, V> extends
   V get(K key, V defaultValue);
 
   /**
-   * @return an {@code Optional} containing the value under {@code key}, or nothing if the value is {@code null} or
+   * @return an {@link Optional} containing the value under {@code key}, or nothing if the value is {@code null} or
    * is not contained within the map.
    */
   default Optional<V> get(K key) {
@@ -71,7 +71,7 @@ public interface IMap<K, V> extends
   }
 
   /**
-   * @return the index of {@code key} within {@code nth()}, if it's present
+   * @return the index of {@code key} within the collection, if it's present
    */
   OptionalLong indexOf(K key);
 
@@ -101,7 +101,6 @@ public interface IMap<K, V> extends
   }
 
   /**
-   * @param set a set of keys
    * @return true if this map contains all elements in {@code set}
    */
   default boolean containsAll(ISet<K> set) {
@@ -137,8 +136,7 @@ public interface IMap<K, V> extends
   }
 
   /**
-   * @return the collection, represented as a normal Java {@code io.lacuna.bifurcan.MapNodes}, which will throw
-   * {@code UnsupportedOperationException} on writes
+   * @return the collection, represented as a normal Java map, which will throw {@link UnsupportedOperationException} on writes
    */
   default java.util.Map<K, V> toMap() {
     return Maps.toMap(this);
@@ -159,7 +157,7 @@ public interface IMap<K, V> extends
   }
 
   /**
-   * @return a {@code java.util.stream.Stream}, representing the entries in the map
+   * @return a {@link java.util.stream.Stream}, representing the entries in the map
    */
   default Stream<IEntry<K, V>> stream() {
     return StreamSupport.stream(spliterator(), false);
@@ -180,7 +178,6 @@ public interface IMap<K, V> extends
   }
 
   /**
-   * @param keys a set of keys
    * @return a new map representing the current map, less the keys in {@code keys}
    */
   default IMap<K, V> difference(ISet<K> keys) {
@@ -188,7 +185,6 @@ public interface IMap<K, V> extends
   }
 
   /**
-   * @param keys a set of keys
    * @return a new map representing the current map, but only with the keys in {@code keys}
    */
   default IMap<K, V> intersection(ISet<K> keys) {
@@ -197,15 +193,13 @@ public interface IMap<K, V> extends
   }
 
   /**
-   * @param m another map
-   * @return a new map combining the entries of both, with the values from the second map shadowing those of the first
+   * @return a combined map, with the values from {@code m} shadowing those in this amp
    */
   default IMap<K, V> union(IMap<K, V> m) {
     return merge(m, Maps.MERGE_LAST_WRITE_WINS);
   }
 
   /**
-   * @param m another map
    * @return a new map representing the current map, less the keys in {@code m}
    */
   default IMap<K, V> difference(IMap<K, ?> m) {
@@ -213,7 +207,6 @@ public interface IMap<K, V> extends
   }
 
   /**
-   * @param m another map
    * @return a new map representing the current map, but only with the keys in {@code m}
    */
   default IMap<K, V> intersection(IMap<K, ?> m) {
@@ -267,7 +260,7 @@ public interface IMap<K, V> extends
     return keys()
       .split(parts)
       .stream()
-      .map(ks -> Maps.from(ks, k -> get(k, null)))
+      .map(ks -> ks.zip(this))
       .collect(Lists.collector());
   }
 

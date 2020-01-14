@@ -9,7 +9,7 @@ import static io.lacuna.bifurcan.utils.Encodings.doubleToLong;
 import static io.lacuna.bifurcan.utils.Encodings.longToDouble;
 
 /**
- * A map which has floating-point keys, built atop {@code IntMap}, with which it shares performance characteristics.
+ * A map which has floating-point keys, built atop {@link IntMap}, with which it shares performance characteristics.
  *
  * Since this is intended foremost as a sorted data structure, it does not allow {@code NaN} and treats {@code -0.0} as
  * equivalent to {@code 0.0}.  Anyone looking for identity-based semantics should use a normal {@code Map} instead.
@@ -31,7 +31,7 @@ public class FloatMap<V> implements ISortedMap<Double, V>, Cloneable {
   }
 
   /**
-   * @param m a {@code java.util.Map}
+   * @param m a Java map
    * @return a forked copy of the map
    */
   public static <V> FloatMap<V> from(java.util.Map<Number, V> m) {
@@ -39,8 +39,8 @@ public class FloatMap<V> implements ISortedMap<Double, V>, Cloneable {
   }
 
   /**
-   * @param collection a collection of {@code java.util.map.Entry} objects
-   * @return an {@code IntMap} representing the entries in the collection
+   * @param collection a collection of {@link java.util.Map.Entry} objects
+   * @return an {@link IntMap} representing the entries in the collection
    */
   public static <V> FloatMap<V> from(Collection<java.util.Map.Entry<Number, V>> collection) {
     FloatMap<V> map = new FloatMap<V>().linear();
@@ -51,8 +51,8 @@ public class FloatMap<V> implements ISortedMap<Double, V>, Cloneable {
   }
 
   /**
-   * @param list a list of {@code IEntry} objects
-   * @return an {@code IntMap} representing the entries in the list
+   * @param list a list of {@link IEntry} objects
+   * @return an {@link IntMap} representing the entries in the list
    */
   public static <V> FloatMap<V> from(IList<IEntry<Number, V>> list) {
     FloatMap<V> map = new FloatMap<V>().linear();
@@ -108,8 +108,8 @@ public class FloatMap<V> implements ISortedMap<Double, V>, Cloneable {
   }
 
   @Override
-  public IEntry<Double, V> nth(long index) {
-    return convertEntry(map.nth(index));
+  public IEntry<Double, V> nth(long idx) {
+    return convertEntry(map.nth(idx));
   }
 
   @Override
@@ -193,7 +193,7 @@ public class FloatMap<V> implements ISortedMap<Double, V>, Cloneable {
   /**
    * @param key   a primitive {@code long} key
    * @param value a value
-   * @return an updated {@code FloatMap} with {@code value} under {@code key}
+   * @return an updated {@link FloatMap} with {@code value} under {@code key}
    */
   public FloatMap<V> put(double key, V value) {
     return put(key, value, (BinaryOperator<V>) Maps.MERGE_LAST_WRITE_WINS);

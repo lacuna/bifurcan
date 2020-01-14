@@ -12,7 +12,7 @@ import java.util.Iterator;
 import java.util.function.Consumer;
 
 /**
- * A {@code DurableOutput} which will spill its contents to disk.
+ * A {@link DurableOutput} which will incrementally flush its contents to disk.
  */
 public class DurableBuffer implements DurableOutput {
 

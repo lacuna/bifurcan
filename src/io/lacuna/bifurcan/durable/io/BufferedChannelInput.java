@@ -7,7 +7,7 @@ import java.io.EOFException;
 import java.nio.ByteBuffer;
 
 /**
- * An implementation of {@code DurableInput} atop {@code BufferedChannel}.
+ * An implementation of {@link DurableInput} atop {@link BufferedChannel}.
  *
  * @author ztellman
  */

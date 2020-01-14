@@ -64,27 +64,8 @@ public class SortedSet<V> implements ISortedSet<V> {
   }
 
   @Override
-  public SortedSet<V> union(ISet<V> s) {
-    if (s instanceof SortedSet) {
-      return new SortedSet<>(m.union(((SortedSet<V>) s).m));
-    } else {
-      return new SortedSet<>(m.union(Maps.from(s, k -> null)));
-    }
-  }
-
-  @Override
   public <U> SortedMap<V, U> zip(Function<V, U> f) {
     return m.mapValues((k, v) -> f.apply(k));
-  }
-
-  @Override
-  public SortedSet<V> difference(ISet<V> s) {
-    return new SortedSet<>(m.difference(s));
-  }
-
-  @Override
-  public SortedSet<V> intersection(ISet<V> s) {
-    return new SortedSet<>(m.intersection(s));
   }
 
   @Override
@@ -113,8 +94,8 @@ public class SortedSet<V> implements ISortedSet<V> {
   }
 
   @Override
-  public V nth(long index) {
-    return m.nth(index).key();
+  public V nth(long idx) {
+    return m.nth(idx).key();
   }
 
   @Override

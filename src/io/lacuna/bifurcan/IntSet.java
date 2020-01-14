@@ -115,8 +115,8 @@ public class IntSet implements ISortedSet<Long> {
   }
 
   @Override
-  public Long nth(long index) {
-    return m.nth(index).key();
+  public Long nth(long idx) {
+    return m.nth(idx).key();
   }
 
   @Override

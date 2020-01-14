@@ -22,8 +22,8 @@ import java.util.stream.StreamSupport;
  */
 @SuppressWarnings("unchecked")
 public interface IList<V> extends
-  ICollection<IList<V>, V>,
-  Iterable<V> {
+    ICollection<IList<V>, V>,
+    Iterable<V> {
 
   default IList<V> update(long idx, Function<V, V> updateFn) {
     return set(idx, updateFn.apply(nth(idx)));
@@ -65,15 +65,15 @@ public interface IList<V> extends
   }
 
   /**
-   * @return a new list, with the element at {@code idx} overwritten with {@code value}. If {@code idx} is equal to {@code size()}, the value is appended.
-   * @throws IndexOutOfBoundsException when {@code idx} is not within {@code [0, count]}
+   * @return a new list, with the element at {@code idx} overwritten with {@code value}. If {@code idx} is equal to {@link ICollection#size()}, the value is appended.
+   * @throws IndexOutOfBoundsException when {@code idx} is not within {@code [0, size]}
    */
   default IList<V> set(long idx, V value) {
     return new DiffList<>(this).set(idx, value);
   }
 
   /**
-   * @return a {@code java.util.stream.Stream}, representing the elements in the list
+   * @return a {@link java.util.stream.Stream}, representing the elements in the list
    */
   default Stream<V> stream() {
     return StreamSupport.stream(spliterator(), false);
@@ -110,7 +110,7 @@ public interface IList<V> extends
   }
 
   /**
-   * @return the collection, represented as a normal Java {@code ListNodes}, which will throw an {@code UnsupportedOperationException} for any write
+   * @return the collection, represented as a normal Java list, which will throw an {@link UnsupportedOperationException} for any write
    */
   default java.util.List<V> toList() {
     return Lists.toList(this);
@@ -134,7 +134,7 @@ public interface IList<V> extends
   /**
    * @param start the inclusive start of the range
    * @param end   the exclusive end of the range
-   * @return a sub-range of the list within [start, end), which is linear if {@code this} is linear
+   * @return a sub-range of the list within {@code [start, end)}, which is linear if {@code this} is linear
    */
   default IList<V> slice(long start, long end) {
     return Lists.slice(this, start, end);

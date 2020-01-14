@@ -33,7 +33,7 @@ public class TempStream {
 
     Iterator<IList<V>> blocks = Util.partitionBy(
         it,
-        elementEncoding.blockSize(),
+        DurableEncodings.blockSize(elementEncoding),
         elementEncoding::isSingleton);
 
     while (blocks.hasNext()) {
@@ -50,7 +50,7 @@ public class TempStream {
         Iterators.from(in::hasRemaining, in::slicePrefixedBlock),
         block -> (Iterator<V>) decodeBlock(block, null, elementEncoding));
 
-    int indexWindow = elementEncoding.blockSize() * 2;
+    int indexWindow = DurableEncodings.blockSize(elementEncoding) * 2;
 
     return new TempIterator<V>() {
       private final IntMap<IBuffer> positionToBuffer = new IntMap<IBuffer>().linear();

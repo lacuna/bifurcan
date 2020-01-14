@@ -25,6 +25,9 @@ public interface IDurableCollection {
     }
   }
 
+  /**
+   *
+   */
   interface Root {
     void close();
 
@@ -47,9 +50,5 @@ public interface IDurableCollection {
 
   default IList<Fingerprint> dependencies() {
     return null;
-  }
-
-  default long rootByteOffset() {
-    return bytes().instance().bounds().absolute().start;
   }
 }

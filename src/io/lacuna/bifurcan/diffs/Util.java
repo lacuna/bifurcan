@@ -14,7 +14,7 @@ import java.util.PrimitiveIterator;
 public class Util {
 
   /**
-   * @return the number of removed entries before the idx, unless {@code idx} itself is removed
+   * @return the number of removed entries before {@code idx}, unless {@code idx} itself is removed
    */
   public static OptionalLong removedPredecessors(ISortedSet<Long> removedIndices, long idx) {
     Long floor = removedIndices.floor(idx);

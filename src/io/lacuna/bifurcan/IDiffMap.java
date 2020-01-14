@@ -78,12 +78,12 @@ public interface IDiffMap<K, V> extends IMap<K, V>, IDiff<IMap<K, V>, IEntry<K, 
   }
 
   @Override
-  default IEntry<K, V> nth(long index) {
+  default IEntry<K, V> nth(long idx) {
     long underlyingSize = underlying().size() - removedIndices().size();
-    if (index < underlyingSize) {
-      return underlying().nth(Util.offsetIndex(removedIndices(), index));
+    if (idx < underlyingSize) {
+      return underlying().nth(Util.offsetIndex(removedIndices(), idx));
     } else {
-      return added().nth(index - underlyingSize);
+      return added().nth(idx - underlyingSize);
     }
   }
 

@@ -36,14 +36,14 @@ public interface ISet<V> extends
   }
 
   /**
-   * @return an {@code IList} containing all the elements in the set
+   * @return a list containing all the elements in the set
    */
   default IList<V> elements() {
     return Lists.from(size(), this::nth, this::iterator);
   }
 
   /**
-   * @return an {@code IMap} which has a corresponding value, computed by {@code f}, for each element in the set
+   * @return a map which has a corresponding value, computed by {@code f}, for each element in the set
    */
   default <U> IMap<V, U> zip(Function<V, U> f) {
     Map<V, U> m = new Map<V, U>(valueHash(), valueEquality()).linear();
@@ -52,7 +52,7 @@ public interface ISet<V> extends
   }
 
   /**
-   * @return the position of {@code element} in {@code nth()}, if it's present
+   * @return the position of {@code element} in the collection, if it's present
    */
   OptionalLong indexOf(V element);
 
@@ -89,14 +89,14 @@ public interface ISet<V> extends
   }
 
   /**
-   * @return the set, containing {@code rowValue}
+   * @return the set, containing {@code value}
    */
   default ISet<V> add(V value) {
     return new DiffSet<V>(this).add(value);
   }
 
   /**
-   * @return the set, without {@code rowValue}
+   * @return the set, without {@code value}
    */
   default ISet<V> remove(V value) {
     return new DiffSet<V>(this).remove(value);
@@ -115,40 +115,36 @@ public interface ISet<V> extends
   }
 
   /**
-   * @return a {@code java.util.stream.Stream}, representing the elements in the set
+   * @return a {@link java.util.stream.Stream}, representing the elements in the set
    */
   default Stream<V> stream() {
     return StreamSupport.stream(spliterator(), false);
   }
 
   /**
-   * @param s another set
-   * @return a new set, representing the union of the two sets
+   * @return a new set, representing the union with {@code set}
    */
-  default ISet<V> union(ISet<V> s) {
-    return Sets.union(this, s);
+  default ISet<V> union(ISet<V> set) {
+    return Sets.union(this, set);
   }
 
   /**
-   * @param s another set
-   * @return a new set, representing the difference of the two sets
+   * @return a new set, representing the difference with {@code set}
    */
-  default ISet<V> difference(ISet<V> s) {
-    return Sets.difference(this, s);
+  default ISet<V> difference(ISet<V> set) {
+    return Sets.difference(this, set);
   }
 
   /**
-   * @param s another set
-   * @return a new set, representing the intersection of the two sets
+   * @return a new set, representing the intersection with {@code set}
    */
-  default ISet<V> intersection(ISet<V> s) {
-    ISet<V> result = Sets.intersection(new Set(valueHash(), valueEquality()).linear(), this, s);
+  default ISet<V> intersection(ISet<V> set) {
+    ISet<V> result = Sets.intersection(new Set(valueHash(), valueEquality()).linear(), this, set);
     return isLinear() ? result : result.forked();
   }
 
   /**
-   * @return the collection, represented as a normal Java {@code Set}, which will throw
-   * {@code UnsupportedOperationException} on writes
+   * @return the collection, represented as a normal Java set, which will throw {@link UnsupportedOperationException} on writes
    */
   default java.util.Set<V> toSet() {
     return Sets.toSet(elements(), this::contains);

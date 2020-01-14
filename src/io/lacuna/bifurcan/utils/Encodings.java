@@ -23,7 +23,7 @@ public class Encodings {
   }
 
   /**
-   * The inverse operation for {@code doubleToLong()}.
+   * The inverse operation for {@link #doubleToLong(double)}.
    */
   public static double longToDouble(long value) {
     if (value < -0.0) {

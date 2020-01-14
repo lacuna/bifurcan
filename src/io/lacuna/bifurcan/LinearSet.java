@@ -23,24 +23,21 @@ public class LinearSet<V> implements ISet<V>, Cloneable {
   ///
 
   /**
-   * @param elements a list of elements
-   * @return a {@code LinearSet} containing the elements in the list
+   * @return a set containing the elements in {@code list}
    */
-  public static <V> LinearSet<V> from(IList<V> elements) {
-    return from(elements.toList());
+  public static <V> LinearSet<V> from(IList<V> list) {
+    return from(list.toList());
   }
 
   /**
-   * @param elements a collection of elements
-   * @return a {@code LinearSet} containing the elements in the collection
+   * @return a set containing the elements in {@code collection}
    */
-  public static <V> LinearSet<V> from(java.util.Collection<V> elements) {
-    return elements.stream().collect(Sets.linearCollector(elements.size()));
+  public static <V> LinearSet<V> from(java.util.Collection<V> collection) {
+    return collection.stream().collect(Sets.linearCollector(collection.size()));
   }
 
   /**
-   * @param iterator an iterator
-   * @return a {@code LinearSet} containing the remaining elements in the iterator
+   * @return a set containing the remaining elements in {@code iterator}
    */
   public static <V> LinearSet<V> from(Iterator<V> iterator) {
     LinearSet<V> set = new LinearSet<V>();
@@ -49,16 +46,14 @@ public class LinearSet<V> implements ISet<V>, Cloneable {
   }
 
   /**
-   * @param iterable an {@code Iterable} object
-   * @return a {@code LinearSet} containing the elements in the iterator
+   * @return a set containing the elements in {@code iterable}
    */
   public static <V> LinearSet<V> from(Iterable<V> iterable) {
     return from(iterable.iterator());
   }
 
   /**
-   * @param set another set
-   * @return a {@code LinearSet} containing the same elements, with the same equality semantics
+   * @return a set containing the same elements as {@code set}, with the same equality semantics
    */
   public static <V> LinearSet<V> from(ISet<V> set) {
     if (set instanceof LinearSet) {
@@ -70,6 +65,9 @@ public class LinearSet<V> implements ISet<V>, Cloneable {
     }
   }
 
+  /**
+   * @return a set containing {@code elements}
+   */
   public static <V> LinearSet<V> of(V... elements) {
     LinearSet<V> set = new LinearSet<>(elements.length);
     for (V e : elements) {
@@ -161,8 +159,8 @@ public class LinearSet<V> implements ISet<V>, Cloneable {
   }
 
   @Override
-  public V nth(long index) {
-    return map.nth(index).key();
+  public V nth(long idx) {
+    return map.nth(idx).key();
   }
 
   @Override

@@ -6,7 +6,7 @@ import java.util.function.*;
 import static io.lacuna.bifurcan.Graphs.MERGE_LAST_WRITE_WINS;
 
 /**
- * A directed graph which will throw a {@code DirectedAcyclicGraph.CycleException} if any new edge creates a cycle.
+ * A directed graph which will throw a {@link DirectedAcyclicGraph.CycleException} if any new edge creates a cycle.
  *
  * @author ztellman
  */

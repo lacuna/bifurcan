@@ -14,7 +14,7 @@ public interface ICollection<C, V> extends Iterable<V> {
    * as used in type theory.  It is meant to describe the linear dataflow of the method calls, and as a converse to
    * "forked" data structures.
    * <p>
-   * If {@code forked()} is called on a linear collection, all references to that linear collection should be discarded.
+   * If {@link ICollection#forked()} is called on a linear collection, all references to that linear collection should be discarded.
    * <p>
    * If the data structure is already linear, it will simply return itself.
    *
@@ -57,10 +57,10 @@ public interface ICollection<C, V> extends Iterable<V> {
   long size();
 
   /**
-   * @return the element at {@code index}
-   * @throws IndexOutOfBoundsException when {@code index} is not within {@code [0, size-1]}
+   * @return the element at {@code idx}
+   * @throws IndexOutOfBoundsException when {@code idx} is not within {@code [0, size-1]}
    */
-  V nth(long index);
+  V nth(long idx);
 
   /**
    * @return the element at {@code idx}, or {@code defaultValue} if it is not within {@code [0, size-1]}

@@ -154,8 +154,8 @@ public class Sets {
       }
 
       @Override
-      public V nth(long index) {
-        return elements.nth(index);
+      public V nth(long idx) {
+        return elements.nth(idx);
       }
 
       @Override

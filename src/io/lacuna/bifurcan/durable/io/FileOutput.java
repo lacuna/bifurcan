@@ -19,8 +19,8 @@ import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 
 /**
- * A special {@code WritableByteChannel} for a durable collection file, which will construct a hash as the file is written,
- * and
+ * A special {@link WritableByteChannel} for a durable collection file, which will construct a hash as the file is
+ * written, and add the appropriate prefix.
  */
 public class FileOutput implements WritableByteChannel {
 
@@ -65,7 +65,7 @@ public class FileOutput implements WritableByteChannel {
   }
 
   /**
-   * Finalizes the collection after {@code close()} is called, moving the file to {@code directory}, with the hex-encoded
+   * Finalizes the collection after {@link #close()} is called, moving the file to {@code directory}, with the hex-encoded
    * hash for a name.
    */
   public Path moveTo(Path directory) {
@@ -96,6 +96,7 @@ public class FileOutput implements WritableByteChannel {
     }
 
     return end - start;
+//    return channel.transferTo(start, end, this.file);
   }
 
   @Override

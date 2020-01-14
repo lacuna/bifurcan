@@ -44,18 +44,18 @@ public interface IDiffList<V> extends IList<V>, IDiff<IList<V>, V> {
   }
 
   @Override
-  default V nth(long index) {
-    if (index < prefix().size()) {
-      return prefix().nth(index);
+  default V nth(long idx) {
+    if (idx < prefix().size()) {
+      return prefix().nth(idx);
     }
-    index -= prefix().size();
+    idx -= prefix().size();
 
-    if (index < underlyingSlice().size()) {
-      return underlying().nth(underlyingSlice().start + index);
+    if (idx < underlyingSlice().size()) {
+      return underlying().nth(underlyingSlice().start + idx);
     }
-    index -= underlyingSlice().size();
+    idx -= underlyingSlice().size();
 
-    return suffix().nth(index);
+    return suffix().nth(idx);
   }
 
   @Override

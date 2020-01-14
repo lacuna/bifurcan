@@ -3,7 +3,9 @@ package io.lacuna.bifurcan.durable;
 import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.durable.allocator.IBuffer;
 import io.lacuna.bifurcan.durable.blocks.TempStream;
+import io.lacuna.bifurcan.utils.Iterators;
 
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.function.Function;
@@ -11,16 +13,17 @@ import java.util.function.Function;
 public class ChunkSort {
 
   private static class Chunk<T> {
-    private final SortedMap<T, LinearList<T>> entries;
+    private final T[] entries;
+    private Comparator<T> comparator;
     private int size;
 
-    Chunk(Comparator<T> comparator) {
-      this.entries = new SortedMap<T, LinearList<T>>(comparator).linear();
+    Chunk(int maxSize, Comparator<T> comparator) {
+      this.entries = (T[]) new Object[maxSize];
+      this.comparator = comparator;
     }
 
     void add(T entry) {
-      size++;
-      entries.getOrCreate(entry, LinearList::new).addLast(entry);
+      entries[size++] = entry;
     }
 
     int size() {
@@ -28,7 +31,8 @@ public class ChunkSort {
     }
 
     Iterator<T> entries() {
-      return entries.values().stream().flatMap(IList::stream).iterator();
+      Arrays.sort(entries, 0, size, comparator);
+      return Iterators.range(0, size, i -> entries[(int) i]);
     }
 
     <S> S spill(Function<Iterator<T>, S> encode) {
@@ -55,14 +59,14 @@ public class ChunkSort {
       this.comparator = comparator;
       this.maxRealizedElements = maxRealizedElements;
 
-      this.curr = new Chunk<>(comparator);
+      this.curr = new Chunk<>(maxRealizedElements, comparator);
     }
 
     public void add(T x) {
       curr.add(x);
       if (curr.size() >= maxRealizedElements) {
         spilled.addLast(curr.spill(encode));
-        curr = new Chunk<>(comparator);
+        curr = new Chunk<>(maxRealizedElements, comparator);
       }
     }
 

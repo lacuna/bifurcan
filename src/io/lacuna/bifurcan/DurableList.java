@@ -84,13 +84,13 @@ public class DurableList<V> implements IDurableCollection, IList<V> {
   }
 
   @Override
-  public V nth(long index) {
-    if (index < 0 || index >= size) {
-      throw new IndexOutOfBoundsException(index + " must be within [0," + size() + ")");
+  public V nth(long idx) {
+    if (idx < 0 || idx >= size) {
+      throw new IndexOutOfBoundsException(idx + " must be within [0," + size() + ")");
     }
-    SkipTable.Entry entry = skipTable == null ? SkipTable.Entry.ORIGIN : skipTable.floor(index);
+    SkipTable.Entry entry = skipTable == null ? SkipTable.Entry.ORIGIN : skipTable.floor(idx);
     return (V) Encodings.decodeBlock(elements.instance().seek(entry.offset), root, encoding.elementEncoding())
-        .skip(index - entry.index)
+        .skip(idx - entry.index)
         .next();
   }
 

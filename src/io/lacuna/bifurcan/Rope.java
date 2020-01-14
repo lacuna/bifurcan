@@ -33,8 +33,7 @@ public class Rope implements Comparable<Rope> {
   private int hash = -1;
 
   /**
-   * @param cs a Java-style {@code CharSequence}
-   * @return a corresponding {@code Rope} representation
+   * @return a rope corresponding to {@code cs}
    */
   public static Rope from(CharSequence cs) {
 
@@ -60,8 +59,7 @@ public class Rope implements Comparable<Rope> {
   ///
 
   /**
-   * @param rope another {@code Rope}
-   * @return a new Rope which is the concatenation of these two values
+   * @return a new Rope with {@code rope} concatenated to the end
    */
   public Rope concat(Rope rope) {
     return new Rope(root.concat(rope.root, new Object()), isLinear());
@@ -69,7 +67,7 @@ public class Rope implements Comparable<Rope> {
 
   /**
    * @return the nth code point within the rope
-   * @throws IndexOutOfBoundsException if {@code idx} is not within {@code [0, size())}
+   * @throws IndexOutOfBoundsException if {@code idx} is not within {@code [0, size)}
    */
   public int nth(int idx) {
     if (idx < 0 || idx >= size()) {
@@ -87,7 +85,7 @@ public class Rope implements Comparable<Rope> {
 
   /**
    * @return a rope without the code points within {@code [start, end)}
-   * @throws IllegalArgumentException if {@code start} or {@code end} are not within {@code [0, size()) }
+   * @throws IllegalArgumentException if {@code start} or {@code end} are not within {@code [0, size) }
    */
   public Rope remove(int start, int end) {
 
@@ -165,14 +163,14 @@ public class Rope implements Comparable<Rope> {
   }
 
   /**
-   * @return a new rope with {@code rope} inserted after the first {@code index} code points
+   * @return a new rope with {@code rope} inserted after the first {@code idx} code points
    */
-  public Rope insert(int index, Rope rope) {
+  public Rope insert(int idx, Rope rope) {
     if (rope.size() == 0) {
       return this;
     }
 
-    return insert(index, rope.chunks(), rope.root.numCodeUnits());
+    return insert(idx, rope.chunks(), rope.root.numCodeUnits());
 
   }
 
@@ -188,7 +186,7 @@ public class Rope implements Comparable<Rope> {
 
   /**
    * @return a new rope representing the code points within {@code [start, end)}
-   * @throws IllegalArgumentException if {@code end} < {@code start}, or {@code start} and {@code end} are not within {@code [0, size())}
+   * @throws IllegalArgumentException if {@code end} < {@code start}, or {@code start} and {@code end} are not within {@code [0, size)}
    */
   public Rope slice(int start, int end) {
     if (end < start || start < 0 || end > size()) {
@@ -261,7 +259,7 @@ public class Rope implements Comparable<Rope> {
   }
 
   /**
-   * @return a corresponding Java-style {@code CharSequence} in {@code O(1)} time
+   * @return a corresponding Java-style {@link CharSequence} in {@code O(1)} time
    */
   public CharSequence toCharSequence() {
     return new CharSequence() {

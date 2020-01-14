@@ -128,12 +128,12 @@ public class DurableMap<K, V> implements IDurableCollection, IMap<K, V> {
   }
 
   @Override
-  public IEntry.WithHash<K, V> nth(long index) {
-    if (index < 0 || index >= size) {
-      throw new IndexOutOfBoundsException(index + " must be within [0," + size() + ")");
+  public IEntry.WithHash<K, V> nth(long idx) {
+    if (idx < 0 || idx >= size) {
+      throw new IndexOutOfBoundsException(idx + " must be within [0," + size() + ")");
     }
-    SkipTable.Entry blockEntry = indexTable == null ? SkipTable.Entry.ORIGIN : indexTable.floor(index);
-    return (IEntry.WithHash<K, V>) chunkedEntries(blockEntry.offset).next().nth((int) (index - blockEntry.index));
+    SkipTable.Entry blockEntry = indexTable == null ? SkipTable.Entry.ORIGIN : indexTable.floor(idx);
+    return (IEntry.WithHash<K, V>) chunkedEntries(blockEntry.offset).next().nth((int) (idx - blockEntry.index));
   }
 
   @Override

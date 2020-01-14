@@ -60,38 +60,6 @@ public class SortedMap<K, V> implements ISortedMap<K, V> {
   }
 
   @Override
-  public SortedMap<K, V> difference(ISet<K> keys) {
-    SortedMap<K, V> result = clone().linear();
-    keys.forEach(result::remove);
-    return isLinear() ? result : result.forked();
-  }
-
-  @Override
-  public SortedMap<K, V> intersection(ISet<K> keys) {
-    SortedMap<K, V> result = (SortedMap<K, V>) Maps.intersection(new SortedMap<K, V>().linear(), this, keys);
-    return isLinear() ? result : result.forked();
-  }
-
-  @Override
-  public SortedMap<K, V> union(IMap<K, V> m) {
-    return merge(m, (BinaryOperator<V>) Maps.MERGE_LAST_WRITE_WINS);
-  }
-
-  @Override
-  public SortedMap<K, V> difference(IMap<K, ?> m) {
-    SortedMap<K, V> result = clone().linear();
-    m.keys().forEach(result::remove);
-    return isLinear() ? result : result.forked();
-  }
-
-  @Override
-  public SortedMap<K, V> merge(IMap<K, V> b, BinaryOperator<V> mergeFn) {
-    SortedMap<K, V> result = clone().linear();
-    b.forEach(e -> result.put(e.key(), e.value(), mergeFn));
-    return isLinear() ? result : result.forked();
-  }
-
-  @Override
   public SortedMap<K, V> update(K key, UnaryOperator<V> update) {
     return put(key, update.apply(this.get(key, null)));
   }
@@ -99,11 +67,6 @@ public class SortedMap<K, V> implements ISortedMap<K, V> {
   @Override
   public SortedMap<K, V> put(K key, V value) {
     return put(key, value, (BinaryOperator<V>) Maps.MERGE_LAST_WRITE_WINS);
-  }
-
-  @Override
-  public SortedMap<K, V> intersection(IMap<K, ?> m) {
-    return intersection(m.keys());
   }
 
   @Override
@@ -175,11 +138,11 @@ public class SortedMap<K, V> implements ISortedMap<K, V> {
   }
 
   @Override
-  public IEntry<K, V> nth(long index) {
-    if (index < 0 || index >= size()) {
+  public IEntry<K, V> nth(long idx) {
+    if (idx < 0 || idx >= size()) {
       throw new IndexOutOfBoundsException();
     }
-    Node<K, V> n = SortedMapNodes.nth(root, (int) index);
+    Node<K, V> n = SortedMapNodes.nth(root, (int) idx);
     return IEntry.of(n.k, n.v);
   }
 

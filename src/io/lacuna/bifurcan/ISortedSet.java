@@ -16,12 +16,21 @@ public interface ISortedSet<V> extends ISet<V> {
    * @return the entry whose key is either equal to {@code key}, or just above it. If {@code key} is greater than the
    * maximum value in the map, returns {@code null}.
    */
-  V ceil(V val);
+  default V ceil(V val) {
+    V f = floor(val);
+    if (f == null) {
+      return nth(0, null);
+    } else if (valueEquality().test(val, f)) {
+      return f;
+    } else {
+      return nth(indexOf(f).getAsLong() + 1, null);
+    }
+  }
 
   /**
    * @param min the inclusive minimum key value
    * @param max the inclusive maximum key value
-   * @return a map representing all entries within [{@code} min, {@code} max]
+   * @return a map representing all entries within {@code [min, max]}
    */
   ISortedSet<V> slice(V min, V max);
 
@@ -29,11 +38,17 @@ public interface ISortedSet<V> extends ISet<V> {
 
   ISortedSet<V> remove(V value);
 
-  ISortedSet<V> union(ISet<V> s);
+  default ISortedSet<V> union(ISet<V> s) {
+    return (ISortedSet<V>) Sets.union(this, s);
+  }
 
-  ISortedSet<V> difference(ISet<V> s);
+  default ISortedSet<V> difference(ISet<V> s) {
+    return (ISortedSet<V>) Sets.difference(this, s);
+  }
 
-  ISortedSet<V> intersection(ISet<V> s);
+  default ISortedSet<V> intersection(ISet<V> s) {
+    return (ISortedSet<V>) Sets.intersection(new SortedSet<>(), this, s);
+  }
 
   ISortedSet<V> forked();
 

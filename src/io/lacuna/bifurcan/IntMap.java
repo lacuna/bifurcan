@@ -15,8 +15,8 @@ import java.util.function.*;
  * characteristics.
  * <p>
  * This collection keeps the keys in sorted order, and can thought of as either a map of integers or a sparse vector.
- * It provides {@code slice()}, {@code floor()}, and {@code ceil()} methods which allow for lookups and filtering on
- * its keys.
+ * It provides {@link IntMap#slice(Long, Long)}, {@link IntMap#floor(Long)}, and {@link IntMap#ceil(Long)} methods which
+ * allow for lookups and filtering on its keys.
  *
  * @author ztellman
  */
@@ -42,16 +42,15 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
   }
 
   /**
-   * @param m a {@code java.util.Map}
-   * @return a forked copy of the map
+   * @return a forked copy of {@code m}
    */
   public static <V> IntMap<V> from(java.util.Map<Number, V> m) {
     return from(m.entrySet());
   }
 
   /**
-   * @param collection a collection of {@code java.util.map.Entry} objects
-   * @return an {@code IntMap} representing the entries in the collection
+   * @param collection a collection of {@link java.util.Map.Entry} objects
+   * @return an {@link IntMap} representing the entries in the collection
    */
   public static <V> IntMap<V> from(Collection<Map.Entry<Number, V>> collection) {
     IntMap<V> map = new IntMap<V>().linear();
@@ -62,8 +61,8 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
   }
 
   /**
-   * @param list a list of {@code IEntry} objects
-   * @return an {@code IntMap} representing the entries in the list
+   * @param list a list of {@link IEntry} objects
+   * @return an {@link IntMap} representing the entries in the list
    */
   public static <V> IntMap<V> from(IList<IEntry<Number, V>> list) {
     IntMap<V> map = new IntMap<V>().linear();
@@ -106,7 +105,7 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
   /**
    * @param min the inclusive minimum key value
    * @param max the inclusive maximum key value
-   * @return a map representing all entries within [{@code} min, {@code} max]
+   * @return a map representing all entries within {@code [min, max]}
    */
   public IntMap<V> slice(long min, long max) {
     Node<V> negPrime = neg.slice(editor, min, max);
@@ -186,7 +185,7 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
   /**
    * @param key   a primitive {@code long} key
    * @param value a value
-   * @return an updated {@code IntMap} with {@code value} under {@code key}
+   * @return an updated {@link IntMap} with {@code value} under {@code key}
    */
   public IntMap<V> put(long key, V value) {
     return put(key, value, (BinaryOperator<V>) Maps.MERGE_LAST_WRITE_WINS);
@@ -338,8 +337,8 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
   }
 
   @Override
-  public IEntry<Long, V> nth(long index) {
-    return index < neg.size() ? neg.nth(index) : pos.nth(index - neg.size());
+  public IEntry<Long, V> nth(long idx) {
+    return idx < neg.size() ? neg.nth(idx) : pos.nth(idx - neg.size());
   }
 
   @Override

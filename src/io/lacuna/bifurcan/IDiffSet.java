@@ -33,8 +33,8 @@ public interface IDiffSet<V> extends ISet<V>, IDiff<IMap<V, Void>, IEntry<V, Voi
   }
 
   @Override
-  default V nth(long index) {
-    return diffMap().nth(index).key();
+  default V nth(long idx) {
+    return diffMap().nth(idx).key();
   }
 
   @Override

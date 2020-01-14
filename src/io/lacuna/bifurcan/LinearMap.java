@@ -12,16 +12,16 @@ import static java.lang.System.arraycopy;
 
 /**
  * A hash-map implementation which uses Robin Hood hashing for placement, and allows for customized hashing and equality
- * semantics.  Performance is equivalent to {@code java.util.HashMap} for lookups and construction, and superior in the
- * case of poor hash distribution.  Because entries are stored contiguously, performance of {@code clone()} and
- * iteration is significantly better than {@code java.util.HashMap}.
+ * semantics.  Performance is equivalent to {@link java.util.HashMap} for lookups and construction, and superior in the
+ * case of poor hash distribution.  Because entries are stored contiguously, performance of {@link LinearMap#clone()} and
+ * iteration is significantly better than {@link java.util.HashMap}.
  * <p>
- * The {@code entries()} method is O(1) and allows random access, returning an IList that proxies through to an
+ * The {@link LinearMap#entries()} method is O(1) and allows random access, returning an IList that proxies through to an
  * underlying array.  Partitioning this list is the most efficient way to process the collection in parallel.
  * <p>
- * However, {@code LinearMap} also exposes O(N) {@code split()} and {@code merge()} methods, which despite their
- * asymptotic complexity can be quite fast in practice.  The appropriate way to split this collection will depend
- * on the use case.
+ * However, {@code LinearMap} also exposes O(N) {@link #split(int)} and {@link #merge(IMap, BinaryOperator)}
+ * methods, which despite their asymptotic complexity can be quite fast in practice.  The appropriate way to split this
+ * collection will depend on the use case.
  *
  * @author ztellman
  */
@@ -48,16 +48,14 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
   /// Constructors
 
   /**
-   * @param map a {@code java.util.Map}
-   * @return a copy of the map
+   * @return a copy of {@code map}
    */
   public static <K, V> LinearMap<K, V> from(java.util.Map<K, V> map) {
     return from(map.entrySet());
   }
 
   /**
-   * @param map another map
-   * @return a copy of the map, with the same equality semantics
+   * @return a copy of {@code map}, with the same equality semantics
    */
   public static <K, V> LinearMap<K, V> from(IMap<K, V> map) {
     if (map instanceof LinearMap) {
@@ -70,29 +68,26 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
   }
 
   /**
-   * @param entries a sequence of {@code IEntry} objects
-   * @return a {@code LinearMap} representing the entries in the sequence
+   * @return a map representing all elements in {@code entries}
    */
   public static <K, V> LinearMap<K, V> from(Iterable<IEntry<K, V>> entries) {
     return from(entries.iterator());
   }
 
   /**
-   * @param entries an iterator of {@code IEntry} objects
-   * @return a {@code LinearMap} representing the entries remaining in the iterator
+   * @return a map representing all remaining entries in {@code iterator}
    */
-  public static <K, V> LinearMap<K, V> from(Iterator<IEntry<K, V>> entries) {
+  public static <K, V> LinearMap<K, V> from(Iterator<IEntry<K, V>> iterator) {
     LinearMap<K, V> m = new LinearMap<>();
-    entries.forEachRemaining(e -> m.put(e.key(), e.value()));
+    iterator.forEachRemaining(e -> m.put(e.key(), e.value()));
     return m;
   }
 
   /**
-   * @param entries a collection of {@code java.util.Map.Entry} objects
-   * @return a {@code LinearMap} representing the entries in the collection
+   * @return a map representing the entries in {@code collection}
    */
-  public static <K, V> LinearMap<K, V> from(Collection<Map.Entry<K, V>> entries) {
-    return entries.stream().collect(Maps.linearCollector(Map.Entry::getKey, Map.Entry::getValue, entries.size()));
+  public static <K, V> LinearMap<K, V> from(Collection<Map.Entry<K, V>> collection) {
+    return collection.stream().collect(Maps.linearCollector(Map.Entry::getKey, Map.Entry::getValue, collection.size()));
   }
 
   public LinearMap() {

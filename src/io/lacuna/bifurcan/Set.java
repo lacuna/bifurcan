@@ -108,8 +108,8 @@ public class Set<V> implements ISet<V>, Cloneable {
   }
 
   @Override
-  public V nth(long index) {
-    return map.nth(index).key();
+  public V nth(long idx) {
+    return map.nth(idx).key();
   }
 
   @Override

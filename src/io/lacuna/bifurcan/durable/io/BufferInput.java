@@ -6,7 +6,7 @@ import io.lacuna.bifurcan.durable.Bytes;
 import java.nio.ByteBuffer;
 
 /**
- * An implementation of {@code DurableInput} atop {@code ByteBuffer}.
+ * An implementation of {@link DurableInput} atop {@link ByteBuffer}.
  *
  * @author ztellman
  */

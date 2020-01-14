@@ -9,7 +9,7 @@ import java.util.stream.Collector;
 import static io.lacuna.bifurcan.Lists.lazyMap;
 
 /**
- * Utility functions for classes implementing {@code IMap}.
+ * Utility functions for classes implementing {@link IMap}.
  *
  * @author ztellman
  */
@@ -104,7 +104,6 @@ public class Maps {
     }
   }
 
-
   public static <K, V> String toString(IMap<K, V> m) {
     return toString(m, Objects::toString, Objects::toString);
   }
@@ -195,8 +194,8 @@ public class Maps {
       }
 
       @Override
-      public IEntry<K, V> nth(long index) {
-        K key = keys.nth(index);
+      public IEntry<K, V> nth(long idx) {
+        K key = keys.nth(idx);
         return new Entry<>(key, lookup.apply(key));
       }
 

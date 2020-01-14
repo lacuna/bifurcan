@@ -77,12 +77,12 @@ public interface IDiffSortedMap<K, V> extends ISortedMap<K, V> {
   }
 
   @Override
-  default IEntry<K, V> nth(long index) {
-    IEntry<Long, K> addedFloor = addedKeys().floor(index);
-    if (addedFloor.key() == index) {
+  default IEntry<K, V> nth(long idx) {
+    IEntry<Long, K> addedFloor = addedKeys().floor(idx);
+    if (addedFloor.key() == idx) {
       return IEntry.of(addedFloor.value(), added().get(addedFloor.value()).get());
     } else {
-      return underlying().nth(Util.offsetIndex(removedIndices(), index - addedFloor.key()));
+      return underlying().nth(Util.offsetIndex(removedIndices(), idx - addedFloor.key()));
     }
   }
 

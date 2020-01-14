@@ -21,7 +21,7 @@ import java.util.stream.IntStream;
 import static java.lang.Math.min;
 
 /**
- * Utility functions for classes implementing {@code IList}.
+ * Utility functions for classes implementing {@link IList}.
  *
  * @author ztellman
  */

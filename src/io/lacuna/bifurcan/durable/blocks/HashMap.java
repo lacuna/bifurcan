@@ -113,7 +113,7 @@ public class HashMap {
     Iterator<IList<IEntry.WithHash<K, V>>> entryBlocks =
         Util.partitionBy(
             sortedEntries,
-            Math.min(encoding.keyEncoding().blockSize(), encoding.keyEncoding().blockSize()),
+            Math.min(DurableEncodings.blockSize(encoding.keyEncoding()), DurableEncodings.blockSize(encoding.keyEncoding())),
             e -> encoding.keyEncoding().isSingleton(e.key()) || encoding.valueEncoding().isSingleton(e.value()));
 
     long index = 0;

@@ -68,27 +68,20 @@ public class Bytes {
     a = a.duplicate();
     b = b.duplicate();
 
-    IBuffer
-        ia = GenerationalAllocator.allocate(1 << 10),
-        ib = GenerationalAllocator.allocate(1 << 10);
-
-    try {
-      while (a.hasRemaining() || b.hasRemaining()) {
-        ByteBuffer ba = ia.bytes();
-        ByteBuffer bb = ib.bytes();
-        a.read(ba);
-        b.read(bb);
-        int cmp = compareBuffers((ByteBuffer) ba.flip(), (ByteBuffer) bb.flip());
-        if (cmp != 0) {
-          return cmp;
-        }
+    while (a.hasRemaining() && b.hasRemaining()) {
+      int d = a.readUnsignedByte() - b.readUnsignedByte();
+      if (d != 0) {
+        return d;
       }
-    } finally {
-      ia.free();
-      ib.free();
     }
 
-    return 0;
+    if (a.hasRemaining()) {
+      return 1;
+    } else if (b.hasRemaining()) {
+      return -1;
+    } else {
+      return 0;
+    }
   }
 
   public static ByteBuffer slice(ByteBuffer b, long start, long end) {

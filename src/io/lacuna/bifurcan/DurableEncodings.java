@@ -5,19 +5,65 @@ import io.lacuna.bifurcan.durable.Encodings;
 import io.lacuna.bifurcan.durable.io.DurableBuffer;
 import io.lacuna.bifurcan.durable.Util;
 
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.NoSuchElementException;
-import java.util.Objects;
+import java.util.*;
 import java.util.function.*;
 
+/**
+ * Utility methods for constructing {@link IDurableEncoding}s.
+ */
 public class DurableEncodings {
 
+  /**
+   * An encoding which encodes nothing and yields {@code null}.
+   */
+  public static final IDurableEncoding.Primitive VOID =
+      primitive("void", 64 << 10,
+          Codec.from(
+              (l, out) -> out.writeUVLQ(l.size()),
+              (in, root) -> {
+                long n = in.readUVLQ();
+                return new IDurableEncoding.SkippableIterator() {
+                  long remaining = n;
+
+                  @Override
+                  public void skip() {
+                    remaining--;
+                  }
+
+                  @Override
+                  public boolean hasNext() {
+                    return remaining > 0;
+                  }
+
+                  @Override
+                  public Object next() {
+                    remaining--;
+                    return null;
+                  }
+                };
+              }
+          ));
+
+  /**
+   * @return the block size for {@code encoding}, which is {@code 1} for all non-primitives
+   */
+  public static int blockSize(IDurableEncoding encoding) {
+    return (encoding instanceof IDurableEncoding.Primitive)
+        ? ((IDurableEncoding.Primitive) encoding).blockSize()
+        : 1;
+  }
+
+  /**
+   * A convenience interface capturing the codec behavior for a primitive encoding.
+   */
   public interface Codec {
     void encode(IList<Object> values, DurableOutput out);
 
     IDurableEncoding.SkippableIterator decode(DurableInput in, IDurableCollection.Root root);
 
+    /**
+     * @return a corresponding codec
+     */
     static Codec from(
         BiConsumer<IList<Object>, DurableOutput> encode,
         BiFunction<DurableInput, IDurableCollection.Root, IDurableEncoding.SkippableIterator> decode) {
@@ -34,6 +80,10 @@ public class DurableEncodings {
       };
     }
 
+    /**
+     * Using {@code encode} and {@code decode} methods for individual values that are not explicitly separated, returns
+     * a codec which can deal with blocks of values.
+     */
     static Codec undelimited(
         BiConsumer<Object, DurableOutput> encode,
         BiFunction<DurableInput, IDurableCollection.Root, Object> decode) {
@@ -70,6 +120,10 @@ public class DurableEncodings {
       };
     }
 
+    /**
+     * Using {@code encode} and {@code decode} methods for individual values that are either delimited or fixed-size,
+     * returns a codec which can deal with blocks of values.
+     */
     static Codec selfDelimited(
         BiConsumer<Object, DurableOutput> encode,
         BiFunction<DurableInput, IDurableCollection.Root, Object> decode) {
@@ -158,6 +212,9 @@ public class DurableEncodings {
     };
   }
 
+  /**
+   * @return a primitive encoding
+   */
   public static IDurableEncoding.Primitive primitive(
       String description,
       int blockSize,
@@ -172,6 +229,9 @@ public class DurableEncodings {
         codec);
   }
 
+  /**
+   * @return a primitive encoding
+   */
   public static IDurableEncoding.Primitive primitive(
       String description,
       int blockSize,
@@ -223,6 +283,16 @@ public class DurableEncodings {
     };
   }
 
+  /**
+   * Creates a tuple encoding, which allows us to decompose a compound object into individual values we know how to encode.
+   *
+   * To deconstruct the value, we use {@code preEncode}, which yields an array of individual values, which by convention
+   * have the same order as {@code encodings}.
+   *
+   * To reconstruct the value, we use {@code postDecode}, which takes an array of individual values an yields a compound value.
+   *
+   * The block size of this encoding is equal to the smallest block size of its sub-encodings.
+   */
   public static IDurableEncoding.Primitive tuple(
       Function<Object, Object[]> preEncode,
       Function<Object[], Object> postDecode,
@@ -230,10 +300,14 @@ public class DurableEncodings {
     return tuple(
         preEncode,
         postDecode,
-        Arrays.stream(encodings).mapToInt(IDurableEncoding::blockSize).min().getAsInt(),
+        Arrays.stream(encodings).mapToInt(DurableEncodings::blockSize).min().getAsInt(),
         encodings);
   }
 
+  /**
+   * Same as {@link DurableEncodings#tuple(Function, Function, IDurableEncoding...)}, except that {@code blockSize} can
+   * be explicitly specified.
+   */
   public static IDurableEncoding.Primitive tuple(
       Function<Object, Object[]> preEncode,
       Function<Object[], Object> postDecode,
@@ -299,7 +373,7 @@ public class DurableEncodings {
           @Override
           public boolean hasNext() {
             for (int i = 1; i < iterators.length; i++) {
-              assert(iterators[0].hasNext() == iterators[i].hasNext());
+              assert (iterators[0].hasNext() == iterators[i].hasNext());
             }
             return iterators[0].hasNext();
           }
@@ -317,6 +391,9 @@ public class DurableEncodings {
     };
   }
 
+  /**
+   * A unityped encoding, where all possible primitive values can be handled by {@code primitiveEncoding}.
+   */
   public static IDurableEncoding unityped(
       IDurableEncoding.Primitive primitiveEncoding) {
     return new IDurableEncoding.Unityped() {

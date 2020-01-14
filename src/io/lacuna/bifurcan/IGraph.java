@@ -28,7 +28,7 @@ public interface IGraph<V, E> extends ICollection<IGraph<V, E>, V> {
   E edge(V from, V to);
 
   /**
-   * In an undirected graph, this is equivalent to {@code out()}.
+   * In an undirected graph, this is equivalent to {@link IGraph#out(Object)}.
    *
    * @return the set of all incoming edges to {@code vertex}
    * @throws IllegalArgumentException if no such vertex exists
@@ -36,7 +36,7 @@ public interface IGraph<V, E> extends ICollection<IGraph<V, E>, V> {
   ISet<V> in(V vertex);
 
   /**
-   * In an undirected graph, this is equivalent to {@code in()}.
+   * In an undirected graph, this is equivalent to {@link IGraph#in(Object)}.
    *
    * @return the set of all outgoing edges from {@code vertex}
    * @throws IllegalArgumentException if no such vertex exists
@@ -76,8 +76,8 @@ public interface IGraph<V, E> extends ICollection<IGraph<V, E>, V> {
     return vertices().indexOf(vertex);
   }
 
-  default V nth(long index) {
-    return vertices().nth(index);
+  default V nth(long idx) {
+    return vertices().nth(idx);
   }
 
   default Iterator<V> iterator() {
@@ -145,7 +145,7 @@ public interface IGraph<V, E> extends ICollection<IGraph<V, E>, V> {
   IGraph<V, E> transpose();
 
   /**
-   * @return a singleton list of the graph, unsplit.  The graph can be split into separate pieces in linear time using {@code Graphs.connectedComponents()}.
+   * @return a singleton list of the graph, unsplit.  The graph can be split into separate pieces in linear time using {@link Graphs#connectedComponents(IGraph)}.
    */
   default IList<? extends IGraph<V, E>> split(int parts) {
     return List.of(this);
