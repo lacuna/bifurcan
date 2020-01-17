@@ -101,7 +101,7 @@ These collections are not realized in-memory, and can be used as a translation l
 
 ### durable collections
 
-[a short explanation, with a link to a longer explanation, goes here, in the meantime [here are some graphs](doc/durable.md)]
+All in-memory structures can be saved to disk, while retaining the same API and asymptotic performance.  These durable collections are optimized for reads and batched writes, which means they are not a replacement for general-purpose databases, but they are still [useful in a variety of applications](doc/durable.md).
 
 ### no lazy collections
 
