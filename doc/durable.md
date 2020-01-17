@@ -80,7 +80,7 @@ Both of these values are measured using [pidstat](https://linux.die.net/man/1/pi
 
 The benchmarks below were run on an Intel NUC8i5BEK running Ubuntu 18.04.3, with 16gb of RAM and a 1TB Samsung 970 EVO NVMe drive.  Each entry is 1024 bytes of pseudo-random binary data.
 
-### creation
+### construction
 
 ![](../benchmarks/images/durable_write.png)
 
