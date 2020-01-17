@@ -32,7 +32,7 @@ Bifurcan's durable collections are optimized for these use cases.  By ignoring i
 
 ## how it works
 
-In Bifurcan, any collection can be saved to disk by invoking `save(encoding, directory), where `encoding` is an [IDurableEncoding](https://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/IDurableEncoding.html):
+In Bifurcan, any collection can be saved to disk by invoking `save(encoding, directory)`, where `encoding` is an [IDurableEncoding](https://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/IDurableEncoding.html):
 
 ```java
 IMap<String, Integer> m = new Map<>().put("a", 1).put("b", 2);
