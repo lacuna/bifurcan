@@ -72,11 +72,11 @@ We can layer as many diffs atop a collection as we like, but they're primarily i
 
 Benchmarks for disk-backed collections require even more disclaimers than [in-memory collections](comparison.md#methodology).  Any latency or throughput numbers will be intimately tied to the available cache and underlying storage medium.  In an attempt at more universal numbers, we have also measured read and write amplification.
 
-Read amplification is the ratio of bytes read from disk for each byte read from the database.  When all data is in-cache, we'd expect the value to be zero.  When our data is not in-cache, we'd expect the value to be the size of a [page](https://en.wikipedia.org/wiki/Page_(computer_memory)) (typically 4kb) divided by the size of each entry.  In our benchmarks, each entry is 1kb, so the "optimal" amplification for a single uncached read is 4x.  
+Read amplification is the ratio of bytes read from disk to each byte read from the database.  When all data is in-cache, we'd expect the value to be zero.  When our data is not in-cache, we'd expect the value to be the size of a [page](https://en.wikipedia.org/wiki/Page_(computer_memory)) (typically 4kb) divided by the size of each entry.  In our benchmarks, each entry is 1kb, so the "optimal" amplification for a single uncached read is 4x.  
 
-Likewise, write amplification is the ratio of bytes written to disk for each byte written to the database.  To allow for efficient reads, each new write cannot simply be appended to the end of a file.  As we write, the existing data must be periodically reshuffled, leading to write amplifications above the minimum theoretical value of 1x.
+Likewise, write amplification is the ratio of bytes written to disk to each byte written to the database.  To allow for efficient reads, each new write cannot simply be app ended to the end of a file.  As we write, the existing data must be periodically reshuffled, leading to write amplifications above the minimum theoretical value of 1x.
 
-Both of these values are measured using [pidstat](https://linux.die.net/man/1/pidstat), and unlike the latency numbers should be reproducible on a variety of hardware.  Since all measured tasks are I/O bound, low amplification should always correlate to low latency and high throughput, but always linearly.
+Both of these values are measured using [pidstat](https://linux.die.net/man/1/pidstat), and unlike the latency numbers should be reproducible on a variety of hardware.  Since all measured tasks are I/O bound, low amplification should always correlate to low latency and high throughput, but not always linearly.
 
 The benchmarks below were run on an Intel NUC8i5BEK running Ubuntu 18.04.3, with 16gb of RAM and a 1TB Samsung 970 EVO NVMe drive.  Each entry is 1024 bytes of pseudo-random binary data.
 
@@ -84,9 +84,9 @@ The benchmarks below were run on an Intel NUC8i5BEK running Ubuntu 18.04.3, with
 
 ![](../benchmarks/images/durable_write.png)
 
-To create a `DurableMap`, we write the data to disk in the order provided, then perform a merge sort (reading all the data, and writing it to disk again) and construct an index, and finally perform a third pass to write the index and entries contiguously, computing the SHA-512 hash as we go.  Predictably, this results in a 3x write amplification no matter the size of the database, and a 2x read amplification once we exceed the size of our cache.
+To create a `DurableMap`, we write the data to disk in the order provided, then perform a merge sort (reading all the data, and writing it to disk again) while constructing an index, and finally perform a third pass to write the index and entries contiguously, computing the SHA-512 hash as we go.  Predictably, this results in a 3x write amplification no matter the size of the database, and a 2x read amplification once we exceed the size of our cache.
 
-To create a `DurableList` we do the same, without the merge sort, resulting in a 2x write and 1x read amplifications.
+To create a `DurableList` we do the same without the merge sort, resulting in a 2x write and 1x read amplifications.
 
 RocksDB uses an [LSM Tree](https://en.wikipedia.org/wiki/Log-structured_merge-tree), which is generally considered write-optimized, but it's solving a harder problem: after each incremental insert, it must provide a queryable database.  To accomplish this, it shuffles our entries into an ever-deepening set of levels, leading to logarithmic growth of both write and read amplification.
 
@@ -108,7 +108,7 @@ Despite this, the sequential read latencies for Bifurcan are lower, because bein
 
 ![](../benchmarks/images/durable_random_read.png)
 
-As explained above, the optimal amplification for our 1kb entries is 4x.  Both databases, however, fail to achieve this.  In RocksDB's case, this is because LSM trees allow an entry to be stored in multiple places, requiring multiple pages to be read from disk.  In Bifurcan's case, it almost always reads a single page, but the read-ahead mechanism which helped us in the sequential benchmarks hurts us here, occasionally pulling in pages we don't need.
+As explained above, the optimal amplification for our 1kb entries is 4x.  Both libraries, however, fail to achieve this.  In RocksDB's case, this is because LSM trees allow an entry to be stored in multiple places, requiring multiple pages to be read from disk.  In Bifurcan's case, while it almost always reads a single page, the read-ahead mechanism which helped us in the sequential benchmarks hurts us here, occasionally pulling in pages we don't need.  This overhead, however, is fairly constant as our dataset grows.  
 
 ![](../benchmarks/images/durable_random_read_duration.png)
 
@@ -116,4 +116,4 @@ The latencies tell a similar story: Bifurcan's latencies remain fairly constant 
 
 ![](../benchmarks/images/durable_in_cache_random_read_duration.png)
 
-It's worth noting, however, that when our dataset fits in-memory Bifurcan has half the latency, and much more consistency.  This should also translate to larger datasets with non-uniform read patterns (i.e. a smaller set of keys which are "hot").  
+It's worth noting specifically that when our dataset fits in memory Bifurcan has half the latency, and much more consistency.  This should also translate to larger datasets with non-uniform read patterns (i.e. a smaller set of keys which are "hot").  
