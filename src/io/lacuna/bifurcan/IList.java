@@ -171,7 +171,7 @@ public interface IList<V> extends
   }
 
   @Override
-  default DurableList<V> save(IDurableEncoding encoding, Path directory, double diffMergeThreshold) {
+  default DurableList<V> save(IDurableEncoding encoding, Path directory) {
     if (!(encoding instanceof IDurableEncoding.List)) {
       throw new IllegalArgumentException(String.format("%s cannot be used to encode lists", encoding.description()));
     }

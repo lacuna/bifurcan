@@ -6,7 +6,7 @@ import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
 import io.lacuna.bifurcan.durable.io.DurableBuffer;
 
 /**
- * A sorted map of uint64 onto uint64, which assumes that the keys are unique and in sorted order
+ * A sorted map of int64 onto int64, which assumes keys are appended in sorted order.
  * <p>
  * It begins with a pair of the initial key/value [VLQ, VLQ].
  * <p>

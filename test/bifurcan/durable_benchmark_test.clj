@@ -35,18 +35,12 @@
     Bytes]
    [io.lacuna.bifurcan.hash
     PerlHash]
-   [com.sleepycat.je
-    EnvironmentConfig
-    Environment
-    DatabaseConfig
-    Database
-    DatabaseEntry
-    LockMode
-    OperationStatus]
    [org.rocksdb
     RocksDB
     Options
-    FlushOptions]))
+    FlushOptions]
+   [org.lmdbjava
+    Env]))
 
 #_(set! *warn-on-reflection* true)
 
@@ -76,6 +70,14 @@
       read-string)
     (catch Exception e
       0)))
+
+(defn fs-trim []
+  #_(try
+    (-> (sh/sh "fstrim" "-v" "/tmp")
+      :out
+      println)
+    (catch Exception e
+      )))
 
 ;;; RocksDB
 
@@ -107,53 +109,6 @@
     (doto (FlushOptions.)
       (.setWaitForFlush true)
       (.setAllowWriteStall true))))
-
-;;; BerkeleyDB
-
-(defn bdb-open [dir create?]
-  (let [f   (io/file dir)
-        _   (.mkdirs f)
-        env (Environment.
-              f
-              (doto (EnvironmentConfig.)
-                (.setAllowCreate create?)
-                (.setReadOnly false)
-                (.setLocking false)
-                (.setTransactional false)
-                (.setSharedCache true)
-                (.setConfigParam EnvironmentConfig/CLEANER_MIN_UTILIZATION "90")))]
-    (.openDatabase env
-      nil
-      "bifurcan-benchmark"
-      (doto (DatabaseConfig.)
-        (.setAllowCreate create?)
-        (.setReadOnly false)
-        (.setDeferredWrite true)))))
-
-(defn bdb-count [^Database db]
-  (.count db))
-
-(defn bdb-get [^Database db key]
-  (let [k (DatabaseEntry. (bs/to-byte-array key))
-        v (DatabaseEntry.)]
-    (when (= OperationStatus/SUCCESS (.get db nil k v LockMode/READ_UNCOMMITTED))
-      (.getData v))))
-
-(defn bdb-put! [^Database db ^bytes key ^bytes value]
-  (.put db nil (DatabaseEntry. key) (DatabaseEntry. value)))
-
-(defn bdb-scan [^Database db]
-  (with-open [cursor (.openCursor db nil nil)]
-    (let [e (atom nil)]
-      (loop []
-        (let [key (DatabaseEntry.)
-              val (DatabaseEntry.)]
-          (when (= OperationStatus/SUCCESS (.getNext cursor key val LockMode/READ_UNCOMMITTED))
-            (reset! e [key val])
-            (recur)))))))
-
-(defn bdb-flush! [^Database db]
-  (.sync db))
 
 ;;; I/O stats
 
@@ -266,6 +221,13 @@
   (dotimes [_ samples]
     (get-fn db (hashed-key (rand-int n)))))
 
+(defmacro least-by [metric & body]
+  `(let [a# (do ~@body)
+         b# (do ~@body)]
+     (if (< (~metric a#) (~metric b#))
+       a#
+       b#)))
+
 (defn benchmark-db [name dir db get-fn scan-fn put-fn flush-fn sizes]
   (let [writes (atom {})]
     (zipmap
@@ -278,9 +240,11 @@
             ;; we write 8 byte keys + 1016 byte values so each entry is exactly 1kb
             (time
               (let [write      (io-stats (populate! db put-fn flush-fn (range a b) 1016))
-                    sequential (io-stats (scan-fn db))
+                    sequential (least-by :duration
+                                 (io-stats (scan-fn db)))
                     samples    (random-samples b)
-                    random     (io-stats (random-reads db get-fn b samples))
+                    random     (least-by :duration
+                                 (io-stats (random-reads db get-fn b samples)))
                     size       (directory-size dir)]
                 {:write                 (scale-stats (swap! writes #(merge-with + % write)) b)
                  :random                (scale-stats random samples)
@@ -362,17 +326,23 @@
                     write      (io-stats
                                  (reset! m
                                    (create-fn dir n)))
-                    sequential (io-stats
-                                 (doit [e @m]
-                                   e))
+                    sequential (least-by :duration
+                                 (io-stats
+                                   (doit [e @m]
+                                     e)))
                     samples    (random-samples n)
-                    random     (io-stats
-                                 (let [^IMap m @m]
-                                   (dotimes [_ samples]
-                                     (get-fn m (rand-int n)))))
+                    random     (least-by :duration
+                                 (io-stats
+                                  (let [^IMap m @m]
+                                    (dotimes [_ samples]
+                                      (get-fn m (rand-int n))))))
                     size       (directory-size dir)]
+
+                ;; clean everything up
                 (-> @m .root .close)
                 (clear-directory dir)
+                (fs-trim)
+
                 (System/gc)
                 {:write                 (scale-stats write n)
                  :random                (scale-stats random samples)
@@ -398,25 +368,8 @@
         sizes)
       (finally
         (.close rdb)
-        (clear-directory dir)))))
-
-(defn benchmark-berkeley [dir sizes]
-  (clear-directory dir)
-  (let [^Database bdb (bdb-open dir true)]
-    (try
-      (benchmark-db
-        'berkeley
-        dir
-        bdb
-        bdb-get
-        bdb-scan
-        bdb-put!
-        bdb-flush!
-        sizes)
-      (finally
-        (.close bdb)
-        (-> bdb .getEnvironment .close)
-        (clear-directory dir)))))
+        (clear-directory dir)
+        (fs-trim)))))
 
 (def benchmark-edn "benchmarks/data/durable.edn")
 
@@ -439,19 +392,15 @@
            (comment
              (benchmark-rocks "/tmp/rocks" sizes))
 
-           ;; the storage amplification is too high for benchmarks at the larger sizes
-           #_"Berkeley DB"
-           #_(benchmark-berkeley "/tmp/bdb" sizes)
-
            "bifurcan.DurableMap"
            (comment
              (benchmark-bifurcan "/tmp/bifurcan"
-              'bifurcan-hash-map
-              sizes
-              #(create-hash-map %1 %2 1016)
-              #(-> ^IMap %1
-                 (.get (->durable-input (hashed-key %2)))
-                 .get)))
+               'bifurcan-hash-map
+               sizes
+               #(create-hash-map %1 %2 1016)
+               #(-> ^IMap %1
+                  (.get (->durable-input (hashed-key %2)))
+                  .get)))
 
            "bifurcan.DurableList"
            (benchmark-bifurcan "/tmp/bifurcan"
@@ -470,7 +419,7 @@
    "durable_write_duration"
    [identity
     (fn [db-data]
-       {"" (-> db-data :write :us-per-entry)})]
+      {"" (-> db-data :write :us-per-entry)})]
 
    "durable_random_read_amplification"
    [identity

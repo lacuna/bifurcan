@@ -77,17 +77,5 @@ public interface ICollection<C, V> extends Iterable<V> {
    */
   C clone();
 
-  /**
-   * @param directory the directory in which to save the durable data structure
-   * @param encoding the encoding for the durable data structure
-   * @param diffMergeThreshold TODO
-   * @return a durable version of the data structure
-   */
-  default C save(IDurableEncoding encoding, Path directory, double diffMergeThreshold) {
-    throw new UnsupportedOperationException();
-  }
-
-  default C save(IDurableEncoding encoding, Path directory) {
-    return save(encoding, directory, 1.0);
-  }
+  C save(IDurableEncoding encoding, Path directory);
 }

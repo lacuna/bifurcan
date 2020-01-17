@@ -16,7 +16,7 @@ This library provides high-quality Java implementations of mutable and immutable
 * customizable equality semantics
 * contiguous memory used wherever possible
 * performance equivalent to, or better than, existing alternatives
-* [ALPHA] durable (disk-backed) representations that share the API and broad performance characteristics of their in-memory counterparts
+* [ALPHA] durable (disk-backed) representations which share the API and asymptotic performance of their in-memory counterparts
 
 Rather than using the existing collection interfaces in `java.util` such as `List` or `Map`, it provides its own interfaces (`IList`, `IMap`, `ISet`) that provide functional semantics - each update to a collection returns a reference to a new collection.  Each interface provides a method (`toList`, `toMap`, `toSet`) for coercing the collection to a read-only version of the standard Java interfaces.
 

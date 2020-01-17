@@ -36,6 +36,7 @@
                                       ;; for comparative durable benchmarks
                                       [org.rocksdb/rocksdbjni "6.4.6"]
                                       [com.sleepycat/je "18.3.12"]
+                                      [org.lmdbjava/lmdbjava "0.7.0"]
                                       ]}}
   :aliases {"partest"              ["run" "-m" "bifurcan.run-tests"]
             "benchmark"            ["run" "-m" "bifurcan.benchmark-test" "benchmark"]
