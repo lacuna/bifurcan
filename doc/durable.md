@@ -1,4 +1,6 @@
-# expanding the frontiers of small data
+# durable collections
+
+## expanding the frontiers of small data
 
 There's an urban legend, told by software consultants, which begins with a worried client.
 
