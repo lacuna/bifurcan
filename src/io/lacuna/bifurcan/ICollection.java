@@ -77,5 +77,7 @@ public interface ICollection<C, V> extends Iterable<V> {
    */
   C clone();
 
-  C save(IDurableEncoding encoding, Path directory);
+  default C save(IDurableEncoding encoding, Path directory) {
+    throw new UnsupportedOperationException();
+  }
 }
