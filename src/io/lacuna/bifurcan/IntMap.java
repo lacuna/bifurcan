@@ -15,7 +15,7 @@ import java.util.function.*;
  * characteristics.
  * <p>
  * This collection keeps the keys in sorted order, and can thought of as either a map of integers or a sparse vector.
- * It provides {@link IntMap#slice(Long, Long)}, {@link IntMap#floor(Long)}, and {@link IntMap#ceil(Long)} methods which
+ * It provides {@link IntMap#slice(Long, Long)}, {@link IntMap#floorIndex(Long)}, and {@link IntMap#ceilIndex(Long)} methods which
  * allow for lookups and filtering on its keys.
  *
  * @author ztellman
@@ -350,44 +350,42 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
    * @return the entry whose key is either equal to {@code key}, or just below it. If {@code key} is less than the
    * minimum value in the map, returns {@code null}.
    */
-  public IEntry<Long, V> floor(long key) {
+  public OptionalLong floorIndex(long key) {
     if (key < 0) {
-      return neg.floor(key);
+      long idx = neg.floorIndex(key, 0);
+      return idx < 0 ? OptionalLong.empty() : OptionalLong.of(idx);
     } else {
-      IEntry<Long, V> entry = pos.floor(key);
-      if (entry != null) {
-        return entry;
-      } else {
-        return neg.size() > 0 ? neg.nth(neg.size() - 1) : null;
-      }
+      long idx = pos.floorIndex(key, 0);
+      idx = idx >= 0 ? idx + neg.size() : neg.size() - 1;
+      return idx < 0 ? OptionalLong.empty() : OptionalLong.of(idx);
     }
   }
 
   @Override
-  public IEntry<Long, V> floor(Long key) {
-    return floor((long) key);
+  public OptionalLong floorIndex(Long key) {
+    return floorIndex((long) key);
   }
 
   /**
    * @return the entry whose key is either equal to {@code key}, or just above it. If {@code key} is greater than the
    * maximum value in the map, returns {@code null}.
    */
-  public IEntry<Long, V> ceil(long key) {
-    if (key >= 0) {
-      return pos.ceil(key);
-    } else {
-      IEntry<Long, V> entry = neg.ceil(key);
-      if (entry != null) {
-        return entry;
-      } else {
-        return pos.size() > 0 ? pos.nth(0) : null;
+  public OptionalLong ceilIndex(long key) {
+    if (key < 0) {
+      long idx = neg.ceilIndex(key, 0);
+      if (idx < 0 && pos.size() > 0) {
+        idx = neg.size();
       }
+      return idx < 0 ? OptionalLong.empty() : OptionalLong.of(idx);
+    } else {
+      long idx = pos.ceilIndex(key, 0);
+      return idx < 0 ? OptionalLong.empty() : OptionalLong.of(neg.size() + idx);
     }
   }
 
   @Override
-  public IEntry<Long, V> ceil(Long key) {
-    return ceil((long) key);
+  public OptionalLong ceilIndex(Long key) {
+    return ceilIndex((long) key);
   }
 
   @Override

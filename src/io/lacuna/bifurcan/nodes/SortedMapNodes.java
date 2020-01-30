@@ -31,7 +31,7 @@ public class SortedMapNodes {
     public final K k;
     public final V v;
     public final Node<K, V> l, r;
-    public final int size;
+    public final long size;
 
     public Node(Color c, Node<K, V> l, K k, V v, Node<K, V> r) {
       this.c = c;
@@ -245,35 +245,35 @@ public class SortedMapNodes {
       return node(c, l.removeMin(), k, v, r).rotate();
     }
 
-    public Node<K, V> floor(K key, Comparator<K> comparator) {
+    public long floorIndex(K key, Comparator<K> comparator, long offset) {
       if (size == 0) {
-        return null;
+        return -1;
       }
 
       int cmp = comparator.compare(key, k);
       if (cmp > 0) {
-        Node<K, V> n = r.floor(key, comparator);
-        return n != null ? n : this;
+        long idx = r.floorIndex(key, comparator, offset + l.size + 1);
+        return idx < 0 ? offset + l.size : idx;
       } else if (cmp < 0) {
-        return l.floor(key, comparator);
+        return l.floorIndex(key, comparator, offset);
       } else {
-        return this;
+        return offset + l.size;
       }
     }
 
-    public Node<K, V> ceil(K key, Comparator<K> comparator) {
+    public long ceilIndex(K key, Comparator<K> comparator, long offset) {
       if (size == 0) {
-        return null;
+        return -1;
       }
 
       int cmp = comparator.compare(key, k);
       if (cmp > 0) {
-        return r.ceil(key, comparator);
+        return r.ceilIndex(key, comparator, offset + l.size + 1);
       } else if (cmp < 0) {
-        Node<K, V> n = l.ceil(key, comparator);
-        return n != null ? n : this;
+        long idx = l.ceilIndex(key, comparator, offset);
+        return idx < 0 ? offset + l.size : idx;
       } else {
-        return this;
+        return offset + l.size;
       }
     }
 
@@ -371,8 +371,8 @@ public class SortedMapNodes {
     }
   }
 
-  public static <K, V> int indexOf(Node<K, V> n, K key, Comparator<K> comparator) {
-    int idx = 0;
+  public static <K, V> long indexOf(Node<K, V> n, K key, Comparator<K> comparator) {
+    long idx = 0;
     for (; ; ) {
       if (n.size == 0) {
         return -1;

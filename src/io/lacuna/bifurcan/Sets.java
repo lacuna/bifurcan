@@ -127,6 +127,45 @@ public class Sets {
     };
   }
 
+  public static <V> ISortedSet<V> from(IList<V> elements, Comparator<V> comparator, Function<V, OptionalLong> floorIndex) {
+    return new ISortedSet<V>() {
+      @Override
+      public Comparator<V> comparator() {
+        return comparator;
+      }
+
+      @Override
+      public OptionalLong floorIndex(V val) {
+        return floorIndex.apply(val);
+      }
+
+      @Override
+      public ToLongFunction<V> valueHash() {
+        return Objects::hashCode;
+      }
+
+      @Override
+      public BiPredicate<V, V> valueEquality() {
+        return (a, b) -> comparator().compare(a, b) == 0;
+      }
+
+      @Override
+      public long size() {
+        return elements.size();
+      }
+
+      @Override
+      public V nth(long idx) {
+        return elements.nth(idx);
+      }
+
+      @Override
+      public ISet<V> clone() {
+        return this;
+      }
+    };
+  }
+
   public static <V> ISet<V> from(IList<V> elements, Function<V, OptionalLong> indexOf) {
     return from(elements, indexOf, elements::iterator);
   }

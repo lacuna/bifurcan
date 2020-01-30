@@ -34,7 +34,12 @@ public interface IMap<K, V> extends
   /**
    * @return the value under {@code key}, or {@code defaultValue} if there is no such key
    */
-  V get(K key, V defaultValue);
+  default V get(K key, V defaultValue) {
+    OptionalLong idx = indexOf(key);
+    return idx.isPresent()
+        ? nth(idx.getAsLong()).value()
+        : defaultValue;
+  }
 
   /**
    * @return an {@link Optional} containing the value under {@code key}, or nothing if the value is {@code null} or

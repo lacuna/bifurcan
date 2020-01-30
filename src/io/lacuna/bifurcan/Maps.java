@@ -154,29 +154,71 @@ public class Maps {
     });
   }
 
+  public static <K, V> ISortedMap<K, V> from(ISortedSet<K> keys, Function<K, V> lookup) {
+    return from(keys, lookup, () -> Iterators.map(keys.iterator(), k -> IEntry.of(k, lookup.apply(k))));
+  }
+
+  public static <K, V> ISortedMap<K, V> from(ISortedSet<K> keys, Function<K, V> lookup, Supplier<Iterator<IEntry<K, V>>> iterator) {
+    return new ISortedMap<K, V>() {
+      @Override
+      public Comparator<K> comparator() {
+        return keys.comparator();
+      }
+
+      @Override
+      public OptionalLong floorIndex(K key) {
+        return keys.floorIndex(key);
+      }
+
+      @Override
+      public OptionalLong ceilIndex(K key) {
+        return keys.ceilIndex(key);
+      }
+
+      @Override
+      public ISortedMap<K, V> slice(K min, K max) {
+        return from(keys.slice(min, max), lookup);
+      }
+
+      @Override
+      public ToLongFunction<K> keyHash() {
+        return keys.valueHash();
+      }
+
+      @Override
+      public BiPredicate<K, K> keyEquality() {
+        return keys.valueEquality();
+      }
+
+      @Override
+      public long size() {
+        return keys.size();
+      }
+
+      @Override
+      public IEntry<K, V> nth(long idx) {
+        K key = keys().nth(idx);
+        return IEntry.of(key, lookup.apply(key));
+      }
+
+      @Override
+      public Iterator<IEntry<K, V>> iterator() {
+        return iterator.get();
+      }
+
+      @Override
+      public IMap<K, V> clone() {
+        return this;
+      }
+    };
+  }
+
   public static <K, V> IMap<K, V> from(ISet<K> keys, Function<K, V> lookup) {
     return from(keys, lookup, () -> Iterators.map(keys.iterator(), k -> IEntry.of(k, lookup.apply(k))));
   }
 
   public static <K, V> IMap<K, V> from(ISet<K> keys, Function<K, V> lookup, Supplier<Iterator<IEntry<K, V>>> iterator) {
     return new IMap<K, V>() {
-      @Override
-      public V get(K key, V defaultValue) {
-        if (keys.contains(key)) {
-          return lookup.apply(key);
-        } else {
-          return defaultValue;
-        }
-      }
-
-      @Override
-      public Optional<V> get(K key) {
-        if (keys.contains(key)) {
-          return Optional.ofNullable(lookup.apply(key));
-        } else {
-          return Optional.empty();
-        }
-      }
 
       @Override
       public boolean contains(K key) {

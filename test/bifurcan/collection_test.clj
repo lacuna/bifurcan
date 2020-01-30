@@ -542,7 +542,7 @@
   [l (List.) bifurcan-list]
   (= l (-> l (.split 2) into-array Lists/concat)))
 
-(u/def-collection-check test-list-split2 iterations list-actions
+(u/def-collection-check test-wrapped-list-split iterations list-actions
   [l (Lists/from []) bifurcan-list]
   (= l (-> l (.split 2) into-array Lists/concat)))
 
@@ -550,7 +550,7 @@
   [s (LinearSet.) bifurcan-set]
   (= s (-> s (.split 2) (set-union (LinearSet.)))))
 
-(u/def-collection-check test-linear-set-split2 iterations set-actions
+(u/def-collection-check test-set-split iterations set-actions
   [s (Set.) bifurcan-set]
   (= s (-> s (.split 2) (set-union (Set.)))))
 

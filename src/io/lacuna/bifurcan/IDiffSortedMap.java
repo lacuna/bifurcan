@@ -1,93 +1,78 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.diffs.Util;
+import io.lacuna.bifurcan.utils.Iterators;
 
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.OptionalLong;
 import java.util.function.BiPredicate;
-import java.util.function.ToIntFunction;
 import java.util.function.ToLongFunction;
 
 public interface IDiffSortedMap<K, V> extends ISortedMap<K, V> {
 
-  /**
-   * The baseline data structure.
-   */
-  ISortedMap<K, V> underlying();
+  ISortedMap<K, ISortedMap<K, V>> segments();
 
-  /**
-   * Entries which have been added to the underlying data structure, some of which may shadow underlying entries.
-   */
-  ISortedMap<K, V> added();
-
-  /**
-   * The indices of the added keys within the combined data structure.
-   */
-  ISortedMap<Long, K> addedKeys();
-
-  /**
-   * Indices which have been removed or shadowed from the underlying data structure.
-   */
-  ISortedSet<Long> removedIndices();
+  ISortedSet<Long> segmentOffsets();
 
   @Override
   default ToLongFunction<K> keyHash() {
-    return underlying().keyHash();
+    return segments().first().value().keyHash();
   }
 
   @Override
   default BiPredicate<K, K> keyEquality() {
-    return underlying().keyEquality();
+    return segments().first().value().keyEquality();
   }
 
   @Override
   default Comparator<K> comparator() {
-    return underlying().comparator();
-  }
-
-  @Override
-  default V get(K key, V defaultValue) {
-    V v = added().get(key, defaultValue);
-    if (v != defaultValue) {
-      return v;
-    } else  {
-      OptionalLong idx = underlying().indexOf(key);
-      if (!idx.isPresent() || removedIndices().contains(idx.getAsLong())) {
-        return defaultValue;
-      } else {
-        return underlying().nth(idx.getAsLong()).value();
-      }
-    }
+    return segments().first().value().comparator();
   }
 
   @Override
   default long size() {
-    return underlying().size() + added().size() - removedIndices().size();
+    return segmentOffsets().last() + segments().last().value().size();
   }
 
   @Override
-  default IEntry<K, V> floor(K key) {
-    return null;
-  }
+  default OptionalLong floorIndex(K key) {
+    ISortedMap<K, ISortedMap<K, V>> segments = segments();
+    ISortedSet<Long> segmentOffsets = segmentOffsets();
 
-  @Override
-  default IEntry<K, V> ceil(K key) {
-    return null;
-  }
+    OptionalLong oSegmentIdx = segments.floorIndex(key);
+    if (!oSegmentIdx.isPresent()) {
+      return OptionalLong.empty();
+    }
+    long segmentIdx = oSegmentIdx.getAsLong();
 
-  @Override
-  default IEntry<K, V> nth(long idx) {
-    IEntry<Long, K> addedFloor = addedKeys().floor(idx);
-    if (addedFloor.key() == idx) {
-      return IEntry.of(addedFloor.value(), added().get(addedFloor.value()).get());
+    ISortedMap<K, V> segment = segments.nth(segmentIdx).value();
+    OptionalLong oIdx = segment.floorIndex(key);
+
+    if (oIdx.isPresent()) {
+      return OptionalLong.of(segmentOffsets.nth(segmentIdx) + oIdx.getAsLong());
+    } else if (segmentIdx > 0) {
+      return OptionalLong.of(segmentOffsets.nth(segmentIdx - 1) + segments.nth(segmentIdx - 1).value().size() - 1);
     } else {
-      return underlying().nth(Util.offsetIndex(removedIndices(), idx - addedFloor.key()));
+      return OptionalLong.empty();
     }
   }
 
   @Override
+  default IEntry<K, V> nth(long idx) {
+    if (idx < 0 || idx >= size()) {
+      throw new IndexOutOfBoundsException(String.format("index must be within [0,%d)", size()));
+    }
+
+    ISortedSet<Long> segmentOffsets = segmentOffsets();
+    ISortedMap<K, ISortedMap<K, V>> segments = segments();
+
+    long segmentIdx = segmentOffsets.floorIndex(idx).getAsLong();
+    long offset = segmentOffsets.nth(segmentIdx);
+    return segments.nth(segmentIdx).value().nth(idx - offset);
+  }
+
+  @Override
   default Iterator<IEntry<K, V>> iterator() {
-    return null;
+    return Iterators.flatMap(segments().iterator(), e -> e.value().iterator());
   }
 }

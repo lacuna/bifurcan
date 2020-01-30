@@ -27,13 +27,13 @@ public class SortedSet<V> implements ISortedSet<V> {
   }
 
   @Override
-  public V floor(V val) {
-    return Optional.of(m.floor(val)).map(IEntry::key).orElse(null);
+  public OptionalLong floorIndex(V val) {
+    return m.floorIndex(val);
   }
 
   @Override
-  public V ceil(V val) {
-    return Optional.of(m.ceil(val)).map(IEntry::key).orElse(null);
+  public OptionalLong ceilIndex(V val) {
+    return m.ceilIndex(val);
   }
 
   @Override

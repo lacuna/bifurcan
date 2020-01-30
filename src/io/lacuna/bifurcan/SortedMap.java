@@ -44,19 +44,15 @@ public class SortedMap<K, V> implements ISortedMap<K, V> {
   }
 
   @Override
-  public IEntry<K, V> floor(K key) {
-    Node<K, V> n = root.floor(key, comparator);
-    return n == null
-      ? null
-      : IEntry.of(n.k, n.v);
+  public OptionalLong floorIndex(K key) {
+    long idx = root.floorIndex(key, comparator, 0);
+    return idx < 0 ? OptionalLong.empty() : OptionalLong.of(idx);
   }
 
   @Override
-  public IEntry<K, V> ceil(K key) {
-    Node<K, V> n = root.ceil(key, comparator);
-    return n == null
-      ? null
-      : IEntry.of(n.k, n.v);
+  public OptionalLong ceilIndex(K key) {
+    long idx = root.ceilIndex(key, comparator, 0);
+    return idx < 0 ? OptionalLong.empty() : OptionalLong.of(idx);
   }
 
   @Override

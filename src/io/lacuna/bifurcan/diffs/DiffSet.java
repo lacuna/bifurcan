@@ -17,7 +17,7 @@ public class DiffSet<V> implements IDiffSet<V> {
   }
 
   public DiffSet(ISet<V> underlying) {
-    this(underlying.zip(x -> null));
+    this(Maps.from(underlying, x -> null));
   }
 
   private DiffSet(DiffMap<V, Void> diffMap) {

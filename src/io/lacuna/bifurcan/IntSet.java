@@ -21,13 +21,13 @@ public class IntSet implements ISortedSet<Long> {
   }
 
   @Override
-  public Long floor(Long val) {
-    return Optional.of(m.floor(val)).map(IEntry::key).orElse(null);
+  public OptionalLong floorIndex(Long val) {
+    return m.floorIndex(val);
   }
 
   @Override
-  public Long ceil(Long val) {
-    return Optional.of(m.ceil(val)).map(IEntry::key).orElse(null);
+  public OptionalLong ceilIndex(Long val) {
+    return m.ceilIndex(val);
   }
 
   @Override

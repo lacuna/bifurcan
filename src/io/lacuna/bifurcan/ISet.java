@@ -1,6 +1,7 @@
 package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.diffs.DiffSet;
+import io.lacuna.bifurcan.utils.Iterators;
 
 import java.util.Iterator;
 import java.util.OptionalLong;
@@ -46,9 +47,7 @@ public interface ISet<V> extends
    * @return a map which has a corresponding value, computed by {@code f}, for each element in the set
    */
   default <U> IMap<V, U> zip(Function<V, U> f) {
-    Map<V, U> m = new Map<V, U>(valueHash(), valueEquality()).linear();
-    this.forEach(e -> m.put(e, f.apply(e)));
-    return m.forked();
+    return Maps.from(this, f);
   }
 
   /**
@@ -106,7 +105,7 @@ public interface ISet<V> extends
    * @return an iterator representing the elements of the set
    */
   default Iterator<V> iterator() {
-    return elements().iterator();
+    return Iterators.range(size(), this::nth);
   }
 
   @Override

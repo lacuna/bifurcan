@@ -117,22 +117,22 @@ public class FloatMap<V> implements ISortedMap<Double, V>, Cloneable {
     return map.size();
   }
 
-  public IEntry<Double, V> floor(double key) {
-    return convertEntry(map.floor(doubleToLong(key)));
+  public OptionalLong floorIndex(double key) {
+    return map.floorIndex(doubleToLong(key));
   }
 
   @Override
-  public IEntry<Double, V> floor(Double key) {
-    return floor((double) key);
+  public OptionalLong floorIndex(Double key) {
+    return floorIndex((double) key);
   }
 
-  public IEntry<Double, V> ceil(double key) {
-    return convertEntry(map.ceil(doubleToLong(key)));
+  public OptionalLong ceilIndex(double key) {
+    return map.ceilIndex(doubleToLong(key));
   }
 
   @Override
-  public IEntry<Double, V> ceil(Double key) {
-    return ceil((double) key);
+  public OptionalLong ceilIndex(Double key) {
+    return ceilIndex((double) key);
   }
 
   public FloatMap<V> slice(double min, double max) {

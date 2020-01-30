@@ -36,7 +36,7 @@ public class IntMapNodes {
 
     public int datamap;
     public int nodemap;
-    public int size;
+    public long size;
 
     public long[] keys;
     public Object[] content;
@@ -124,36 +124,40 @@ public class IntMapNodes {
       }
     }
 
-    public IEntry<Long, V> floor(long key) {
+    public long floorIndex(long key, long offset) {
 
       if (min() > key) {
-        return null;
+        return -1;
 
       } else {
+        offset += size;
         PrimitiveIterator.OfInt masks = reverseMasks();
         while (masks.hasNext()) {
           int mask = masks.next();
           if (isEntry(mask)) {
+            offset--;
             int idx = entryIndex(mask);
             if (keys[idx] <= key) {
-              return IEntry.of(keys[idx], (V) content[idx]);
+              return offset;
             }
           } else if (isNode(mask)) {
-            IEntry<Long, V> entry = node(mask).floor(key);
-            if (entry != null) {
-              return entry;
+            Node<V> n = node(mask);
+            offset -= n.size;
+            long idx = n.floorIndex(key, offset);
+            if (idx >= 0) {
+              return idx;
             }
           }
         }
       }
 
-      return null;
+      return -1;
     }
 
-    public IEntry<Long, V> ceil(long key) {
+    public long ceilIndex(long key, long offset) {
 
       if (max() < key) {
-        return null;
+        return -1;
 
       } else {
         PrimitiveIterator.OfInt masks = masks();
@@ -162,18 +166,23 @@ public class IntMapNodes {
           if (isEntry(mask)) {
             int idx = entryIndex(mask);
             if (keys[idx] >= key) {
-              return IEntry.of(keys[idx], (V) content[idx]);
+              return offset;
             }
+            offset++;
+
           } else if (isNode(mask)) {
-            IEntry<Long, V> entry = node(mask).ceil(key);
-            if (entry != null) {
-              return entry;
+            Node<V> n = node(mask);
+            long idx = n.ceilIndex(key, offset);
+            if (idx >= 0) {
+              return idx;
             }
+            offset += n.size;
+
           }
         }
       }
 
-      return null;
+      return -1;
     }
 
     // update
@@ -205,15 +214,10 @@ public class IntMapNodes {
       // common parent
       if (offsetPrime > this.offset) {
         Node<V> n = new Node<V>(editor, k, offsetPrime);
-        switch (size) {
-          case 0:
-            break;
-          case 1:
-            n = n.putEntry(n.mask(prefix), keys[0], (V) content[0]);
-            break;
-          default:
-            n = n.putNode(n.mask(prefix), this);
-            break;
+        if (size == 1) {
+          n = n.putEntry(n.mask(prefix), keys[0], (V) content[0]);
+        } else if (size > 0) {
+          n = n.putNode(n.mask(prefix), this);
         }
         return n.putEntry(n.mask(k), k, v);
 
@@ -235,7 +239,7 @@ public class IntMapNodes {
           }
         } else if (isNode(mask)) {
           Node<V> n = node(mask);
-          int prevSize = n.size();
+          long prevSize = n.size();
           Node<V> nPrime = n.put(editor, k, v, mergeFn);
           setNode(mask, nPrime);
           if (n == nPrime) {
@@ -263,22 +267,19 @@ public class IntMapNodes {
         result = keys[idx] == k ? removeEntry(mask) : this;
       } else if (isNode(mask)) {
         Node<V> n = node(mask);
-        int prevSize = n.size();
+        long prevSize = n.size();
         boolean isLinear = n.editor == editor;
         Node<V> nPrime = n.remove(editor, k);
         if (isLinear) {
           size -= prevSize - nPrime.size();
         }
 
-        switch (nPrime.size()) {
-          case 0:
-            result = removeNode(mask);
-            break;
-          case 1:
-            result = removeNode(mask).putEntry(mask, nPrime.keys[0], (V) nPrime.content[0]);
-            break;
-          default:
-            result = setNode(mask, nPrime);
+        if (nPrime.size == 0) {
+          result = removeNode(mask);
+        } else if (nPrime.size == 1) {
+          result = removeNode(mask).putEntry(mask, nPrime.keys[0], (V) nPrime.content[0]);
+        } else {
+          result = setNode(mask, nPrime);
         }
       }
 
@@ -397,7 +398,7 @@ public class IntMapNodes {
 
     // misc
 
-    public int size() {
+    public long size() {
       return size;
     }
 
@@ -627,7 +628,7 @@ public class IntMapNodes {
     return (max1 - min0) >= 0 && (max0 - min1) >= 0;
   }
 
-  public static <V> IList<Node<V>> split(Object editor, Node<V> node, int targetSize) {
+  public static <V> IList<Node<V>> split(Object editor, Node<V> node, long targetSize) {
     IList<Node<V>> result = new LinearList<>();
     if ((node.size() >> 1) < targetSize) {
       result.addLast(node);
