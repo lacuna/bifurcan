@@ -136,13 +136,12 @@ public class SortedMap<K, V> implements ISortedMap<K, V> {
   @Override
   public IEntry<K, V> nth(long idx) {
     if (idx < 0 || idx >= size()) {
-      throw new IndexOutOfBoundsException();
+      throw new IndexOutOfBoundsException(String.format("%d must be within [0,%d)", idx, size()));
     }
     Node<K, V> n = SortedMapNodes.nth(root, (int) idx);
     return IEntry.of(n.k, n.v);
   }
 
-  @Override
   public long size() {
     return root.size;
   }

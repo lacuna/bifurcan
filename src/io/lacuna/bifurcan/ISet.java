@@ -190,6 +190,7 @@ public interface ISet<V> extends
 
   @Override
   default IList<? extends ISet<V>> split(int parts) {
+    // TODO: do an actual slice here
     parts = Math.max(1, Math.min((int) size(), parts));
     return elements().split(parts).stream().map(LinearSet::from).collect(Lists.collector());
   }

@@ -25,7 +25,9 @@
    [io.lacuna.bifurcan.diffs
     DiffMap
     DiffList
-    DiffSet]
+    DiffSet
+    ConcatSortedMap
+    DiffSortedSet]
    [io.lacuna.bifurcan
     IntMap
     FloatMap
@@ -42,7 +44,8 @@
     ISet
     LinearList
     LinearMap
-    LinearSet]))
+    LinearSet
+    SortedSet]))
 
 (set! *warn-on-reflection* false)
 
@@ -294,7 +297,7 @@
     (map= a c)))
 
 (u/def-collection-check test-sorted-map iterations map-actions
-  [a {} clj-map
+  [a (sorted-map) clj-map
    b (SortedMap.) bifurcan-sorted-map
    c (.linear (SortedMap.)) bifurcan-sorted-map]
   (and
@@ -336,6 +339,18 @@
    b (DiffMap. Map/EMPTY) bifurcan-map]
   (map= a b))
 
+(let [diff-sorted-map (ConcatSortedMap/from
+                        (java.util.Comparator/naturalOrder)
+                        (List.))]
+  (u/def-collection-check test-diff-sorted-map iterations map-actions
+    [a (sorted-map) clj-map
+     b diff-sorted-map bifurcan-map
+     c (.linear diff-sorted-map) bifurcan-map]
+    (and
+      (= b c)
+      (map= a b)
+      (map= a c))))
+
 (u/def-collection-check test-map-indices iterations map-actions
   [a (Map.) bifurcan-map]
   (valid-map-indices? a))
@@ -367,6 +382,28 @@
     (= b c)
     (set= a b)
     (set= a c)))
+
+(u/def-collection-check test-sorted-set iterations set-actions
+  [a (sorted-set) clj-set
+   b (SortedSet.) bifurcan-set
+   c (.linear (SortedSet.)) bifurcan-set]
+  (and
+    (= b c)
+    (set= a b)
+    (set= a c)))
+
+(let [diff-sorted-set (DiffSortedSet.
+                        (ConcatSortedMap/from
+                          (java.util.Comparator/naturalOrder)
+                          (List.)))]
+  (u/def-collection-check test-diff-sorted-set iterations set-actions
+    [a (sorted-set) clj-set
+     b diff-sorted-set bifurcan-set
+     c (.linear diff-sorted-set) bifurcan-set]
+    (and
+      (= b c)
+      (set= a b)
+      (set= a c))))
 
 (u/def-collection-check test-diff-set iterations set-actions
   [a #{} clj-set

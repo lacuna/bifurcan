@@ -2,11 +2,8 @@ package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.utils.Iterators;
 
-import java.util.Comparator;
 import java.util.Iterator;
 import java.util.OptionalLong;
-import java.util.function.BiPredicate;
-import java.util.function.ToLongFunction;
 
 public interface IDiffSortedMap<K, V> extends ISortedMap<K, V> {
 
@@ -15,23 +12,10 @@ public interface IDiffSortedMap<K, V> extends ISortedMap<K, V> {
   ISortedSet<Long> segmentOffsets();
 
   @Override
-  default ToLongFunction<K> keyHash() {
-    return segments().first().value().keyHash();
-  }
-
-  @Override
-  default BiPredicate<K, K> keyEquality() {
-    return segments().first().value().keyEquality();
-  }
-
-  @Override
-  default Comparator<K> comparator() {
-    return segments().first().value().comparator();
-  }
-
-  @Override
   default long size() {
-    return segmentOffsets().last() + segments().last().value().size();
+    return segments().size() == 0
+        ? 0
+        : segmentOffsets().last() + segments().last().value().size();
   }
 
   @Override

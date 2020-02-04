@@ -66,6 +66,8 @@ If we want to collapse our two files into one, we can simply call `compact()`:
 m = m.compact();
 ```
 
+This will create a third file, representing the merged result of the first two.
+
 We can layer as many diffs atop a collection as we like, but they're primarily intended to be a way to convey changes.  To perform a batch update, we can create diffs on one machine, transmit them to all the others, and finally compact them into a new canonical collection.  
 
 ## comparative benchmarks

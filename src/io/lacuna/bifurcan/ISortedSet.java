@@ -1,7 +1,11 @@
 package io.lacuna.bifurcan;
 
+import io.lacuna.bifurcan.diffs.DiffSortedSet;
+
 import java.util.Comparator;
 import java.util.OptionalLong;
+import java.util.function.BiPredicate;
+import java.util.function.ToLongFunction;
 
 public interface ISortedSet<V> extends ISet<V> {
 
@@ -12,6 +16,16 @@ public interface ISortedSet<V> extends ISet<V> {
    * minimum value in the map, returns {@code null}.
    */
   OptionalLong floorIndex(V val);
+
+  @Override
+  default ToLongFunction<V> valueHash() {
+    throw new UnsupportedOperationException("ISortedSet does not use hashes");
+  }
+
+  @Override
+  default BiPredicate<V, V> valueEquality() {
+    return (a, b) -> comparator().compare(a, b) == 0;
+  }
 
   /**
    * @return the entry whose key is either equal to {@code key}, or just above it. If {@code key} is greater than the
@@ -89,11 +103,11 @@ public interface ISortedSet<V> extends ISet<V> {
   }
 
   default ISortedSet<V> add(V value) {
-    return null;
+    return new DiffSortedSet<V>(this).add(value);
   }
 
   default ISortedSet<V> remove(V value) {
-    return null;
+    return new DiffSortedSet<V>(this).remove(value);
   }
 
   default ISortedSet<V> union(ISet<V> s) {
@@ -113,7 +127,7 @@ public interface ISortedSet<V> extends ISet<V> {
   }
 
   default ISortedSet<V> linear() {
-    return null;
+    return new DiffSortedSet<V>(this).linear();
   }
 
   default V first() {

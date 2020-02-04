@@ -140,16 +140,6 @@ public class Sets {
       }
 
       @Override
-      public ToLongFunction<V> valueHash() {
-        return Objects::hashCode;
-      }
-
-      @Override
-      public BiPredicate<V, V> valueEquality() {
-        return (a, b) -> comparator().compare(a, b) == 0;
-      }
-
-      @Override
       public long size() {
         return elements.size();
       }
@@ -162,6 +152,25 @@ public class Sets {
       @Override
       public ISet<V> clone() {
         return this;
+      }
+
+      @Override
+      public int hashCode() {
+        return (int) Sets.hash(this);
+      }
+
+      @Override
+      public boolean equals(Object obj) {
+        if (obj instanceof ISet) {
+          return Sets.equals(this, (ISet) obj);
+        } else {
+          return false;
+        }
+      }
+
+      @Override
+      public String toString() {
+        return Sets.toString(this);
       }
     };
   }

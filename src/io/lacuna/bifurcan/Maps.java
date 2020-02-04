@@ -181,16 +181,6 @@ public class Maps {
       }
 
       @Override
-      public ToLongFunction<K> keyHash() {
-        return keys.valueHash();
-      }
-
-      @Override
-      public BiPredicate<K, K> keyEquality() {
-        return keys.valueEquality();
-      }
-
-      @Override
       public long size() {
         return keys.size();
       }
@@ -209,6 +199,25 @@ public class Maps {
       @Override
       public IMap<K, V> clone() {
         return this;
+      }
+
+      @Override
+      public int hashCode() {
+        return (int) Maps.hash(this);
+      }
+
+      @Override
+      public boolean equals(Object obj) {
+        if (obj instanceof IMap) {
+          return Maps.equals(this, (IMap) obj);
+        } else {
+          return false;
+        }
+      }
+
+      @Override
+      public String toString() {
+        return Maps.toString(this);
       }
     };
   }

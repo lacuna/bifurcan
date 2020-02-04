@@ -1,8 +1,12 @@
 package io.lacuna.bifurcan;
 
+import io.lacuna.bifurcan.diffs.ConcatSortedMap;
+
 import java.util.Comparator;
 import java.util.OptionalLong;
+import java.util.function.BiPredicate;
 import java.util.function.BinaryOperator;
+import java.util.function.ToLongFunction;
 import java.util.function.UnaryOperator;
 
 /**
@@ -13,6 +17,16 @@ public interface ISortedMap<K, V> extends IMap<K, V> {
   Comparator<K> comparator();
 
   OptionalLong floorIndex(K key);
+
+  @Override
+  default ToLongFunction<K> keyHash() {
+    throw new UnsupportedOperationException("ISortedMap does not use hashes");
+  }
+
+  @Override
+  default BiPredicate<K, K> keyEquality() {
+    return (a, b) -> comparator().compare(a, b) == 0;
+  }
 
   @Override
   default ISortedSet<K> keys() {
@@ -100,7 +114,7 @@ public interface ISortedMap<K, V> extends IMap<K, V> {
   }
 
   default ISortedMap<K, V> put(K key, V value, BinaryOperator<V> merge) {
-    return null;
+    return ConcatSortedMap.from(comparator(), this).put(key, value, merge);
   }
 
   default ISortedMap<K, V> update(K key, UnaryOperator<V> update) {
@@ -112,7 +126,7 @@ public interface ISortedMap<K, V> extends IMap<K, V> {
   }
 
   default ISortedMap<K, V> remove(K key) {
-    return null;
+    return ConcatSortedMap.from(comparator(), this).remove(key);
   }
 
   default ISortedMap<K, V> forked() {
@@ -120,7 +134,7 @@ public interface ISortedMap<K, V> extends IMap<K, V> {
   }
 
   default ISortedMap<K, V> linear() {
-    return null;
+    return ConcatSortedMap.from(comparator(), this).linear();
   }
 
   default IEntry<K, V> first() {
