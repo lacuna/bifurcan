@@ -7,14 +7,7 @@ import io.lacuna.bifurcan.utils.Iterators;
 import java.lang.reflect.Array;
 import java.util.*;
 import java.util.Set;
-import java.util.function.BiConsumer;
-import java.util.function.BiPredicate;
-import java.util.function.BinaryOperator;
-import java.util.function.Function;
-import java.util.function.LongBinaryOperator;
-import java.util.function.LongFunction;
-import java.util.function.Supplier;
-import java.util.function.ToLongFunction;
+import java.util.function.*;
 import java.util.stream.Collector;
 import java.util.stream.IntStream;
 
@@ -241,7 +234,7 @@ public class Lists {
     return Lists.from(
         l.size(),
         i -> f.apply(l.nth(i)),
-        () -> Iterators.map(l.iterator(), f));
+        idx -> Iterators.map(l.iterator(idx), f));
   }
 
   /**
@@ -346,7 +339,11 @@ public class Lists {
    * @return a view of the Java list as an IList
    */
   public static <V> IList<V> from(java.util.List<V> list) {
-    return Lists.from(list.size(), idx -> list.get((int) idx), list::iterator);
+    LongFunction<V> nth = idx -> list.get((int) idx);
+    return Lists.from(
+        list.size(),
+        nth,
+        idx -> idx == 0 ? list.iterator() : Iterators.range(idx, list.size(), nth));
   }
 
   /**
@@ -357,7 +354,7 @@ public class Lists {
    * @return a list
    */
   public static <V> IList<V> from(long size, LongFunction<V> elementFn) {
-    return from(size, elementFn, () -> Iterators.range(size, elementFn));
+    return from(size, elementFn, idx -> Iterators.range(idx, size, elementFn));
   }
 
   /**
@@ -368,8 +365,8 @@ public class Lists {
    * @param iteratorFn a function which generates an iterator for the list
    * @return a list
    */
-  public static <V> IList<V> from(long size, LongFunction<V> elementFn, Supplier<Iterator<V>> iteratorFn) {
-    return new IList<V>() {
+  public static <V> IList<V> from(long size, LongFunction<V> elementFn, LongFunction<Iterator<V>> iteratorFn) {
+    return new  IList<V>() {
       @Override
       public int hashCode() {
         return (int) Lists.hash(this);
@@ -397,8 +394,8 @@ public class Lists {
       }
 
       @Override
-      public Iterator<V> iterator() {
-        return iteratorFn.get();
+      public Iterator<V> iterator(long startIndex) {
+        return iteratorFn.apply(startIndex);
       }
 
       @Override
@@ -488,8 +485,8 @@ public class Lists {
   /**
    * @return an iterator over the list which repeatedly calls nth()
    */
-  public static <V> Iterator<V> iterator(IList<V> list) {
-    return Iterators.range(list.size(), list::nth);
+  public static <V> Iterator<V> iterator(IList<V> list, long startIndex) {
+    return Iterators.range(startIndex, list.size(), list::nth);
   }
 
   /**

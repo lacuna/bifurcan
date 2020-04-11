@@ -104,8 +104,8 @@ public interface ISet<V> extends
   /**
    * @return an iterator representing the elements of the set
    */
-  default Iterator<V> iterator() {
-    return Iterators.range(size(), this::nth);
+  default Iterator<V> iterator(long startIndex) {
+    return Iterators.range(startIndex, size(), this::nth);
   }
 
   @Override

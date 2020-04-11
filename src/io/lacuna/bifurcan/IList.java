@@ -84,8 +84,8 @@ public interface IList<V> extends
     return Spliterators.spliterator(iterator(), size(), Spliterator.ORDERED);
   }
 
-  default Iterator<V> iterator() {
-    return Lists.iterator(this);
+  default Iterator<V> iterator(long startIndex) {
+    return Lists.iterator(this, startIndex);
   }
 
   /**

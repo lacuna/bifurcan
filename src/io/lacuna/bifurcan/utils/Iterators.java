@@ -1,7 +1,6 @@
 package io.lacuna.bifurcan.utils;
 
 import io.lacuna.bifurcan.IDurableEncoding;
-import io.lacuna.bifurcan.IList;
 import io.lacuna.bifurcan.LinearList;
 
 import java.util.*;
@@ -308,6 +307,61 @@ public class Iterators {
       @Override
       public Object next() {
         return it.next();
+      }
+    };
+  }
+
+  public static <V> Iterator<V> merge(Iterator<V> a, Iterator<V> b, Comparator<V> comparator, BinaryOperator<V> mergeFn) {
+    return new Iterator<V>() {
+      boolean aExhausted, bExhausted;
+      V ax, bx;
+
+      {
+        a();
+        b();
+      }
+
+      private V a() {
+        V result = ax;
+        if (a.hasNext()) {
+          ax = a.next();
+        } else {
+          aExhausted = true;
+        }
+        return result;
+      }
+
+      private V b() {
+        V result = bx;
+        if (b.hasNext()) {
+          bx = b.next();
+        } else {
+          bExhausted = true;
+        }
+        return result;
+      }
+
+      @Override
+      public boolean hasNext() {
+        return !aExhausted | !bExhausted;
+      }
+
+      @Override
+      public V next() {
+        if (aExhausted) {
+          return b();
+        } else if (bExhausted) {
+          return a();
+        } else {
+          int cmp = comparator.compare(ax, bx);
+          if (cmp < 0) {
+            return a();
+          } else if (cmp > 0) {
+            return b();
+          } else {
+            return mergeFn.apply(a(), b());
+          }
+        }
       }
     };
   }

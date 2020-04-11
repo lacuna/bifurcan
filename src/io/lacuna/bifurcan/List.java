@@ -74,24 +74,22 @@ public class List<V> implements IList<V>, Cloneable {
 
   @Override
   public V nth(long idx) {
-    int rootSize = root.size();
+    long rootSize = root.size();
     if (idx < 0 || idx >= (rootSize + prefixLen + suffixLen)) {
       throw new IndexOutOfBoundsException(idx + " must be within [0," + size() + ")");
     }
 
-    int i = (int) idx;
-
     // look in the prefix
-    if (i < prefixLen) {
-      return (V) prefix[prefix.length + i - prefixLen];
+    if (idx < prefixLen) {
+      return (V) prefix[(int) (prefix.length + idx - prefixLen)];
 
       // look in the tree
-    } else if (i - prefixLen < rootSize) {
-      return (V) root.nth(i - prefixLen, false);
+    } else if (idx - prefixLen < rootSize) {
+      return (V) root.nth(idx - prefixLen, false);
 
       // look in the suffix
     } else {
-      return (V) suffix[i - (rootSize + prefixLen)];
+      return (V) suffix[(int) (idx - (rootSize + prefixLen))];
     }
   }
 
@@ -140,18 +138,18 @@ public class List<V> implements IList<V>, Cloneable {
   }
 
   @Override
-  public Iterator<V> iterator() {
+  public Iterator<V> iterator(long startIndex) {
 
     final Object[] initChunk;
     final int initOffset, initLimit;
-    final int size = (int) size();
-    final int rootSize = root.size();
+    final long size = size();
+    final long rootSize = root.size();
 
-    if (prefixLen > 0) {
+    if (prefixLen > startIndex) {
       initChunk = prefix;
       initOffset = pIdx(0);
       initLimit = prefix.length;
-    } else if (rootSize > 0) {
+    } else if (rootSize > startIndex) {
       initChunk = (Object[]) root.nth(0, true);
       initOffset = 0;
       initLimit = initChunk.length;
@@ -163,7 +161,7 @@ public class List<V> implements IList<V>, Cloneable {
 
     return new Iterator<V>() {
 
-      int idx = 0;
+      long idx = startIndex;
 
       Object[] chunk = initChunk;
       int offset = initOffset;
@@ -204,14 +202,11 @@ public class List<V> implements IList<V>, Cloneable {
     if (start < 0 || end > size()) {
       throw new IndexOutOfBoundsException();
     } else if (end <= start) {
-      List<V> result = new List<>();
+      return new List<>();
     }
 
-    int s = (int) start;
-    int e = (int) end;
-
-    int pStart = min(prefixLen, s);
-    int pEnd = min(prefixLen, e);
+    int pStart = (int) min(prefixLen, start);
+    int pEnd = (int) min(prefixLen, end);
     int pLen = pEnd - pStart;
     Object[] pre = null;
     if (pLen > 0) {
@@ -219,8 +214,8 @@ public class List<V> implements IList<V>, Cloneable {
       arraycopy(prefix, pIdx(pStart), pre, pre.length - pLen, pLen);
     }
 
-    int sStart = Math.max(0, s - (prefixLen + root.size()));
-    int sEnd = Math.max(0, e - (prefixLen + root.size()));
+    int sStart = (int) Math.max(0, start - (prefixLen + root.size()));
+    int sEnd = (int) Math.max(0, end - (prefixLen + root.size()));
     int sLen = sEnd - sStart;
     Object[] suf = null;
     if (sLen > 0) {
@@ -229,9 +224,9 @@ public class List<V> implements IList<V>, Cloneable {
     }
 
     return new List<V>(
-      isLinear(),
-      root.slice(Math.max(0, min(root.size(), s - prefixLen)), Math.max(0, min(root.size(), e - prefixLen)), new Object()),
-      pLen, pre, sLen, suf);
+        isLinear(),
+        root.slice(Math.max(0, min(root.size(), start - prefixLen)), Math.max(0, min(root.size(), end - prefixLen)), new Object()),
+        pLen, pre, sLen, suf);
   }
 
   @Override
@@ -256,9 +251,9 @@ public class List<V> implements IList<V>, Cloneable {
       }
 
       return new List<V>(
-        isLinear(), r,
-        prefixLen, prefixLen > 0 ? prefix.clone() : null,
-        b.suffixLen, b.suffixLen > 0 ? b.suffix.clone() : null);
+          isLinear(), r,
+          prefixLen, prefixLen > 0 ? prefix.clone() : null,
+          b.suffixLen, b.suffixLen > 0 ? b.suffix.clone() : null);
 
     } else {
       return Lists.concat(this, l);
@@ -291,9 +286,9 @@ public class List<V> implements IList<V>, Cloneable {
   @Override
   public List<V> clone() {
     return new List<V>(
-      isLinear(), root,
-      prefixLen, prefix == null ? null : prefix.clone(),
-      suffixLen, suffix == null ? null : suffix.clone());
+        isLinear(), root,
+        prefixLen, prefix == null ? null : prefix.clone(),
+        suffixLen, suffix == null ? null : suffix.clone());
   }
 
   ///
@@ -317,7 +312,7 @@ public class List<V> implements IList<V>, Cloneable {
   }
 
   List<V> overwrite(int idx, V value) {
-    int rootSize = root.size();
+    long rootSize = root.size();
 
     // overwrite prefix
     if (idx < prefixLen) {
@@ -329,7 +324,7 @@ public class List<V> implements IList<V>, Cloneable {
 
       // overwrite suffix
     } else {
-      suffix[idx - (prefixLen + rootSize)] = value;
+      suffix[(int)(idx - (prefixLen + rootSize))] = value;
     }
 
     return this;

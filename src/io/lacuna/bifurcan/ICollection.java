@@ -1,6 +1,7 @@
 package io.lacuna.bifurcan;
 
 import java.nio.file.Path;
+import java.util.Iterator;
 import java.util.Optional;
 
 /**
@@ -70,6 +71,12 @@ public interface ICollection<C, V> extends Iterable<V> {
       return defaultValue;
     }
     return nth(idx);
+  }
+
+  Iterator<V> iterator(long startIndex);
+
+  default Iterator<V> iterator() {
+    return iterator(0);
   }
 
   /**

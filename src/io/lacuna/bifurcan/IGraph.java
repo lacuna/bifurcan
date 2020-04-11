@@ -80,8 +80,8 @@ public interface IGraph<V, E> extends ICollection<IGraph<V, E>, V> {
     return vertices().nth(idx);
   }
 
-  default Iterator<V> iterator() {
-    return vertices().iterator();
+  default Iterator<V> iterator(long startIndex) {
+    return vertices().iterator(startIndex);
   }
 
   default long size() {

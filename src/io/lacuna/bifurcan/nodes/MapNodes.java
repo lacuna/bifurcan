@@ -79,6 +79,8 @@ public class MapNodes {
       int mask = hashMask(hash, shift);
       if (isEntry(mask)) {
         int idx = entryIndex(mask);
+        // checking the hash only helps when equality checks are expensive and failed lookups are common
+        // in the normal case, it just leads to cache misses
         return /*hash == hashes[idx] &&*/ equals.test(key, (K) content[idx << 1]) ? idx : -1;
 
       } else if (isNode(mask)) {

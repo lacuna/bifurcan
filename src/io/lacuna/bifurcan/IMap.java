@@ -150,8 +150,8 @@ public interface IMap<K, V> extends
   /**
    * @return an iterator over all entries in the map
    */
-  default Iterator<IEntry<K, V>> iterator() {
-    return Iterators.range(size(), this::nth);
+  default Iterator<IEntry<K, V>> iterator(long startIndex) {
+    return Iterators.range(startIndex, size(), this::nth);
   }
 
   /**

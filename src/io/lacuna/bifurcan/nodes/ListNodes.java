@@ -13,10 +13,10 @@ public class ListNodes {
   public static final int MAX_BRANCHES = 1 << SHIFT_INCREMENT;
   private static final int BRANCH_MASK = MAX_BRANCHES - 1;
 
-  public static Object slice(Object node, Object editor, int start, int end) {
+  public static Object slice(Object node, Object editor, long start, long end) {
     if (node instanceof Object[]) {
-      Object[] ary = new Object[end - start];
-      arraycopy(node, start, ary, 0, ary.length);
+      Object[] ary = new Object[(int)(end - start)];
+      arraycopy(node, (int) start, ary, 0, ary.length);
       return ary;
     } else {
       return ((Node) node).slice(start, end, editor);
@@ -45,7 +45,7 @@ public class ListNodes {
     public boolean isStrict;
     public int numNodes;
     Object editor;
-    public int[] offsets;
+    public long[] offsets;
     public Object[] nodes;
 
     // constructors
@@ -54,7 +54,7 @@ public class ListNodes {
       this.editor = editor;
       this.shift = (byte) shift;
       this.numNodes = 0;
-      this.offsets = new int[2];
+      this.offsets = new long[2];
       this.nodes = new Object[2];
     }
 
@@ -116,14 +116,14 @@ public class ListNodes {
       return (Object[]) n.nodes[n.numNodes - 1];
     }
 
-    public Object nth(int idx, boolean returnChunk) {
+    public Object nth(long idx, boolean returnChunk) {
       if (!isStrict) {
         return relaxedNth(idx, returnChunk);
       }
 
       Node n = this;
       while (n.shift > SHIFT_INCREMENT) {
-        int nodeIdx = (idx >>> n.shift) & BRANCH_MASK;
+        int nodeIdx = (int) ((idx >>> n.shift) & BRANCH_MASK);
         n = (Node) n.nodes[nodeIdx];
 
         if (!n.isStrict) {
@@ -131,14 +131,14 @@ public class ListNodes {
         }
       }
 
-      Object[] chunk = (Object[]) n.nodes[(idx >>> SHIFT_INCREMENT) & BRANCH_MASK];
-      return returnChunk ? chunk : chunk[idx & BRANCH_MASK];
+      Object[] chunk = (Object[]) n.nodes[(int) ((idx >>> SHIFT_INCREMENT) & BRANCH_MASK)];
+      return returnChunk ? chunk : chunk[(int) (idx & BRANCH_MASK)];
     }
 
-    private Object relaxedNth(int idx, boolean returnChunk) {
+    private Object relaxedNth(long idx, boolean returnChunk) {
 
       // moved inside here to make nth() more inline-able
-      idx = idx & (int) Bits.maskBelow(shift + SHIFT_INCREMENT);
+      idx = idx & Bits.maskBelow(shift + SHIFT_INCREMENT);
 
       Node n = this;
 
@@ -150,11 +150,11 @@ public class ListNodes {
 
       int nodeIdx = n.indexOf(idx);
       Object[] chunk = (Object[]) n.nodes[nodeIdx];
-      return returnChunk ? chunk : chunk[idx - n.offset(nodeIdx)];
+      return returnChunk ? chunk : chunk[(int) (idx - n.offset(nodeIdx))];
     }
 
-    private int indexOf(int idx) {
-      int estimate = shift > 60 ? 0 : (idx >>> shift) & BRANCH_MASK;
+    private int indexOf(long idx) {
+      int estimate = (int) (shift > 60 ? 0 : (idx >>> shift) & BRANCH_MASK);
       if (isStrict) {
         return estimate;
       } else {
@@ -167,20 +167,20 @@ public class ListNodes {
       }
     }
 
-    int offset(int idx) {
+    long offset(int idx) {
       return idx == 0 ? 0 : offsets[idx - 1];
     }
 
     // update
 
-    public Node set(Object editor, int idx, Object value) {
+    public Node set(Object editor, long idx, Object value) {
       if (editor != this.editor) {
         return clone(editor).set(editor, idx, value);
       }
 
       int nodeIdx = indexOf(idx);
       if (shift == SHIFT_INCREMENT) {
-        nodes[nodeIdx] = ListNodes.set((Object[]) nodes[nodeIdx], idx - offset(nodeIdx), value);
+        nodes[nodeIdx] = ListNodes.set((Object[]) nodes[nodeIdx], (int) (idx - offset(nodeIdx)), value);
       } else {
         nodes[nodeIdx] = ((Node) nodes[nodeIdx]).set(editor, idx - offset(nodeIdx), value);
       }
@@ -189,7 +189,7 @@ public class ListNodes {
 
     // misc
 
-    public int size() {
+    public long size() {
       return numNodes == 0 ? 0 : offsets[numNodes - 1];
     }
 
@@ -221,7 +221,7 @@ public class ListNodes {
       }
     }
 
-    public Node slice(int start, int end, Object editor) {
+    public Node slice(long start, long end, Object editor) {
 
       if (start == end) {
         return EMPTY;
@@ -236,7 +236,7 @@ public class ListNodes {
 
       // we're slicing within a single node
       if (startIdx == endIdx) {
-        int offset = offset(startIdx);
+        long offset = offset(startIdx);
         Object child = ListNodes.slice(nodes[startIdx], editor, start - offset, end - offset);
         if (shift > SHIFT_INCREMENT) {
           return (Node) child;
@@ -248,8 +248,8 @@ public class ListNodes {
       } else {
 
         // first partial node
-        int sLower = offset(startIdx);
-        int sUpper = offset(startIdx + 1);
+        long sLower = offset(startIdx);
+        long sUpper = offset(startIdx + 1);
         rn = ListNodes.pushLast(rn, ListNodes.slice(nodes[startIdx], editor, start - sLower, sUpper - sLower), editor);
 
         // intermediate full nodes
@@ -258,7 +258,7 @@ public class ListNodes {
         }
 
         // last partial node
-        int eLower = offset(endIdx);
+        long eLower = offset(endIdx);
         rn = ListNodes.pushLast(rn, ListNodes.slice(nodes[endIdx], editor, 0, end - eLower), editor);
       }
 
@@ -400,7 +400,7 @@ public class ListNodes {
       parent.offsets[parent.numNodes] = parent.size();
       parent.numNodes++;
 
-      int nSize = node.size();
+      long nSize = node.size();
 
       for (int i = 0; i < stack.length; i++) {
         Node n = stack[i];
@@ -459,7 +459,7 @@ public class ListNodes {
       parent.numNodes++;
       parent.offsets[0] = 0;
 
-      int nSize = node.size();
+      long nSize = node.size();
 
       for (int i = 0; i < stack.length; i++) {
         Node n = stack[i];
@@ -569,7 +569,7 @@ public class ListNodes {
     }
 
     private void grow() {
-      int[] o = new int[offsets.length << 1];
+      long[] o = new long[offsets.length << 1];
       arraycopy(offsets, 0, o, 0, offsets.length);
       this.offsets = o;
 
