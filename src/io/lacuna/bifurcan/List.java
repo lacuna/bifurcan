@@ -138,18 +138,18 @@ public class List<V> implements IList<V>, Cloneable {
   }
 
   @Override
-  public Iterator<V> iterator(long startIndex) {
+  public Iterator<V> iterator() {
 
     final Object[] initChunk;
     final int initOffset, initLimit;
     final long size = size();
     final long rootSize = root.size();
 
-    if (prefixLen > startIndex) {
+    if (prefixLen > 0) {
       initChunk = prefix;
       initOffset = pIdx(0);
       initLimit = prefix.length;
-    } else if (rootSize > startIndex) {
+    } else if (rootSize > 0) {
       initChunk = (Object[]) root.nth(0, true);
       initOffset = 0;
       initLimit = initChunk.length;
@@ -161,7 +161,7 @@ public class List<V> implements IList<V>, Cloneable {
 
     return new Iterator<V>() {
 
-      long idx = startIndex;
+      long idx = 0;
 
       Object[] chunk = initChunk;
       int offset = initOffset;
