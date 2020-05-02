@@ -210,7 +210,7 @@ public class Lists {
     @Override
     public boolean equals(Object obj) {
       if (obj instanceof java.util.List) {
-        return Lists.equals(list, Lists.from(this));
+        return Lists.equals(list, Lists.from((java.util.List)obj));
       }
       return false;
     }
