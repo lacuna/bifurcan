@@ -10,7 +10,7 @@ import static io.lacuna.bifurcan.utils.Bits.log2Ceil;
 /**
  * A simple implementation of a mutable list combining the best characteristics of {@link java.util.ArrayList} and
  * {@link java.util.ArrayDeque}, allowing elements to be added and removed from both ends of the collection <i>and</i>
- * allowing random-access reads and updates.
+ * allowing random-access reads and updates.  Unlike {@link List}, it can only hold {@code Integer.MAX_VALUE} elements.
  * <p>
  * Calls to {@link #concat(IList)}, {@link #slice(long, long)}, and {@link #split(int)} create virtual collections which
  * retain a reference to the whole underlying collection, and are somewhat less efficient than {@code LinearList}.

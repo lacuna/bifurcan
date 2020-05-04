@@ -96,6 +96,10 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
     this.editor = linear ? new Object() : null;
   }
 
+  public static <K, V> Map<K, V> empty() {
+    return (Map<K, V>) EMPTY;
+  }
+
   ///
 
   @Override

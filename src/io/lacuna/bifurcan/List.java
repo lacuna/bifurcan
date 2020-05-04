@@ -70,6 +70,10 @@ public class List<V> implements IList<V>, Cloneable {
     this.suffix = suffix;
   }
 
+  public static <V> List<V> empty() {
+    return (List<V>) EMPTY;
+  }
+
   ///
 
   @Override

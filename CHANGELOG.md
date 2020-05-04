@@ -4,7 +4,8 @@
 
 * fixed issue where `DirectedGraph.edges()` returned edges pointing in the wrong direction
 * fixed issue in `List` where series of operations including `slice()` could lead to a degenerate structure which made lookups impossible.  If you haven't seen mysterious `IndexOutOfBoundsException`s, this didn't affect you.
-* fixed surprising implementation detail where `List` couldn't hold more than `Integer.MAX_VALUE` elements.
+* fixed surprising implementation detail where `List` couldn't hold more than `Integer.MAX_VALUE` elements
+* fixed issue where `list.toList().equals(...)` would always return true no matter the input
 
 ### Changes
 

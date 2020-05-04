@@ -75,6 +75,10 @@ public class Set<V> implements ISet<V>, Cloneable {
     this.map = map;
   }
 
+  public static <V> Set<V> empty() {
+    return (Set<V>) EMPTY;
+  }
+
   ///
 
   @Override
