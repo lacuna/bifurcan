@@ -4,6 +4,7 @@
 
 * fixed issue where `DirectedGraph.edges()` returned edges pointing in the wrong direction
 * fixed issue in `List` where series of operations including `slice()` could lead to a degenerate structure which made lookups impossible.  If you haven't seen mysterious `IndexOutOfBoundsException`s, this didn't affect you.
+* fixed surprising implementation detail where `List` couldn't hold more than `Integer.MAX_VALUE` elements.
 
 ### Changes
 
@@ -12,3 +13,4 @@
 * moved `Lists.Concat` to `diffs.ConcatList`
 * subsumed `Lists.Slice` into `diffs.DiffList`
 * made all hash functions (`IMap.keyHash`, `ISet.valueHash`, `IGraph.vertexHash`) yield `long`s instead of `int`s.
+* changed `indexOf` methods to return `OptionalInt` instead of an `int` which is `-1` if no such element is found
