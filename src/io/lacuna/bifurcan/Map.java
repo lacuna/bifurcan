@@ -17,7 +17,7 @@ import java.util.function.*;
  * equivalent performance for larger collections.
  * <p>
  * By ensuring that equivalent maps always have equivalent layout in memory, it can perform equality checks and set
- * operations (union, difference, intersection) significantly faster than a more naive implementation..  By keeping the
+ * operations (union, difference, intersection) significantly faster than a more naive implementation.  By keeping the
  * memory layout of each node more compact, iteration is at least 2x faster than Clojure's map.
  *
  * @author ztellman

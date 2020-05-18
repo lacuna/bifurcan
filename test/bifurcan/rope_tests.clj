@@ -88,6 +88,7 @@
    :concat str})
 
 (u/def-collection-check test-rope iterations actions
+  []
   [a (Rope/from "") rope-actions
    b "" string-actions]
   (if (= (str a) b)

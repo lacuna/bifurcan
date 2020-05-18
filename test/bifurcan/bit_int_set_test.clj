@@ -53,11 +53,13 @@
    :remove #(bit-set-remove %1 bits %2)})
 
 (u/def-collection-check test-bit-int-set-16 1e4 (set-actions 16384)
+  []
   [s (HashSet.) java-set
    [len v] [0 (BitIntSet/create)] (bit-set 16)]
   (= s (bit-int-set [len v] 16)))
 
 (u/def-collection-check test-bit-int-set-48 1e4 (set-actions Integer/MAX_VALUE)
+  []
   [s (HashSet.) java-set
    [len v] [0 (BitIntSet/create)] (bit-set 48)]
   (= s (bit-int-set [len v] 48)))

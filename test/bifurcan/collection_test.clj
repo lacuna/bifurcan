@@ -100,12 +100,25 @@
 (defn ->vec [^IList l]
   (->> l .iterator iterator-seq (into [])))
 
+(defn ->diff-sorted-map [^SortedMap m]
+  (ConcatSortedMap/from
+    (.comparator m)
+    (.addLast (List.) m)))
+
 ;;;
 
 (defn map= [a ^IMap b]
-  (= a
-    (zipmap (.keys b) (->> b .keys (map #(.get b % nil))))
-    (->map b)))
+  (and
+    (=
+      (set a)
+      (->> b
+        .iterator
+        iterator-seq
+        (map #(vector (.key %) (.value %)))
+        set))
+    (= a
+      (zipmap (.keys b) (->> b .keys (map #(.get b % nil))))
+      (->map b))))
 
 (defn set= [a ^ISet b]
   (= a
@@ -283,11 +296,13 @@
 ;; Maps
 
 (u/def-collection-check test-linear-map iterations map-actions
+  []
   [a {} clj-map
    b (LinearMap.) bifurcan-map]
   (map= a b))
 
 (u/def-collection-check test-map iterations map-actions
+  []
   [a {} clj-map
    b (Map.) bifurcan-map
    c (.linear (Map.)) bifurcan-map]
@@ -297,6 +312,7 @@
     (map= a c)))
 
 (u/def-collection-check test-sorted-map iterations map-actions
+  []
   [a (sorted-map) clj-map
    b (SortedMap.) bifurcan-sorted-map
    c (.linear (SortedMap.)) bifurcan-sorted-map]
@@ -317,6 +333,7 @@
         (map= b' b)))))
 
 (u/def-collection-check test-int-map iterations map-actions
+  []
   [a {} clj-map
    b (IntMap.) int-map
    c (.linear (IntMap.)) int-map]
@@ -326,6 +343,7 @@
     (map= a c)))
 
 (u/def-collection-check test-float-map iterations float-map-actions
+  []
   [a {} clj-map
    b (FloatMap.) float-map
    c (.linear (FloatMap.)) float-map]
@@ -335,46 +353,51 @@
     (map= a c)))
 
 (u/def-collection-check test-diff-map iterations map-actions
-  [a {} clj-map
-   b (DiffMap. Map/EMPTY) bifurcan-map]
+  [m (map-gen (constantly Map/EMPTY))]
+  [a (->map m) clj-map
+   b (DiffMap. m) bifurcan-map]
   (map= a b))
 
-(let [diff-sorted-map (ConcatSortedMap/from
-                        (java.util.Comparator/naturalOrder)
-                        (List.))]
-  (u/def-collection-check test-diff-sorted-map iterations map-actions
-    [a (sorted-map) clj-map
-     b diff-sorted-map bifurcan-map
-     c (.linear diff-sorted-map) bifurcan-map]
-    (and
-      (= b c)
-      (map= a b)
-      (map= a c))))
+(u/def-collection-check test-diff-sorted-map iterations map-actions
+  [m (map-gen (constantly (SortedMap.)))]
+  [a (->map m) clj-map
+   b (->diff-sorted-map m) bifurcan-map
+   c (.linear (->diff-sorted-map m)) bifurcan-map]
+  (and
+    (= b c)
+    (map= a b)
+    (map= a c)))
 
 (u/def-collection-check test-map-indices iterations map-actions
+  []
   [a (Map.) bifurcan-map]
   (valid-map-indices? a))
 
 (u/def-collection-check test-sorted-map-indices iterations map-actions
+  []
   [a (SortedMap.) bifurcan-sorted-map]
   (valid-map-indices? a))
 
 (u/def-collection-check test-int-map-indices iterations map-actions
+  []
   [a (IntMap.) int-map]
   (valid-map-indices? a))
 
 (u/def-collection-check test-float-map-indices iterations float-map-actions
+  []
   [a (FloatMap.) float-map]
   (valid-map-indices? a))
 
 ;; Sets
 
 (u/def-collection-check test-linear-set iterations set-actions
+  []
   [a #{} clj-set
    b (LinearSet.) bifurcan-set]
   (set= a b))
 
 (u/def-collection-check test-set iterations set-actions
+  []
   [a #{} clj-set
    b (Set.) bifurcan-set
    c (.linear (Set.)) bifurcan-set]
@@ -384,6 +407,7 @@
     (set= a c)))
 
 (u/def-collection-check test-sorted-set iterations set-actions
+  []
   [a (sorted-set) clj-set
    b (SortedSet.) bifurcan-set
    c (.linear (SortedSet.)) bifurcan-set]
@@ -392,36 +416,37 @@
     (set= a b)
     (set= a c)))
 
-(let [diff-sorted-set (DiffSortedSet.
-                        (ConcatSortedMap/from
-                          (java.util.Comparator/naturalOrder)
-                          (List.)))]
-  (u/def-collection-check test-diff-sorted-set iterations set-actions
-    [a (sorted-set) clj-set
-     b diff-sorted-set bifurcan-set
-     c (.linear diff-sorted-set) bifurcan-set]
-    (and
-      (= b c)
-      (set= a b)
-      (set= a c))))
+(u/def-collection-check test-diff-sorted-set iterations set-actions
+  [s (set-gen (constantly (SortedSet.)))]
+  [a (->> s .iterator iterator-seq (into (sorted-set))) clj-set
+   b (DiffSortedSet. s) bifurcan-set
+   c (.linear (DiffSortedSet. s)) bifurcan-set]
+  (and
+    (= b c)
+    (set= a b)
+    (set= a c)))
 
 (u/def-collection-check test-diff-set iterations set-actions
-  [a #{} clj-set
-   b (DiffSet. Set/EMPTY) bifurcan-set]
+  [s (set-gen (constantly Set/EMPTY))]
+  [a (->> s .toSet (into #{})) clj-set
+   b (DiffSet. s) bifurcan-set]
   (set= a b))
 
 (u/def-collection-check test-set-indices iterations set-actions
+  []
   [a (Set.) bifurcan-set]
   (valid-set-indices? a))
 
 ;; Lists
 
 (u/def-collection-check test-linear-list iterations list-actions
+  []
   [a [] clj-list
    b (LinearList.) bifurcan-list]
   (list= a b))
 
 (u/def-collection-check test-list iterations list-actions
+  []
   [a [] clj-list
    b (List.) bifurcan-list
    c (.linear (List.)) bifurcan-list]
@@ -431,10 +456,10 @@
     (list= a c)))
 
 (u/def-collection-check test-diff-list iterations list-actions
-  [a [] clj-list
-   b (DiffList. List/EMPTY) bifurcan-list
-   c (.linear (DiffList. List/EMPTY)) bifurcan-list
-   ]
+  [l (list-gen (constantly List/EMPTY))]
+  [a (->vec l) clj-list
+   b (DiffList. l) bifurcan-list
+   c (.linear (DiffList. l)) bifurcan-list]
   (and
     (= b c)
     (list= a b)
@@ -552,42 +577,52 @@
   (reduce #(.union ^ISet %1 %2) init sets))
 
 (u/def-collection-check test-linear-map-split iterations map-actions
+  []
   [m (LinearMap.) bifurcan-map]
   (= m (-> m (.split 2) (map-union (LinearMap.)))))
 
 (u/def-collection-check test-map-split iterations map-actions
+  []
   [m (Map.) bifurcan-map]
   (= m (-> m (.split 2) (map-union (Map.)))))
 
 (u/def-collection-check test-sorted-map-split iterations map-actions
+  []
   [m (SortedMap.) bifurcan-sorted-map]
   (= m (-> m (.split 2) (map-union (SortedMap.)))))
 
 (u/def-collection-check test-int-map-split iterations map-actions
+  []
   [m (IntMap.) int-map]
   (= m (-> m (.split 2) (map-union (IntMap.)))))
 
 (u/def-collection-check test-float-map-split iterations float-map-actions
+  []
   [m (FloatMap.) float-map]
   (= m (-> m (.split 2) (map-union (FloatMap.)))))
 
 (u/def-collection-check test-linear-list-split iterations list-actions
+  []
   [l (LinearList.) bifurcan-list]
   (= l (-> l (.split 2) into-array Lists/concat)))
 
 (u/def-collection-check test-list-split iterations list-actions
+  []
   [l (List.) bifurcan-list]
   (= l (-> l (.split 2) into-array Lists/concat)))
 
 (u/def-collection-check test-wrapped-list-split iterations list-actions
+  []
   [l (Lists/from []) bifurcan-list]
   (= l (-> l (.split 2) into-array Lists/concat)))
 
 (u/def-collection-check test-linear-set-split iterations set-actions
+  []
   [s (LinearSet.) bifurcan-set]
   (= s (-> s (.split 2) (set-union (LinearSet.)))))
 
 (u/def-collection-check test-set-split iterations set-actions
+  []
   [s (Set.) bifurcan-set]
   (= s (-> s (.split 2) (set-union (Set.)))))
 

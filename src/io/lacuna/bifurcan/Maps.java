@@ -161,6 +161,11 @@ public class Maps {
   public static <K, V> ISortedMap<K, V> from(ISortedSet<K> keys, Function<K, V> lookup, Supplier<Iterator<IEntry<K, V>>> iterator) {
     return new ISortedMap<K, V>() {
       @Override
+      public ISortedSet<K> keys() {
+        return keys;
+      }
+
+      @Override
       public Comparator<K> comparator() {
         return keys.comparator();
       }
@@ -187,7 +192,7 @@ public class Maps {
 
       @Override
       public IEntry<K, V> nth(long idx) {
-        K key = keys().nth(idx);
+        K key = keys.nth(idx);
         return IEntry.of(key, lookup.apply(key));
       }
 

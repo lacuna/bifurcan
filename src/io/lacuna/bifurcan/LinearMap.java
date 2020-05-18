@@ -69,13 +69,6 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
   }
 
   /**
-   * @return a map representing all elements in {@code entries}
-   */
-  public static <K, V> LinearMap<K, V> from(Iterable<IEntry<K, V>> entries) {
-    return from(entries.iterator());
-  }
-
-  /**
    * @return a map representing all remaining entries in {@code iterator}
    */
   public static <K, V> LinearMap<K, V> from(Iterator<IEntry<K, V>> iterator) {

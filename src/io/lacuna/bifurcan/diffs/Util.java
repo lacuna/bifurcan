@@ -7,8 +7,6 @@ import java.util.OptionalLong;
 import java.util.PrimitiveIterator;
 
 /**
- *
- *
  * @author ztellman
  */
 public class Util {
@@ -23,7 +21,7 @@ public class Util {
     } else if (floor == idx) {
       return OptionalLong.empty();
     } else {
-      return removedIndices.indexOf(floor);
+      return OptionalLong.of(removedIndices.indexOf(floor).getAsLong() + 1);
     }
   }
 
@@ -32,7 +30,19 @@ public class Util {
     if (floor == null) {
       return idx;
     } else {
-      return idx + removedIndices.indexOf(floor).getAsLong();
+      long estimate = idx;
+      // TODO: this can get linear for long contiguous blocks of indices, is there a better (but still simple) index?
+      for (;;) {
+        long actual = estimate - (removedIndices.indexOf(floor).getAsLong() + 1);
+        if (actual == idx) {
+          return estimate;
+        } else if (actual < idx) {
+          estimate += idx - actual;
+          floor = removedIndices.floor(estimate);
+        } else {
+          throw new IllegalStateException("we overshot, somehow");
+        }
+      }
     }
   }
 
@@ -46,11 +56,15 @@ public class Util {
         return skippedIndices.hasNext() ? skippedIndices.next() : -1;
       }
 
+      private V nextUnderlying() {
+        nextIndex++;
+        return it.next();
+      }
+
       void prime() {
         while (nextSkippedIndex == nextIndex && it.hasNext()) {
+          nextUnderlying();
           nextSkippedIndex = nextSkippedIndex();
-          nextIndex++;
-          it.next();
         }
       }
 
@@ -63,7 +77,7 @@ public class Util {
       @Override
       public V next() {
         prime();
-        return it.next();
+        return nextUnderlying();
       }
     };
   }

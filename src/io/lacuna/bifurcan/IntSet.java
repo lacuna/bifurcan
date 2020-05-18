@@ -138,4 +138,22 @@ public class IntSet implements ISortedSet<Long> {
   public ISet<Long> clone() {
     return this;
   }
+
+  @Override
+  public int hashCode() {
+    return (int) Sets.hash(this);
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (obj instanceof ISet) {
+      return Sets.equals(this, (ISet) obj);
+    }
+    return false;
+  }
+
+  @Override
+  public String toString() {
+    return Sets.toString(this);
+  }
 }

@@ -70,11 +70,13 @@
    :append list-append})
 
 (u/def-collection-check test-bit-vector-16 1e4 (vector-actions 16384)
+  []
   [a (ArrayList.) java-list
    [len v] [0 (BitVector/create 0)] (bit-vector 16)]
   (= a (bit-vector-seq 16 (/ len 16) v)))
 
 (u/def-collection-check test-bit-vector-48 1e4 (vector-actions Integer/MAX_VALUE)
+  []
   [a (ArrayList.) java-list
    [len v] [0 (BitVector/create 0)] (bit-vector 48)]
   (= a (bit-vector-seq 48 (/ len 48) v)))

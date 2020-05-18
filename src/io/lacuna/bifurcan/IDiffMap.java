@@ -38,21 +38,6 @@ public interface IDiffMap<K, V> extends IMap<K, V>, IDiff<IMap<K, V>, IEntry<K, 
   }
 
   @Override
-  default V get(K key, V defaultValue) {
-    V v = added().get(key, defaultValue);
-    if (v != defaultValue) {
-      return v;
-    } else  {
-      OptionalLong idx = underlying().indexOf(key);
-      if (!idx.isPresent() || removedIndices().contains(idx.getAsLong())) {
-        return defaultValue;
-      } else {
-        return underlying().nth(idx.getAsLong()).value();
-      }
-    }
-  }
-
-  @Override
   default OptionalLong indexOf(K key) {
     OptionalLong addedIdx = added().indexOf(key);
     if (addedIdx.isPresent()) {

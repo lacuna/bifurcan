@@ -71,10 +71,11 @@
     actions))
 
 (defmacro def-collection-check
-  [name iterations action-spec colls & predicate]
+  [name iterations action-spec generators colls & predicate]
   (let [actions (gensym "actions")]
     `(defspec ~name ~iterations
-       (prop/for-all [~actions (actions->generator ~action-spec)]
+       (prop/for-all [~@generators
+                      ~actions (actions->generator ~action-spec)]
          (let [~@(->> (zipmap
                         (->> colls (partition 3) (map first))
                         (->> colls
