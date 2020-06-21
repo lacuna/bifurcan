@@ -11,7 +11,6 @@ import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.OptionalLong;
 import java.util.function.BiPredicate;
-import java.util.function.ToIntFunction;
 import java.util.function.ToLongFunction;
 
 public class DurableMap<K, V> implements IDurableCollection, IMap<K, V> {
@@ -109,7 +108,7 @@ public class DurableMap<K, V> implements IDurableCollection, IMap<K, V> {
 
     return blockEntry == null
         ? defaultValue
-        : (V) HashMapEntries.get(chunkedEntries(blockEntry.offset), root, hash, key, defaultValue);
+        : (V) HashMapEntries.get(chunkedEntries(blockEntry.value), root, hash, key, defaultValue);
   }
 
   @Override
@@ -119,7 +118,7 @@ public class DurableMap<K, V> implements IDurableCollection, IMap<K, V> {
 
     return blockEntry == null
         ? OptionalLong.empty()
-        : HashMapEntries.indexOf(chunkedEntries(blockEntry.offset), hash, key);
+        : HashMapEntries.indexOf(chunkedEntries(blockEntry.value), hash, key);
   }
 
   @Override
@@ -133,7 +132,7 @@ public class DurableMap<K, V> implements IDurableCollection, IMap<K, V> {
       throw new IndexOutOfBoundsException(idx + " must be within [0," + size() + ")");
     }
     SkipTable.Entry blockEntry = indexTable == null ? SkipTable.Entry.ORIGIN : indexTable.floor(idx);
-    return (IEntry.WithHash<K, V>) chunkedEntries(blockEntry.offset).next().nth((int) (idx - blockEntry.index));
+    return (IEntry.WithHash<K, V>) chunkedEntries(blockEntry.value).next().nth((int) (idx - blockEntry.key));
   }
 
   @Override

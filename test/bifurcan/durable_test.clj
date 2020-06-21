@@ -154,10 +154,10 @@
         contents (.sliceBlock in BlockPrefix$BlockType/TABLE)
         buf      (Bytes/allocate (.size contents))
         _        (.read contents buf)]
-    [in (SkipTable. (.pool (BufferInput. (.flip buf))) (.tiers writer))]))
+    [(.seek in 0) (SkipTable. (.pool (BufferInput. (.flip buf))) (.tiers writer))]))
 
 (defn print-skip-table [^DurableInput in]
-  (->> (repeatedly #(when (pos? (.remaining in)) (.readVLQ in)))
+  (->> (repeatedly #(when (pos? (.remaining in)) (.readUVLQ in)))
     (take-while identity)))
 
 (defspec test-durable-skip-table iterations
@@ -165,16 +165,11 @@
                  entry-offsets (gen/such-that
                                  (complement empty?)
                                  (gen/list (gen/tuple gen-small-pos-int gen/int)))]
-    (let [entries (reductions #(map + %1 %2) init-entry entry-offsets)
-          [in t]  (create-skip-table entries)]
+    (let [entries           (reductions #(mapv + %1 %2) init-entry entry-offsets)
+          [in ^SkipTable t] (create-skip-table entries)
+          expected          (into {} entries)]
       (try
-        (every?
-          (fn [[index offset]]
-            (let [e (.floor ^SkipTable t index)]
-              (and
-                (= index (.index e))
-                (= offset (.offset e)))))
-          entries)
+        (coll/map= expected (.toSortedMap t))
         (finally
           (free! in))))))
 

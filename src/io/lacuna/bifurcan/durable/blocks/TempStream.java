@@ -68,7 +68,6 @@ public class TempStream {
       {
         ITERATORS.get().add(this);
 
-        //
         long offset = 0;
         for (IBuffer b : buffers) {
           offset += b.size();

@@ -1,9 +1,11 @@
 package io.lacuna.bifurcan.durable.blocks;
 
-import io.lacuna.bifurcan.DurableInput;
-import io.lacuna.bifurcan.DurableOutput;
+import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
 import io.lacuna.bifurcan.durable.io.DurableBuffer;
+
+import java.util.Comparator;
+import java.util.OptionalLong;
 
 /**
  * A sorted map of int64 onto int64, which assumes keys are appended in sorted order.
@@ -23,10 +25,11 @@ import io.lacuna.bifurcan.durable.io.DurableBuffer;
  * the value of each entry represents the actual value associated with the key.
  * <p>
  * In other words, this is a flattened representation of an n-ary tree.  The map {0 0, 1 1, 2 2, 3 3, 4 4}, would be
- * encoded as the bytes [0 0 2 4 3 4 2 3 0 7 8 1 1 0 2 1 1 0 4], which is interpreted as this tree:
+ * encoded as the bytes [0 0 2 4 3 4 2 3 0 7 8 1 1 0 2 1 1 0 4], which is interpreted as this binary tree (note that in
+ * practice we use a 32-ary tree):
  * <code>
  * [0, 0]
- *
+ * <p>
  * 2: [4, 3]
  *        └---------------┐
  * 4: [2, 3]          [0, 7]
@@ -36,85 +39,215 @@ import io.lacuna.bifurcan.durable.io.DurableBuffer;
  * Note that the zeroed out key in each terminating pair doesn't matter, since we already have the key value from the
  * previous tier.
  * <p>
- * In practice, we use a 32-ary tree, but this can be configured on the write-side without any repercussions on the
- * read-side.
  *
  * @author ztellman
  */
 public class SkipTable {
 
+  private static final int LOG_BRANCHING_FACTOR = 1;
+  private static final int BRANCHING_FACTOR = 1 << LOG_BRANCHING_FACTOR;
+  private static final long BIT_MASK = BRANCHING_FACTOR - 1;
+
   public static class Entry {
-    public static final Entry ORIGIN = new Entry(0, 0);
+    public static final Entry ORIGIN = new Entry(Long.MIN_VALUE, Long.MIN_VALUE);
 
-    public final long index, offset;
+    public final long key, value;
 
-    public Entry(long index, long offset) {
-      this.index = index;
-      this.offset = offset;
+    public Entry(long key, long value) {
+      this.key = key;
+      this.value = value;
     }
 
     @Override
     public String toString() {
-      return "[" + index + ", " + offset + "]";
+      return "[" + key + ", " + value + "]";
     }
 
   }
 
   public final DurableInput.Pool in;
-  public final int tiers;
+  public final int numTiers;
 
-  public SkipTable(DurableInput.Pool in, int tiers) {
+  public SkipTable(DurableInput.Pool in, int numTiers) {
     this.in = in;
-    this.tiers = tiers;
+    this.numTiers = numTiers;
+  }
+
+  private Reader reader() {
+    return new Reader();
   }
 
   public Entry floor(long key) {
-    DurableInput in = this.in.instance();
+    Reader r = reader();
+    for (; ; ) {
+      if (r.key > key) {
+        if (r.tier == 0) {
+          return r.prevEntry();
+        } else {
+          r.descendPrev();
+        }
+      } else if (!r.hasNext() || r.key == key) {
+        if (r.tier == 0) {
+          return r.entry();
+        } else {
+          r.descend();
+        }
+      } else {
+        r.next();
+      }
+    }
+  }
 
-    long currKey = in.readVLQ();
-    long initOffset = in.readVLQ();
-    long nextTier = in.position();
-    long currOffset = 0;
-    for (int i = 0; i < tiers; i++) {
+  public OptionalLong floorIndex(long key) {
+    Reader r = reader();
+    if (key < r.key) {
+      return OptionalLong.empty();
+    }
+
+    for (; ; ) {
+      if (r.key > key) {
+        if (r.tier == 0) {
+          return OptionalLong.of(r.idx - 1);
+        } else {
+          r.descendPrev();
+        }
+      } else if (!r.hasNext() || r.key == key) {
+        if (r.tier == 0) {
+          return OptionalLong.of(r.idx);
+        } else {
+          r.descend();
+        }
+      } else {
+        r.next();
+      }
+    }
+  }
+
+  public long size() {
+    Reader r = reader();
+    while (r.tier > 0 || r.hasNext()) {
+      if (r.hasNext()) {
+        r.next();
+      } else {
+        r.descend();
+      }
+    }
+    return r.idx + 1;
+  }
+
+  public Entry nth(long idx) {
+    Reader r = reader();
+    while (r.idx < idx || r.tier > 0) {
+      if ((idx - r.idx) >= r.step) {
+        r.next();
+      } else {
+        r.descend();
+      }
+    }
+    return r.entry();
+  }
+
+  public ISortedMap<Long, Long> toSortedMap() {
+    IList<Long> elements = Lists.from(size(), i -> nth(i).key);
+    ISortedSet<Long> keys = Sets.from(elements, Comparator.naturalOrder(), this::floorIndex);
+    return Maps.from(keys, k -> floor(k).value);
+  }
+
+  ///
+
+  private class Reader {
+    private final DurableInput in = SkipTable.this.in.instance();
+
+    int tier;
+    long idx, key, offset;
+
+    private long prevKey, prevOffset, nextTier, step;
+    private final long initOffset;
+
+    public Reader() {
+      prevKey = key = in.readVLQ();
+      initOffset = in.readVLQ();
+      nextTier = in.position();
+
+      tier = SkipTable.this.numTiers;
+      step = 1L << tier;
+      if (tier > 0) {
+        descend();
+      }
+    }
+
+    /**
+     * Returns true if there is another entry in this "chunk".
+     */
+    boolean hasNext() {
+      return in.position() < nextTier;
+    }
+
+    /**
+     * Advances to the next entry on this level, if it exists.
+     */
+    void next() {
+      assert hasNext();
+      prevKey = key;
+      prevOffset = offset;
+
+      key += in.readUVLQ();
+      if (prevKey != key) {
+        idx += step;
+        offset += in.readVLQ();
+      } else {
+        // we've hit the end of this chunk, make sure hasNext() return false
+        in.seek(nextTier);
+      }
+    }
+
+    /**
+     * Descend to the next tier.
+     */
+    void descend() {
+      assert tier > 0;
+      tier--;
+      step >>= LOG_BRANCHING_FACTOR;
+
       // get tier bounds
       in.seek(nextTier);
       long len = in.readUVLQ();
       nextTier = in.position() + len;
 
       // recalibrate wrt offset on the next tier
-      if (currOffset > 0) {
-        in.skipBytes(currOffset);
-        currOffset = in.readVLQ();
-
-        // if we're at the beginning of the bottom tier, adjust wrt the init offset
-      } else if (i == tiers - 1) {
-        currOffset = initOffset;
-      }
-
-      // scan
-      while (in.position() < nextTier) {
-        long keyDelta = in.readUVLQ();
-
-        if (keyDelta == 0 || (currKey + keyDelta) > key) {
-          break;
-        }
-
-        currKey += keyDelta;
-        currOffset += in.readVLQ();
+      if (offset > 0) {
+        in.skipBytes(offset);
+        prevOffset = offset = in.readVLQ();
+        prevKey = key;
+      } else if (tier == 0) {
+        prevOffset = offset = initOffset;
       }
     }
 
-    return new Entry(currKey, currOffset);
+    /**
+     * Move back to the previous entry, and down to the next tier.
+     */
+    void descendPrev() {
+      key = prevKey;
+      offset = prevOffset;
+      idx -= step;
+      descend();
+    }
+
+    Entry entry() {
+      assert tier == 0;
+      return new Entry(key, offset);
+    }
+
+    Entry prevEntry() {
+      assert tier == 0;
+      return key == prevKey ? Entry.ORIGIN : new Entry(prevKey, prevOffset);
+    }
   }
 
   ///
 
   public static class Writer {
-
-    // these values can be changed without affecting decoding
-    private static final int LOG_BRANCHING_FACTOR = 5;
-    private static final int BRANCHING_FACTOR = 1 << LOG_BRANCHING_FACTOR;
-    private static final long BIT_MASK = BRANCHING_FACTOR - 1;
 
     private final DurableBuffer acc = new DurableBuffer();
     private Writer parent = null;
@@ -194,7 +327,7 @@ public class SkipTable {
     }
 
     public long flushTo(DurableOutput out) {
-      assert acc.written() > 0;
+      assert init;
 
       long offset = out.written();
       DurableBuffer.flushTo(out, BlockType.TABLE, acc -> {
