@@ -66,7 +66,10 @@
 
 (defn apply-actions [actions coll action->fn]
   (reduce
-    (fn [c [action & args]] (apply (action->fn action) c args))
+    (fn [c [action & args]]
+      (if (contains? action->fn action)
+        (apply (action->fn action) c args)
+        c))
     coll
     actions))
 

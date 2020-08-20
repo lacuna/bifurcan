@@ -14,6 +14,8 @@
    [java.nio
     ByteBuffer]
    [io.lacuna.bifurcan
+    ICollection
+    IDurableCollection
     IMap
     Map
     List
@@ -23,6 +25,7 @@
     DurableOutput
     DurableMap
     DurableList
+    IDurableEncoding
     DurableEncodings
     DurableEncodings$Codec]
    [io.lacuna.bifurcan.utils
@@ -31,7 +34,7 @@
     GenerationalAllocator]
    [io.lacuna.bifurcan.hash
     PerlHash]
-   [io.lacuna.bifurcan.durable.blocks
+   [io.lacuna.bifurcan.durable.codecs
     HashMap
     SkipTable
     SkipTable$Writer
@@ -40,13 +43,21 @@
     DurableBuffer
     BufferInput]
    [io.lacuna.bifurcan.durable
-    Encodings
+    Util
     BlockPrefix
     BlockPrefix$BlockType
     ChunkSort
     Bytes]))
 
 (set! *warn-on-reflection* true)
+
+(def ^java.nio.file.Path test-dir (.toPath (io/file "/tmp/bifurcan-tests")))
+
+(-> test-dir .toFile .mkdirs)
+
+(defn clear-test-dir []
+  (doseq [^java.io.File f (->> test-dir .toFile .listFiles)]
+    (.delete f)))
 
 (def gen-pos-int
   (gen/such-that
@@ -62,7 +73,7 @@
       #(Math/abs (p/int %))
       gen/int)))
 
-(def edn-encoding
+(def ^IDurableEncoding edn-encoding
   (DurableEncodings/unityped
     (DurableEncodings/primitive
       "edn"
@@ -115,10 +126,10 @@
   (prop/for-all [n gen-pos-int
                  bits (gen/choose 0 6)]
     (let [out (DurableBuffer.)
-          _   (Encodings/writePrefixedUVLQ 0 bits n out)
+          _   (Util/writePrefixedUVLQ 0 bits n out)
           in  (.toInput out)]
       (try
-        (= n (Encodings/readPrefixedUVLQ (.readByte in) bits in))
+        (= n (Util/readPrefixedUVLQ (.readByte in) bits in))
         (finally
           (free! in))))))
 
@@ -130,7 +141,8 @@
                         (remove
                           #{BlockPrefix$BlockType/DIFF
                             BlockPrefix$BlockType/COLLECTION
-                            BlockPrefix$BlockType/EXTENDED})
+                            BlockPrefix$BlockType/EXTENDED
+                            BlockPrefix$BlockType/DEPENDENCY})
                         (map gen/return)
                         gen/one-of)]
     (let [out (DurableBuffer.)
@@ -153,25 +165,20 @@
         in       (.toInput out)
         contents (.sliceBlock in BlockPrefix$BlockType/TABLE)
         buf      (Bytes/allocate (.size contents))
-        _        (.read contents buf)]
-    [(.seek in 0) (SkipTable. (.pool (BufferInput. (.flip buf))) (.tiers writer))]))
+        _        (.read contents buf)
+        _        (free! in)]
+    (SkipTable/decode (.pool (BufferInput. (.flip buf))) (.tiers writer))))
 
 (defn print-skip-table [^DurableInput in]
   (->> (repeatedly #(when (pos? (.remaining in)) (.readUVLQ in)))
     (take-while identity)))
 
 (defspec test-durable-skip-table iterations
-  (prop/for-all [init-entry (gen/tuple gen/int gen/int)
-                 entry-offsets (gen/such-that
-                                 (complement empty?)
-                                 (gen/list (gen/tuple gen-small-pos-int gen/int)))]
-    (let [entries           (reductions #(mapv + %1 %2) init-entry entry-offsets)
-          [in ^SkipTable t] (create-skip-table entries)
-          expected          (into {} entries)]
-      (try
-        (coll/map= expected (.toSortedMap t))
-        (finally
-          (free! in))))))
+  (prop/for-all [entries (gen/list (gen/tuple gen/int gen/int))]
+    (let [entries  (->> entries (sort-by first) (partition-by first) (map first))
+          m        (create-skip-table entries)
+          expected (into {} entries)]
+      (coll/map= expected m))))
 
 ;;; SortedChunk
 
@@ -193,21 +200,50 @@
 
 ;;; DurableMap
 
-(defspec test-durable-map iterations
-  (prop/for-all [m (coll/map-gen #(Map.))]
-    (let [out (DurableBuffer.)
-          _   (DurableMap/encode (-> ^IMap m .entries .iterator) edn-encoding 10 out)
-          in  (.toInput out)
-          m'  (DurableMap/decode edn-encoding nil (.pool in))]
-      (try
-        (and
-          (= m m')
-          (coll/valid-map-indices? m')
-          (free! in))))))
+(defn save [^ICollection c]
+  (let [^IDurableCollection c' (.save c edn-encoding test-dir)]
+    (-> c' .root .path .toFile .deleteOnExit)
+    c'))
+
+(def durable-map-actions
+  (-> coll/map-actions
+    (dissoc :diff-wrap)
+    (assoc :save [])))
+
+(def bifurcan-durable-map
+  (assoc coll/bifurcan-map
+    :save save))
+
+(u/def-collection-check test-durable-map 1e6 durable-map-actions
+  []
+  [m (Map.) bifurcan-durable-map
+   m' {} coll/clj-map]
+  (try
+    (coll/map= m' m)
+    (finally
+      (clear-test-dir))))
 
 ;;; DurableList
 
- (defspec test-durable-list iterations
+(def durable-list-actions
+  (-> coll/list-actions
+    (dissoc :diff-wrap)
+    (assoc :save [])))
+
+(def bifurcan-durable-list
+  (assoc coll/bifurcan-list
+    :save save))
+
+(u/def-collection-check test-durable-list iterations durable-list-actions
+  []
+  [m (List.) bifurcan-durable-list
+   m' [] coll/clj-list]
+  (try
+    (coll/list= m' m)
+    (finally
+      (clear-test-dir))))
+
+ #_(defspec test-durable-list iterations
   (prop/for-all [l (coll/list-gen #(List.))]
     (let [out (DurableBuffer.)
           _   (DurableList/encode (.iterator ^Iterable l) edn-encoding out)
@@ -216,3 +252,13 @@
       (and
         (= l l')
         (free! in)))))
+
+
+(comment
+  (def p (.toPath (io/file "/tmp")))
+  (-> (Map.)
+    (.put 1 1)
+    (.save edn-encoding p)
+    (.put 2 2)
+    (.put 1 42)
+    (.save edn-encoding p)))

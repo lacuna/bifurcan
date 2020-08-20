@@ -2,7 +2,6 @@ package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.durable.BlockPrefix;
 import io.lacuna.bifurcan.durable.Bytes;
-import io.lacuna.bifurcan.durable.Encodings;
 import io.lacuna.bifurcan.durable.Util;
 import io.lacuna.bifurcan.durable.io.ConcatInput;
 import io.lacuna.bifurcan.utils.Iterators;
@@ -261,14 +260,14 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
    * then works as described <a href="https://en.wikipedia.org/wiki/Variable-length_quantity">here</a>.
    */
   default long readVLQ() {
-    return Encodings.readVLQ(this);
+    return Util.readVLQ(this);
   }
 
   /**
    * Reads and advances past the next unsigned variable-length quantity, which works as described <a href="https://en.wikipedia.org/wiki/Variable-length_quantity">here</a>.
    */
   default long readUVLQ() {
-    return Encodings.readUVLQ(this);
+    return Util.readUVLQ(this);
   }
 
   /**

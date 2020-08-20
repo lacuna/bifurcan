@@ -1,12 +1,16 @@
 package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.durable.BlockPrefix;
-import io.lacuna.bifurcan.durable.Encodings;
 import io.lacuna.bifurcan.durable.io.DurableBuffer;
-import io.lacuna.bifurcan.durable.Util;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.function.*;
+
+import static io.lacuna.bifurcan.durable.codecs.Util.decodeBlock;
+import static io.lacuna.bifurcan.durable.codecs.Util.encodeBlock;
 
 /**
  * Utility methods for constructing {@link IDurableEncoding}s.
@@ -351,7 +355,7 @@ public class DurableEncodings {
           DurableBuffer.flushTo(
               out,
               BlockPrefix.BlockType.PRIMITIVE,
-              inner -> Encodings.encodeBlock(Lists.lazyMap(arrays, t -> t[i]), e, inner));
+              inner -> encodeBlock(Lists.lazyMap(arrays, t -> t[i]), e, inner));
         }
       }
 
@@ -359,7 +363,7 @@ public class DurableEncodings {
       public SkippableIterator decode(DurableInput in, IDurableCollection.Root root) {
         SkippableIterator[] iterators = new SkippableIterator[encodings.length];
         for (int i = 0; i < encodings.length; i++) {
-          iterators[i] = Encodings.decodeBlock(in.sliceBlock(BlockPrefix.BlockType.PRIMITIVE), root, encodings[i]);
+          iterators[i] = decodeBlock(in.sliceBlock(BlockPrefix.BlockType.PRIMITIVE), root, encodings[i]);
         }
 
         return new SkippableIterator() {

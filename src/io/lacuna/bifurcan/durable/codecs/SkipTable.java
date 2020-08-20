@@ -1,4 +1,4 @@
-package io.lacuna.bifurcan.durable.blocks;
+package io.lacuna.bifurcan.durable.codecs;
 
 import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
@@ -49,8 +49,6 @@ public class SkipTable {
   private static final long BIT_MASK = BRANCHING_FACTOR - 1;
 
   public static class Entry {
-    public static final Entry ORIGIN = new Entry(Long.MIN_VALUE, Long.MIN_VALUE);
-
     public final long key, value;
 
     public Entry(long key, long value) {
@@ -68,16 +66,20 @@ public class SkipTable {
   public final DurableInput.Pool in;
   public final int numTiers;
 
-  public SkipTable(DurableInput.Pool in, int numTiers) {
+  private SkipTable(DurableInput.Pool in, int numTiers) {
     this.in = in;
     this.numTiers = numTiers;
+  }
+
+  public static ISortedMap<Long, Long> decode(DurableInput.Pool pool, int numTiers) {
+    return new SkipTable(pool, numTiers).toSortedMap();
   }
 
   private Reader reader() {
     return new Reader();
   }
 
-  public Entry floor(long key) {
+  private Entry floor(long key) {
     Reader r = reader();
     for (; ; ) {
       if (r.key > key) {
@@ -98,7 +100,7 @@ public class SkipTable {
     }
   }
 
-  public OptionalLong floorIndex(long key) {
+  private OptionalLong floorIndex(long key) {
     Reader r = reader();
     if (key < r.key) {
       return OptionalLong.empty();
@@ -123,7 +125,7 @@ public class SkipTable {
     }
   }
 
-  public long size() {
+  private long size() {
     Reader r = reader();
     while (r.tier > 0 || r.hasNext()) {
       if (r.hasNext()) {
@@ -135,7 +137,7 @@ public class SkipTable {
     return r.idx + 1;
   }
 
-  public Entry nth(long idx) {
+  private Entry nth(long idx) {
     Reader r = reader();
     while (r.idx < idx || r.tier > 0) {
       if ((idx - r.idx) >= r.step) {
@@ -147,10 +149,14 @@ public class SkipTable {
     return r.entry();
   }
 
-  public ISortedMap<Long, Long> toSortedMap() {
-    IList<Long> elements = Lists.from(size(), i -> nth(i).key);
-    ISortedSet<Long> keys = Sets.from(elements, Comparator.naturalOrder(), this::floorIndex);
-    return Maps.from(keys, k -> floor(k).value);
+  private ISortedMap<Long, Long> toSortedMap() {
+    if (in.instance().size() == 0) {
+      return SortedMap.empty();
+    } else {
+      IList<Long> elements = Lists.from(size(), i -> nth(i).key);
+      ISortedSet<Long> keys = Sets.from(elements, Comparator.naturalOrder(), this::floorIndex);
+      return Maps.from(keys, k -> floor(k).value);
+    }
   }
 
   ///
@@ -173,6 +179,8 @@ public class SkipTable {
       step = 1L << tier;
       if (tier > 0) {
         descend();
+      } else {
+        offset = initOffset;
       }
     }
 
@@ -241,7 +249,7 @@ public class SkipTable {
 
     Entry prevEntry() {
       assert tier == 0;
-      return key == prevKey ? Entry.ORIGIN : new Entry(prevKey, prevOffset);
+      return key == prevKey ? null : new Entry(prevKey, prevOffset);
     }
   }
 
@@ -327,13 +335,15 @@ public class SkipTable {
     }
 
     public long flushTo(DurableOutput out) {
-      assert init;
-
       long offset = out.written();
       DurableBuffer.flushTo(out, BlockType.TABLE, acc -> {
-        acc.writeVLQ(firstKey);
-        acc.writeVLQ(firstOffset);
-        flush(acc, 1);
+        if (init) {
+          acc.writeVLQ(firstKey);
+          acc.writeVLQ(firstOffset);
+          flush(acc, 1);
+        } else {
+          free();
+        }
       });
       return out.written() - offset;
     }

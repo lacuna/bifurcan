@@ -2,7 +2,7 @@ package io.lacuna.bifurcan.durable;
 
 import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.durable.allocator.IBuffer;
-import io.lacuna.bifurcan.durable.blocks.TempStream;
+import io.lacuna.bifurcan.durable.codecs.TempStream;
 import io.lacuna.bifurcan.utils.Iterators;
 
 import java.util.Arrays;
@@ -71,7 +71,7 @@ public class ChunkSort {
     }
 
     private S spill(IList<Iterator<T>> iterators) {
-      return encode.apply(Util.mergeSort(iterators, comparator));
+      return encode.apply(Iterators.mergeSort(iterators, comparator));
     }
 
     public Iterator<T> sortedIterator() {
@@ -90,7 +90,7 @@ public class ChunkSort {
         iterators = merged;
       }
 
-      return Util.mergeSort(iterators, comparator);
+      return Iterators.mergeSort(iterators, comparator);
     }
   }
 

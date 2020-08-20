@@ -13,6 +13,8 @@ import java.util.function.*;
  */
 public class SortedMap<K, V> implements ISortedMap<K, V> {
 
+  private static final SortedMap EMPTY = new SortedMap();
+
   private final Comparator<K> comparator;
   public Node<K, V> root;
   private final Object editor;
@@ -36,6 +38,10 @@ public class SortedMap<K, V> implements ISortedMap<K, V> {
     this.root = root;
     this.comparator = comparator;
     this.editor = linear ? new Object() : null;
+  }
+
+  public static <K, V> SortedMap<K, V> empty() {
+    return EMPTY;
   }
 
   @Override

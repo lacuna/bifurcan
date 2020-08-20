@@ -1,4 +1,4 @@
-package io.lacuna.bifurcan.durable.blocks;
+package io.lacuna.bifurcan.durable.codecs;
 
 import io.lacuna.bifurcan.DurableInput;
 import io.lacuna.bifurcan.DurableOutput;
@@ -6,14 +6,12 @@ import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
 import io.lacuna.bifurcan.durable.io.DurableBuffer;
 import io.lacuna.bifurcan.utils.Iterators;
 
-import java.util.PrimitiveIterator;
-import java.util.PrimitiveIterator.OfInt;
 import java.util.PrimitiveIterator.OfLong;
 
 /**
  * A block representing a sorted sequence of 32-bit integers:
- * - the initial value [int32]
- * - zero or more deltas from the previous value [VLQs]
+ * - the initial value [VLQ]
+ * - zero or more deltas from the previous value [UVLQs]
  *
  * @author ztellman
  */

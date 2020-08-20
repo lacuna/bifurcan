@@ -21,6 +21,10 @@ public class ConcatSortedMap<K, V> implements IDiffSortedMap<K, V> {
     this.isLinear = isLinear;
   }
 
+  public static <K, V> ConcatSortedMap<K, V> from(ISortedMap<K, V> m) {
+    return from(m.comparator(), LinearList.of(m));
+  }
+
   public static <K, V> ConcatSortedMap<K, V> from(Comparator<K> comparator, ISortedMap<K, V>... segments) {
     return from(comparator, LinearList.of(segments));
   }

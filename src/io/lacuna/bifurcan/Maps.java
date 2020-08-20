@@ -128,8 +128,8 @@ public class Maps {
   }
 
   public static <K, V> long hash(IMap<K, V> m) {
-    ToLongFunction hashFn = m.keyHash();
-    return hash(m, e -> (hashFn.applyAsLong(e.key()) * 31) ^ Objects.hashCode(e.value()), (a, b) -> a + b);
+    ToLongFunction<K> hashFn = m.keyHash();
+    return hash(m, e -> (hashFn.applyAsLong(e.key()) * 31) ^ Objects.hashCode(e.value()), Long::sum);
   }
 
   public static <K, V> long hash(IMap<K, V> m, ToLongFunction<IEntry<K, V>> hash, LongBinaryOperator combiner) {

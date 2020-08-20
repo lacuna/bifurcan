@@ -2,9 +2,11 @@ package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.diffs.DiffMap;
 import io.lacuna.bifurcan.durable.Dependencies;
+import io.lacuna.bifurcan.durable.Roots;
+import io.lacuna.bifurcan.durable.codecs.Diffs;
 import io.lacuna.bifurcan.durable.io.FileOutput;
 import io.lacuna.bifurcan.durable.io.DurableBuffer;
-import io.lacuna.bifurcan.durable.blocks.HashMap;
+import io.lacuna.bifurcan.durable.codecs.HashMap;
 import io.lacuna.bifurcan.utils.Iterators;
 
 import java.nio.file.Path;
@@ -20,6 +22,9 @@ import java.util.stream.StreamSupport;
 public interface IMap<K, V> extends
   ICollection<IMap<K, V>, IEntry<K, V>>,
   Function<K, V> {
+
+  interface Durable<K, V> extends IMap<K,V>, IDurableCollection {
+  }
 
   /**
    * @return the hash function used by the map
@@ -293,21 +298,7 @@ public interface IMap<K, V> extends
   }
 
   @Override
-  default DurableMap<K, V> save(IDurableEncoding encoding, Path directory) {
-    if (!(encoding instanceof IDurableEncoding.Map)) {
-      throw new IllegalArgumentException(String.format("%s cannot be used to encode maps", encoding.description()));
-    }
-
-    Dependencies.enter();
-    DurableBuffer acc = new DurableBuffer();
-    HashMap.encodeSortedEntries(hashSortedEntries(), (IDurableEncoding.Map) encoding, acc);
-
-    FileOutput file = new FileOutput(Dependencies.exit());
-    DurableOutput out = DurableOutput.from(file);
-    acc.flushTo(out);
-    out.close();
-
-    Path path = file.moveTo(directory);
-    return (DurableMap<K, V>) DurableCollections.open(path, encoding);
+  default IMap.Durable<K, V> save(IDurableEncoding encoding, Path directory) {
+    return (IMap.Durable<K,V>) ICollection.super.save(encoding, directory);
   }
 }

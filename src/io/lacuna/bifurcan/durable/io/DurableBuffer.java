@@ -3,7 +3,6 @@ package io.lacuna.bifurcan.durable.io;
 import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.durable.BlockPrefix;
 import io.lacuna.bifurcan.durable.Bytes;
-import io.lacuna.bifurcan.durable.Util;
 import io.lacuna.bifurcan.durable.allocator.GenerationalAllocator;
 import io.lacuna.bifurcan.durable.allocator.IBuffer;
 

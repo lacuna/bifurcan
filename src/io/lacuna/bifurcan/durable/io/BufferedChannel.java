@@ -14,8 +14,6 @@ import java.util.concurrent.atomic.AtomicLong;
  * @author ztellman
  */
 public class BufferedChannel {
-  public static boolean VERBOSE = false;
-
   public static final AtomicLong PAGES_READ = new AtomicLong();
 
   private static final int PAGE_SIZE = 4 << 10;

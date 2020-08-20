@@ -51,7 +51,8 @@ public class Fingerprints {
 
     try {
       in.readFully(b);
-      return from(b);
+      Fingerprint f = from(b);
+      return f;
     } catch (IOException e) {
       throw new RuntimeException(e);
     }

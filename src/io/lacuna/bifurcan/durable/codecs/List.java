@@ -1,4 +1,4 @@
-package io.lacuna.bifurcan.durable.blocks;
+package io.lacuna.bifurcan.durable.codecs;
 
 import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.durable.BlockPrefix;
@@ -8,7 +8,7 @@ import io.lacuna.bifurcan.durable.io.DurableBuffer;
 
 import java.util.Iterator;
 
-import static io.lacuna.bifurcan.durable.Encodings.encodeBlock;
+import static io.lacuna.bifurcan.durable.codecs.Util.encodeBlock;
 
 /**
  * An indexed list, encoded as:
@@ -52,6 +52,8 @@ public class List {
     });
   }
 
+  private static final ISortedMap<Long, Long> DEFAULT_TABLE = new SortedMap<Long, Long>().put(0L, 0L);
+
   public static DurableList decode(IDurableEncoding.List encoding, IDurableCollection.Root root, DurableInput.Pool pool) {
     DurableInput in = pool.instance();
 
@@ -62,14 +64,16 @@ public class List {
     long size = in.readUVLQ();
     int skipTableTiers = in.readUnsignedByte();
 
-    SkipTable skipTable = null;
+    ISortedMap<Long, Long> indexTable;
     if (skipTableTiers > 0) {
       DurableInput skipIn = in.sliceBlock(BlockType.TABLE);
-      skipTable = new SkipTable(root == null ? skipIn.pool() : () -> root.cached(skipIn), skipTableTiers);
+      indexTable = SkipTable.decode(root == null ? skipIn.pool() : () -> root.cached(skipIn), skipTableTiers);
+    } else {
+      indexTable = DEFAULT_TABLE;
     }
 
     DurableInput.Pool elements = in.sliceBytes((pos + prefix.length) - in.position()).pool();
 
-    return new DurableList(pool, root, size, skipTable, elements, encoding);
+    return new DurableList(pool, root, size, indexTable, elements, encoding);
   }
 }

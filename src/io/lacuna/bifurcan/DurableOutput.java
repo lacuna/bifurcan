@@ -1,6 +1,5 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.durable.Encodings;
 import io.lacuna.bifurcan.durable.allocator.IBuffer;
 import io.lacuna.bifurcan.durable.io.ByteChannelOutput;
 import io.lacuna.bifurcan.durable.Util;
@@ -111,11 +110,11 @@ public interface DurableOutput extends DataOutput, Flushable, Closeable, AutoClo
   int write(ByteBuffer src);
 
   default void writeVLQ(long n) {
-    Encodings.writeVLQ(n, this);
+    Util.writeVLQ(n, this);
   }
 
   default void writeUVLQ(long n) {
-    Encodings.writeUVLQ(n, this);
+    Util.writeUVLQ(n, this);
   }
 
   default void write(int b) {

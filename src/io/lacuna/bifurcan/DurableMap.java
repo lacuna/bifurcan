@@ -1,10 +1,11 @@
 package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.durable.Dependencies;
+import io.lacuna.bifurcan.durable.Roots;
 import io.lacuna.bifurcan.durable.io.BufferedChannel;
 import io.lacuna.bifurcan.durable.io.FileOutput;
 import io.lacuna.bifurcan.durable.io.DurableBuffer;
-import io.lacuna.bifurcan.durable.blocks.*;
+import io.lacuna.bifurcan.durable.codecs.*;
 import io.lacuna.bifurcan.utils.Iterators;
 
 import java.nio.file.Path;
@@ -13,22 +14,22 @@ import java.util.OptionalLong;
 import java.util.function.BiPredicate;
 import java.util.function.ToLongFunction;
 
-public class DurableMap<K, V> implements IDurableCollection, IMap<K, V> {
+public class DurableMap<K, V> implements IMap.Durable<K, V> {
   private final IDurableEncoding.Map encoding;
   private final Root root;
   private final DurableInput.Pool bytes;
 
   private final long size;
-  private final SkipTable hashTable;
-  private final SkipTable indexTable;
+  private final ISortedMap<Long, Long> hashTable;
+  private final ISortedMap<Long, Long> indexTable;
   private final DurableInput.Pool entries;
 
   public DurableMap(
       DurableInput.Pool bytes,
       Root root,
       long size,
-      SkipTable hashTable,
-      SkipTable indexTable,
+      ISortedMap<Long, Long> hashTable,
+      ISortedMap<Long, Long> indexTable,
       DurableInput.Pool entries,
       IDurableEncoding.Map encoding) {
     this.bytes = bytes;
@@ -41,7 +42,7 @@ public class DurableMap<K, V> implements IDurableCollection, IMap<K, V> {
   }
 
   public static <K, V> DurableMap<K, V> open(Path path, IDurableEncoding.Map encoding) {
-    return (DurableMap<K, V>) DurableCollections.open(path, encoding);
+    return (DurableMap<K, V>) Roots.open(path).decode(encoding);
   }
 
   public static <K, V> void encode(Iterator<IEntry<K, V>> entries, IDurableEncoding.Map encoding, int maxRealizedEntries, DurableOutput out) {
@@ -53,19 +54,17 @@ public class DurableMap<K, V> implements IDurableCollection, IMap<K, V> {
   }
 
   public static <K, V> DurableMap<K, V> from(Iterator<IEntry<K, V>> entries, IDurableEncoding.Map encoding, Path directory, int maxRealizedEntries) {
-    BufferedChannel.VERBOSE = false;
     Dependencies.enter();
     DurableBuffer acc = new DurableBuffer();
     encode(entries, encoding, maxRealizedEntries, acc);
 
-    FileOutput file = new FileOutput(Dependencies.exit());
+    FileOutput file = new FileOutput(Dependencies.exit(), Map.empty());
     DurableOutput out = DurableOutput.from(file);
     acc.flushTo(out);
     out.close();
 
     Path path = file.moveTo(directory);
-    BufferedChannel.VERBOSE = true;
-    return (DurableMap<K, V>) DurableCollections.open(path, encoding);
+    return (DurableMap<K, V>) Roots.open(path).decode(encoding);
   }
 
   private Iterator<HashMapEntries> chunkedEntries(long offset) {
@@ -73,12 +72,12 @@ public class DurableMap<K, V> implements IDurableCollection, IMap<K, V> {
     DurableInput in = entries.instance().seek(offset);
     return Iterators.from(
         () -> in.remaining() > 0,
-        () -> HashMapEntries.decode(in, root, encoding));
+        () -> HashMapEntries.decode(in, encoding, root));
   }
 
   @Override
   public DurableInput.Pool bytes() {
-    return bytes();
+    return bytes;
   }
 
   @Override
@@ -104,21 +103,21 @@ public class DurableMap<K, V> implements IDurableCollection, IMap<K, V> {
   @Override
   public V get(K key, V defaultValue) {
     long hash = keyHash().applyAsLong(key);
-    SkipTable.Entry blockEntry = hashTable == null ? SkipTable.Entry.ORIGIN : hashTable.floor(hash);
+    IEntry<Long, Long> blockEntry = hashTable.floor(hash);
 
     return blockEntry == null
         ? defaultValue
-        : (V) HashMapEntries.get(chunkedEntries(blockEntry.value), root, hash, key, defaultValue);
+        : (V) HashMapEntries.get(chunkedEntries(blockEntry.value()), root, hash, key, defaultValue);
   }
 
   @Override
   public OptionalLong indexOf(K key) {
     long hash = keyHash().applyAsLong(key);
-    SkipTable.Entry blockEntry = hashTable == null ? SkipTable.Entry.ORIGIN : hashTable.floor(hash);
+    IEntry<Long, Long> blockEntry = hashTable.floor(hash);
 
     return blockEntry == null
         ? OptionalLong.empty()
-        : HashMapEntries.indexOf(chunkedEntries(blockEntry.value), hash, key);
+        : HashMapEntries.indexOf(chunkedEntries(blockEntry.value()), hash, key);
   }
 
   @Override
@@ -131,8 +130,8 @@ public class DurableMap<K, V> implements IDurableCollection, IMap<K, V> {
     if (idx < 0 || idx >= size) {
       throw new IndexOutOfBoundsException(idx + " must be within [0," + size() + ")");
     }
-    SkipTable.Entry blockEntry = indexTable == null ? SkipTable.Entry.ORIGIN : indexTable.floor(idx);
-    return (IEntry.WithHash<K, V>) chunkedEntries(blockEntry.value).next().nth((int) (idx - blockEntry.key));
+    IEntry<Long, Long> blockEntry = indexTable.floor(idx);
+    return (IEntry.WithHash<K, V>) chunkedEntries(blockEntry.value()).next().nth((int) (idx - blockEntry.key()));
   }
 
   @Override

@@ -1,10 +1,8 @@
 package io.lacuna.bifurcan.durable;
 
-import io.lacuna.bifurcan.DurableInput;
+import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.IDurableCollection.Fingerprint;
 import io.lacuna.bifurcan.IDurableCollection.Root;
-import io.lacuna.bifurcan.IMap;
-import io.lacuna.bifurcan.IntMap;
 import io.lacuna.bifurcan.durable.io.*;
 import io.lacuna.bifurcan.utils.Functions;
 
@@ -13,13 +11,51 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
 public class Roots {
 
+  private static class Lookup {
+    public final Fingerprint fingerprint;
+    public final IMap<Fingerprint, Fingerprint> rebases;
+
+    public Lookup(Fingerprint fingerprint, IMap<Fingerprint, Fingerprint> rebases) {
+      this.fingerprint = fingerprint;
+      this.rebases = rebases;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(fingerprint, rebases);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (obj instanceof Lookup) {
+        Lookup l = (Lookup) obj;
+        return l.fingerprint.equals(fingerprint) && l.rebases.equals(rebases);
+      }
+      return false;
+    }
+  }
+
   private static DurableInput map(FileChannel file, long offset, long size) throws IOException {
     return new BufferInput(file.map(FileChannel.MapMode.READ_ONLY, offset, size));
+  }
+
+  private static DurableInput map(FileChannel file) throws IOException {
+    long size = file.size();
+    LinearList<DurableInput> bufs = new LinearList<>();
+    long offset = 0;
+    while (offset < size) {
+      long len = Math.min(Integer.MAX_VALUE, size - offset);
+      bufs.addLast(map(file, offset, len));
+      offset += len;
+    }
+    return DurableInput.from(bufs);
   }
 
   public static DurableInput cachedInput(DurableInput in) {
@@ -29,12 +65,12 @@ public class Roots {
   }
 
   public static Root open(Path path) {
-    AtomicReference<Function<Fingerprint, Root>> fn = new AtomicReference<>();
-    fn.set(Functions.memoize(f -> open(path.getParent().resolve(f.toHexString() + ".bfn"), fn.get())));
-    return open(path, fn.get());
+    AtomicReference<Function<Lookup, Root>> fn = new AtomicReference<>();
+    fn.set(Functions.memoize(l -> open(path.getParent().resolve(l.fingerprint.toHexString() + ".bfn"), l.rebases, fn.get())));
+    return open(path, Map.empty(), fn.get());
   }
 
-  private static Root open(Path path, Function<Fingerprint, Root> roots) {
+  private static Root open(Path path, IMap<Fingerprint, Fingerprint> parentRebases, Function<Lookup, Root> roots) {
     try {
       FileChannel fc = FileChannel.open(path, StandardOpenOption.READ);
       BufferedChannel channel = new BufferedChannel(path, fc);
@@ -50,23 +86,18 @@ public class Roots {
 
       // read in header
       Fingerprint fingerprint = Fingerprints.decode(file);
-      IMap<Fingerprint, Root> dependencies = Dependencies.decode(file).zip(roots);
+      IMap<Fingerprint, Fingerprint> rebases = parentRebases;// parentRebases.union(Rebases.decode(file));
+      ISet<Fingerprint> dependencies = Dependencies.decode(file).stream().map(f -> rebases.get(f, f)).collect(Sets.collector());
 
-      // map over the file
-//      long size = file.size();
-//      LinearList<DurableInput> bufs = new LinearList<>();
-//      long offset = 0;
-//      while (offset < size) {
-//        long len = Math.min(Integer.MAX_VALUE, size - offset);
-//        bufs.addLast(map(fc, offset, len));
-//        offset += len;
-//      }
+      // mmap
+//      final DurableInput.Pool contents = map(fc).slice(file.position(), size).pool();
 //      file.close();
-//      final DurableInput.Pool contents = DurableInput.from(bufs).slice(file.position(), size).pool();
+
+      // standard I/O
+      final DurableInput.Pool contents = file.slice(file.position(), file.size()).pool();
 
       AtomicReference<IntMap<DurableInput>> cachedBuffers = new AtomicReference<>(new IntMap<>());
 
-      final DurableInput.Pool contents = file.slice(file.position(), file.size()).pool();
       return new Root() {
 
         @Override
@@ -98,11 +129,16 @@ public class Roots {
                 .updateAndGet(map -> map.update(start, i -> i == null ? cachedInput(in) : i))
                 .get(start)
                 .get();
-            System.out.println("total cached bytes: " + cachedBuffers.get().values().stream().mapToLong(DurableInput::size).sum());
+//            System.out.println("total cached bytes: " + cachedBuffers.get().values().stream().mapToLong(DurableInput::size).sum());
           }
 
           assert cached.remaining() == in.size();
           return cached.duplicate();
+        }
+
+        @Override
+        public IMap<Fingerprint, Fingerprint> rebases() {
+          return rebases;
         }
 
         @Override
@@ -116,7 +152,12 @@ public class Roots {
         }
 
         @Override
-        public IMap<Fingerprint, Root> dependencies() {
+        public Root open(Fingerprint dependency) {
+          return roots.apply(new Lookup(rebases.get(dependency, dependency), rebases));
+        }
+
+        @Override
+        public ISet<Fingerprint> dependencies() {
           return dependencies;
         }
       };

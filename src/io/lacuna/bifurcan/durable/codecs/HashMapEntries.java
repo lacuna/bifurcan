@@ -1,10 +1,9 @@
-package io.lacuna.bifurcan.durable.blocks;
+package io.lacuna.bifurcan.durable.codecs;
 
 import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.IDurableCollection.Root;
 import io.lacuna.bifurcan.durable.BlockPrefix.BlockType;
 import io.lacuna.bifurcan.durable.io.DurableBuffer;
-import io.lacuna.bifurcan.durable.Util;
 import io.lacuna.bifurcan.utils.Iterators;
 
 import java.util.Iterator;
@@ -12,8 +11,8 @@ import java.util.OptionalLong;
 import java.util.PrimitiveIterator;
 import java.util.function.BiPredicate;
 
-import static io.lacuna.bifurcan.durable.Encodings.decodeBlock;
-import static io.lacuna.bifurcan.durable.Encodings.encodeBlock;
+import static io.lacuna.bifurcan.durable.codecs.Util.decodeBlock;
+import static io.lacuna.bifurcan.durable.codecs.Util.encodeBlock;
 
 /**
  * A block that represents zero or more key/value pairs in a HashMap.
@@ -45,7 +44,7 @@ public class HashMapEntries {
     });
   }
 
-  public static HashMapEntries decode(DurableInput in, Root root, IDurableEncoding.Map mapEncoding) {
+  public static HashMapEntries decode(DurableInput in, IDurableEncoding.Map mapEncoding, Root root) {
     DurableInput entries = in.sliceBlock(BLOCK_TYPE);
     long entryOffset = entries.readUVLQ();
     HashDeltas deltas = HashDeltas.decode(entries);
@@ -80,14 +79,14 @@ public class HashMapEntries {
       if (keyIndex == -1 && candidates.isBounded) {
         return OptionalLong.empty();
       } else if (keyIndex != -1) {
-        return OptionalLong.of(entries.entryOffset + keyIndex);
+        return OptionalLong.of(entries.indexOffset + keyIndex);
       }
     }
 
     return OptionalLong.empty();
   }
 
-  public final long entryOffset;
+  public final long indexOffset;
   public final HashDeltas hashes;
   public final DurableInput keys, values;
   public final IDurableEncoding.Map mapEncoding;
@@ -95,13 +94,13 @@ public class HashMapEntries {
 
   private HashMapEntries(
       Root root,
-      long entryOffset,
+      long indexOffset,
       HashDeltas hashes,
       DurableInput keys,
       DurableInput values,
       IDurableEncoding.Map mapEncoding) {
     this.root = root;
-    this.entryOffset = entryOffset;
+    this.indexOffset = indexOffset;
     this.hashes = hashes;
     this.keys = keys;
     this.values = values;
@@ -124,6 +123,12 @@ public class HashMapEntries {
     }
 
     return -1;
+  }
+
+  public boolean isSingleton() {
+    PrimitiveIterator.OfLong it = hashes.iterator();
+    it.nextLong();
+    return it.hasNext();
   }
 
   public IEntry.WithHash<Object, Object> nth(long index) {

@@ -1,4 +1,4 @@
-package io.lacuna.bifurcan.durable.blocks;
+package io.lacuna.bifurcan.durable.codecs;
 
 import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.durable.Util;
@@ -8,8 +8,9 @@ import io.lacuna.bifurcan.utils.Iterators;
 
 import java.util.Iterator;
 
-import static io.lacuna.bifurcan.durable.Encodings.decodeBlock;
-import static io.lacuna.bifurcan.durable.Encodings.encodeBlock;
+import static io.lacuna.bifurcan.durable.codecs.Util.decodeBlock;
+import static io.lacuna.bifurcan.durable.codecs.Util.encodeBlock;
+
 
 /**
  * A means of spilling {@link io.lacuna.bifurcan.durable.ChunkSort} data to disk.  This data has a much more narrowly

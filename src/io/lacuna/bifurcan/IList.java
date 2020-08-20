@@ -1,10 +1,6 @@
 package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.diffs.DiffList;
-import io.lacuna.bifurcan.durable.Dependencies;
-import io.lacuna.bifurcan.durable.io.FileOutput;
-import io.lacuna.bifurcan.durable.io.DurableBuffer;
-import io.lacuna.bifurcan.durable.blocks.List;
 
 import java.nio.file.Path;
 import java.util.Iterator;

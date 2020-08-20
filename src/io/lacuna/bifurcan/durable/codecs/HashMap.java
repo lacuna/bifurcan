@@ -1,4 +1,4 @@
-package io.lacuna.bifurcan.durable.blocks;
+package io.lacuna.bifurcan.durable.codecs;
 
 import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.durable.BlockPrefix;
@@ -12,9 +12,7 @@ import java.util.Comparator;
 import java.util.Iterator;
 import java.util.PrimitiveIterator;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.ToIntFunction;
 import java.util.function.ToLongFunction;
-import java.util.stream.IntStream;
 
 /**
  * The underlying encode/decode logic for DurableMap.
@@ -55,10 +53,10 @@ public class HashMap {
   }
 
   private static final IDurableEncoding.Primitive MAP_INDEX_ENCODING =
-    DurableEncodings.primitive("MapIndex", 32,
-        DurableEncodings.Codec.from(
-            (l, out) -> l.forEach(e -> MapIndex.encode((MapIndex) e, out)),
-            (in, root) -> Iterators.skippable(Iterators.from(in::hasRemaining, () -> MapIndex.decode(in)))));
+      DurableEncodings.primitive("MapIndex", 32,
+          DurableEncodings.Codec.from(
+              (l, out) -> l.forEach(e -> MapIndex.encode((MapIndex) e, out)),
+              (in, root) -> Iterators.skippable(Iterators.from(in::hasRemaining, () -> MapIndex.decode(in)))));
 
   public static <K, V> Iterator<IEntry.WithHash<K, V>> sortIndexedEntries(ICollection<?, IEntry<K, V>> entries, ToLongFunction<K> keyHash) {
     AtomicLong index = new AtomicLong(0);
@@ -145,8 +143,10 @@ public class HashMap {
 
     TempStream.release();
 
-    // flush everything to the provided sink
-    long size = index;
+    flush(index, indexTable, hashTable, entries, out);
+  }
+
+  private static void flush(long size, SkipTable.Writer indexTable, SkipTable.Writer hashTable, DurableBuffer entries, DurableOutput out) {
     DurableBuffer.flushTo(out, BlockType.HASH_MAP, acc -> {
       acc.writeUVLQ(size);
 
@@ -176,6 +176,8 @@ public class HashMap {
 
   /// decoding
 
+  private static final ISortedMap<Long, Long> DEFAULT_TABLE = new SortedMap<Long, Long>().put(Long.MIN_VALUE, 0L);
+
   public static DurableMap decode(IDurableEncoding.Map encoding, IDurableCollection.Root root, DurableInput.Pool pool) {
     DurableInput in = pool.instance();
 
@@ -187,21 +189,88 @@ public class HashMap {
     int skipTableTiers = in.readUnsignedByte();
     int hashTableTiers = in.readUnsignedByte();
 
-    SkipTable skipTable = null;
+    ISortedMap<Long, Long> skipTable;
     if (skipTableTiers > 0) {
       DurableInput skipIn = in.sliceBlock(BlockType.TABLE);
-      skipTable = new SkipTable(root == null ? skipIn.pool() : () -> root.cached(skipIn), skipTableTiers);
+      skipTable = SkipTable.decode(root == null ? skipIn.pool() : () -> root.cached(skipIn), skipTableTiers);
+    } else {
+      skipTable = DEFAULT_TABLE;
     }
 
-    SkipTable hashTable = null;
+    ISortedMap<Long, Long> hashTable;
     if (hashTableTiers > 0) {
       DurableInput hashIn = in.sliceBlock(BlockType.TABLE);
-      hashTable = new SkipTable(root == null ? hashIn.pool() : () -> root.cached(hashIn), hashTableTiers);
+      hashTable = SkipTable.decode(root == null ? hashIn.pool() : () -> root.cached(hashIn), hashTableTiers);
+    } else {
+      hashTable = DEFAULT_TABLE;
     }
 
     DurableInput.Pool entries = in.sliceBytes((pos + prefix.length) - in.position()).pool();
 
     return new DurableMap(pool, root, size, hashTable, skipTable, entries, encoding);
+  }
+
+  /// inlining
+
+  /**
+   * Effectively a fusion of {@link HashMap#encodeSortedEntries} and {@link HashMap#decode}.  Given a preexisting map,
+   * write it to {@code out}, re-encoding each singleton entry such that they too can be inlined.
+   */
+  public static void inline(DurableInput.Pool pool, IDurableEncoding.Map encoding, IDurableCollection.Root root, DurableOutput out) {
+    DurableInput in = pool.instance();
+
+    BlockPrefix prefix = in.readPrefix();
+    assert (prefix.type == BlockType.HASH_MAP);
+
+    // skip over the existing tables
+    long size = in.readUVLQ();
+    int skipTableTiers = in.readUnsignedByte();
+    int hashTableTiers = in.readUnsignedByte();
+    if (skipTableTiers > 0) {
+      in.skipBlock();
+    }
+    if (hashTableTiers > 0) {
+      in.skipBlock();
+    }
+
+    // create buffers for the inlined map
+    DurableBuffer entries = new DurableBuffer();
+    SkipTable.Writer indexTable = new SkipTable.Writer();
+    SkipTable.Writer hashTable = new SkipTable.Writer();
+
+    long prevHash = Long.MAX_VALUE;
+    Iterator<DurableInput> it = Iterators.from(in::hasRemaining, in::slicePrefixedBlock);
+    while (it.hasNext()) {
+      DurableInput block = it.next();
+      HashMapEntries es = HashMapEntries.decode(block.duplicate(), encoding, root);
+      long offset = entries.written();
+
+      // update nth() lookup
+      indexTable.append(es.indexOffset, offset);
+
+      // update get() lookup
+      PrimitiveIterator.OfLong hashes = es.hashes.iterator();
+      long firstHash = hashes.nextLong();
+      if (firstHash != prevHash) {
+        hashTable.append(firstHash, offset);
+      }
+
+      // if this block has a given hash, don't let the next block claim it
+      while (hashes.hasNext()) {
+        prevHash = hashes.nextLong();
+      }
+
+      // if it's a singleton, re-encode it
+      if (es.isSingleton()) {
+        HashMapEntries.encode(es.indexOffset, LinearList.of(es.entries(0).next()), encoding, entries);
+
+        // otherwise, just reuse the existing bytes
+      } else {
+        entries.transferFrom(block);
+      }
+    }
+
+    flush(size, indexTable, hashTable, entries, out);
   }
 
 }

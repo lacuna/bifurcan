@@ -1,15 +1,17 @@
 package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.durable.Dependencies;
-import io.lacuna.bifurcan.durable.Encodings;
-import io.lacuna.bifurcan.durable.blocks.List;
-import io.lacuna.bifurcan.durable.blocks.SkipTable;
+import io.lacuna.bifurcan.durable.Roots;
+import io.lacuna.bifurcan.durable.codecs.List;
+import io.lacuna.bifurcan.durable.codecs.SkipTable;
 import io.lacuna.bifurcan.durable.io.DurableBuffer;
 import io.lacuna.bifurcan.durable.io.FileOutput;
 import io.lacuna.bifurcan.utils.Iterators;
 
 import java.nio.file.Path;
 import java.util.Iterator;
+
+import static io.lacuna.bifurcan.durable.codecs.Util.decodeBlock;
 
 public class DurableList<V> implements IDurableCollection, IList<V> {
 
@@ -18,43 +20,35 @@ public class DurableList<V> implements IDurableCollection, IList<V> {
 
   private final long size;
   private final IDurableEncoding.List encoding;
-  private final SkipTable skipTable;
+  private final ISortedMap<Long, Long> indexTable;
   private final DurableInput.Pool elements;
 
-  public DurableList(DurableInput.Pool bytes, Root root, long size, SkipTable skipTable, DurableInput.Pool elements, IDurableEncoding.List encoding) {
+  public DurableList(DurableInput.Pool bytes, Root root, long size, ISortedMap<Long, Long> indexTable, DurableInput.Pool elements, IDurableEncoding.List encoding) {
     this.bytes = bytes;
     this.root = root;
 
     this.size = size;
-    this.skipTable = skipTable;
+    this.indexTable = indexTable;
     this.elements = elements;
     this.encoding = encoding;
   }
 
   public static <V> DurableList<V> open(IDurableEncoding.List encoding, Path path) {
-    return (DurableList<V>) DurableCollections.open(path, encoding);
+    return (DurableList<V>) Roots.open(path).decode(encoding);
   }
 
   public static <V> DurableList<V> from(Iterator<V> elements, IDurableEncoding.List encoding, Path directory) {
     Dependencies.enter();
     DurableBuffer acc = new DurableBuffer();
-    encode(elements, encoding, acc);
+    List.encode(elements, encoding, acc);
 
-    FileOutput file = new FileOutput(Dependencies.exit());
+    FileOutput file = new FileOutput(Dependencies.exit(), Map.empty());
     DurableOutput out = DurableOutput.from(file);
     acc.flushTo(out);
     out.close();
 
     Path path = file.moveTo(directory);
-    return (DurableList<V>) DurableCollections.open(path, encoding);
-  }
-
-  public static <V> void encode(Iterator<V> elements, IDurableEncoding.List encoding, DurableOutput out) {
-    List.encode(elements, encoding, out);
-  }
-
-  public static <V> DurableList<V> decode(IDurableEncoding.List encoding, Root root, DurableInput.Pool pool) {
-    return List.decode(encoding, root, pool);
+    return (DurableList<V>) Roots.open(path).decode(encoding);
   }
 
   @Override
@@ -87,9 +81,9 @@ public class DurableList<V> implements IDurableCollection, IList<V> {
     if (idx < 0 || idx >= size) {
       throw new IndexOutOfBoundsException(idx + " must be within [0," + size() + ")");
     }
-    SkipTable.Entry entry = skipTable == null ? SkipTable.Entry.ORIGIN : skipTable.floor(idx);
-    return (V) Encodings.decodeBlock(elements.instance().seek(entry.value), root, encoding.elementEncoding())
-        .skip(idx - entry.key)
+    IEntry<Long, Long> entry = indexTable.floor(idx);
+    return (V) decodeBlock(elements.instance().seek(entry.value()), root, encoding.elementEncoding())
+        .skip(idx - entry.key())
         .next();
   }
 
@@ -99,7 +93,7 @@ public class DurableList<V> implements IDurableCollection, IList<V> {
     DurableInput elements = this.elements.instance();
     return Iterators.flatMap(
         Iterators.from(elements::hasRemaining, elements::slicePrefixedBlock),
-        in -> (Iterator<V>) Encodings.decodeBlock(in, root, encoding.elementEncoding()));
+        in -> (Iterator<V>) decodeBlock(in, root, encoding.elementEncoding()));
   }
 
   @Override

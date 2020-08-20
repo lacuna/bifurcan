@@ -6,8 +6,8 @@ import io.lacuna.bifurcan.DurableOutput;
 import java.util.Objects;
 
 import static io.lacuna.bifurcan.durable.BlockPrefix.BlockType.*;
-import static io.lacuna.bifurcan.durable.Encodings.readPrefixedUVLQ;
-import static io.lacuna.bifurcan.durable.Encodings.writePrefixedUVLQ;
+import static io.lacuna.bifurcan.durable.Util.readPrefixedUVLQ;
+import static io.lacuna.bifurcan.durable.Util.writePrefixedUVLQ;
 
 public class BlockPrefix {
 
@@ -36,7 +36,7 @@ public class BlockPrefix {
     SLICE_LIST,
     CONCAT_LIST,
     DIFF_PLACEHOLDER_0,
-    DIFF_PLACEHOLDER_1,
+    DEPENDENCY, // continuation
 
     // 3 bits preceded by COLLECTION and EXTENDED
     DIRECTED_GRAPH,
@@ -47,6 +47,17 @@ public class BlockPrefix {
     EXTENDED_PLACEHOLDER_2,
     EXTENDED_PLACEHOLDER_3,
     EXTENDED_PLACEHOLDER_4,
+
+    // 3 bits preceded by DIFF and DEPENDENCY
+    REFERENCE,
+    REBASE,
+    DEPENDENCY_PLACEHOLDER_0,
+    DEPENDENCY_PLACEHOLDER_1,
+    DEPENDENCY_PLACEHOLDER_2,
+    DEPENDENCY_PLACEHOLDER_3,
+    DEPENDENCY_PLACEHOLDER_4,
+    DEPENDENCY_PLACEHOLDER_5,
+
   }
 
   private static final BlockType[] TYPES = BlockType.values();
@@ -81,26 +92,34 @@ public class BlockPrefix {
 
   public static BlockPrefix decode(DurableInput in) {
     byte firstByte = in.readByte();
-
     int root = (firstByte & 0b11000000) >> 6;
+
     if (root < DIFF.ordinal()) {
       return new BlockPrefix(readPrefixedUVLQ(firstByte, 2, in), TYPES[root]);
     } else if (root == DIFF.ordinal()) {
-      int diff = (firstByte & 0b00111000) >> 3;
-      return new BlockPrefix(readPrefixedUVLQ(firstByte, 5, in), TYPES[diff + DIFF_HASH_MAP.ordinal()]);
-    } else {
-      int collection = (firstByte & 0b00111000) >> 3;
-      if (collection + HASH_MAP.ordinal() == EXTENDED.ordinal()) {
-        int extended = firstByte & 0b00000111;
-        return new BlockPrefix(in.readUVLQ(), TYPES[extended + DIRECTED_GRAPH.ordinal()]);
+      int diff = DIFF_HASH_MAP.ordinal() + ((firstByte & 0b00111000) >> 3);
+      if (diff == DEPENDENCY.ordinal()) {
+        int dependency = REFERENCE.ordinal() + (firstByte & 0b00000111);
+        return new BlockPrefix(in.readUVLQ(), TYPES[dependency]);
       } else {
-        return new BlockPrefix(readPrefixedUVLQ(firstByte, 5, in), TYPES[collection + HASH_MAP.ordinal()]);
+        return new BlockPrefix(readPrefixedUVLQ(firstByte, 5, in), TYPES[diff]);
+      }
+    } else {
+      int collection = HASH_MAP.ordinal() + ((firstByte & 0b00111000) >> 3);
+      if (collection == EXTENDED.ordinal()) {
+        int extended = DIRECTED_GRAPH.ordinal() + (firstByte & 0b00000111);
+        return new BlockPrefix(in.readUVLQ(), TYPES[extended]);
+      } else {
+        return new BlockPrefix(readPrefixedUVLQ(firstByte, 5, in), TYPES[collection]);
       }
     }
   }
 
   public void encode(DurableOutput out) {
-    if (type.ordinal() >= DIRECTED_GRAPH.ordinal()) {
+    if (type.ordinal() >= REFERENCE.ordinal()) {
+      out.writeByte(0b10111000 | (type.ordinal() - DIRECTED_GRAPH.ordinal()));
+      out.writeUVLQ(length);
+    } else if (type.ordinal() >= DIRECTED_GRAPH.ordinal()) {
       out.writeByte(0b11111000 | (type.ordinal() - DIRECTED_GRAPH.ordinal()));
       out.writeUVLQ(length);
     } else if (type.ordinal() >= DIFF_HASH_MAP.ordinal()) {

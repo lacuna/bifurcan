@@ -1,10 +1,15 @@
 package io.lacuna.bifurcan.diffs;
 
+import io.lacuna.bifurcan.IDiffMap;
+import io.lacuna.bifurcan.IList;
 import io.lacuna.bifurcan.ISortedSet;
 
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 import java.util.OptionalLong;
 import java.util.PrimitiveIterator;
+import java.util.stream.LongStream;
+import java.util.stream.Stream;
 
 /**
  * @author ztellman
@@ -32,6 +37,7 @@ public class Util {
     } else {
       long estimate = idx;
       // TODO: this can get linear for long contiguous blocks of indices, is there a better (but still simple) index?
+      // barring that, use a binary search
       for (;;) {
         long actual = estimate - (removedIndices.indexOf(floor).getAsLong() + 1);
         if (actual == idx) {
@@ -78,6 +84,71 @@ public class Util {
       public V next() {
         prime();
         return nextUnderlying();
+      }
+    };
+  }
+
+  public static PrimitiveIterator.OfLong mergedRemovedIndices(IList<Iterator<Long>> iteratorStack) {
+    int stackSize = (int) iteratorStack.size();
+    return new PrimitiveIterator.OfLong() {
+      final long[] offsets = new long[stackSize];
+      final long[] nextIndices = new long[stackSize];
+      boolean hasNext = true;
+
+      {
+        for (int i = 0; i < stackSize; i++) {
+          Iterator<Long> it = iteratorStack.nth(i);
+          nextIndices[i] = it.hasNext() ? it.next() : -1;
+        }
+        checkHasNext();
+      }
+
+      private void checkHasNext() {
+        for (int i = 0; i < stackSize; i++) {
+          if (nextIndices[i] != -1 || iteratorStack.nth(i).hasNext()) {
+            return;
+          }
+        }
+        hasNext = false;
+      }
+
+      @Override
+      public long nextLong() {
+        if (!hasNext) {
+          throw new NoSuchElementException();
+        }
+
+        int minIndex = -1;
+        long minNext = Long.MAX_VALUE;
+        for (int i = 0; i < stackSize; i++) {
+          if (nextIndices[i] >= 0) {
+            long next = offsets[i] + nextIndices[i];
+            if (next < minNext) {
+              minIndex = i;
+              minNext = next;
+            }
+          }
+        }
+
+        if (minIndex >= 0) {
+          for (int i = minIndex + 1; i < stackSize; i++) {
+            offsets[i]++;
+          }
+
+          if (iteratorStack.nth(minIndex).hasNext()) {
+            nextIndices[minIndex] = iteratorStack.nth(minIndex).next();
+          } else {
+            nextIndices[minIndex] = -1;
+            checkHasNext();
+          }
+        }
+
+        return minNext;
+      }
+
+      @Override
+      public boolean hasNext() {
+        return hasNext;
       }
     };
   }

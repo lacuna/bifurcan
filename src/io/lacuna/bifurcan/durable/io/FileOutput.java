@@ -1,10 +1,12 @@
 package io.lacuna.bifurcan.durable.io;
 
 import io.lacuna.bifurcan.IDurableCollection.Fingerprint;
+import io.lacuna.bifurcan.IMap;
 import io.lacuna.bifurcan.ISet;
 import io.lacuna.bifurcan.durable.Bytes;
 import io.lacuna.bifurcan.durable.Dependencies;
 import io.lacuna.bifurcan.durable.Fingerprints;
+import io.lacuna.bifurcan.durable.Rebases;
 import io.lacuna.bifurcan.durable.allocator.GenerationalAllocator;
 import io.lacuna.bifurcan.durable.allocator.IBuffer;
 
@@ -46,7 +48,7 @@ public class FileOutput implements WritableByteChannel {
 
   private byte[] hash;
 
-  public FileOutput(ISet<Fingerprint> dependencies) {
+  public FileOutput(ISet<Fingerprint> dependencies, IMap<Fingerprint, Fingerprint> rebases) {
     try {
       this.path = Files.createTempFile("bifurcan-", ".draft");
       this.digest = MessageDigest.getInstance(ALGORITHM);
@@ -57,7 +59,10 @@ public class FileOutput implements WritableByteChannel {
 
       // skip over prefix, to fill in later
       file.position(PREFIX_LENGTH);
-      ByteChannelOutput.wrap(this, out -> Dependencies.encode(dependencies, out));
+      ByteChannelOutput.wrap(this, out -> {
+        Dependencies.encode(dependencies, out);
+//        Rebases.encode(rebases, out);
+      });
 
     } catch (Exception e) {
       throw new RuntimeException(e);

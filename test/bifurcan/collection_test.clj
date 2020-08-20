@@ -38,6 +38,7 @@
     Lists
     Set
     Sets
+    IDiffMap
     IMap
     IEntry
     IList
@@ -100,11 +101,6 @@
 (defn ->vec [^IList l]
   (->> l .iterator iterator-seq (into [])))
 
-(defn ->diff-sorted-map [^SortedMap m]
-  (ConcatSortedMap/from
-    (.comparator m)
-    (.addLast (List.) m)))
-
 ;;;
 
 (defn map= [a ^IMap b]
@@ -160,28 +156,32 @@
    :slice        [gen/pos-int gen/pos-int]
    :concat       [(gen/vector gen-element 0 1e3)]
    :remove-first []
-   :remove-last  []})
+   :remove-last  []
+   :diff-wrap    []})
 
 (def map-actions
   {:put          [gen/large-integer gen-element]
    :remove       [gen/large-integer]
    :union        [(gen/vector gen/large-integer 0 32)]
    :intersection [(gen/vector gen/large-integer 0 32)]
-   :difference   [(gen/vector gen/large-integer 0 32)]})
+   :difference   [(gen/vector gen/large-integer 0 32)]
+   :diff-wrap    []})
 
 (def float-map-actions
   {:put          [gen-double gen-element]
    :remove       [gen-double]
    :union        [(gen/vector gen-double 0 32)]
    :intersection [(gen/vector gen-double 0 32)]
-   :difference   [(gen/vector gen-double 0 32)]})
+   :difference   [(gen/vector gen-double 0 32)]
+   :diff-wrap    []})
 
 (def set-actions
   {:add          [gen/large-integer]
    :remove       [gen/large-integer]
    :union        [(gen/vector gen/large-integer 0 32)]
    :intersection [(gen/vector gen/large-integer 0 32)]
-   :difference   [(gen/vector gen/large-integer 0 32)]})
+   :difference   [(gen/vector gen/large-integer 0 32)]
+   :diff-wrap    []})
 
 (def clj-list
   {:add-first    #(cons %2 %1)
@@ -191,20 +191,23 @@
                     (->> %1 (drop s) (take (- e s)) vec))
    :concat       #(vec (concat %1 %2))
    :remove-first #(or (rest %) [])
-   :remove-last  #(or (butlast %) [])})
+   :remove-last  #(or (butlast %) [])
+   :diff-wrap    identity
+   :save         identity})
 
 (def bifurcan-list
   {:add-first    #(.addFirst ^IList %1 %2)
    :add-last     #(.addLast ^IList %1 %2)
    :set          #(.set ^IList %1 (min (.size ^IList %1) %2) %3)
    :slice        #(let [^IList l %1
-                        [s e] (sort [%2 %3])]
+                        [s e]    (sort [%2 %3])]
                     (.slice l
                       (max 0 (min (.size l) s))
                       (min (.size l) e)))
    :concat       #(.concat ^IList %1 (List/from %2))
    :remove-first #(.removeFirst ^IList %)
-   :remove-last  #(.removeLast ^IList %)})
+   :remove-last  #(.removeLast ^IList %)
+   :diff-wrap    #(DiffList. %)})
 
 (def clj-map
   {:put          assoc
@@ -219,7 +222,9 @@
    :remove       #(.remove ^IMap %1 %2)
    :union        #(.union ^IMap %1 (Map/from ^java.util.Map (zipmap %2 %2)))
    :intersection #(.intersection ^IMap %1 (Map/from ^java.util.Map (zipmap %2 %2)))
-   :difference   #(.difference ^IMap %1 (Map/from ^java.util.Map (zipmap %2 %2)))})
+   :difference   #(.difference ^IMap %1 (Map/from ^java.util.Map (zipmap %2 %2)))
+   :diff-wrap    #(DiffMap. %)
+   })
 
 (def bifurcan-sorted-map
   {:put          #(.put ^IMap %1 %2 %3)
@@ -227,6 +232,7 @@
    :union        #(.union ^IMap %1 (SortedMap/from ^java.util.Map (zipmap %2 %2)))
    :intersection #(.intersection ^IMap %1 (SortedMap/from ^java.util.Map (zipmap %2 %2)))
    :difference   #(.difference ^IMap %1 (SortedMap/from ^java.util.Map (zipmap %2 %2)))
+   :diff-wrap    #(ConcatSortedMap/from %)
    })
 
 (def int-map
@@ -234,21 +240,25 @@
    :remove       #(.remove ^IMap %1 %2)
    :union        #(.union ^IMap %1 (IntMap/from (zipmap %2 %2)))
    :intersection #(.intersection ^IMap %1 (IntMap/from (zipmap %2 %2)))
-   :difference   #(.difference ^IMap %1 (IntMap/from (zipmap %2 %2)))})
+   :difference   #(.difference ^IMap %1 (IntMap/from (zipmap %2 %2)))
+   :diff-wrap    #(ConcatSortedMap/from %)
+   })
 
 (def float-map
   {:put          #(.put ^IMap %1 %2 %3)
    :remove       #(.remove ^IMap %1 %2)
    :union        #(.union ^IMap %1 (FloatMap/from (zipmap %2 %2)))
    :intersection #(.intersection ^IMap %1 (FloatMap/from (zipmap %2 %2)))
-   :difference   #(.difference ^IMap %1 (FloatMap/from (zipmap %2 %2)))})
+   :difference   #(.difference ^IMap %1 (FloatMap/from (zipmap %2 %2)))
+   :diff-wrap    #(ConcatSortedMap/from %)})
 
 (def clj-set
   {:add          conj
    :remove       disj
    :union        #(reduce conj %1 %2)
    :difference   #(reduce disj %1 %2)
-   :intersection #(set/intersection %1 (set %2))})
+   :intersection #(set/intersection %1 (set %2))
+   })
 
 (defn construct-set [template elements]
   (if (instance? Set template)
@@ -260,7 +270,9 @@
    :remove       #(.remove ^ISet %1 %2)
    :union        #(.union ^ISet %1 (construct-set %1 %2))
    :intersection #(.intersection ^ISet %1 (construct-set %1 %2))
-   :difference   #(.difference ^ISet %1 (construct-set %1 %2))})
+   :difference   #(.difference ^ISet %1 (construct-set %1 %2))
+   :diff-wrap    #(DiffSet. %)
+   })
 
 ;; Generators
 
@@ -328,9 +340,9 @@
           b  (u/apply-actions (drop n actions) (.forked a) bifurcan-map)
           a' (u/apply-actions (take n actions) {} clj-map)
           b' (u/apply-actions actions {} clj-map)]
-      (and
-        (map= a' a)
-        (map= b' b)))))
+()      (and
+          (map= a' a)
+          (map= b' b)))))
 
 (u/def-collection-check test-int-map iterations map-actions
   []
@@ -347,22 +359,6 @@
   [a {} clj-map
    b (FloatMap.) float-map
    c (.linear (FloatMap.)) float-map]
-  (and
-    (= b c)
-    (map= a b)
-    (map= a c)))
-
-(u/def-collection-check test-diff-map iterations map-actions
-  [m (map-gen (constantly Map/EMPTY))]
-  [a (->map m) clj-map
-   b (DiffMap. m) bifurcan-map]
-  (map= a b))
-
-(u/def-collection-check test-diff-sorted-map iterations map-actions
-  [m (map-gen (constantly (SortedMap.)))]
-  [a (->map m) clj-map
-   b (->diff-sorted-map m) bifurcan-map
-   c (.linear (->diff-sorted-map m)) bifurcan-map]
   (and
     (= b c)
     (map= a b)
@@ -416,27 +412,6 @@
     (set= a b)
     (set= a c)))
 
-(u/def-collection-check test-diff-sorted-set iterations set-actions
-  [s (set-gen (constantly (SortedSet.)))]
-  [a (->> s .iterator iterator-seq (into (sorted-set))) clj-set
-   b (DiffSortedSet. s) bifurcan-set
-   c (.linear (DiffSortedSet. s)) bifurcan-set]
-  (and
-    (= b c)
-    (set= a b)
-    (set= a c)))
-
-(u/def-collection-check test-diff-set iterations set-actions
-  [s (set-gen (constantly Set/EMPTY))]
-  [a (->> s .toSet (into #{})) clj-set
-   b (DiffSet. s) bifurcan-set]
-  (set= a b))
-
-(u/def-collection-check test-set-indices iterations set-actions
-  []
-  [a (Set.) bifurcan-set]
-  (valid-set-indices? a))
-
 ;; Lists
 
 (u/def-collection-check test-linear-list iterations list-actions
@@ -450,16 +425,6 @@
   [a [] clj-list
    b (List.) bifurcan-list
    c (.linear (List.)) bifurcan-list]
-  (and
-    (= b c)
-    (list= a b)
-    (list= a c)))
-
-(u/def-collection-check test-diff-list iterations list-actions
-  [l (list-gen (constantly List/EMPTY))]
-  [a (->vec l) clj-list
-   b (DiffList. l) bifurcan-list
-   c (.linear (DiffList. l)) bifurcan-list]
   (and
     (= b c)
     (list= a b)

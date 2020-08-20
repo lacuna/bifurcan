@@ -3,11 +3,10 @@ package io.lacuna.bifurcan;
 import io.lacuna.bifurcan.diffs.Util;
 import io.lacuna.bifurcan.utils.Iterators;
 
-import javax.swing.text.html.Option;
 import java.util.Iterator;
 import java.util.OptionalLong;
+import java.util.PrimitiveIterator;
 import java.util.function.BiPredicate;
-import java.util.function.ToIntFunction;
 import java.util.function.ToLongFunction;
 
 public interface IDiffMap<K, V> extends IMap<K, V>, IDiff<IMap<K, V>, IEntry<K, V>> {
@@ -77,5 +76,49 @@ public interface IDiffMap<K, V> extends IMap<K, V>, IDiff<IMap<K, V>, IEntry<K, 
     return Iterators.concat(
         Util.skipIndices(underlying().entries().iterator(), removedIndices().iterator()),
         added().entries().iterator());
+  }
+
+  static <K, V> IList<IDiffMap<K, V>> diffStack(IDiffMap<K, V> m) {
+    List<IDiffMap<K, V>> result = new List<IDiffMap<K, V>>().linear();
+    IDiffMap<K, V> curr = m;
+    for (;;) {
+      result.addFirst(curr);
+      if (curr.underlying() instanceof IDiffMap) {
+        curr = (IDiffMap<K, V>) curr.underlying();
+      } else {
+        break;
+      }
+    }
+    return result;
+  }
+
+  static PrimitiveIterator.OfLong compactedRemovedIndices(IList<IDiffMap<?, ?>> diffStack) {
+    IList<Iterator<Long>> iterators = new LinearList<>();
+    long underlyingSize = diffStack.first().underlying().size();
+    long removed = 0;
+    for (IDiffMap<?, ?> m : diffStack) {
+      long underlyingRemainingSize = underlyingSize - removed;
+      ISortedSet<Long> s = m.removedIndices().slice(0L, underlyingRemainingSize - 1);
+      iterators.addLast(s.iterator());
+      removed += s.size();
+    }
+    return Util.mergedRemovedIndices(iterators);
+  }
+
+  static <K, V> Iterator<IEntry<K, V>> compactedAddedEntries(IList<IDiffMap<K, V>> diffStack) {
+    IList<Iterator<Long>> iterators = new LinearList<>();
+    long underlyingSize = diffStack.first().underlying().size();
+    long removed = 0;
+    for (IDiffMap<?, ?> m : diffStack) {
+      long underlyingRemainingSize = underlyingSize - removed;
+      ISortedSet<Long> underlyingIndices = m.removedIndices().slice(0L, underlyingRemainingSize - 1);
+      ISortedSet<Long> addedIndices = m.removedIndices().slice(underlyingRemainingSize, Long.MAX_VALUE);
+      iterators.addLast(Iterators.map(addedIndices.iterator(), n -> n - underlyingRemainingSize));
+      removed += underlyingIndices.size();
+    }
+
+    PrimitiveIterator.OfLong removedFromAdded = Util.mergedRemovedIndices(iterators);
+    IList<IEntry<K, V>> added = diffStack.stream().map(m -> m.added().entries()).reduce(Lists::concat).get();
+    return Util.skipIndices(added.iterator(), removedFromAdded);
   }
 }
