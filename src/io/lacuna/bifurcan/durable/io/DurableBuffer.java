@@ -53,6 +53,15 @@ public class DurableBuffer implements DurableOutput {
     return DurableInput.from(flushed.stream().map(IBuffer::toInput).collect(Lists.linearCollector()));
   }
 
+  public DurableInput toOffHeapInput() {
+    assert (written() <= Integer.MAX_VALUE);
+    DurableInput tmp = toInput();
+    ByteBuffer b = Bytes.allocate((int) tmp.remaining());
+    tmp.read(b);
+    tmp.close();
+    return new BufferInput((ByteBuffer) b.flip());
+  }
+
   public IList<IBuffer> toBuffers() {
     close();
     return flushed;

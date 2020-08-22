@@ -208,6 +208,8 @@ public class HashMap {
     DurableInput.Pool entries = in.sliceBytes((pos + prefix.length) - in.position()).pool();
 
     return new DurableMap(pool, root, size, hashTable, skipTable, entries, encoding);
+
+
   }
 
   /// inlining

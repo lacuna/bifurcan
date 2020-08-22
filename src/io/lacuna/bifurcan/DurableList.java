@@ -3,7 +3,6 @@ package io.lacuna.bifurcan;
 import io.lacuna.bifurcan.durable.Dependencies;
 import io.lacuna.bifurcan.durable.Roots;
 import io.lacuna.bifurcan.durable.codecs.List;
-import io.lacuna.bifurcan.durable.codecs.SkipTable;
 import io.lacuna.bifurcan.durable.io.DurableBuffer;
 import io.lacuna.bifurcan.durable.io.FileOutput;
 import io.lacuna.bifurcan.utils.Iterators;
@@ -11,7 +10,7 @@ import io.lacuna.bifurcan.utils.Iterators;
 import java.nio.file.Path;
 import java.util.Iterator;
 
-import static io.lacuna.bifurcan.durable.codecs.Util.decodeBlock;
+import static io.lacuna.bifurcan.durable.codecs.Core.decodeBlock;
 
 public class DurableList<V> implements IDurableCollection, IList<V> {
 
@@ -38,17 +37,8 @@ public class DurableList<V> implements IDurableCollection, IList<V> {
   }
 
   public static <V> DurableList<V> from(Iterator<V> elements, IDurableEncoding.List encoding, Path directory) {
-    Dependencies.enter();
-    DurableBuffer acc = new DurableBuffer();
-    List.encode(elements, encoding, acc);
-
-    FileOutput file = new FileOutput(Dependencies.exit(), Map.empty());
-    DurableOutput out = DurableOutput.from(file);
-    acc.flushTo(out);
-    out.close();
-
-    Path path = file.moveTo(directory);
-    return (DurableList<V>) Roots.open(path).decode(encoding);
+    Fingerprint f = FileOutput.write(directory, Map.empty(), acc -> List.encode(elements, encoding, acc));
+    return (DurableList<V>) Roots.open(directory, f).decode(encoding);
   }
 
   @Override

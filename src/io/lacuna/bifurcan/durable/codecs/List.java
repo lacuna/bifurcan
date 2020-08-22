@@ -8,7 +8,7 @@ import io.lacuna.bifurcan.durable.io.DurableBuffer;
 
 import java.util.Iterator;
 
-import static io.lacuna.bifurcan.durable.codecs.Util.encodeBlock;
+import static io.lacuna.bifurcan.durable.codecs.Core.encodeBlock;
 
 /**
  * An indexed list, encoded as:

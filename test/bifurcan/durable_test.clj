@@ -4,6 +4,7 @@
    [byte-streams :as bs]
    [clojure.edn :as edn]
    [clojure.java.io :as io]
+   [clojure.java.shell :as sh]
    [clojure.test :refer :all]
    [clojure.test.check.generators :as gen]
    [clojure.test.check.properties :as prop]
@@ -16,8 +17,11 @@
    [io.lacuna.bifurcan
     ICollection
     IDurableCollection
+    IDurableCollection$Root
+    IDurableCollection$Rebase
     IMap
     Map
+    Set
     List
     Maps
     IEntry
@@ -51,13 +55,16 @@
 
 (set! *warn-on-reflection* true)
 
-(def ^java.nio.file.Path test-dir (.toPath (io/file "/tmp/bifurcan-tests")))
+(def test-dirs
+  (->> [:repl :maps :sets :lists]
+    (map (fn [t]
+           (let [f (io/file (str "/tmp/bifurcan-tests/" (name t)))]
+             (.mkdirs f)
+             [t (.toPath f)])))
+    (into {})))
 
-(-> test-dir .toFile .mkdirs)
-
-(defn clear-test-dir []
-  (doseq [^java.io.File f (->> test-dir .toFile .listFiles)]
-    (.delete f)))
+(defn clear-test-dir [t]
+  (sh/sh "rm" (str (test-dirs t) "/*")))
 
 (def gen-pos-int
   (gen/such-that
@@ -159,15 +166,8 @@
 (defn create-skip-table [entries]
   (let [writer   (SkipTable$Writer.)
         _        (doseq [[index offset] entries]
-                   (.append writer index offset))
-        out      (DurableBuffer.)
-        _        (.flushTo writer out)
-        in       (.toInput out)
-        contents (.sliceBlock in BlockPrefix$BlockType/TABLE)
-        buf      (Bytes/allocate (.size contents))
-        _        (.read contents buf)
-        _        (free! in)]
-    (SkipTable/decode (.pool (BufferInput. (.flip buf))) (.tiers writer))))
+                   (.append writer index offset))]
+    (.toOffHeapMap writer)))
 
 (defn print-skip-table [^DurableInput in]
   (->> (repeatedly #(when (pos? (.remaining in)) (.readUVLQ in)))
@@ -200,10 +200,11 @@
 
 ;;; DurableMap
 
-(defn save [^ICollection c]
-  (let [^IDurableCollection c' (.save c edn-encoding test-dir)]
-    (-> c' .root .path .toFile .deleteOnExit)
-    c'))
+(defn save
+  ([c]
+   (save (:repl test-dirs) c))
+  ([dir ^ICollection c]
+   (.save c edn-encoding dir)))
 
 (def durable-map-actions
   (-> coll/map-actions
@@ -212,16 +213,41 @@
 
 (def bifurcan-durable-map
   (assoc coll/bifurcan-map
-    :save save))
+    :save #(save (test-dirs :maps) %)))
 
-(u/def-collection-check test-durable-map 1e6 durable-map-actions
+(u/def-collection-check test-durable-map iterations durable-map-actions
   []
   [m (Map.) bifurcan-durable-map
    m' {} coll/clj-map]
   (try
     (coll/map= m' m)
     (finally
-      (clear-test-dir))))
+      (clear-test-dir :maps))))
+
+(defn dep-chain [^IDurableCollection$Root r]
+  (cons (.fingerprint r)
+    (let [deps (->> r .dependencies .iterator iterator-seq (map #(.open r %)))]
+      (when-not (empty? deps)
+        (dep-chain (first deps))))))
+
+(defn compact [^IDurableCollection c deps]
+  (if (< (count deps) 2)
+    c
+    (let [c' (-> c .root (.open (first deps)) (.decode edn-encoding))
+          r  (.compact c' (-> ^Iterable deps .iterator Set/from))]
+      (.apply r c))))
+
+(u/def-collection-check test-durable-map-compact iterations durable-map-actions
+  [n-drop gen-small-pos-int
+   n-take gen-small-pos-int]
+  [m (Map.) bifurcan-durable-map]
+  (let [m (save (:maps test-dirs) m)
+        deps (->> ^IDurableCollection m .root dep-chain (drop n-drop) (take n-take))]
+    (if (= m (compact m deps))
+      true
+      (do
+        (prn m (compact m deps))
+        false))))
 
 ;;; DurableList
 
@@ -232,7 +258,7 @@
 
 (def bifurcan-durable-list
   (assoc coll/bifurcan-list
-    :save save))
+    :save #(save (test-dirs :lists) %)))
 
 (u/def-collection-check test-durable-list iterations durable-list-actions
   []
@@ -241,24 +267,4 @@
   (try
     (coll/list= m' m)
     (finally
-      (clear-test-dir))))
-
- #_(defspec test-durable-list iterations
-  (prop/for-all [l (coll/list-gen #(List.))]
-    (let [out (DurableBuffer.)
-          _   (DurableList/encode (.iterator ^Iterable l) edn-encoding out)
-          in  (.toInput out)
-          l'  (DurableList/decode edn-encoding nil (.pool in))]
-      (and
-        (= l l')
-        (free! in)))))
-
-
-(comment
-  (def p (.toPath (io/file "/tmp")))
-  (-> (Map.)
-    (.put 1 1)
-    (.save edn-encoding p)
-    (.put 2 2)
-    (.put 1 42)
-    (.save edn-encoding p)))
+      (clear-test-dir :lists))))

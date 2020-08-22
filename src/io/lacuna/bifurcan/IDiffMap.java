@@ -1,8 +1,11 @@
 package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.diffs.Util;
+import io.lacuna.bifurcan.durable.codecs.SkipTable;
+import io.lacuna.bifurcan.durable.io.DurableBuffer;
 import io.lacuna.bifurcan.utils.Iterators;
 
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.OptionalLong;
 import java.util.PrimitiveIterator;
@@ -78,47 +81,62 @@ public interface IDiffMap<K, V> extends IMap<K, V>, IDiff<IMap<K, V>, IEntry<K, 
         added().entries().iterator());
   }
 
-  static <K, V> IList<IDiffMap<K, V>> diffStack(IDiffMap<K, V> m) {
-    List<IDiffMap<K, V>> result = new List<IDiffMap<K, V>>().linear();
-    IDiffMap<K, V> curr = m;
-    for (;;) {
-      result.addFirst(curr);
-      if (curr.underlying() instanceof IDiffMap) {
-        curr = (IDiffMap<K, V>) curr.underlying();
-      } else {
-        break;
-      }
-    }
-    return result;
-  }
+  static PrimitiveIterator.OfLong mergedRemovedIndices(IList<IDiffMap<?, ?>> diffStack) {
+    assert diffStack.stream().allMatch(m -> m instanceof IMap.Durable);
 
-  static PrimitiveIterator.OfLong compactedRemovedIndices(IList<IDiffMap<?, ?>> diffStack) {
+    // isolate the removed indices which only apply to the underlying collection (which is potentially shrinking with
+    // each new stacked diff)
     IList<Iterator<Long>> iterators = new LinearList<>();
     long underlyingSize = diffStack.first().underlying().size();
     long removed = 0;
     for (IDiffMap<?, ?> m : diffStack) {
-      long underlyingRemainingSize = underlyingSize - removed;
-      ISortedSet<Long> s = m.removedIndices().slice(0L, underlyingRemainingSize - 1);
+      long remainingUnderlyingSize = underlyingSize - removed;
+      ISortedSet<Long> s = m.removedIndices().slice(0L, remainingUnderlyingSize - 1);
       iterators.addLast(s.iterator());
       removed += s.size();
     }
+
     return Util.mergedRemovedIndices(iterators);
   }
 
-  static <K, V> Iterator<IEntry<K, V>> compactedAddedEntries(IList<IDiffMap<K, V>> diffStack) {
+  static <K, V> Iterator<IEntry.WithHash<K, V>> mergedAddedEntries(IList<IDiffMap<K, V>> diffStack) {
+    assert diffStack.stream().allMatch(m -> m instanceof IMap.Durable);
+
+    // isolate the removed indices which only apply to the added entries
     IList<Iterator<Long>> iterators = new LinearList<>();
     long underlyingSize = diffStack.first().underlying().size();
     long removed = 0;
-    for (IDiffMap<?, ?> m : diffStack) {
-      long underlyingRemainingSize = underlyingSize - removed;
-      ISortedSet<Long> underlyingIndices = m.removedIndices().slice(0L, underlyingRemainingSize - 1);
-      ISortedSet<Long> addedIndices = m.removedIndices().slice(underlyingRemainingSize, Long.MAX_VALUE);
-      iterators.addLast(Iterators.map(addedIndices.iterator(), n -> n - underlyingRemainingSize));
+    for (IDiffMap<K, V> m : diffStack) {
+      long remainingUnderlyingSize = underlyingSize - removed;
+      ISortedSet<Long> underlyingIndices = m.removedIndices().slice(0L, remainingUnderlyingSize - 1);
+      ISortedSet<Long> addedIndices = m.removedIndices().slice(remainingUnderlyingSize, Long.MAX_VALUE);
+      iterators.addLast(Iterators.map(addedIndices.iterator(), n -> n - remainingUnderlyingSize));
       removed += underlyingIndices.size();
     }
 
-    PrimitiveIterator.OfLong removedFromAdded = Util.mergedRemovedIndices(iterators);
-    IList<IEntry<K, V>> added = diffStack.stream().map(m -> m.added().entries()).reduce(Lists::concat).get();
-    return Util.skipIndices(added.iterator(), removedFromAdded);
+    SkipTable.Writer writer = new SkipTable.Writer();
+    Util.mergedRemovedIndices(iterators).forEachRemaining((long idx) -> writer.append(idx, 0));
+
+    // for this to consume too much memory would require >100M entries being repeatedly overwritten within the stack
+    // of diffs, which implies that many entries being in-memory at once, which seems far-fetched enough that I'm not
+    // going to worry about it for now
+    // TODO: worry about it
+    ISortedSet<Long> removedIndices = writer.toOffHeapMap().keys();
+
+    // get the hash-sorted entries (which are in the same order as entries() because it's a durable map) from each
+    // added() and filter out the removed entries from each
+    IList<Iterator<IEntry.WithHash<K, V>>> sortedEntries = new LinearList<>();
+    long offset = 0;
+    for (IDiffMap<K, V> m : diffStack) {
+      long size = m.added().size();
+      long currOffset = offset;
+      sortedEntries.addLast(
+          Util.skipIndices(
+              m.added().hashSortedEntries(),
+              Iterators.map(removedIndices.slice(currOffset, currOffset + size - 1).iterator(), n -> n - currOffset)));
+      offset += size;
+    }
+
+    return Iterators.mergeSort(sortedEntries, Comparator.comparing(IEntry.WithHash::keyHash));
   }
 }

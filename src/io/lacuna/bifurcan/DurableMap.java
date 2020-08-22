@@ -45,26 +45,12 @@ public class DurableMap<K, V> implements IMap.Durable<K, V> {
     return (DurableMap<K, V>) Roots.open(path).decode(encoding);
   }
 
-  public static <K, V> void encode(Iterator<IEntry<K, V>> entries, IDurableEncoding.Map encoding, int maxRealizedEntries, DurableOutput out) {
-    HashMap.encodeSortedEntries(HashMap.sortEntries(entries, encoding, maxRealizedEntries), encoding, out);
-  }
-
-  public static <K, V> DurableMap<K, V> decode(IDurableEncoding.Map encoding, Root root, DurableInput.Pool pool ) {
-    return HashMap.decode(encoding, root, pool);
-  }
-
   public static <K, V> DurableMap<K, V> from(Iterator<IEntry<K, V>> entries, IDurableEncoding.Map encoding, Path directory, int maxRealizedEntries) {
-    Dependencies.enter();
-    DurableBuffer acc = new DurableBuffer();
-    encode(entries, encoding, maxRealizedEntries, acc);
-
-    FileOutput file = new FileOutput(Dependencies.exit(), Map.empty());
-    DurableOutput out = DurableOutput.from(file);
-    acc.flushTo(out);
-    out.close();
-
-    Path path = file.moveTo(directory);
-    return (DurableMap<K, V>) Roots.open(path).decode(encoding);
+    Fingerprint f = FileOutput.write(
+        directory,
+        Map.empty(),
+        acc -> HashMap.encodeSortedEntries(HashMap.sortEntries(entries, encoding, maxRealizedEntries), encoding, acc));
+    return (DurableMap<K, V>) Roots.open(directory, f).decode(encoding);
   }
 
   private Iterator<HashMapEntries> chunkedEntries(long offset) {
@@ -136,11 +122,16 @@ public class DurableMap<K, V> implements IMap.Durable<K, V> {
 
   @Override
   public Iterator<IEntry<K, V>> iterator() {
+    return (Iterator) hashSortedEntries();
+  }
+
+  @Override
+  public Iterator<IEntry.WithHash<K, V>> hashSortedEntries() {
     return Iterators.flatMap(
         chunkedEntries(0),
         chunk -> Iterators.map(
             chunk.entries(0),
-            e -> IEntry.of((K) e.key(), (V) e.value())));
+            e -> IEntry.of(e.keyHash(), (K) e.key(), (V) e.value())));
   }
 
   @Override

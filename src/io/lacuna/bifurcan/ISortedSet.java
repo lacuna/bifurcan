@@ -90,7 +90,7 @@ public interface ISortedSet<V> extends ISet<V> {
     } else {
       long minIdx = oMinIdx.getAsLong();
       long maxIdx = oMaxIdx.getAsLong();
-      return Sets.from(elements().slice(minIdx, maxIdx), comparator(), v -> {
+      return Sets.from(elements().slice(minIdx, maxIdx + 1), comparator(), v -> {
         OptionalLong oIdx = floorIndex(v);
         if (oIdx.isPresent()) {
           long idx = oIdx.getAsLong();

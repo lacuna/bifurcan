@@ -11,8 +11,8 @@ import java.util.OptionalLong;
 import java.util.PrimitiveIterator;
 import java.util.function.BiPredicate;
 
-import static io.lacuna.bifurcan.durable.codecs.Util.decodeBlock;
-import static io.lacuna.bifurcan.durable.codecs.Util.encodeBlock;
+import static io.lacuna.bifurcan.durable.codecs.Core.decodeBlock;
+import static io.lacuna.bifurcan.durable.codecs.Core.encodeBlock;
 
 /**
  * A block that represents zero or more key/value pairs in a HashMap.

@@ -8,8 +8,8 @@ import io.lacuna.bifurcan.utils.Iterators;
 
 import java.util.Iterator;
 
-import static io.lacuna.bifurcan.durable.codecs.Util.decodeBlock;
-import static io.lacuna.bifurcan.durable.codecs.Util.encodeBlock;
+import static io.lacuna.bifurcan.durable.codecs.Core.decodeBlock;
+import static io.lacuna.bifurcan.durable.codecs.Core.encodeBlock;
 
 
 /**

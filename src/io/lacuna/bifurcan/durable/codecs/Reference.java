@@ -20,8 +20,10 @@ public class Reference {
     this.position = position;
   }
 
-  public static Reference from(IDurableCollection collection) {
-    return new Reference(collection.root().fingerprint(), collection.bytes().instance().position());
+  public static Reference from(IDurableCollection c) {
+    // get the offset from the start of `c` to the start of the root collection
+    long pos = c.bytes().instance().bounds().absolute().start - c.root().bytes().instance().bounds().absolute().start;
+    return new Reference(c.root().fingerprint(), pos);
   }
 
   public void encode(DurableOutput out) {
@@ -32,10 +34,12 @@ public class Reference {
     });
   }
 
+  public DurableInput.Pool underlyingBytes(IDurableCollection.Root root) {
+    return root.open(fingerprint).bytes().instance().seek(position).slicePrefixedBlock().pool();
+  }
+
   public IDurableCollection decodeCollection(IDurableEncoding encoding, IDurableCollection.Root root) {
-    IDurableCollection.Root underlyingRoot = root.open(fingerprint);
-    DurableInput.Pool underlyingBytes = underlyingRoot.bytes().instance().seek(position).slicePrefixedBlock().pool();
-    return Util.decodeCollection(encoding, underlyingRoot, underlyingBytes);
+    return Core.decodeCollection(encoding, root.open(fingerprint), underlyingBytes(root));
   }
 
   public static void encode(IDurableCollection collection, DurableOutput out) {

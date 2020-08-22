@@ -1,12 +1,8 @@
 package io.lacuna.bifurcan.durable.io;
 
+import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.IDurableCollection.Fingerprint;
-import io.lacuna.bifurcan.IMap;
-import io.lacuna.bifurcan.ISet;
-import io.lacuna.bifurcan.durable.Bytes;
-import io.lacuna.bifurcan.durable.Dependencies;
-import io.lacuna.bifurcan.durable.Fingerprints;
-import io.lacuna.bifurcan.durable.Rebases;
+import io.lacuna.bifurcan.durable.*;
 import io.lacuna.bifurcan.durable.allocator.GenerationalAllocator;
 import io.lacuna.bifurcan.durable.allocator.IBuffer;
 
@@ -19,6 +15,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
+import java.util.function.Consumer;
 
 /**
  * A special {@link WritableByteChannel} for a durable collection file, which will construct a hash as the file is
@@ -27,8 +24,6 @@ import java.security.MessageDigest;
 public class FileOutput implements WritableByteChannel {
 
   // `version` encompasses the algorithm, but not necessarily the number of bytes we use
-  private static final String ALGORITHM = "SHA-512";
-  private static final int HASH_BYTES = 32;
 
   // these will be the first four bytes of any valid collection file
   public static final ByteBuffer MAGIC_BYTES = (ByteBuffer)
@@ -39,19 +34,19 @@ public class FileOutput implements WritableByteChannel {
           .put((byte) 0x01) // version
           .flip();
 
-  private static final int PREFIX_LENGTH = MAGIC_BYTES.remaining() + 1 + HASH_BYTES;
+  private static final int PREFIX_LENGTH = MAGIC_BYTES.remaining() + 1 + Fingerprint.HASH_BYTES;
 
   private final Path path;
   private final MessageDigest digest;
   private final FileChannel file;
   private final IBuffer buffer;
 
-  private byte[] hash;
+  private Fingerprint fingerprint;
 
-  public FileOutput(ISet<Fingerprint> dependencies, IMap<Fingerprint, Fingerprint> rebases) {
+  private FileOutput(ISet<Fingerprint> dependencies, IMap<Fingerprint, Fingerprint> rebases) {
     try {
       this.path = Files.createTempFile("bifurcan-", ".draft");
-      this.digest = MessageDigest.getInstance(ALGORITHM);
+      this.digest = MessageDigest.getInstance(Fingerprint.ALGORITHM);
       this.buffer = GenerationalAllocator.allocate(16 << 20);
 
       this.file = FileChannel.open(path, StandardOpenOption.WRITE);
@@ -61,12 +56,27 @@ public class FileOutput implements WritableByteChannel {
       file.position(PREFIX_LENGTH);
       ByteChannelOutput.wrap(this, out -> {
         Dependencies.encode(dependencies, out);
-//        Rebases.encode(rebases, out);
+        Rebases.encode(rebases, out);
       });
 
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+  }
+
+  public static Fingerprint write(Path directory, IMap<Fingerprint, Fingerprint> rebases, Consumer<DurableOutput> body) {
+    Dependencies.enter();
+    DurableBuffer acc = new DurableBuffer();
+
+    body.accept(acc);
+
+    FileOutput file = new FileOutput(Dependencies.exit(), rebases);
+    DurableOutput out = DurableOutput.from(file);
+    acc.flushTo(out);
+    out.close();
+
+    file.moveTo(directory);
+    return file.fingerprint;
   }
 
   /**
@@ -77,9 +87,9 @@ public class FileOutput implements WritableByteChannel {
     assert !isOpen();
 
     try {
-      String hexHash = Bytes.toHexString(ByteBuffer.wrap(hash, 0, HASH_BYTES));
-      Path newPath = directory.resolve(hexHash + ".bfn");
+      Path newPath = directory.resolve(fingerprint.toHexString() + ".bfn");
       directory.toFile().mkdirs();
+      // TODO: should we actually replace a file with the same hash?
       Files.move(path, newPath, StandardCopyOption.REPLACE_EXISTING);
       return newPath;
     } catch (IOException e) {
@@ -122,7 +132,7 @@ public class FileOutput implements WritableByteChannel {
 
   @Override
   public void close() {
-    this.hash = digest.digest();
+    this.fingerprint = Fingerprints.from(Fingerprints.trim(digest.digest(), Fingerprint.HASH_BYTES));
     this.buffer.free();
 
     try {
@@ -132,7 +142,7 @@ public class FileOutput implements WritableByteChannel {
       ByteChannelOutput.wrap(this, out ->
           DurableBuffer.flushTo(out, acc -> {
             acc.write(MAGIC_BYTES.duplicate());
-            Fingerprints.encode(hash, HASH_BYTES, acc);
+            Fingerprints.encode(fingerprint, acc);
           }));
 
       file.close();

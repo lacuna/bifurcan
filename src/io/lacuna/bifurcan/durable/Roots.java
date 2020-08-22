@@ -64,6 +64,10 @@ public class Roots {
     return new BufferInput((ByteBuffer) bytes.flip());
   }
 
+  public static Root open(Path directory, Fingerprint fingerprint) {
+    return open(directory.resolve(fingerprint.toHexString() + ".bfn"));
+  }
+
   public static Root open(Path path) {
     AtomicReference<Function<Lookup, Root>> fn = new AtomicReference<>();
     fn.set(Functions.memoize(l -> open(path.getParent().resolve(l.fingerprint.toHexString() + ".bfn"), l.rebases, fn.get())));
@@ -86,8 +90,9 @@ public class Roots {
 
       // read in header
       Fingerprint fingerprint = Fingerprints.decode(file);
-      IMap<Fingerprint, Fingerprint> rebases = parentRebases;// parentRebases.union(Rebases.decode(file));
-      ISet<Fingerprint> dependencies = Dependencies.decode(file).stream().map(f -> rebases.get(f, f)).collect(Sets.collector());
+      ISet<Fingerprint> rawDependencies = Dependencies.decode(file);
+      IMap<Fingerprint, Fingerprint> rebases = parentRebases.union(Rebases.decode(file));
+      ISet<Fingerprint> dependencies = rawDependencies.stream().map(f -> rebases.get(f, f)).collect(Sets.collector());
 
       // mmap
 //      final DurableInput.Pool contents = map(fc).slice(file.position(), size).pool();
@@ -159,6 +164,11 @@ public class Roots {
         @Override
         public ISet<Fingerprint> dependencies() {
           return dependencies;
+        }
+
+        @Override
+        public String toString() {
+          return path.toString();
         }
       };
 

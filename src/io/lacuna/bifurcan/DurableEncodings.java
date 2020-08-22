@@ -9,8 +9,8 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.function.*;
 
-import static io.lacuna.bifurcan.durable.codecs.Util.decodeBlock;
-import static io.lacuna.bifurcan.durable.codecs.Util.encodeBlock;
+import static io.lacuna.bifurcan.durable.codecs.Core.decodeBlock;
+import static io.lacuna.bifurcan.durable.codecs.Core.encodeBlock;
 
 /**
  * Utility methods for constructing {@link IDurableEncoding}s.

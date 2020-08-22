@@ -137,7 +137,7 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
   }
 
   /**
-   * @returnb the bounds for this input
+   * @return the bounds for this input
    */
   Bounds bounds();
 

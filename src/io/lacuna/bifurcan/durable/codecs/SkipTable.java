@@ -347,6 +347,12 @@ public class SkipTable {
       });
       return out.written() - offset;
     }
+
+    public ISortedMap<Long, Long> toOffHeapMap() {
+      DurableBuffer tmp = new DurableBuffer();
+      flushTo(tmp);
+      return SkipTable.decode(tmp.toOffHeapInput().sliceBlock(BlockType.TABLE).pool(), tiers());
+    }
   }
 }
 

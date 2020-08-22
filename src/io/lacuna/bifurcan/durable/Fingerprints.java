@@ -11,7 +11,6 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 public class Fingerprints {
-
   public static Fingerprint from(byte[] binary) {
     int hash = PerlHash.hash(ByteBuffer.wrap(binary));
 
@@ -33,17 +32,31 @@ public class Fingerprints {
         }
         return false;
       }
+
+      @Override
+      public String toString() {
+        return toHexString().substring(0, 8);
+      }
     };
   }
 
-  public static void encode(byte[] b, int len, DurableOutput out) {
-    out.writeUnsignedByte(len);
-    out.write(b, 0, len);
+  public static byte[] trim(byte[] b, int len) {
+    if (b.length == len) {
+      return b;
+    } else {
+      byte[] result = new byte[len];
+      System.arraycopy(b, 0, result, 0, len);
+      return result;
+    }
+  }
+
+  public static void encode(byte[] b, DurableOutput out) {
+    out.writeUnsignedByte(b.length);
+    out.write(b);
   }
 
   public static void encode(Fingerprint f, DurableOutput out) {
-    byte[] b = f.binary();
-    encode(b, b.length, out);
+    encode(f.binary(), out);
   }
 
   public static Fingerprint decode(DurableInput in) {

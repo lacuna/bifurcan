@@ -1,11 +1,6 @@
 package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.diffs.DiffMap;
-import io.lacuna.bifurcan.durable.Dependencies;
-import io.lacuna.bifurcan.durable.Roots;
-import io.lacuna.bifurcan.durable.codecs.Diffs;
-import io.lacuna.bifurcan.durable.io.FileOutput;
-import io.lacuna.bifurcan.durable.io.DurableBuffer;
 import io.lacuna.bifurcan.durable.codecs.HashMap;
 import io.lacuna.bifurcan.utils.Iterators;
 
@@ -24,6 +19,7 @@ public interface IMap<K, V> extends
   Function<K, V> {
 
   interface Durable<K, V> extends IMap<K,V>, IDurableCollection {
+    IDurableEncoding.Map encoding();
   }
 
   /**

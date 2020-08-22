@@ -122,7 +122,7 @@ public interface IDurableEncoding {
   interface Unityped extends Map, Set, List, Primitive {
     @Override
     default boolean isSingleton(Object o) {
-      return o instanceof ICollection;
+      return o instanceof ICollection || o instanceof java.util.Collection;
     }
 
     @Override
