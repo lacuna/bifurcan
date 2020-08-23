@@ -19,6 +19,37 @@ public interface ISet<V> extends
   ICollection<ISet<V>, V>,
   Predicate<V> {
 
+  abstract class Mixin<V> implements ISet<V> {
+    protected int hash = -1;
+
+    @Override
+    public int hashCode() {
+      if (hash == -1) {
+        hash = (int) Sets.hash(this);
+      }
+      return hash;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (obj instanceof ISet) {
+        return Sets.equals(this, (ISet<V>) obj);
+      } else {
+        return false;
+      }
+    }
+
+    @Override
+    public String toString() {
+      return Sets.toString(this);
+    }
+
+    @Override
+    public ISet<V> clone() {
+      return this;
+    }
+  }
+
   /**
    * @return the hash function used by the set
    */

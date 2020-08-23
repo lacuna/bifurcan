@@ -11,7 +11,7 @@ import static java.lang.Math.min;
  *
  * @author ztellman
  */
-public class ConcatList<V> implements IList<V> {
+public class ConcatList<V> extends IList.Mixin<V> {
 
   final IntMap<IList<V>> lists;
   final long size;
@@ -57,24 +57,6 @@ public class ConcatList<V> implements IList<V> {
   }
 
   @Override
-  public int hashCode() {
-    return (int) Lists.hash(this);
-  }
-
-  @Override
-  public boolean equals(Object obj) {
-    if (obj instanceof IList) {
-      return Lists.equals(this, (IList<V>) obj);
-    }
-    return false;
-  }
-
-  @Override
-  public String toString() {
-    return Lists.toString(this);
-  }
-
-  @Override
   public IList<V> slice(long start, long end) {
     if (end > size() || start < 0) {
       throw new IndexOutOfBoundsException();
@@ -102,11 +84,6 @@ public class ConcatList<V> implements IList<V> {
     } else {
       return new ConcatList<>(lists.put(size, l), this.size + l.size());
     }
-  }
-
-  @Override
-  public IList<V> clone() {
-    return this;
   }
 
   private ConcatList<V> concat(ConcatList<V> o) {

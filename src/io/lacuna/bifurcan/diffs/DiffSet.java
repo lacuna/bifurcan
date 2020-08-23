@@ -8,7 +8,7 @@ import java.util.OptionalLong;
  *
  * @author ztellman
  */
-public class DiffSet<V> implements IDiffSet<V> {
+public class DiffSet<V> extends IDiffSet.Mixin<V> implements IDiffSet<V> {
 
   private final DiffMap<V, Void> diffMap;
 
@@ -32,13 +32,23 @@ public class DiffSet<V> implements IDiffSet<V> {
   @Override
   public ISet<V> add(V value) {
     DiffMap<V, Void> diffPrime = diffMap.put(value, null, Maps.MERGE_LAST_WRITE_WINS);
-    return isLinear() ? this : new DiffSet<>(diffPrime);
+    if (isLinear()) {
+      super.hash = -1;
+      return this;
+    } else {
+      return new DiffSet<>(diffPrime);
+    }
   }
 
   @Override
   public ISet<V> remove(V value) {
     DiffMap<V, Void> diffPrime = diffMap.remove(value);
-    return isLinear() ? this : new DiffSet<>(diffPrime);
+    if (isLinear()) {
+      super.hash = -1;
+      return this;
+    } else {
+      return new DiffSet<>(diffPrime);
+    }
   }
 
   @Override
@@ -54,28 +64,5 @@ public class DiffSet<V> implements IDiffSet<V> {
   @Override
   public ISet<V> linear() {
     return isLinear() ? this : new DiffSet<>(diffMap.linear());
-  }
-
-  @Override
-  public int hashCode() {
-    return (int) Sets.hash(this);
-  }
-
-  @Override
-  public boolean equals(Object obj) {
-    if (obj instanceof ISet) {
-      return Sets.equals(this, (ISet<V>) obj);
-    }
-    return false;
-  }
-
-  @Override
-  public String toString() {
-    return Sets.toString(this);
-  }
-
-  @Override
-  public DiffSet<V> clone() {
-    return this;
   }
 }

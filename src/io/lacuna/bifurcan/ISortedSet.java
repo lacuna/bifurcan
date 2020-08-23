@@ -9,6 +9,13 @@ import java.util.function.ToLongFunction;
 
 public interface ISortedSet<V> extends ISet<V> {
 
+  abstract class Mixin<V> extends ISet.Mixin<V> implements ISortedSet<V> {
+    @Override
+    public ISortedSet<V> clone() {
+      return this;
+    }
+  }
+
   Comparator<V> comparator();
 
   /**

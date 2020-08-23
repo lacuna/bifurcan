@@ -20,14 +20,13 @@ import java.util.function.*;
  *
  * @author ztellman
  */
-public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
+public class IntMap<V> extends ISortedMap.Mixin<Long, V> {
 
   static final ToLongFunction<Long> HASH = n -> n;
   private static final Object DEFAULT_VALUE = new Object();
 
   final Object editor;
   private Node<V> neg, pos;
-  private int hash = -1;
 
   /**
    * @param m another map
@@ -212,7 +211,7 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
       if (neg == negPrime) {
         return this;
       } else if (isLinear()) {
-        hash = -1;
+        super.hash = -1;
         neg = negPrime;
         return this;
       } else {
@@ -223,7 +222,7 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
       if (pos == posPrime) {
         return this;
       } else if (isLinear()) {
-        hash = -1;
+        super.hash = -1;
         pos = posPrime;
         return this;
       } else {
@@ -255,7 +254,7 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
       if (neg == negPrime) {
         return this;
       } else if (isLinear()) {
-        hash = -1;
+        super.hash = -1;
         neg = negPrime;
         return this;
       } else {
@@ -266,7 +265,7 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
       if (pos == posPrime) {
         return this;
       } else if (isLinear()) {
-        hash = -1;
+        super.hash = -1;
         pos = posPrime;
         return this;
       } else {
@@ -438,16 +437,6 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
     return result.forked();
   }
 
-
-
-  @Override
-  public int hashCode() {
-    if (hash == -1) {
-      hash = (int) Maps.hash(this);
-    }
-    return hash;
-  }
-
   @Override
   public boolean equals(IMap<Long, V> o, BiPredicate<V, V> valEquals) {
     if (o instanceof IntMap) {
@@ -465,11 +454,6 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
     } else {
       return false;
     }
-  }
-
-  @Override
-  public String toString() {
-    return Maps.toString(this);
   }
 
   @Override

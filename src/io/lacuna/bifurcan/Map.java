@@ -18,11 +18,11 @@ import java.util.function.*;
  * <p>
  * By ensuring that equivalent maps always have equivalent layout in memory, it can perform equality checks and set
  * operations (union, difference, intersection) significantly faster than a more naive implementation.  By keeping the
- * memory layout of each node more compact, iteration is at least 2x faster than Clojure's map.
+ * memory layout of each node more compact, iteration is at least 2x faster than Clojure's implementation.
  *
  * @author ztellman
  */
-public class Map<K, V> implements IMap<K, V>, Cloneable {
+public class Map<K, V> extends IMap.Mixin<K, V> {
 
   public static final Map EMPTY = new Map();
 
@@ -31,7 +31,6 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
   private final BiPredicate<K, K> equalsFn;
   private final ToLongFunction<K> hashFn;
   private Node<K, V> root;
-  private int hash = -1;
   final Object editor;
 
   ///
@@ -133,7 +132,7 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
 
     if (isLinear() && editor == this.editor) {
       root = rootPrime;
-      hash = -1;
+      super.hash = -1;
       return this;
     } else {
       return new Map<K, V>(rootPrime, hashFn, equalsFn, false);
@@ -159,7 +158,7 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
 
     if (isLinear() && editor == this.editor) {
       root = rootPrime;
-      hash = -1;
+      super.hash = -1;
       return this;
     } else {
       return new Map<K, V>(rootPrime, hashFn, equalsFn, false);
@@ -288,14 +287,6 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
   }
 
   @Override
-  public int hashCode() {
-    if (hash == -1) {
-      hash = (int) Maps.hash(this);
-    }
-    return hash;
-  }
-
-  @Override
   public boolean equals(IMap<K, V> m, BiPredicate<V, V> valEquals) {
     if (m instanceof Map && keyHash() == m.keyHash()) {
       return root.equals(((Map<K, V>) m).root, equalsFn, valEquals);
@@ -310,11 +301,6 @@ public class Map<K, V> implements IMap<K, V>, Cloneable {
       return equals((IMap<K, V>) obj, Objects::equals);
     }
     return false;
-  }
-
-  @Override
-  public String toString() {
-    return Maps.toString(this);
   }
 
   @Override

@@ -48,7 +48,7 @@ public class Maps {
 
     @Override
     public int hashCode() {
-      return (Objects.hash(key) * 31) + Objects.hash(value);
+      return Objects.hash(key, value);
     }
 
     @Override
@@ -61,46 +61,32 @@ public class Maps {
     }
   }
 
-  public static class HashEntry<K, V> implements IEntry.WithHash<K, V> {
+  public static class HashEntry<K, V> extends Entry<K, V> implements IEntry.WithHash<K, V> {
     private final long keyHash;
-    private final K key;
-    private final V value;
 
     public HashEntry(long keyHash, K key, V value) {
+      super(key, value);
       this.keyHash = keyHash;
-      this.key = key;
-      this.value = value;
     }
 
+    @Override
     public long keyHash() {
       return keyHash;
     }
 
-    public K key() {
-      return key;
-    }
-
-    public V value() {
-      return value;
-    }
-
-    @Override
-    public String toString() {
-      return key + " = " + value;
-    }
-
     @Override
     public int hashCode() {
-      return (Objects.hash(key) * 31) + Objects.hash(value);
+      return Objects.hash(keyHash, key(), value());
     }
 
     @Override
     public boolean equals(Object obj) {
       if (obj instanceof IEntry.WithHash) {
         IEntry.WithHash<K, V> e = (IEntry.WithHash<K, V>) obj;
-        return keyHash == e.keyHash() && Objects.equals(key, e.key()) && Objects.equals(value, e.value());
+        return keyHash == e.keyHash() && Objects.equals(key(), e.key()) && Objects.equals(value(), e.value());
+      } else {
+        return false;
       }
-      return false;
     }
   }
 
@@ -148,8 +134,7 @@ public class Maps {
     }
 
     return a.entries().stream().allMatch(e -> {
-      IMap m = b;
-      Object val = m.get(e.key(), DEFAULT_VALUE);
+      Object val = ((IMap<K, Object>) b).get(e.key(), DEFAULT_VALUE);
       return val != DEFAULT_VALUE && valEquals.test((V) val, e.value());
     });
   }
@@ -159,7 +144,7 @@ public class Maps {
   }
 
   public static <K, V> ISortedMap<K, V> from(ISortedSet<K> keys, Function<K, V> lookup, Supplier<Iterator<IEntry<K, V>>> iterator) {
-    return new ISortedMap<K, V>() {
+    return new ISortedMap.Mixin<K, V>() {
       @Override
       public ISortedSet<K> keys() {
         return keys;
@@ -200,30 +185,6 @@ public class Maps {
       public Iterator<IEntry<K, V>> iterator() {
         return iterator.get();
       }
-
-      @Override
-      public IMap<K, V> clone() {
-        return this;
-      }
-
-      @Override
-      public int hashCode() {
-        return (int) Maps.hash(this);
-      }
-
-      @Override
-      public boolean equals(Object obj) {
-        if (obj instanceof IMap) {
-          return Maps.equals(this, (IMap) obj);
-        } else {
-          return false;
-        }
-      }
-
-      @Override
-      public String toString() {
-        return Maps.toString(this);
-      }
     };
   }
 
@@ -232,7 +193,7 @@ public class Maps {
   }
 
   public static <K, V> IMap<K, V> from(ISet<K> keys, Function<K, V> lookup, Supplier<Iterator<IEntry<K, V>>> iterator) {
-    return new IMap<K, V>() {
+    return new IMap.Mixin<K, V>() {
 
       @Override
       public boolean contains(K key) {
@@ -273,29 +234,6 @@ public class Maps {
       @Override
       public BiPredicate<K, K> keyEquality() {
         return keys.valueEquality();
-      }
-
-      @Override
-      public int hashCode() {
-        return (int) Maps.hash(this);
-      }
-
-      @Override
-      public boolean equals(Object obj) {
-        if (obj instanceof IMap) {
-          return Maps.equals(this, (IMap<K, V>) obj);
-        }
-        return false;
-      }
-
-      @Override
-      public IMap<K, V> clone() {
-        return this;
-      }
-
-      @Override
-      public String toString() {
-        return Maps.toString(this);
       }
     };
   }
@@ -385,7 +323,7 @@ public class Maps {
 
           return m.entrySet().stream().allMatch(e -> {
             Object val = ((Map) map).get(e.getKey(), DEFAULT_VALUE);
-            return val != DEFAULT_VALUE && Objects.equals((V) val, e.getValue());
+            return val != DEFAULT_VALUE && Objects.equals(val, e.getValue());
           });
         }
 
@@ -434,7 +372,7 @@ public class Maps {
       }
     } else {
       for (K key : keys) {
-        Object value = ((IMap) map).get(key, DEFAULT_VALUE);
+        Object value = ((IMap<K, Object>) map).get(key, DEFAULT_VALUE);
         if (value != DEFAULT_VALUE) {
           accumulator = accumulator.put(key, (V) value);
         }
@@ -443,11 +381,11 @@ public class Maps {
     return accumulator;
   }
 
-  public static <K, V> boolean equivEquality(IMap<K, ?> a, IMap<K, ?> b) {
+  public static <K> boolean equivEquality(IMap<K, ?> a, IMap<K, ?> b) {
     return a.keyHash() == b.keyHash() && a.keyEquality() == b.keyEquality();
   }
 
-  public static <K, V> boolean equivEquality(IMap<K, ?> a, ISet<K> b) {
+  public static <K> boolean equivEquality(IMap<K, ?> a, ISet<K> b) {
     return a.keyHash() == b.valueHash() && a.keyEquality() == b.valueEquality();
   }
 
@@ -474,7 +412,7 @@ public class Maps {
     return new Collector<T, LinearMap<K, V>, LinearMap<K, V>>() {
       @Override
       public Supplier<LinearMap<K, V>> supplier() {
-        return () -> new LinearMap<K, V>(capacity);
+        return () -> new LinearMap<>(capacity);
       }
 
       @Override

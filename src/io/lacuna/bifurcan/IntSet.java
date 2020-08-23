@@ -7,7 +7,7 @@ import java.util.function.BiPredicate;
 import java.util.function.ToIntFunction;
 import java.util.function.ToLongFunction;
 
-public class IntSet implements ISortedSet<Long> {
+public class IntSet extends ISet.Mixin<Long> implements ISortedSet<Long> {
 
   final IntMap<Void> m;
   int hash = -1;
@@ -132,28 +132,5 @@ public class IntSet implements ISortedSet<Long> {
   @Override
   public IntSet linear() {
     return isLinear() ? this : new IntSet(m.linear());
-  }
-
-  @Override
-  public ISet<Long> clone() {
-    return this;
-  }
-
-  @Override
-  public int hashCode() {
-    return (int) Sets.hash(this);
-  }
-
-  @Override
-  public boolean equals(Object obj) {
-    if (obj instanceof ISet) {
-      return Sets.equals(this, (ISet) obj);
-    }
-    return false;
-  }
-
-  @Override
-  public String toString() {
-    return Sets.toString(this);
   }
 }

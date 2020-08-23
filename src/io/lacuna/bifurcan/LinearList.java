@@ -18,14 +18,13 @@ import static io.lacuna.bifurcan.utils.Bits.log2Ceil;
  * @author ztellman
  */
 @SuppressWarnings("unchecked")
-public class LinearList<V> implements IList<V>, Cloneable {
+public class LinearList<V> extends IList.Mixin<V> implements Cloneable {
 
   private static final int DEFAULT_CAPACITY = 4;
 
   private Object[] elements;
   private int mask;
   private int size, offset;
-  private int hash = -1;
 
   public static <V> LinearList<V> of(V... elements) {
     LinearList<V> list = new LinearList<V>(elements.length);
@@ -117,7 +116,7 @@ public class LinearList<V> implements IList<V>, Cloneable {
       resize(size << 1);
     }
     elements[(offset + size++) & mask] = value;
-    hash = -1;
+    super.hash = -1;
 
     return this;
   }
@@ -130,7 +129,7 @@ public class LinearList<V> implements IList<V>, Cloneable {
     offset = (offset - 1) & mask;
     elements[offset] = value;
     size++;
-    hash = -1;
+    super.hash = -1;
 
     return this;
   }
@@ -142,7 +141,7 @@ public class LinearList<V> implements IList<V>, Cloneable {
     }
     offset = (offset + 1) & mask;
     size--;
-    hash = -1;
+    super.hash = -1;
 
     return this;
   }
@@ -153,7 +152,7 @@ public class LinearList<V> implements IList<V>, Cloneable {
       return this;
     }
     elements[(offset + --size) & mask] = null;
-    hash = -1;
+    super.hash = -1;
 
     return this;
   }
@@ -162,7 +161,7 @@ public class LinearList<V> implements IList<V>, Cloneable {
     Arrays.fill(elements, null);
     offset = 0;
     size = 0;
-    hash = -1;
+    super.hash = -1;
 
     return this;
   }
@@ -176,7 +175,7 @@ public class LinearList<V> implements IList<V>, Cloneable {
     }
 
     elements[(int) (offset + (int) idx) & mask] = value;
-    hash = -1;
+    super.hash = -1;
 
     return this;
   }
@@ -200,7 +199,7 @@ public class LinearList<V> implements IList<V>, Cloneable {
         System.arraycopy(list.elements, 0, elements, size + truncatedListSize, list.size - truncatedListSize);
       }
       size += list.size();
-      hash = -1;
+      super.hash = -1;
 
     } else {
       for (V e : l) {
@@ -281,27 +280,6 @@ public class LinearList<V> implements IList<V>, Cloneable {
   @Override
   public IList<V> linear() {
     return this;
-  }
-
-  @Override
-  public int hashCode() {
-    if (hash == -1) {
-      hash = (int) Lists.hash(this);
-    }
-    return hash;
-  }
-
-  @Override
-  public boolean equals(Object obj) {
-    if (obj instanceof IList) {
-      return Lists.equals(this, (IList<V>) obj);
-    }
-    return false;
-  }
-
-  @Override
-  public String toString() {
-    return Lists.toString(this);
   }
 
   @Override

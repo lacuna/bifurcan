@@ -21,6 +21,37 @@ public interface IList<V> extends
     ICollection<IList<V>, V>,
     Iterable<V> {
 
+  abstract class Mixin<V> implements IList<V> {
+    protected int hash = -1;
+
+    @Override
+    public int hashCode() {
+      if (hash == -1) {
+        hash = (int) Lists.hash(this);
+      }
+      return hash;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (obj instanceof IList) {
+        return Lists.equals(this, (IList<V>) obj);
+      } else {
+        return false;
+      }
+    }
+
+    @Override
+    public String toString() {
+      return Lists.toString(this);
+    }
+
+    @Override
+    public IList<V> clone() {
+      return this;
+    }
+  }
+
   default IList<V> update(long idx, Function<V, V> updateFn) {
     return set(idx, updateFn.apply(nth(idx)));
   }

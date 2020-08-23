@@ -45,7 +45,7 @@ public interface IDurableCollection {
 
     DurableInput cached(DurableInput in);
 
-    IMap<Fingerprint, Fingerprint> rebases();
+    IMap<Fingerprint, Fingerprint> redirects();
 
     ISet<Fingerprint> dependencies();
 

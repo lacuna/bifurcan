@@ -366,25 +366,7 @@ public class Lists {
    * @return a list
    */
   public static <V> IList<V> from(long size, LongFunction<V> elementFn, LongFunction<Iterator<V>> iteratorFn) {
-    return new  IList<V>() {
-      @Override
-      public int hashCode() {
-        return (int) Lists.hash(this);
-      }
-
-      @Override
-      public boolean equals(Object obj) {
-        if (obj instanceof IList) {
-          return Lists.equals(this, (IList<V>) obj);
-        }
-        return false;
-      }
-
-      @Override
-      public String toString() {
-        return Lists.toString(this);
-      }
-
+    return new  IList.Mixin<V>() {
       @Override
       public V nth(long idx) {
         if (idx < 0 || size <= idx) {
@@ -396,11 +378,6 @@ public class Lists {
       @Override
       public Iterator<V> iterator(long startIndex) {
         return iteratorFn.apply(startIndex);
-      }
-
-      @Override
-      public IList<V> clone() {
-        return this;
       }
 
       @Override

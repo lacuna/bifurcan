@@ -27,7 +27,7 @@ import static java.lang.System.arraycopy;
  * @author ztellman
  */
 @SuppressWarnings("unchecked")
-public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
+public class LinearMap<K, V> extends IMap.Mixin<K, V> {
 
   /// Fields
 
@@ -44,7 +44,6 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
   long[] table;
   Object[] entries;
   private int size;
-  private int hash = -1;
 
   /// Constructors
 
@@ -151,7 +150,7 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
       resize(size << 1);
     }
     put(keyHash(key), key, value, merge);
-    hash = -1;
+    super.hash = -1;
 
     return this;
   }
@@ -177,7 +176,7 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
 
       table[idx] = Row.addTombstone(row);
       putEntry(lastKeyIndex, null, null);
-      hash = -1;
+      super.hash = -1;
     }
 
     return this;
@@ -187,7 +186,7 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
     Arrays.fill(entries, null);
     Arrays.fill(table, 0);
     size = 0;
-    hash = -1;
+    super.hash = -1;
 
     return this;
   }
@@ -221,7 +220,7 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
       long row = table[idx];
       int valIdx = Row.keyIndex(row) + 1;
       entries[valIdx] = update.apply((V) entries[valIdx]);
-      hash = -1;
+      super.hash = -1;
     } else {
       put(key, update.apply(null));
     }
@@ -286,22 +285,17 @@ public class LinearMap<K, V> implements IMap<K, V>, Cloneable {
 
   @Override
   public int hashCode() {
-    if (hash == -1) {
-      hash = 0;
+    if (super.hash == -1) {
+      super.hash = 0;
       for (long row : table) {
         if (Row.populated(row)) {
           V value = (V) entries[Row.keyIndex(row) + 1];
-          hash += (Row.hash(row) * 31) + Objects.hashCode(value);
+          super.hash += (Row.hash(row) * 31) + Objects.hashCode(value);
         }
       }
     }
 
-    return hash;
-  }
-
-  @Override
-  public String toString() {
-    return Maps.toString(this);
+    return super.hash;
   }
 
   @Override

@@ -13,30 +13,29 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.BiFunction;
 import java.util.function.Function;
 
 public class Roots {
 
   private static class Lookup {
     public final Fingerprint fingerprint;
-    public final IMap<Fingerprint, Fingerprint> rebases;
+    public final IMap<Fingerprint, Fingerprint> redirects;
 
-    public Lookup(Fingerprint fingerprint, IMap<Fingerprint, Fingerprint> rebases) {
+    public Lookup(Fingerprint fingerprint, IMap<Fingerprint, Fingerprint> redirects) {
       this.fingerprint = fingerprint;
-      this.rebases = rebases;
+      this.redirects = redirects;
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(fingerprint, rebases);
+      return Objects.hash(fingerprint, redirects);
     }
 
     @Override
     public boolean equals(Object obj) {
       if (obj instanceof Lookup) {
         Lookup l = (Lookup) obj;
-        return l.fingerprint.equals(fingerprint) && l.rebases.equals(rebases);
+        return l.fingerprint.equals(fingerprint) && l.redirects.equals(redirects);
       }
       return false;
     }
@@ -70,7 +69,7 @@ public class Roots {
 
   public static Root open(Path path) {
     AtomicReference<Function<Lookup, Root>> fn = new AtomicReference<>();
-    fn.set(Functions.memoize(l -> open(path.getParent().resolve(l.fingerprint.toHexString() + ".bfn"), l.rebases, fn.get())));
+    fn.set(Functions.memoize(l -> open(path.getParent().resolve(l.fingerprint.toHexString() + ".bfn"), l.redirects, fn.get())));
     return open(path, Map.empty(), fn.get());
   }
 
@@ -91,8 +90,8 @@ public class Roots {
       // read in header
       Fingerprint fingerprint = Fingerprints.decode(file);
       ISet<Fingerprint> rawDependencies = Dependencies.decode(file);
-      IMap<Fingerprint, Fingerprint> rebases = parentRebases.union(Rebases.decode(file));
-      ISet<Fingerprint> dependencies = rawDependencies.stream().map(f -> rebases.get(f, f)).collect(Sets.collector());
+      IMap<Fingerprint, Fingerprint> redirects = parentRebases.union(Redirects.decode(file));
+      ISet<Fingerprint> dependencies = rawDependencies.stream().map(f -> redirects.get(f, f)).collect(Sets.collector());
 
       // mmap
 //      final DurableInput.Pool contents = map(fc).slice(file.position(), size).pool();
@@ -142,8 +141,8 @@ public class Roots {
         }
 
         @Override
-        public IMap<Fingerprint, Fingerprint> rebases() {
-          return rebases;
+        public IMap<Fingerprint, Fingerprint> redirects() {
+          return redirects;
         }
 
         @Override
@@ -158,7 +157,7 @@ public class Roots {
 
         @Override
         public Root open(Fingerprint dependency) {
-          return roots.apply(new Lookup(rebases.get(dependency, dependency), rebases));
+          return roots.apply(new Lookup(redirects.get(dependency, dependency), redirects));
         }
 
         @Override

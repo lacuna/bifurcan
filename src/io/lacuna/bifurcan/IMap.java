@@ -18,6 +18,37 @@ public interface IMap<K, V> extends
   ICollection<IMap<K, V>, IEntry<K, V>>,
   Function<K, V> {
 
+  abstract class Mixin<K, V> implements IMap<K, V> {
+    protected int hash = -1;
+
+    @Override
+    public int hashCode() {
+      if (hash == -1) {
+        hash = (int) Maps.hash(this);
+      }
+      return hash;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (obj instanceof IMap) {
+        return Maps.equals(this, (IMap<K, V>) obj);
+      } else {
+        return false;
+      }
+    }
+
+    @Override
+    public String toString() {
+      return Maps.toString(this);
+    }
+
+    @Override
+    public IMap<K, V> clone() {
+      return this;
+    }
+  }
+
   interface Durable<K, V> extends IMap<K,V>, IDurableCollection {
     IDurableEncoding.Map encoding();
   }

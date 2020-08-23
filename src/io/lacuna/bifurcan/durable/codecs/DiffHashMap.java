@@ -15,7 +15,7 @@ import static io.lacuna.bifurcan.durable.codecs.Core.decodeCollection;
 
 public class DiffHashMap {
 
-  public interface IDurableMap<K, V> extends IDiffMap<K, V>, io.lacuna.bifurcan.IMap.Durable<K, V> {
+  private static abstract class AMap<K, V> extends IMap.Mixin<K, V> implements IDiffMap<K, V>, IMap.Durable<K, V> {
   }
 
   public static <K, V> void encodeDiffHashMap(IDiffMap<K, V> m, IDurableCollection underlying, IDurableEncoding.Map encoding, DurableOutput out) {
@@ -77,7 +77,7 @@ public class DiffHashMap {
     IMap<K, V> added = (IMap<K, V>) decodeCollection(encoding, root, in.slicePrefixedBlock().pool());
     IMap<K, V> underlying = (IMap<K, V>) Reference.decode(in.slicePrefixedBlock().pool()).decodeCollection(encoding, root);
 
-    return new IDurableMap<K, V>() {
+    return new AMap<K, V>() {
       @Override
       public IMap<K, V> underlying() {
         return underlying;
@@ -106,30 +106,6 @@ public class DiffHashMap {
       @Override
       public Root root() {
         return root;
-      }
-
-      @Override
-      public IMap<K, V> clone() {
-        return this;
-      }
-
-      @Override
-      public int hashCode() {
-        return (int) Maps.hash(this);
-      }
-
-      @Override
-      public boolean equals(Object obj) {
-        if (obj instanceof IMap) {
-          return Maps.equals(this, (IMap<K, V>) obj);
-        } else {
-          return false;
-        }
-      }
-
-      @Override
-      public String toString() {
-        return Maps.toString(this);
       }
     };
   }

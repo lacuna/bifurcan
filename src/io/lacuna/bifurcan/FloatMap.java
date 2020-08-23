@@ -16,7 +16,7 @@ import static io.lacuna.bifurcan.utils.Encodings.longToDouble;
  *
  * @author ztellman
  */
-public class FloatMap<V> implements ISortedMap<Double, V>, Cloneable {
+public class FloatMap<V> extends ISortedMap.Mixin<Double, V> {
 
   private static final ToLongFunction<Double> HASH = Encodings::doubleToLong;
 
@@ -319,11 +319,6 @@ public class FloatMap<V> implements ISortedMap<Double, V>, Cloneable {
   }
 
   @Override
-  public int hashCode() {
-    return (int) Maps.hash(this);
-  }
-
-  @Override
   public boolean equals(IMap<Double, V> o, BiPredicate<V, V> valEquals) {
     if (o instanceof FloatMap) {
       FloatMap<V> m = (FloatMap<V>) o;
@@ -340,11 +335,6 @@ public class FloatMap<V> implements ISortedMap<Double, V>, Cloneable {
     } else {
       return false;
     }
-  }
-
-  @Override
-  public String toString() {
-    return Maps.toString(this);
   }
 
   ///

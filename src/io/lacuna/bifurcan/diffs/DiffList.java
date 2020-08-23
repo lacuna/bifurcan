@@ -9,7 +9,7 @@ import io.lacuna.bifurcan.Lists;
  *
  * @author ztellman
  */
-public class DiffList<V> implements IDiffList<V> {
+public class DiffList<V> extends IList.Mixin<V> implements IDiffList<V> {
 
   private final IList<V> underlying;
   private final List<V> prefix, suffix;
@@ -77,13 +77,23 @@ public class DiffList<V> implements IDiffList<V> {
   @Override
   public IList<V> addLast(V value) {
     List<V> suffixPrime = suffix.addLast(value);
-    return isLinear() ? this : new DiffList<>(underlying, prefix, suffixPrime, slice);
+    if (isLinear()) {
+      super.hash = -1;
+      return this;
+    } else {
+      return new DiffList<>(underlying, prefix, suffixPrime, slice);
+    }
   }
 
   @Override
   public IList<V> addFirst(V value) {
     List<V> prefixPrime = prefix.addFirst(value);
-    return isLinear() ? this : new DiffList<>(underlying, prefixPrime, suffix, slice);
+    if (isLinear()) {
+      super.hash = -1;
+      return this;
+    } else {
+      return new DiffList<>(underlying, prefixPrime, suffix, slice);
+    }
   }
 
   @Override
@@ -163,23 +173,5 @@ public class DiffList<V> implements IDiffList<V> {
   @Override
   public DiffList<V> clone() {
     return this;
-  }
-
-  @Override
-  public int hashCode() {
-    return (int) Lists.hash(this);
-  }
-
-  @Override
-  public boolean equals(Object obj) {
-    if (obj instanceof IList) {
-      return Lists.equals(this, (IList<V>) obj);
-    }
-    return false;
-  }
-
-  @Override
-  public String toString() {
-    return Lists.toString(this);
   }
 }

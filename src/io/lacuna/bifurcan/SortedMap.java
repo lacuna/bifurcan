@@ -11,14 +11,13 @@ import java.util.function.*;
 /**
  * A red-black tree based on <a href="http://matt.might.net/papers/germane2014deletion.pdf">Germane 2014</a>.
  */
-public class SortedMap<K, V> implements ISortedMap<K, V> {
+public class SortedMap<K, V> extends ISortedMap.Mixin<K, V> {
 
   private static final SortedMap EMPTY = new SortedMap();
 
   private final Comparator<K> comparator;
   public Node<K, V> root;
   private final Object editor;
-  private int hash = -1;
 
   public SortedMap() {
     this(SortedMapNodes.EMPTY_NODE, false, (Comparator<K>) Comparator.naturalOrder());
@@ -91,7 +90,7 @@ public class SortedMap<K, V> implements ISortedMap<K, V> {
     Node<K, V> rootPrime = root.put(key, value, merge, comparator);
     //rootPrime.checkInvariant();
     if (isLinear()) {
-      hash = -1;
+      super.hash = -1;
       root = rootPrime;
       return this;
     } else {
@@ -104,7 +103,7 @@ public class SortedMap<K, V> implements ISortedMap<K, V> {
     Node<K, V> rootPrime = root.remove(key, comparator);
     //rootPrime.checkInvariant();
     if (isLinear()) {
-      hash = -1;
+      super.hash = -1;
       root = rootPrime;
       return this;
     } else {
@@ -180,29 +179,5 @@ public class SortedMap<K, V> implements ISortedMap<K, V> {
   @Override
   public BiPredicate<K, K> keyEquality() {
     return Maps.DEFAULT_EQUALS;
-  }
-
-  @Override
-  public int hashCode() {
-    if (hash == -1) {
-      hash = (int) Maps.hash(this);
-    }
-    return hash;
-  }
-
-  @Override
-  public boolean equals(Object obj) {
-    if (this == obj) {
-      return true;
-    } else if (obj instanceof IMap) {
-      return Maps.equals(this, (IMap) obj);
-    } else {
-      return false;
-    }
-  }
-
-  @Override
-  public String toString() {
-    return Maps.toString(this);
   }
 }

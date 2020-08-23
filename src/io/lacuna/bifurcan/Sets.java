@@ -128,7 +128,7 @@ public class Sets {
   }
 
   public static <V> ISortedSet<V> from(IList<V> elements, Comparator<V> comparator, Function<V, OptionalLong> floorIndex) {
-    return new ISortedSet<V>() {
+    return new ISortedSet.Mixin<V>() {
       @Override
       public Comparator<V> comparator() {
         return comparator;
@@ -150,27 +150,13 @@ public class Sets {
       }
 
       @Override
-      public ISet<V> clone() {
-        return this;
+      public IList<V> elements() {
+        return elements;
       }
 
       @Override
-      public int hashCode() {
-        return (int) Sets.hash(this);
-      }
-
-      @Override
-      public boolean equals(Object obj) {
-        if (obj instanceof ISet) {
-          return Sets.equals(this, (ISet) obj);
-        } else {
-          return false;
-        }
-      }
-
-      @Override
-      public String toString() {
-        return Sets.toString(this);
+      public Iterator<V> iterator(long startIndex) {
+        return elements.iterator(startIndex);
       }
     };
   }
@@ -180,7 +166,7 @@ public class Sets {
   }
 
   public static <V> ISet<V> from(IList<V> elements, Function<V, OptionalLong> indexOf, Supplier<Iterator<V>> iterator) {
-    return new ISet<V>() {
+    return new ISet.Mixin<V>() {
       @Override
       public boolean contains(V value) {
         return indexOf(value).isPresent();
@@ -212,11 +198,6 @@ public class Sets {
       }
 
       @Override
-      public int hashCode() {
-        return (int) Sets.hash(this);
-      }
-
-      @Override
       public ToLongFunction<V> valueHash() {
         return Maps.DEFAULT_HASH_CODE;
       }
@@ -224,24 +205,6 @@ public class Sets {
       @Override
       public BiPredicate<V, V> valueEquality() {
         return Maps.DEFAULT_EQUALS;
-      }
-
-      @Override
-      public boolean equals(Object obj) {
-        if (obj instanceof ISet) {
-          return Sets.equals(this, (ISet<V>) obj);
-        }
-        return false;
-      }
-
-      @Override
-      public ISet<V> clone() {
-        return this;
-      }
-
-      @Override
-      public String toString() {
-        return Sets.toString(this);
       }
     };
   }

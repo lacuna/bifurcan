@@ -67,7 +67,7 @@ public class List {
     ISortedMap<Long, Long> indexTable;
     if (skipTableTiers > 0) {
       DurableInput skipIn = in.sliceBlock(BlockType.TABLE);
-      indexTable = SkipTable.decode(root == null ? skipIn.pool() : () -> root.cached(skipIn), skipTableTiers);
+      indexTable = SkipTable.decode(() -> root.cached(skipIn), skipTableTiers);
     } else {
       indexTable = DEFAULT_TABLE;
     }

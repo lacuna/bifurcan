@@ -16,7 +16,7 @@ import java.util.function.ToLongFunction;
  *
  * @author ztellman
  */
-public class LinearSet<V> implements ISet<V>, Cloneable {
+public class LinearSet<V> extends ISet.Mixin<V> {
 
   LinearMap<V, Void> map;
 
@@ -228,31 +228,19 @@ public class LinearSet<V> implements ISet<V>, Cloneable {
 
   @Override
   public int hashCode() {
-    int hash = 0;
-    for (long row : map.table) {
-      if (LinearMap.Row.populated(row)) {
-        hash += LinearMap.Row.hash(row);
+    if (hash == -1) {
+      hash = 0;
+      for (long row : map.table) {
+        if (LinearMap.Row.populated(row)) {
+          hash += LinearMap.Row.hash(row);
+        }
       }
     }
     return hash;
   }
 
   @Override
-  public boolean equals(Object obj) {
-    if (obj instanceof ISet) {
-      return Sets.equals(this, (ISet<V>) obj);
-    }
-    return false;
-  }
-
-  @Override
   public LinearSet<V> clone() {
     return new LinearSet<>(map.clone());
   }
-
-  @Override
-  public String toString() {
-    return Sets.toString(this);
-  }
-
 }

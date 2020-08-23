@@ -56,7 +56,7 @@ public class FileOutput implements WritableByteChannel {
       file.position(PREFIX_LENGTH);
       ByteChannelOutput.wrap(this, out -> {
         Dependencies.encode(dependencies, out);
-        Rebases.encode(rebases, out);
+        Redirects.encode(rebases, out);
       });
 
     } catch (Exception e) {

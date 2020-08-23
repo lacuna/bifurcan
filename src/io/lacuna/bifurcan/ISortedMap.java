@@ -14,6 +14,13 @@ import java.util.function.UnaryOperator;
  */
 public interface ISortedMap<K, V> extends IMap<K, V> {
 
+  abstract class Mixin<K, V> extends IMap.Mixin<K, V> implements ISortedMap<K, V> {
+    @Override
+    public ISortedMap<K, V> clone() {
+      return this;
+    }
+  }
+
   Comparator<K> comparator();
 
   OptionalLong floorIndex(K key);

@@ -149,39 +149,48 @@
     (gen/such-that #(not (Double/isNaN %)))
     (gen/fmap #(if (== -0.0 %) 0.0 %))))
 
+(def common-actions
+  {:diff-wrap []
+   :linear    []
+   :forked    []})
+
 (def list-actions
-  {:add-first    [gen-element]
-   :add-last     [gen-element]
-   :set          [gen/pos-int gen-element]
-   :slice        [gen/pos-int gen/pos-int]
-   :concat       [(gen/vector gen-element 0 1e3)]
-   :remove-first []
-   :remove-last  []
-   :diff-wrap    []})
+  (merge
+    common-actions
+    {:add-first    [gen-element]
+     :add-last     [gen-element]
+     :set          [gen/pos-int gen-element]
+     :slice        [gen/pos-int gen/pos-int]
+     :concat       [(gen/vector gen-element 0 1e3)]
+     :remove-first []
+     :remove-last  []}))
 
 (def map-actions
-  {:put          [gen/large-integer gen-element]
-   :remove       [gen/large-integer]
-   :union        [(gen/vector gen/large-integer 0 32)]
-   :intersection [(gen/vector gen/large-integer 0 32)]
-   :difference   [(gen/vector gen/large-integer 0 32)]
-   :diff-wrap    []})
+  (merge
+    common-actions
+    {:put          [gen/large-integer gen-element]
+     :remove       [gen/large-integer]
+     :union        [(gen/vector gen/large-integer 0 32)]
+     :intersection [(gen/vector gen/large-integer 0 32)]
+     :difference   [(gen/vector gen/large-integer 0 32)]}))
 
 (def float-map-actions
-  {:put          [gen-double gen-element]
-   :remove       [gen-double]
-   :union        [(gen/vector gen-double 0 32)]
-   :intersection [(gen/vector gen-double 0 32)]
-   :difference   [(gen/vector gen-double 0 32)]
-   :diff-wrap    []})
+  (merge
+    common-actions
+    {:put          [gen-double gen-element]
+     :remove       [gen-double]
+     :union        [(gen/vector gen-double 0 32)]
+     :intersection [(gen/vector gen-double 0 32)]
+     :difference   [(gen/vector gen-double 0 32)]}))
 
 (def set-actions
-  {:add          [gen/large-integer]
-   :remove       [gen/large-integer]
-   :union        [(gen/vector gen/large-integer 0 32)]
-   :intersection [(gen/vector gen/large-integer 0 32)]
-   :difference   [(gen/vector gen/large-integer 0 32)]
-   :diff-wrap    []})
+  (merge
+    common-actions
+    {:add          [gen/large-integer]
+     :remove       [gen/large-integer]
+     :union        [(gen/vector gen/large-integer 0 32)]
+     :intersection [(gen/vector gen/large-integer 0 32)]
+     :difference   [(gen/vector gen/large-integer 0 32)]}))
 
 (def clj-list
   {:add-first    #(cons %2 %1)
@@ -191,9 +200,7 @@
                     (->> %1 (drop s) (take (- e s)) vec))
    :concat       #(vec (concat %1 %2))
    :remove-first #(or (rest %) [])
-   :remove-last  #(or (butlast %) [])
-   :diff-wrap    identity
-   :save         identity})
+   :remove-last  #(or (butlast %) [])})
 
 (def bifurcan-list
   {:add-first    #(.addFirst ^IList %1 %2)
@@ -207,7 +214,9 @@
    :concat       #(.concat ^IList %1 (List/from %2))
    :remove-first #(.removeFirst ^IList %)
    :remove-last  #(.removeLast ^IList %)
-   :diff-wrap    #(DiffList. %)})
+   :diff-wrap    #(DiffList. %)
+   :linear       #(.linear ^IList %)
+   :forked       #(.forked ^IList %)})
 
 (def clj-map
   {:put          assoc
@@ -224,6 +233,8 @@
    :intersection #(.intersection ^IMap %1 (Map/from ^java.util.Map (zipmap %2 %2)))
    :difference   #(.difference ^IMap %1 (Map/from ^java.util.Map (zipmap %2 %2)))
    :diff-wrap    #(DiffMap. %)
+   :linear       #(.linear ^IMap %)
+   :forked       #(.forked ^IMap %)
    })
 
 (def bifurcan-sorted-map
@@ -233,6 +244,8 @@
    :intersection #(.intersection ^IMap %1 (SortedMap/from ^java.util.Map (zipmap %2 %2)))
    :difference   #(.difference ^IMap %1 (SortedMap/from ^java.util.Map (zipmap %2 %2)))
    :diff-wrap    #(ConcatSortedMap/from %)
+   :linear       #(.linear ^IMap %)
+   :forked       #(.forked ^IMap %)
    })
 
 (def int-map
@@ -242,6 +255,8 @@
    :intersection #(.intersection ^IMap %1 (IntMap/from (zipmap %2 %2)))
    :difference   #(.difference ^IMap %1 (IntMap/from (zipmap %2 %2)))
    :diff-wrap    #(ConcatSortedMap/from %)
+   :linear       #(.linear ^IMap %)
+   :forked       #(.forked ^IMap %)
    })
 
 (def float-map
@@ -250,7 +265,10 @@
    :union        #(.union ^IMap %1 (FloatMap/from (zipmap %2 %2)))
    :intersection #(.intersection ^IMap %1 (FloatMap/from (zipmap %2 %2)))
    :difference   #(.difference ^IMap %1 (FloatMap/from (zipmap %2 %2)))
-   :diff-wrap    #(ConcatSortedMap/from %)})
+   :diff-wrap    #(ConcatSortedMap/from %)
+   :linear       #(.linear ^IMap %)
+   :forked       #(.forked ^IMap %)
+   })
 
 (def clj-set
   {:add          conj
@@ -272,6 +290,8 @@
    :intersection #(.intersection ^ISet %1 (construct-set %1 %2))
    :difference   #(.difference ^ISet %1 (construct-set %1 %2))
    :diff-wrap    #(DiffSet. %)
+   :linear       #(.linear ^ISet %)
+   :forked       #(.forked ^ISet %)
    })
 
 ;; Generators

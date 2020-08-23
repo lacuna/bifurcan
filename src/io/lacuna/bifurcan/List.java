@@ -17,7 +17,7 @@ import static java.lang.System.arraycopy;
  *
  * @author ztellman
  */
-public class List<V> implements IList<V>, Cloneable {
+public class List<V> extends IList.Mixin<V> implements Cloneable {
 
   public static final List EMPTY = new List();
 
@@ -272,19 +272,6 @@ public class List<V> implements IList<V>, Cloneable {
   @Override
   public List<V> linear() {
     return isLinear() ? this : new List(true, root, prefixLen, prefix, suffixLen, suffix).clone();
-  }
-
-  @Override
-  public boolean equals(Object obj) {
-    if (obj instanceof IList) {
-      return Lists.equals(this, (IList<V>) obj);
-    }
-    return false;
-  }
-
-  @Override
-  public String toString() {
-    return Lists.toString(this);
   }
 
   @Override

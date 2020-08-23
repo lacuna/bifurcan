@@ -2,7 +2,7 @@ package io.lacuna.bifurcan.diffs;
 
 import io.lacuna.bifurcan.*;
 
-public class DiffSortedSet<V> implements IDiffSortedSet<V> {
+public class DiffSortedSet<V> extends ISortedSet.Mixin<V> implements IDiffSortedSet<V> {
 
   private final ConcatSortedMap<V, Void> diffMap;
 
@@ -26,13 +26,23 @@ public class DiffSortedSet<V> implements IDiffSortedSet<V> {
   @Override
   public DiffSortedSet<V> add(V value) {
     ConcatSortedMap<V, Void> diffPrime = diffMap.put(value, null, Maps.MERGE_LAST_WRITE_WINS);
-    return isLinear() ? this : new DiffSortedSet<>(diffPrime);
+    if (isLinear()) {
+      super.hash = -1;
+      return this;
+    } else {
+      return new DiffSortedSet<>(diffPrime);
+    }
   }
 
   @Override
   public DiffSortedSet<V> remove(V value) {
     ConcatSortedMap<V, Void> diffPrime = diffMap.remove(value);
-    return isLinear() ? this : new DiffSortedSet<>(diffPrime);
+    if (isLinear()) {
+      super.hash = -1;
+      return this;
+    } else {
+      return new DiffSortedSet<V>(diffPrime);
+    }
   }
 
   @Override
@@ -53,24 +63,5 @@ public class DiffSortedSet<V> implements IDiffSortedSet<V> {
   @Override
   public DiffSortedSet<V> clone() {
     return isLinear() ? forked().linear() : this;
-  }
-
-  @Override
-  public int hashCode() {
-    return (int) Sets.hash(this);
-  }
-
-  @Override
-  public boolean equals(Object obj) {
-    if (obj instanceof ISet) {
-      return Sets.equals(this, (ISet) obj);
-    } else {
-      return false;
-    }
-  }
-
-  @Override
-  public String toString() {
-    return Sets.toString(this);
   }
 }

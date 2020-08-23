@@ -6,10 +6,9 @@ import java.util.OptionalLong;
 import java.util.function.BinaryOperator;
 
 /**
- *
  * @author ztellman
  */
-public class DiffMap<K, V> implements IDiffMap<K, V> {
+public class DiffMap<K, V> extends IMap.Mixin<K, V> implements IDiffMap<K, V> {
 
   private final IMap<K, V> underlying, added;
   private final ISortedSet<Long> removedIndices;
@@ -81,24 +80,5 @@ public class DiffMap<K, V> implements IDiffMap<K, V> {
   @Override
   public DiffMap<K, V> clone() {
     return this;
-  }
-
-  @Override
-  public int hashCode() {
-    return (int) Maps.hash(this);
-  }
-
-  @Override
-  public boolean equals(Object obj) {
-    if (obj instanceof IMap) {
-      return Maps.equals(this, (IMap) obj);
-    } else {
-      return false;
-    }
-  }
-
-  @Override
-  public String toString() {
-    return Maps.toString(this);
   }
 }

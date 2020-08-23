@@ -1,11 +1,9 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.durable.Dependencies;
 import io.lacuna.bifurcan.durable.Roots;
-import io.lacuna.bifurcan.durable.io.BufferedChannel;
+import io.lacuna.bifurcan.durable.codecs.HashMap;
+import io.lacuna.bifurcan.durable.codecs.HashMapEntries;
 import io.lacuna.bifurcan.durable.io.FileOutput;
-import io.lacuna.bifurcan.durable.io.DurableBuffer;
-import io.lacuna.bifurcan.durable.codecs.*;
 import io.lacuna.bifurcan.utils.Iterators;
 
 import java.nio.file.Path;
@@ -14,7 +12,7 @@ import java.util.OptionalLong;
 import java.util.function.BiPredicate;
 import java.util.function.ToLongFunction;
 
-public class DurableMap<K, V> implements IMap.Durable<K, V> {
+public class DurableMap<K, V> extends IMap.Mixin<K, V> implements IMap.Durable<K, V> {
   private final IDurableEncoding.Map encoding;
   private final Root root;
   private final DurableInput.Pool bytes;
@@ -137,24 +135,5 @@ public class DurableMap<K, V> implements IMap.Durable<K, V> {
   @Override
   public DurableMap<K, V> clone() {
     return this;
-  }
-
-  @Override
-  public int hashCode() {
-    return (int) Maps.hash(this);
-  }
-
-  @Override
-  public boolean equals(Object obj) {
-    if (obj instanceof IMap) {
-      return Maps.equals(this, (IMap) obj);
-    } else {
-      return false;
-    }
-  }
-
-  @Override
-  public String toString() {
-    return Maps.toString(this);
   }
 }

@@ -8,10 +8,9 @@ import java.util.function.Function;
 import java.util.function.ToIntFunction;
 import java.util.function.ToLongFunction;
 
-public class SortedSet<V> implements ISortedSet<V> {
+public class SortedSet<V> extends ISortedSet.Mixin<V> {
 
   final SortedMap<V, Void> m;
-  int hash = -1;
 
   public SortedSet() {
     this.m = new SortedMap<>();
@@ -45,7 +44,7 @@ public class SortedSet<V> implements ISortedSet<V> {
   public SortedSet<V> add(V value) {
     SortedMap<V, Void> mPrime = m.put(value, null);
     if (m == mPrime) {
-      hash = -1;
+      super.hash = -1;
       return this;
     } else {
       return new SortedSet<>(mPrime);
@@ -56,7 +55,7 @@ public class SortedSet<V> implements ISortedSet<V> {
   public SortedSet<V> remove(V value) {
     SortedMap<V, Void> mPrime = m.remove(value);
     if (m == mPrime) {
-      hash = -1;
+      super.hash = -1;
       return this;
     } else {
       return new SortedSet<>(mPrime);
@@ -111,32 +110,5 @@ public class SortedSet<V> implements ISortedSet<V> {
   @Override
   public SortedSet<V> linear() {
     return isLinear() ? this : new SortedSet<>(m.linear());
-  }
-
-  @Override
-  public int hashCode() {
-    if (hash == -1) {
-      hash = (int) Sets.hash(this);
-    }
-    return hash;
-  }
-
-  @Override
-  public boolean equals(Object obj) {
-    if (obj instanceof ISortedSet) {
-      return Sets.equals(this, (ISortedSet<V>) obj);
-    } else {
-      return false;
-    }
-  }
-
-  @Override
-  public String toString() {
-    return Sets.toString(this);
-  }
-
-  @Override
-  public ISet<V> clone() {
-    return this;
   }
 }

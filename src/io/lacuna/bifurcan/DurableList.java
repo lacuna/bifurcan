@@ -1,9 +1,7 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.durable.Dependencies;
 import io.lacuna.bifurcan.durable.Roots;
 import io.lacuna.bifurcan.durable.codecs.List;
-import io.lacuna.bifurcan.durable.io.DurableBuffer;
 import io.lacuna.bifurcan.durable.io.FileOutput;
 import io.lacuna.bifurcan.utils.Iterators;
 
@@ -12,7 +10,7 @@ import java.util.Iterator;
 
 import static io.lacuna.bifurcan.durable.codecs.Core.decodeBlock;
 
-public class DurableList<V> implements IDurableCollection, IList<V> {
+public class DurableList<V> extends IList.Mixin<V> implements IDurableCollection {
 
   private final DurableInput.Pool bytes;
   private final Root root;
@@ -84,24 +82,5 @@ public class DurableList<V> implements IDurableCollection, IList<V> {
     return Iterators.flatMap(
         Iterators.from(elements::hasRemaining, elements::slicePrefixedBlock),
         in -> (Iterator<V>) decodeBlock(in, root, encoding.elementEncoding()));
-  }
-
-  @Override
-  public int hashCode() {
-    return (int) Lists.hash(this);
-  }
-
-  @Override
-  public boolean equals(Object obj) {
-    if (obj instanceof IList) {
-      return Lists.equals(this, (IList) obj);
-    } else {
-      return false;
-    }
-  }
-
-  @Override
-  public String toString() {
-    return Lists.toString(this);
   }
 }

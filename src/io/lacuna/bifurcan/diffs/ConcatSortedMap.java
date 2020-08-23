@@ -7,7 +7,7 @@ import java.util.Comparator;
 import java.util.OptionalLong;
 import java.util.function.BinaryOperator;
 
-public class ConcatSortedMap<K, V> implements IDiffSortedMap<K, V> {
+public class ConcatSortedMap<K, V> extends ISortedMap.Mixin<K, V> implements IDiffSortedMap<K, V> {
 
   private Comparator<K> comparator;
   private ISortedMap<K, ISortedMap<K, V>> segments;
@@ -96,6 +96,7 @@ public class ConcatSortedMap<K, V> implements IDiffSortedMap<K, V> {
     }
 
     if (isLinear) {
+      super.hash = -1;
       this.segments = result.segments;
       this.segmentOffsets = result.segmentOffsets;
       return this;
@@ -110,6 +111,7 @@ public class ConcatSortedMap<K, V> implements IDiffSortedMap<K, V> {
     if (oIdx.isPresent() && keyEquality().test(key, nth(oIdx.getAsLong()).key())) {
       ConcatSortedMap<K, V> result = from(comparator, belowExclusive(oIdx.getAsLong()), aboveExclusive(oIdx.getAsLong()));
       if (isLinear) {
+        super.hash = -1;
         this.segments = result.segments;
         this.segmentOffsets = result.segmentOffsets;
       } else {
@@ -189,24 +191,5 @@ public class ConcatSortedMap<K, V> implements IDiffSortedMap<K, V> {
     } else {
       return OptionalLong.of(idx < 0 ? -idx - 2 : idx);
     }
-  }
-
-  @Override
-  public int hashCode() {
-    return (int) Maps.hash(this);
-  }
-
-  @Override
-  public boolean equals(Object obj) {
-    if (obj instanceof IMap) {
-      return Maps.equals(this, (IMap) obj);
-    } else {
-      return false;
-    }
-  }
-
-  @Override
-  public String toString() {
-    return Maps.toString(this);
   }
 }

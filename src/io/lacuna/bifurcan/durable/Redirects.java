@@ -6,7 +6,7 @@ import io.lacuna.bifurcan.IDurableCollection.Fingerprint;
 import java.util.Comparator;
 import java.util.stream.LongStream;
 
-public class Rebases {
+public class Redirects {
   public static void encode(IMap<Fingerprint, Fingerprint> rebases, DurableOutput out) {
     out.writeUnsignedInt(rebases.size());
     rebases.entries().stream().sorted(Comparator.comparing(IEntry::key)).forEach(e -> {

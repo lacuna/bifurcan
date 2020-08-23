@@ -12,12 +12,11 @@ import java.util.function.*;
  *
  * @author ztellman
  */
-public class Set<V> implements ISet<V>, Cloneable {
+public class Set<V> extends ISet.Mixin<V> {
 
   public static final Set EMPTY = new Set();
 
   final Map<V, Void> map;
-  private int hash = -1;
 
   /**
    * @param s a set
@@ -201,14 +200,6 @@ public class Set<V> implements ISet<V>, Cloneable {
   }
 
   @Override
-  public int hashCode() {
-    if (hash == -1) {
-      hash = (int) Sets.hash(this);
-    }
-    return hash;
-  }
-
-  @Override
   public boolean equals(Object obj) {
     if (obj instanceof Set) {
       return map.equals(((Set<V>) obj).map, (a, b) -> true);
@@ -217,11 +208,6 @@ public class Set<V> implements ISet<V>, Cloneable {
     } else {
       return false;
     }
-  }
-
-  @Override
-  public String toString() {
-    return Sets.toString(this);
   }
 
   @Override
