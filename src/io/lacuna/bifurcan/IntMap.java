@@ -108,8 +108,8 @@ public class IntMap<V> implements ISortedMap<Long, V>, Cloneable {
    * @return a map representing all entries within {@code [min, max]}
    */
   public IntMap<V> slice(long min, long max) {
-    Node<V> negPrime = neg.slice(editor, min, max);
-    Node<V> posPrime = pos.slice(editor, min, max);
+    Node<V> negPrime = neg.slice(editor, min, Math.min(-1, max));
+    Node<V> posPrime = pos.slice(editor, Math.max(0, min), max);
     return new IntMap<V>(
       negPrime == null ? Node.NEG_EMPTY : negPrime,
       posPrime == null ? Node.POS_EMPTY : posPrime,

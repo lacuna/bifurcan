@@ -180,7 +180,7 @@ public class LinearSet<V> implements ISet<V>, Cloneable {
       return new LinearSet<V>(map.union(((LinearSet<V>) s).map));
     } else {
       LinearMap<V, Void> m = map.clone();
-      s.forEach(e -> map.put(e, null));
+      s.forEach(e -> m.put(e, null));
       return new LinearSet<V>(m);
     }
   }
