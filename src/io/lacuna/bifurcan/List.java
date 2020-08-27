@@ -229,8 +229,13 @@ public class List<V> extends IList.Mixin<V> implements Cloneable {
 
     return new List<V>(
         isLinear(),
-        root.slice(Math.max(0, min(root.size(), start - prefixLen)), Math.max(0, min(root.size(), end - prefixLen)), new Object()),
-        pLen, pre, sLen, suf);
+        root.slice(
+            Math.max(0, min(root.size(), start - prefixLen)),
+            Math.max(0, min(root.size(), end - prefixLen)),
+            new Object()
+        ),
+        pLen, pre, sLen, suf
+    );
   }
 
   @Override
@@ -257,7 +262,8 @@ public class List<V> extends IList.Mixin<V> implements Cloneable {
       return new List<V>(
           isLinear(), r,
           prefixLen, prefixLen > 0 ? prefix.clone() : null,
-          b.suffixLen, b.suffixLen > 0 ? b.suffix.clone() : null);
+          b.suffixLen, b.suffixLen > 0 ? b.suffix.clone() : null
+      );
 
     } else {
       return Lists.concat(this, l);
@@ -279,7 +285,8 @@ public class List<V> extends IList.Mixin<V> implements Cloneable {
     return new List<V>(
         isLinear(), root,
         prefixLen, prefix == null ? null : prefix.clone(),
-        suffixLen, suffix == null ? null : suffix.clone());
+        suffixLen, suffix == null ? null : suffix.clone()
+    );
   }
 
   ///
@@ -315,7 +322,7 @@ public class List<V> extends IList.Mixin<V> implements Cloneable {
 
       // overwrite suffix
     } else {
-      suffix[(int)(idx - (prefixLen + rootSize))] = value;
+      suffix[(int) (idx - (prefixLen + rootSize))] = value;
     }
 
     return this;

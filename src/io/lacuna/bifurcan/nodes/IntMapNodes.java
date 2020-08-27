@@ -233,8 +233,8 @@ public class IntMapNodes {
           } else {
             Node<V> n = new Node<V>(editor, k, offset(k, keys[idx]));
             n = n
-              .putEntry(n.mask(keys[idx]), keys[idx], (V) content[idx])
-              .putEntry(n.mask(k), k, v);
+                .putEntry(n.mask(keys[idx]), keys[idx], (V) content[idx])
+                .putEntry(n.mask(k), k, v);
             return removeEntry(mask).putNode(mask, n);
           }
         } else if (isNode(mask)) {
@@ -688,17 +688,17 @@ public class IntMapNodes {
         long key = a.keys[idx];
         V val = (V) a.content[idx];
         return a.clone(editor)
-          .removeEntry(mask)
-          .putNode(mask, b)
-          .put(editor, key, val, (x, y) -> mergeFn.apply(y, x));
+            .removeEntry(mask)
+            .putNode(mask, b)
+            .put(editor, key, val, (x, y) -> mergeFn.apply(y, x));
 
       } else if (a.isNode(mask)) {
         return a.clone(editor)
-          .setNode(mask, merge(editor, a.node(mask), b, mergeFn));
+            .setNode(mask, merge(editor, a.node(mask), b, mergeFn));
 
       } else {
         return a.clone(editor)
-          .putNode(mask, b);
+            .putNode(mask, b);
       }
 
       // b contains a
@@ -735,14 +735,14 @@ public class IntMapNodes {
           case NODE_ENTRY:
             idx = b.entryIndex(mask);
             result = result
-              .putNode(mask, a.node(mask))
-              .put(editor, b.keys[idx], (V) b.content[idx], mergeFn);
+                .putNode(mask, a.node(mask))
+                .put(editor, b.keys[idx], (V) b.content[idx], mergeFn);
             break;
           case ENTRY_NODE:
             idx = a.entryIndex(mask);
             result = result
-              .putNode(mask, b.node(mask))
-              .put(editor, a.keys[idx], (V) a.content[idx], (x, y) -> mergeFn.apply(y, x));
+                .putNode(mask, b.node(mask))
+                .put(editor, a.keys[idx], (V) a.content[idx], (x, y) -> mergeFn.apply(y, x));
             break;
           case NONE_NONE:
             break;
@@ -770,8 +770,8 @@ public class IntMapNodes {
       if (a.isEntry(mask)) {
         long key = a.key(mask);
         Node<V> nPrime = b.get(key, DEFAULT_VALUE) == DEFAULT_VALUE
-          ? a
-          : a.clone(editor).remove(editor, key);
+            ? a
+            : a.clone(editor).remove(editor, key);
         result = nPrime.size() == 0 ? null : nPrime;
       } else if (a.isNode(mask)) {
         result = a.clone(editor).removeNode(mask);
@@ -852,15 +852,15 @@ public class IntMapNodes {
       return null;
     }
 
-    Node<V> result  = null;
+    Node<V> result = null;
 
     // a contains b
     if (a.offset > b.offset) {
       int mask = a.mask(b.prefix);
       if (a.isEntry(mask)) {
         result = b.get(a.key(mask), DEFAULT_VALUE) == DEFAULT_VALUE
-          ? null
-          : transferEntry(mask, a, new Node<V>(editor, a.prefix, a.offset));
+            ? null
+            : transferEntry(mask, a, new Node<V>(editor, a.prefix, a.offset));
       } else if (a.isNode(mask)) {
         result = intersection(editor, a.node(mask), b);
       } else {
@@ -874,8 +874,8 @@ public class IntMapNodes {
         long key = b.key(mask);
         Object value = a.get(key, DEFAULT_VALUE);
         result = value == DEFAULT_VALUE
-          ? null
-          : new Node<V>(editor, a.prefix, a.offset).putEntry(a.mask(key), key, (V) value);
+            ? null
+            : new Node<V>(editor, a.prefix, a.offset).putEntry(a.mask(key), key, (V) value);
       } else if (b.isNode(mask)) {
         result = intersection(editor, a, b.node(mask));
       } else {

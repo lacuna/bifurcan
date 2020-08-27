@@ -122,8 +122,8 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
   @Override
   public DirectedAcyclicGraph<V, E> link(V from, V to, E edge, BinaryOperator<E> merge) {
     boolean
-      newFrom = !vertices().contains(from),
-      newTo = !vertices().contains(to);
+        newFrom = !vertices().contains(from),
+        newTo = !vertices().contains(to);
 
     if (!newFrom && !newTo && !out(from).contains(to) && createsCycle(from, to)) {
       throw new CycleException();
@@ -202,8 +202,10 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
   @Override
   public DirectedAcyclicGraph<V, E> remove(V vertex) {
     if (graph.vertices().contains(vertex)) {
-      Set<V> topPrime = top.union(graph.out(vertex).stream().filter(v -> graph.in(v).size() == 1).collect(Sets.collector()));
-      Set<V> bottomPrime = bottom.union(graph.in(vertex).stream().filter(v -> graph.out(v).size() == 1).collect(Sets.collector()));
+      Set<V> topPrime =
+          top.union(graph.out(vertex).stream().filter(v -> graph.in(v).size() == 1).collect(Sets.collector()));
+      Set<V> bottomPrime =
+          bottom.union(graph.in(vertex).stream().filter(v -> graph.out(v).size() == 1).collect(Sets.collector()));
       DirectedGraph<V, E> graphPrime = graph.remove(vertex);
 
       if (isLinear()) {

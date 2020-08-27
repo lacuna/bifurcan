@@ -78,6 +78,7 @@ public interface IDiffMap<K, V> extends IMap<K, V>, IDiff<IMap<K, V>, IEntry<K, 
   default Iterator<IEntry<K, V>> iterator() {
     return Iterators.concat(
         Util.skipIndices(underlying().entries().iterator(), removedIndices().iterator()),
-        added().entries().iterator());
+        added().entries().iterator()
+    );
   }
 }

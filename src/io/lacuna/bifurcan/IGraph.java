@@ -145,7 +145,8 @@ public interface IGraph<V, E> extends ICollection<IGraph<V, E>, V> {
   IGraph<V, E> transpose();
 
   /**
-   * @return a singleton list of the graph, unsplit.  The graph can be split into separate pieces in linear time using {@link Graphs#connectedComponents(IGraph)}.
+   * @return a singleton list of the graph, unsplit.  The graph can be split into separate pieces in linear time
+   * using {@link Graphs#connectedComponents(IGraph)}.
    */
   default IList<? extends IGraph<V, E>> split(int parts) {
     return List.of(this);

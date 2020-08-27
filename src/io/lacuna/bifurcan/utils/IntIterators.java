@@ -55,7 +55,7 @@ public class IntIterators {
 
   /**
    * @param it an iterator
-   * @param f a predicate
+   * @param f  a predicate
    * @return an iterator which only yields values that satisfy the predicate
    */
   public static OfInt filter(OfInt it, IntPredicate f) {
@@ -99,7 +99,7 @@ public class IntIterators {
 
   /**
    * @param it an iterator
-   * @param f a function which transforms values
+   * @param f  a function which transforms values
    * @return an iterator which yields the transformed values
    */
   public static OfInt map(OfInt it, IntUnaryOperator f) {
@@ -118,7 +118,7 @@ public class IntIterators {
 
   /**
    * @param it an iterator
-   * @param f a function which transforms values into iterators
+   * @param f  a function which transforms values into iterators
    * @return an iterator which yields the concatenation of the iterators
    */
   public static <U> OfInt flatMap(Iterator<U> it, Function<U, OfInt> f) {
@@ -149,7 +149,7 @@ public class IntIterators {
   /**
    * @param min an inclusive start of the range
    * @param max an exclusive end of the range
-   * @param f a function which transforms a number in the range into a value
+   * @param f   a function which transforms a number in the range into a value
    * @return an iterator which yields the values returned by {@code f}
    */
   public static OfInt range(long min, long max, LongToIntFunction f) {
@@ -177,7 +177,7 @@ public class IntIterators {
    * Represents a range implicitly starting at 0.
    *
    * @param max an exclusive end of the range.
-   * @param f a function which transforms a number in the range into a value.
+   * @param f   a function which transforms a number in the range into a value.
    * @return an iterator which yields the values returned by {@code f}
    */
   public static OfInt range(long max, LongToIntFunction f) {

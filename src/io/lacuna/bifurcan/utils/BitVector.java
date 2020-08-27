@@ -26,7 +26,7 @@ public final class BitVector {
   }
 
   /**
-   * @param vector the bit vector
+   * @param vector   the bit vector
    * @param bitIndex the bit to be tested
    * @return true if the bit is 1, false otherwise
    */

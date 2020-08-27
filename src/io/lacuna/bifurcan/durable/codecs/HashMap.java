@@ -56,27 +56,40 @@ public class HashMap {
       DurableEncodings.primitive("MapIndex", 32,
           DurableEncodings.Codec.from(
               (l, out) -> l.forEach(e -> MapIndex.encode((MapIndex) e, out)),
-              (in, root) -> Iterators.skippable(Iterators.from(in::hasRemaining, () -> MapIndex.decode(in)))));
+              (in, root) -> Iterators.skippable(Iterators.from(in::hasRemaining, () -> MapIndex.decode(in)))
+          )
+      );
 
-  public static <K, V> Iterator<IEntry.WithHash<K, V>> sortIndexedEntries(ICollection<?, IEntry<K, V>> entries, ToLongFunction<K> keyHash) {
+  public static <K, V> Iterator<IEntry.WithHash<K, V>> sortIndexedEntries(
+      ICollection<?, IEntry<K, V>> entries,
+      ToLongFunction<K> keyHash
+  ) {
     AtomicLong index = new AtomicLong(0);
     return Iterators.map(
         ChunkSort.sortedEntries(
             Iterators.map(entries.iterator(), e -> new MapIndex(keyHash.applyAsLong(e.key()), index.getAndIncrement())),
             Comparator.comparingLong((MapIndex e) -> e.hash),
             MAP_INDEX_ENCODING,
-            1 << 16),
+            1 << 16
+        ),
         i -> {
           IEntry<K, V> e = entries.nth(i.index);
           return IEntry.of(i.hash, e.key(), e.value());
-        });
+        }
+    );
   }
 
-  public static <K, V> Iterator<IEntry.WithHash<K, V>> sortEntries(Iterator<IEntry<K, V>> entries, IDurableEncoding.Map encoding, int maxRealizedEntries) {
+  public static <K, V> Iterator<IEntry.WithHash<K, V>> sortEntries(
+      Iterator<IEntry<K, V>> entries,
+      IDurableEncoding.Map encoding,
+      int maxRealizedEntries
+  ) {
     IDurableEncoding hashEncoding = DurableEncodings.primitive("vlq", 1024,
         DurableEncodings.Codec.selfDelimited(
             (o, out) -> out.writeVLQ((long) o),
-            (in, root) -> in.readVLQ()));
+            (in, root) -> in.readVLQ()
+        )
+    );
 
     ToLongFunction<Object> hashFn = encoding.keyEncoding().hashFn();
 
@@ -91,17 +104,31 @@ public class HashMap {
             ary -> IEntry.of((long) ary[0], ary[1], ary[2]),
             hashEncoding,
             encoding.keyEncoding(),
-            encoding.valueEncoding()),
-        maxRealizedEntries);
+            encoding.valueEncoding()
+        ),
+        maxRealizedEntries
+    );
   }
 
   /// encoding
 
-  public static <K, V> void encodeUnsortedEntries(IList<IEntry<K, V>> entries, IDurableEncoding.Map encoding, DurableOutput out) {
-    encodeSortedEntries(sortIndexedEntries(entries, (ToLongFunction<K>) encoding.keyEncoding().hashFn()), encoding, out);
+  public static <K, V> void encodeUnsortedEntries(
+      IList<IEntry<K, V>> entries,
+      IDurableEncoding.Map encoding,
+      DurableOutput out
+  ) {
+    encodeSortedEntries(
+        sortIndexedEntries(entries, (ToLongFunction<K>) encoding.keyEncoding().hashFn()),
+        encoding,
+        out
+    );
   }
 
-  public static <K, V> void encodeSortedEntries(Iterator<IEntry.WithHash<K, V>> sortedEntries, IDurableEncoding.Map encoding, DurableOutput out) {
+  public static <K, V> void encodeSortedEntries(
+      Iterator<IEntry.WithHash<K, V>> sortedEntries,
+      IDurableEncoding.Map encoding,
+      DurableOutput out
+  ) {
     // two tables and actual entries
     DurableBuffer entries = new DurableBuffer();
     SkipTable.Writer indexTable = new SkipTable.Writer();
@@ -111,8 +138,12 @@ public class HashMap {
     Iterator<IList<IEntry.WithHash<K, V>>> entryBlocks =
         Util.partitionBy(
             sortedEntries,
-            Math.min(DurableEncodings.blockSize(encoding.keyEncoding()), DurableEncodings.blockSize(encoding.keyEncoding())),
-            e -> encoding.keyEncoding().isSingleton(e.key()) || encoding.valueEncoding().isSingleton(e.value()));
+            Math.min(
+                DurableEncodings.blockSize(encoding.keyEncoding()),
+                DurableEncodings.blockSize(encoding.keyEncoding())
+            ),
+            e -> encoding.keyEncoding().isSingleton(e.key()) || encoding.valueEncoding().isSingleton(e.value())
+        );
 
     long index = 0;
     long prevHash = Long.MAX_VALUE;
@@ -146,7 +177,13 @@ public class HashMap {
     flush(index, indexTable, hashTable, entries, out);
   }
 
-  private static void flush(long size, SkipTable.Writer indexTable, SkipTable.Writer hashTable, DurableBuffer entries, DurableOutput out) {
+  private static void flush(
+      long size,
+      SkipTable.Writer indexTable,
+      SkipTable.Writer hashTable,
+      DurableBuffer entries,
+      DurableOutput out
+  ) {
     DurableBuffer.flushTo(out, BlockType.HASH_MAP, acc -> {
       acc.writeUVLQ(size);
       indexTable.flushTo(acc);
@@ -191,7 +228,12 @@ public class HashMap {
    * Effectively a fusion of {@link HashMap#encodeSortedEntries} and {@link HashMap#decode}.  Given a preexisting map,
    * write it to {@code out}, re-encoding each singleton entry such that they too can be inlined.
    */
-  public static void inline(DurableInput.Pool pool, IDurableEncoding.Map encoding, IDurableCollection.Root root, DurableOutput out) {
+  public static void inline(
+      DurableInput.Pool pool,
+      IDurableEncoding.Map encoding,
+      IDurableCollection.Root root,
+      DurableOutput out
+  ) {
     DurableInput in = pool.instance();
 
     BlockPrefix prefix = in.readPrefix();

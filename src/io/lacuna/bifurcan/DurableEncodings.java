@@ -46,7 +46,8 @@ public class DurableEncodings {
                   }
                 };
               }
-          ));
+          )
+      );
 
   /**
    * @return the block size for {@code encoding}, which is {@code 1} for all non-primitives
@@ -70,7 +71,8 @@ public class DurableEncodings {
      */
     static Codec from(
         BiConsumer<IList<Object>, DurableOutput> encode,
-        BiFunction<DurableInput, IDurableCollection.Root, IDurableEncoding.SkippableIterator> decode) {
+        BiFunction<DurableInput, IDurableCollection.Root, IDurableEncoding.SkippableIterator> decode
+    ) {
       return new Codec() {
         @Override
         public void encode(IList<Object> values, DurableOutput out) {
@@ -90,7 +92,8 @@ public class DurableEncodings {
      */
     static Codec undelimited(
         BiConsumer<Object, DurableOutput> encode,
-        BiFunction<DurableInput, IDurableCollection.Root, Object> decode) {
+        BiFunction<DurableInput, IDurableCollection.Root, Object> decode
+    ) {
       return new Codec() {
         @Override
         public void encode(IList<Object> values, DurableOutput out) {
@@ -130,7 +133,8 @@ public class DurableEncodings {
      */
     static Codec selfDelimited(
         BiConsumer<Object, DurableOutput> encode,
-        BiFunction<DurableInput, IDurableCollection.Root, Object> decode) {
+        BiFunction<DurableInput, IDurableCollection.Root, Object> decode
+    ) {
       return new Codec() {
         @Override
         public void encode(IList<Object> values, DurableOutput out) {
@@ -222,7 +226,8 @@ public class DurableEncodings {
   public static IDurableEncoding.Primitive primitive(
       String description,
       int blockSize,
-      Codec codec) {
+      Codec codec
+  ) {
     return primitive(
         description,
         blockSize,
@@ -230,7 +235,8 @@ public class DurableEncodings {
         Objects::equals,
         IDurableEncoding::defaultComparator,
         o -> false,
-        codec);
+        codec
+    );
   }
 
   /**
@@ -243,7 +249,8 @@ public class DurableEncodings {
       BiPredicate<Object, Object> valueEquality,
       Comparator<Object> comparator,
       Predicate<Object> isSingleton,
-      Codec codec) {
+      Codec codec
+  ) {
     return new IDurableEncoding.Primitive() {
       @Override
       public String description() {
@@ -288,24 +295,28 @@ public class DurableEncodings {
   }
 
   /**
-   * Creates a tuple encoding, which allows us to decompose a compound object into individual values we know how to encode.
-   *
+   * Creates a tuple encoding, which allows us to decompose a compound object into individual values we know how to
+   * encode.
+   * <p>
    * To deconstruct the value, we use {@code preEncode}, which yields an array of individual values, which by convention
    * have the same order as {@code encodings}.
-   *
-   * To reconstruct the value, we use {@code postDecode}, which takes an array of individual values an yields a compound value.
-   *
+   * <p>
+   * To reconstruct the value, we use {@code postDecode}, which takes an array of individual values an yields a
+   * compound value.
+   * <p>
    * The block size of this encoding is equal to the smallest block size of its sub-encodings.
    */
   public static IDurableEncoding.Primitive tuple(
       Function<Object, Object[]> preEncode,
       Function<Object[], Object> postDecode,
-      IDurableEncoding... encodings) {
+      IDurableEncoding... encodings
+  ) {
     return tuple(
         preEncode,
         postDecode,
         Arrays.stream(encodings).mapToInt(DurableEncodings::blockSize).min().getAsInt(),
-        encodings);
+        encodings
+    );
   }
 
   /**
@@ -316,7 +327,8 @@ public class DurableEncodings {
       Function<Object, Object[]> preEncode,
       Function<Object[], Object> postDecode,
       int blockSize,
-      IDurableEncoding... encodings) {
+      IDurableEncoding... encodings
+  ) {
     return new IDurableEncoding.Primitive() {
 
       @Override
@@ -355,7 +367,8 @@ public class DurableEncodings {
           DurableBuffer.flushTo(
               out,
               BlockPrefix.BlockType.PRIMITIVE,
-              inner -> encodeBlock(Lists.lazyMap(arrays, t -> t[i]), e, inner));
+              inner -> encodeBlock(Lists.lazyMap(arrays, t -> t[i]), e, inner)
+          );
         }
       }
 
@@ -399,7 +412,8 @@ public class DurableEncodings {
    * A unityped encoding, where all possible primitive values can be handled by {@code primitiveEncoding}.
    */
   public static IDurableEncoding unityped(
-      IDurableEncoding.Primitive primitiveEncoding) {
+      IDurableEncoding.Primitive primitiveEncoding
+  ) {
     return new IDurableEncoding.Unityped() {
       @Override
       public IDurableEncoding keyEncoding() {

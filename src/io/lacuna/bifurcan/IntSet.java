@@ -31,7 +31,7 @@ public class IntSet extends ISet.Mixin<Long> implements ISortedSet<Long> {
   }
 
   @Override
-  public IntSet slice(Long min, Long max)   {
+  public IntSet slice(Long min, Long max) {
     return new IntSet(m.slice(min, max));
   }
 

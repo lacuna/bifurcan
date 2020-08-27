@@ -96,7 +96,8 @@ public interface IList<V> extends
   }
 
   /**
-   * @return a new list, with the element at {@code idx} overwritten with {@code value}. If {@code idx} is equal to {@link ICollection#size()}, the value is appended.
+   * @return a new list, with the element at {@code idx} overwritten with {@code value}. If {@code idx} is equal to
+   * {@link ICollection#size()}, the value is appended.
    * @throws IndexOutOfBoundsException when {@code idx} is not within {@code [0, size]}
    */
   default IList<V> set(long idx, V value) {
@@ -141,7 +142,8 @@ public interface IList<V> extends
   }
 
   /**
-   * @return the collection, represented as a normal Java list, which will throw an {@link UnsupportedOperationException} for any write
+   * @return the collection, represented as a normal Java list, which will throw an
+   * {@link UnsupportedOperationException} for any write
    */
   default java.util.List<V> toList() {
     return Lists.toList(this);

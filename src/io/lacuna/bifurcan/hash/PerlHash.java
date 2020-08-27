@@ -72,7 +72,7 @@ public class PerlHash {
 
     return finalize(key);
   }
-  
+
   private static int finalize(int key) {
     key += key << 3;
     key ^= key >>> 11;

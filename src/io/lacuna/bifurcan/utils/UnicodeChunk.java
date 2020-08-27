@@ -18,8 +18,8 @@ public class UnicodeChunk {
   public static final byte[] EMPTY = new byte[]{0, 0};
 
   public static final byte[] LENGTHS = new byte[]{
-          1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-          0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 3, 3, 4, 0};
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+      0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 3, 3, 4, 0};
 
   public static byte[] from(CharSequence cs) {
     return from(cs, 0, cs.length());

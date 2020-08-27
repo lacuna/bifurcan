@@ -27,7 +27,8 @@ public interface IDurableCollection {
     default int compareTo(Fingerprint o) {
       return Bytes.compareBuffers(
           ByteBuffer.wrap(binary()),
-          ByteBuffer.wrap(o.binary()));
+          ByteBuffer.wrap(o.binary())
+      );
     }
   }
 

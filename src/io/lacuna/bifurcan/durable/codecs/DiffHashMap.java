@@ -73,14 +73,20 @@ public class DiffHashMap {
       sortedEntries.addLast(
           Util.skipIndices(
               Iterators.indexed(m.added().hashSortedEntries(), offset),
-              Iterators.map(removedIndices.slice(currOffset, currOffset + size - 1).iterator(), n -> n - currOffset)));
+              Iterators.map(removedIndices.slice(currOffset, currOffset + size - 1).iterator(), n -> n - currOffset)
+          ));
       offset += size;
     }
 
     return Iterators.mergeSort(sortedEntries, Comparator.comparing(e -> e.value.keyHash()));
   }
 
-  public static <K, V> void encodeDiffHashMap(IDiffMap<K, V> m, IDurableCollection underlying, IDurableEncoding.Map encoding, DurableOutput out) {
+  public static <K, V> void encodeDiffHashMap(
+      IDiffMap<K, V> m,
+      IDurableCollection underlying,
+      IDurableEncoding.Map encoding,
+      DurableOutput out
+  ) {
     DurableBuffer.flushTo(out, BlockType.DIFF_HASH_MAP, acc -> {
       // removed indices
       SkipTable.Writer removed = new SkipTable.Writer();
@@ -99,7 +105,8 @@ public class DiffHashMap {
       IList<IDiffMap<K, V>> diffStack,
       IDurableEncoding.Map encoding,
       SkipTable.Writer updatedIndices,
-      DurableOutput out) {
+      DurableOutput out
+  ) {
     DurableBuffer.flushTo(out, BlockType.DIFF_HASH_MAP, acc -> {
       // removed indices
       SkipTable.Writer removed = new SkipTable.Writer();
@@ -130,19 +137,22 @@ public class DiffHashMap {
       IList<IDiffMap<K, V>> diffStack,
       IDurableEncoding.Map encoding,
       SkipTable.Writer updatedIndices,
-      DurableOutput out) {
+      DurableOutput out
+  ) {
 
     // underlying
     Iterator<IEntry.WithHash<K, V>> underlyingEntries =
         skipIndices(
             diffStack.first().underlying().hashSortedEntries(),
-            mergedRemovedIndices((IList) diffStack));
+            mergedRemovedIndices((IList) diffStack)
+        );
 
     // underlying ++ added
     Iterator<Indexed<IEntry.WithHash<K, V>>> entries =
         Iterators.mergeSort(
             LinearList.of(Iterators.indexed(underlyingEntries), mergedAddedEntries(diffStack)),
-            Comparator.comparing(e -> e.value.keyHash()));
+            Comparator.comparing(e -> e.value.keyHash())
+        );
 
     // populate index table
     if (updatedIndices != null) {
@@ -157,9 +167,14 @@ public class DiffHashMap {
     HashMap.encodeSortedEntries(Iterators.map(entries, e -> e.value), encoding, out);
   }
 
-  private static abstract class AMap<K, V> extends IMap.Mixin<K, V> implements IDiffMap<K, V>, IMap.Durable<K, V> { }
+  private static abstract class AMap<K, V> extends IMap.Mixin<K, V> implements IDiffMap<K, V>, IMap.Durable<K, V> {
+  }
 
-  public static <K, V> IMap.Durable<K, V> decodeDiffHashMap(IDurableEncoding.Map encoding, IDurableCollection.Root root, DurableInput.Pool bytes) {
+  public static <K, V> IMap.Durable<K, V> decodeDiffHashMap(
+      IDurableEncoding.Map encoding,
+      IDurableCollection.Root root,
+      DurableInput.Pool bytes
+  ) {
     DurableInput in = bytes.instance();
 
     BlockPrefix prefix = in.readPrefix();
@@ -168,7 +183,10 @@ public class DiffHashMap {
     ISortedMap<Long, Long> m = SkipTable.decode(root, in);
     ISortedSet<Long> removed = m.keys();
     IMap<K, V> added = (IMap<K, V>) decodeCollection(encoding, root, in.slicePrefixedBlock().pool());
-    IMap<K, V> underlying = (IMap<K, V>) Reference.decode(in.slicePrefixedBlock().pool()).decodeCollection(encoding, root);
+    IMap<K, V> underlying = (IMap<K, V>) Reference.decode(in.slicePrefixedBlock().pool()).decodeCollection(
+        encoding,
+        root
+    );
 
     return new AMap<K, V>() {
       @Override

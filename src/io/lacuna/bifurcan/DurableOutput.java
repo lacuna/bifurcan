@@ -153,7 +153,7 @@ public interface DurableOutput extends DataOutput, Flushable, Closeable, AutoClo
 
   /**
    * Appends {@code buffers} to the output.
-   *
+   * <p>
    * Intended for internal use, may be subject to change.
    */
   void append(Iterable<IBuffer> buffers);

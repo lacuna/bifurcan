@@ -69,7 +69,11 @@ public class Roots {
 
   public static Root open(Path path) {
     AtomicReference<Function<Lookup, Root>> fn = new AtomicReference<>();
-    fn.set(Functions.memoize(l -> open(path.getParent().resolve(l.fingerprint.toHexString() + ".bfn"), l.redirects, fn.get())));
+    fn.set(Functions.memoize(l -> open(
+        path.getParent().resolve(l.fingerprint.toHexString() + ".bfn"),
+        l.redirects,
+        fn.get()
+    )));
     return open(path, Map.empty(), fn.get());
   }
 
@@ -94,8 +98,8 @@ public class Roots {
       ISet<Fingerprint> dependencies = rawDependencies.stream().map(f -> redirects.get(f, f)).collect(Sets.collector());
 
       // mmap
-//      final DurableInput.Pool contents = map(fc).slice(file.position(), size).pool();
-//      file.close();
+      //      final DurableInput.Pool contents = map(fc).slice(file.position(), size).pool();
+      //      file.close();
 
       // standard I/O
       final DurableInput.Pool contents = file.slice(file.position(), file.size()).pool();
@@ -133,7 +137,8 @@ public class Roots {
                 .updateAndGet(map -> map.update(start, i -> i == null ? cachedInput(in) : i))
                 .get(start)
                 .get();
-//            System.out.println("total cached bytes: " + cachedBuffers.get().values().stream().mapToLong(DurableInput::size).sum());
+            //            System.out.println("total cached bytes: " + cachedBuffers.get().values().stream().mapToLong
+            //            (DurableInput::size).sum());
           }
 
           assert cached.remaining() == in.size();

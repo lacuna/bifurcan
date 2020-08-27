@@ -15,7 +15,7 @@ public class ListNodes {
 
   public static Object slice(Object node, Object editor, long start, long end) {
     if (node instanceof Object[]) {
-      Object[] ary = new Object[(int)(end - start)];
+      Object[] ary = new Object[(int) (end - start)];
       arraycopy(node, (int) start, ary, 0, ary.length);
       return ary;
     } else {

@@ -127,7 +127,11 @@ public class Sets {
     };
   }
 
-  public static <V> ISortedSet<V> from(IList<V> elements, Comparator<V> comparator, Function<V, OptionalLong> floorIndex) {
+  public static <V> ISortedSet<V> from(
+      IList<V> elements,
+      Comparator<V> comparator,
+      Function<V, OptionalLong> floorIndex
+  ) {
     return new ISortedSet.Mixin<V>() {
       @Override
       public Comparator<V> comparator() {

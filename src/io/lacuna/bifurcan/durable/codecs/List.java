@@ -27,7 +27,8 @@ public class List {
     Iterator<IList<V>> blocks = Util.partitionBy(
         it,
         DurableEncodings.blockSize(elementEncoding),
-        elementEncoding::isSingleton);
+        elementEncoding::isSingleton
+    );
 
     long index = 0;
     while (blocks.hasNext()) {
@@ -47,7 +48,11 @@ public class List {
 
   private static final ISortedMap<Long, Long> DEFAULT_TABLE = new SortedMap<Long, Long>().put(0L, 0L);
 
-  public static DurableList decode(IDurableEncoding.List encoding, IDurableCollection.Root root, DurableInput.Pool pool) {
+  public static DurableList decode(
+      IDurableEncoding.List encoding,
+      IDurableCollection.Root root,
+      DurableInput.Pool pool
+  ) {
     DurableInput in = pool.instance();
 
     BlockPrefix prefix = in.readPrefix();

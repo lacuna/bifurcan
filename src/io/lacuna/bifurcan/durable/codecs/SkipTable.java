@@ -20,8 +20,10 @@ import java.util.OptionalLong;
  * - one or more pairs of [UVLQ, VLQ], representing deltas for the key/value pair
  * - if the block is full, a "terminating" pair where the key is set to {@code 0}
  * <p>
- * Tiers are encoded in descending order.  In all tiers but the last, each entry represents a block in the tier beneath it.
- * The value of these entries represents the the byte offset of the terminating pair in the lower tier.  In the lowest tier,
+ * Tiers are encoded in descending order.  In all tiers but the last, each entry represents a block in the tier
+ * beneath it.
+ * The value of these entries represents the the byte offset of the terminating pair in the lower tier.  In the
+ * lowest tier,
  * the value of each entry represents the actual value associated with the key.
  * <p>
  * In other words, this is a flattened representation of an n-ary tree.  The map {0 0, 1 1, 2 2, 3 3, 4 4}, would be
@@ -31,9 +33,9 @@ import java.util.OptionalLong;
  * [0, 0]
  * <p>
  * 2: [4, 3]
- *        └---------------┐
+ * └---------------┐
  * 4: [2, 3]          [0, 7]
- *        └-------┐       └-------┐
+ * └-------┐       └-------┐
  * 8: [1, 1], [0, 2], [1, 1], [0, 4]
  * </code>
  * Note that the zeroed out key in each terminating pair doesn't matter, since we already have the key value from the

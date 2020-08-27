@@ -38,11 +38,11 @@ public class DirectedGraph<V, E> implements IGraph<V, E> {
   @Override
   public Iterable<IEdge<V, E>> edges() {
     return () -> out.entries().stream()
-      .flatMap(outer -> outer.value()
-        .entries()
-        .stream()
-        .map(inner -> (IEdge<V, E>) new Graphs.DirectedEdge<V, E>(inner.value(), outer.key(), inner.key())))
-      .iterator();
+        .flatMap(outer -> outer.value()
+            .entries()
+            .stream()
+            .map(inner -> (IEdge<V, E>) new Graphs.DirectedEdge<V, E>(inner.value(), outer.key(), inner.key())))
+        .iterator();
   }
 
   @Override
@@ -80,9 +80,10 @@ public class DirectedGraph<V, E> implements IGraph<V, E> {
   @Override
   public <U> DirectedGraph<V, U> mapEdges(Function<IEdge<V, E>, U> f) {
     return new DirectedGraph<>(
-      isLinear(),
-      out.mapValues((u, m) -> m.mapValues((v, e) -> f.apply(new Graphs.DirectedEdge<>(e, u, v)))),
-      in);
+        isLinear(),
+        out.mapValues((u, m) -> m.mapValues((v, e) -> f.apply(new Graphs.DirectedEdge<>(e, u, v)))),
+        in
+    );
   }
 
   @Override
@@ -155,7 +156,12 @@ public class DirectedGraph<V, E> implements IGraph<V, E> {
       return this;
     } else {
       Object editor = isLinear() ? this.editor : new Object();
-      Map<V, Map<V, E>> outPrime = out.put(vertex, new Map<>(), (BinaryOperator<Map<V, E>>) Maps.MERGE_LAST_WRITE_WINS, editor);
+      Map<V, Map<V, E>> outPrime = out.put(
+          vertex,
+          new Map<>(),
+          (BinaryOperator<Map<V, E>>) Maps.MERGE_LAST_WRITE_WINS,
+          editor
+      );
 
       if (isLinear()) {
         out = outPrime;
@@ -201,9 +207,10 @@ public class DirectedGraph<V, E> implements IGraph<V, E> {
     if (graph instanceof DirectedGraph) {
       DirectedGraph<V, E> g = (DirectedGraph<V, E>) graph;
       return new DirectedGraph<>(
-        isLinear(),
-        out.merge(g.out, (a, b) -> a.merge(b, merge)),
-        in.merge(g.in, Set::union));
+          isLinear(),
+          out.merge(g.out, (a, b) -> a.merge(b, merge)),
+          in.merge(g.in, Set::union)
+      );
     } else {
       return (DirectedGraph<V, E>) Graphs.merge(this, graph, merge);
     }
@@ -212,9 +219,10 @@ public class DirectedGraph<V, E> implements IGraph<V, E> {
   @Override
   public DirectedGraph<V, E> select(ISet<V> vertices) {
     return new DirectedGraph<V, E>(
-      isLinear(),
-      out.intersection(vertices).mapValues((x, m) -> m.intersection(vertices)),
-      in.intersection(vertices).mapValues((x, s) -> s.intersection(vertices)));
+        isLinear(),
+        out.intersection(vertices).mapValues((x, m) -> m.intersection(vertices)),
+        in.intersection(vertices).mapValues((x, s) -> s.intersection(vertices))
+    );
   }
 
   @Override
@@ -250,9 +258,10 @@ public class DirectedGraph<V, E> implements IGraph<V, E> {
   @Override
   public DirectedGraph<V, E> transpose() {
     return new DirectedGraph<>(
-      isLinear(),
-      out.mapValues((u, x) -> in.get(u, (Set<V>) EMPTY_SET).map.mapValues((v, y) -> this.edge(v, u))),
-      out.mapValues((x, m) -> m.keys()));
+        isLinear(),
+        out.mapValues((u, x) -> in.get(u, (Set<V>) EMPTY_SET).map.mapValues((v, y) -> this.edge(v, u))),
+        out.mapValues((x, m) -> m.keys())
+    );
   }
 
   @Override

@@ -10,7 +10,7 @@ import static io.lacuna.bifurcan.utils.Encodings.longToDouble;
 
 /**
  * A map which has floating-point keys, built atop {@link IntMap}, with which it shares performance characteristics.
- *
+ * <p>
  * Since this is intended foremost as a sorted data structure, it does not allow {@code NaN} and treats {@code -0.0} as
  * equivalent to {@code 0.0}.  Anyone looking for identity-based semantics should use a normal {@code Map} instead.
  *

@@ -16,11 +16,13 @@ import static io.lacuna.bifurcan.durable.codecs.Core.encodeBlock;
  * A means of spilling {@link io.lacuna.bifurcan.durable.ChunkSort} data to disk.  This data has a much more narrowly
  * defined lifecyle, since it will only be decoded long enough to be written elsewhere.  As such, we can save ourselves
  * the overhead of fully double-buffering the data.
- *
- * The general heuristic is that once the decoder has moved two full blocks of encoded values beyond the end of an allocated
- * buffer, it's safe to release that buffer.  We can't, however, move beyond he very end of the iterator, so we must also
+ * <p>
+ * The general heuristic is that once the decoder has moved two full blocks of encoded values beyond the end of an
+ * allocated
+ * buffer, it's safe to release that buffer.  We can't, however, move beyond he very end of the iterator, so we must
+ * also
  * provide a means to signal once the stream is completely consumed (see {@link #release()}).
- *
+ * <p>
  * This is all a pretty ugly hack, but it reduces our disk overhead while building a collection from ~100% to ~15%.
  *
  * @author ztellman
@@ -43,7 +45,8 @@ public class TempStream {
     Iterator<IList<V>> blocks = Util.partitionBy(
         it,
         DurableEncodings.blockSize(elementEncoding),
-        elementEncoding::isSingleton);
+        elementEncoding::isSingleton
+    );
 
     while (blocks.hasNext()) {
       IList<V> b = blocks.next();
@@ -57,7 +60,8 @@ public class TempStream {
     DurableInput in = DurableInput.from(buffers.stream().map(IBuffer::toInput).collect(Lists.linearCollector()));
     Iterator<V> it = Iterators.flatMap(
         Iterators.from(in::hasRemaining, in::slicePrefixedBlock),
-        block -> (Iterator<V>) decodeBlock(block, null, elementEncoding));
+        block -> (Iterator<V>) decodeBlock(block, null, elementEncoding)
+    );
 
     int indexWindow = DurableEncodings.blockSize(elementEncoding) * 2;
 

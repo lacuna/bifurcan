@@ -6,7 +6,6 @@ import io.lacuna.bifurcan.List;
 import io.lacuna.bifurcan.Lists;
 
 /**
- *
  * @author ztellman
  */
 public class DiffList<V> extends IList.Mixin<V> implements IDiffList<V> {
@@ -143,7 +142,7 @@ public class DiffList<V> extends IList.Mixin<V> implements IDiffList<V> {
 
   @Override
   public IList<V> set(long idx, V value) {
-    if (isLinear()){
+    if (isLinear()) {
       super.hash = -1;
     }
 
@@ -158,7 +157,8 @@ public class DiffList<V> extends IList.Mixin<V> implements IDiffList<V> {
           new ConcatList<>(underlying.slice(slice.start, slice.end)).set(idx, value),
           prefix,
           suffix,
-          new Range(0, slice.size()));
+          new Range(0, slice.size())
+      );
     }
 
     idx -= slice.size();

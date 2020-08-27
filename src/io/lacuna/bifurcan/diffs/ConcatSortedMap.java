@@ -14,7 +14,12 @@ public class ConcatSortedMap<K, V> extends ISortedMap.Mixin<K, V> implements IDi
   private ISortedSet<Long> segmentOffsets;
   private final boolean isLinear;
 
-  private ConcatSortedMap(Comparator<K> comparator, ISortedMap<K, ISortedMap<K, V>> segments, ISortedSet<Long> segmentOffsets, boolean isLinear) {
+  private ConcatSortedMap(
+      Comparator<K> comparator,
+      ISortedMap<K, ISortedMap<K, V>> segments,
+      ISortedSet<Long> segmentOffsets,
+      boolean isLinear
+  ) {
     this.comparator = comparator;
     this.segments = segments;
     this.segmentOffsets = segmentOffsets;
@@ -50,7 +55,11 @@ public class ConcatSortedMap<K, V> extends ISortedMap.Mixin<K, V> implements IDi
       }
     }
 
-    ISortedSet<Long> s = Sets.from(Lists.from(o.length, idx -> o[(int) idx]), Long::compare, idx -> aryFloorIndex(o, idx));
+    ISortedSet<Long> s = Sets.from(
+        Lists.from(o.length, idx -> o[(int) idx]),
+        Long::compare,
+        idx -> aryFloorIndex(o, idx)
+    );
     return new ConcatSortedMap<K, V>(comparator, m, s, false);
   }
 
@@ -109,7 +118,11 @@ public class ConcatSortedMap<K, V> extends ISortedMap.Mixin<K, V> implements IDi
   public ConcatSortedMap<K, V> remove(K key) {
     OptionalLong oIdx = floorIndex(key);
     if (oIdx.isPresent() && keyEquality().test(key, nth(oIdx.getAsLong()).key())) {
-      ConcatSortedMap<K, V> result = from(comparator, belowExclusive(oIdx.getAsLong()), aboveExclusive(oIdx.getAsLong()));
+      ConcatSortedMap<K, V> result = from(
+          comparator,
+          belowExclusive(oIdx.getAsLong()),
+          aboveExclusive(oIdx.getAsLong())
+      );
       if (isLinear) {
         super.hash = -1;
         this.segments = result.segments;

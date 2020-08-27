@@ -29,7 +29,8 @@ public class DurableMap<K, V> extends IMap.Mixin<K, V> implements IMap.Durable<K
       ISortedMap<Long, Long> hashTable,
       ISortedMap<Long, Long> indexTable,
       DurableInput.Pool entries,
-      IDurableEncoding.Map encoding) {
+      IDurableEncoding.Map encoding
+  ) {
     this.bytes = bytes;
     this.root = root;
     this.size = size;
@@ -43,11 +44,17 @@ public class DurableMap<K, V> extends IMap.Mixin<K, V> implements IMap.Durable<K
     return (DurableMap<K, V>) Roots.open(path).decode(encoding);
   }
 
-  public static <K, V> DurableMap<K, V> from(Iterator<IEntry<K, V>> entries, IDurableEncoding.Map encoding, Path directory, int maxRealizedEntries) {
+  public static <K, V> DurableMap<K, V> from(
+      Iterator<IEntry<K, V>> entries,
+      IDurableEncoding.Map encoding,
+      Path directory,
+      int maxRealizedEntries
+  ) {
     Fingerprint f = FileOutput.write(
         directory,
         Map.empty(),
-        acc -> HashMap.encodeSortedEntries(HashMap.sortEntries(entries, encoding, maxRealizedEntries), encoding, acc));
+        acc -> HashMap.encodeSortedEntries(HashMap.sortEntries(entries, encoding, maxRealizedEntries), encoding, acc)
+    );
     return (DurableMap<K, V>) Roots.open(directory, f).decode(encoding);
   }
 
@@ -56,7 +63,8 @@ public class DurableMap<K, V> extends IMap.Mixin<K, V> implements IMap.Durable<K
     DurableInput in = entries.instance().seek(offset);
     return Iterators.from(
         () -> in.remaining() > 0,
-        () -> HashMapEntries.decode(in, encoding, root));
+        () -> HashMapEntries.decode(in, encoding, root)
+    );
   }
 
   @Override
@@ -129,7 +137,9 @@ public class DurableMap<K, V> extends IMap.Mixin<K, V> implements IMap.Durable<K
         chunkedEntries(0),
         chunk -> Iterators.map(
             chunk.entries(0),
-            e -> IEntry.of(e.keyHash(), (K) e.key(), (V) e.value())));
+            e -> IEntry.of(e.keyHash(), (K) e.key(), (V) e.value())
+        )
+    );
   }
 
   @Override

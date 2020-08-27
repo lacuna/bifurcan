@@ -125,18 +125,18 @@ public class Lists {
     @Override
     public int indexOf(Object o) {
       return IntStream.range(0, size())
-        .filter(idx -> Objects.equals(get(idx), o))
-        .findFirst()
-        .orElse(-1);
+          .filter(idx -> Objects.equals(get(idx), o))
+          .findFirst()
+          .orElse(-1);
     }
 
     @Override
     public int lastIndexOf(Object o) {
       return size() -
-        IntStream.range(0, size())
-          .filter(idx -> Objects.equals(get(size() - (idx + 1)), o))
-          .findFirst()
-          .orElse(size() + 1);
+          IntStream.range(0, size())
+              .filter(idx -> Objects.equals(get(size() - (idx + 1)), o))
+              .findFirst()
+              .orElse(size() + 1);
     }
 
     @Override
@@ -210,7 +210,7 @@ public class Lists {
     @Override
     public boolean equals(Object obj) {
       if (obj instanceof java.util.List) {
-        return Lists.equals(list, Lists.from((java.util.List)obj));
+        return Lists.equals(list, Lists.from((java.util.List) obj));
       }
       return false;
     }
@@ -234,7 +234,8 @@ public class Lists {
     return Lists.from(
         l.size(),
         i -> f.apply(l.nth(i)),
-        idx -> Iterators.map(l.iterator(idx), f));
+        idx -> Iterators.map(l.iterator(idx), f)
+    );
   }
 
   /**
@@ -343,7 +344,8 @@ public class Lists {
     return Lists.from(
         list.size(),
         nth,
-        idx -> idx == 0 ? list.iterator() : Iterators.range(idx, list.size(), nth));
+        idx -> idx == 0 ? list.iterator() : Iterators.range(idx, list.size(), nth)
+    );
   }
 
   /**
@@ -366,7 +368,7 @@ public class Lists {
    * @return a list
    */
   public static <V> IList<V> from(long size, LongFunction<V> elementFn, LongFunction<Iterator<V>> iteratorFn) {
-    return new  IList.Mixin<V>() {
+    return new IList.Mixin<V>() {
       @Override
       public V nth(long idx) {
         if (idx < 0 || size <= idx) {

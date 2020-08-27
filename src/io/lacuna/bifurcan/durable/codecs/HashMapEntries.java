@@ -31,7 +31,8 @@ public class HashMapEntries {
       long offset,
       IList<IEntry.WithHash<K, V>> block,
       IDurableEncoding.Map mapEncoding,
-      DurableOutput out) {
+      DurableOutput out
+  ) {
     DurableBuffer.flushTo(out, BLOCK_TYPE, acc -> {
       acc.writeUVLQ(offset);
 
@@ -98,7 +99,8 @@ public class HashMapEntries {
       HashDeltas hashes,
       DurableInput keys,
       DurableInput values,
-      IDurableEncoding.Map mapEncoding) {
+      IDurableEncoding.Map mapEncoding
+  ) {
     this.root = root;
     this.indexOffset = indexOffset;
     this.hashes = hashes;
@@ -141,7 +143,11 @@ public class HashMapEntries {
   public Iterator<IEntry.WithHash<Object, Object>> entries(long dropped) {
     PrimitiveIterator.OfLong hashes = (PrimitiveIterator.OfLong) Iterators.drop(this.hashes.iterator(), dropped);
     IDurableEncoding.SkippableIterator keys = decodeBlock(this.keys, root, mapEncoding.keyEncoding()).skip(dropped);
-    IDurableEncoding.SkippableIterator values = decodeBlock(this.values, root, mapEncoding.valueEncoding()).skip(dropped);
+    IDurableEncoding.SkippableIterator values = decodeBlock(
+        this.values,
+        root,
+        mapEncoding.valueEncoding()
+    ).skip(dropped);
     return Iterators.from(hashes::hasNext, () -> IEntry.of(hashes.nextLong(), keys.next(), values.next()));
   }
 }

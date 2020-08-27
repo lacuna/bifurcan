@@ -13,11 +13,13 @@ import static java.lang.System.arraycopy;
 /**
  * A hash-map implementation which uses Robin Hood hashing for placement, and allows for customized hashing and equality
  * semantics.  Performance is equivalent to {@link java.util.HashMap} for lookups and construction, and superior in the
- * case of poor hash distribution.  Because entries are stored contiguously, performance of {@link LinearMap#clone()} and
+ * case of poor hash distribution.  Because entries are stored contiguously, performance of {@link LinearMap#clone()}
+ * and
  * iteration is significantly better than {@link java.util.HashMap}.  Unlike {@link Map}, it can only hold
  * {@code Integer.MAX_VALUE} elements.
  * <p>
- * The {@link LinearMap#entries()} method is O(1) and allows random access, returning an IList that proxies through to an
+ * The {@link LinearMap#entries()} method is O(1) and allows random access, returning an IList that proxies through
+ * to an
  * underlying array.  Partitioning this list is the most efficient way to process the collection in parallel.
  * <p>
  * However, {@code LinearMap} also exposes O(N) {@link #split(int)} and {@link #merge(IMap, BinaryOperator)}

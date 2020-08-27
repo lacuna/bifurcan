@@ -5,7 +5,6 @@ import io.lacuna.bifurcan.*;
 import java.util.OptionalLong;
 
 /**
- *
  * @author ztellman
  */
 public class DiffSet<V> extends IDiffSet.Mixin<V> implements IDiffSet<V> {

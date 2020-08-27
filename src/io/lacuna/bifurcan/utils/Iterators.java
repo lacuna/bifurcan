@@ -51,7 +51,8 @@ public class Iterators {
             heap.add(IEntry.of(e.value().next(), e.value()));
           }
           return e.key();
-        });
+        }
+    );
   }
 
   /**
@@ -165,7 +166,7 @@ public class Iterators {
 
   /**
    * @param it an iterator
-   * @param f a predicate
+   * @param f  a predicate
    * @return an iterator which only yields values that satisfy the predicate
    */
   public static <V> Iterator<V> filter(Iterator<V> it, Predicate<V> f) {
@@ -208,7 +209,7 @@ public class Iterators {
 
   /**
    * @param it an iterator
-   * @param f a function which transforms values
+   * @param f  a function which transforms values
    * @return an iterator which yields the transformed values
    */
   public static <U, V> Iterator<V> map(Iterator<U> it, Function<U, V> f) {
@@ -217,7 +218,7 @@ public class Iterators {
 
   /**
    * @param it an iterator
-   * @param f a function which transforms values into iterators
+   * @param f  a function which transforms values into iterators
    * @return an iterator which yields the concatenation of the iterators
    */
   public static <U, V> Iterator<V> flatMap(Iterator<U> it, Function<U, Iterator<V>> f) {
@@ -248,7 +249,7 @@ public class Iterators {
   /**
    * @param min an inclusive start of the range
    * @param max an exclusive end of the range
-   * @param f a function which transforms a number in the range into a value
+   * @param f   a function which transforms a number in the range into a value
    * @return an iterator which yields the values returned by {@code f}
    */
   public static <V> Iterator<V> range(long min, long max, LongFunction<V> f) {
@@ -276,7 +277,7 @@ public class Iterators {
    * Represents a range implicitly starting at 0.
    *
    * @param max an exclusive end of the range.
-   * @param f a function which transforms a number in the range into a value.
+   * @param f   a function which transforms a number in the range into a value.
    * @return an iterator which yields the values returned by {@code f}
    */
   public static <V> Iterator<V> range(long max, LongFunction<V> f) {
@@ -301,7 +302,7 @@ public class Iterators {
 
   /**
    * @param it an iterator
-   * @param n the number of elements to drop, which may be larger than the number of values in the iterator
+   * @param n  the number of elements to drop, which may be larger than the number of values in the iterator
    * @return an iterator with the first {@code n} values dropped
    */
   public static <V> Iterator<V> drop(Iterator<V> it, long n) {

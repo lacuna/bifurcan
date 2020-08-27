@@ -33,7 +33,8 @@ public interface IDiffList<V> extends IList<V>, IDiff<IList<V>, V> {
         prefix(),
         underlying().slice(underlyingSlice().start, underlyingSlice().end),
         suffix(),
-        l);
+        l
+    );
 
     return isLinear() ? result.linear() : result;
   }
@@ -64,7 +65,8 @@ public interface IDiffList<V> extends IList<V>, IDiff<IList<V>, V> {
     return Iterators.concat(
         prefix().iterator(),
         r.size() == underlying().size() ? underlying().iterator() : Iterators.range(r.start, r.end, underlying()::nth),
-        suffix().iterator());
+        suffix().iterator()
+    );
   }
 
   @Override

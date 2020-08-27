@@ -11,11 +11,13 @@ import java.util.function.*;
 /**
  * A map which has integer keys, which is an combination of Okasaki and Gill's
  * <a href="http://ittc.ku.edu/~andygill/papers/IntMap98.pdf">Fast Mergeable Integer Maps</a> with the memory layout
- * suggested by Steindorfer and Vinju used in {@link io.lacuna.bifurcan.Map}, with which it shares the same broad performance
+ * suggested by Steindorfer and Vinju used in {@link io.lacuna.bifurcan.Map}, with which it shares the same broad
+ * performance
  * characteristics.
  * <p>
  * This collection keeps the keys in sorted order, and can thought of as either a map of integers or a sparse vector.
- * It provides {@link IntMap#slice(Long, Long)}, {@link IntMap#floorIndex(Long)}, and {@link IntMap#ceilIndex(Long)} methods which
+ * It provides {@link IntMap#slice(Long, Long)}, {@link IntMap#floorIndex(Long)}, and {@link IntMap#ceilIndex(Long)}
+ * methods which
  * allow for lookups and filtering on its keys.
  *
  * @author ztellman
@@ -110,9 +112,10 @@ public class IntMap<V> extends ISortedMap.Mixin<Long, V> {
     Node<V> negPrime = neg.slice(editor, min, Math.min(-1, max));
     Node<V> posPrime = pos.slice(editor, Math.max(0, min), max);
     return new IntMap<V>(
-      negPrime == null ? Node.NEG_EMPTY : negPrime,
-      posPrime == null ? Node.POS_EMPTY : posPrime,
-      isLinear());
+        negPrime == null ? Node.NEG_EMPTY : negPrime,
+        posPrime == null ? Node.POS_EMPTY : posPrime,
+        isLinear()
+    );
   }
 
   @Override
@@ -125,9 +128,10 @@ public class IntMap<V> extends ISortedMap.Mixin<Long, V> {
     if (b instanceof IntMap) {
       IntMap<V> m = (IntMap<V>) b;
       return new IntMap<V>(
-        IntMapNodes.merge(new Object(), neg, m.neg, mergeFn),
-        IntMapNodes.merge(new Object(), pos, m.pos, mergeFn),
-        isLinear());
+          IntMapNodes.merge(new Object(), neg, m.neg, mergeFn),
+          IntMapNodes.merge(new Object(), pos, m.pos, mergeFn),
+          isLinear()
+      );
     } else {
       return (IntMap<V>) Maps.merge(this.clone(), b, mergeFn);
     }
@@ -162,7 +166,11 @@ public class IntMap<V> extends ISortedMap.Mixin<Long, V> {
       IntMap<V> m = (IntMap<V>) b;
       Node<V> negPrime = IntMapNodes.difference(new Object(), neg, m.neg);
       Node<V> posPrime = IntMapNodes.difference(new Object(), pos, m.pos);
-      return new IntMap<V>(negPrime == null ? Node.NEG_EMPTY : negPrime, posPrime == null ? Node.POS_EMPTY : posPrime, isLinear());
+      return new IntMap<V>(
+          negPrime == null ? Node.NEG_EMPTY : negPrime,
+          posPrime == null ? Node.POS_EMPTY : posPrime,
+          isLinear()
+      );
     } else {
       return (IntMap<V>) Maps.difference(this.clone(), b.keys());
     }
@@ -174,7 +182,11 @@ public class IntMap<V> extends ISortedMap.Mixin<Long, V> {
       IntMap<V> m = (IntMap<V>) b;
       Node<V> negPrime = IntMapNodes.intersection(new Object(), neg, m.neg);
       Node<V> posPrime = IntMapNodes.intersection(new Object(), pos, m.pos);
-      return new IntMap<V>(negPrime == null ? Node.NEG_EMPTY : negPrime, posPrime == null ? Node.POS_EMPTY : posPrime, isLinear());
+      return new IntMap<V>(
+          negPrime == null ? Node.NEG_EMPTY : negPrime,
+          posPrime == null ? Node.POS_EMPTY : posPrime,
+          isLinear()
+      );
     } else {
       IntMap<V> result = (IntMap<V>) Maps.intersection(new IntMap<V>().linear(), this, b.keys());
       return isLinear() ? result : result.forked();
@@ -422,16 +434,16 @@ public class IntMap<V> extends ISortedMap.Mixin<Long, V> {
 
     if (negParts > 0) {
       IntMapNodes.split(new Object(), neg, neg.size() / negParts)
-        .stream()
-        .map(n -> new IntMap<V>(n, Node.POS_EMPTY, isLinear()))
-        .forEach(m -> result.addLast((IntMap<V>) m));
+          .stream()
+          .map(n -> new IntMap<V>(n, Node.POS_EMPTY, isLinear()))
+          .forEach(m -> result.addLast((IntMap<V>) m));
     }
 
     if (posParts > 0) {
       IntMapNodes.split(new Object(), pos, pos.size() / posParts)
-        .stream()
-        .map(n -> new IntMap<V>(Node.NEG_EMPTY, n, false))
-        .forEach(m -> result.addLast((IntMap<V>) m));
+          .stream()
+          .map(n -> new IntMap<V>(Node.NEG_EMPTY, n, false))
+          .forEach(m -> result.addLast((IntMap<V>) m));
     }
 
     return result.forked();

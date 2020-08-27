@@ -15,8 +15,8 @@ import java.util.stream.StreamSupport;
  */
 @SuppressWarnings("unchecked")
 public interface IMap<K, V> extends
-  ICollection<IMap<K, V>, IEntry<K, V>>,
-  Function<K, V> {
+    ICollection<IMap<K, V>, IEntry<K, V>>,
+    Function<K, V> {
 
   abstract class Mixin<K, V> implements IMap<K, V> {
     protected int hash = -1;
@@ -49,7 +49,7 @@ public interface IMap<K, V> extends
     }
   }
 
-  interface Durable<K, V> extends IMap<K,V>, IDurableCollection {
+  interface Durable<K, V> extends IMap<K, V>, IDurableCollection {
     IDurableEncoding.Map encoding();
   }
 
@@ -173,7 +173,8 @@ public interface IMap<K, V> extends
   }
 
   /**
-   * @return the collection, represented as a normal Java map, which will throw {@link UnsupportedOperationException} on writes
+   * @return the collection, represented as a normal Java map, which will throw {@link UnsupportedOperationException}
+   * on writes
    */
   default java.util.Map<K, V> toMap() {
     return Maps.toMap(this);
@@ -295,10 +296,10 @@ public interface IMap<K, V> extends
   @Override
   default IList<? extends IMap<K, V>> split(int parts) {
     return keys()
-      .split(parts)
-      .stream()
-      .map(ks -> ks.zip(this))
-      .collect(Lists.collector());
+        .split(parts)
+        .stream()
+        .map(ks -> ks.zip(this))
+        .collect(Lists.collector());
   }
 
   /**
@@ -326,6 +327,6 @@ public interface IMap<K, V> extends
 
   @Override
   default IMap.Durable<K, V> save(IDurableEncoding encoding, Path directory) {
-    return (IMap.Durable<K,V>) ICollection.super.save(encoding, directory);
+    return (IMap.Durable<K, V>) ICollection.super.save(encoding, directory);
   }
 }

@@ -13,7 +13,12 @@ public class Rebase implements IDurableCollection.Rebase {
   private final ISortedMap<Long, Long> updatedIndices;
   private final IDurableCollection.Root root;
 
-  public Rebase(IDurableCollection.Root root, Fingerprint original, Fingerprint updated, ISortedMap<Long, Long> updatedIndices) {
+  public Rebase(
+      IDurableCollection.Root root,
+      Fingerprint original,
+      Fingerprint updated,
+      ISortedMap<Long, Long> updatedIndices
+  ) {
     this.original = original;
     this.updated = updated;
     this.updatedIndices = updatedIndices;

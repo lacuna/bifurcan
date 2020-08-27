@@ -33,7 +33,8 @@ public class BitIntSet {
    * @param bitsPerElement the bits per element
    * @param size           the number of elements in the set
    * @param val            the rowValue to search for
-   * @return If idx >= 0, the actual table of the rowValue.  Otherwise, the return rowValue represents the table where the
+   * @return If idx >= 0, the actual table of the rowValue.  Otherwise, the return rowValue represents the table
+   * where the
    * rowValue would be inserted, where -1 represents the 0th element, -2 represents the 1st element, and so on.
    */
   public static int indexOf(long[] set, int bitsPerElement, int size, long val) {

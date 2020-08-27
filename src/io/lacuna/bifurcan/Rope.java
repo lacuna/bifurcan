@@ -103,8 +103,9 @@ public class Rope implements Comparable<Rope> {
 
       if (end < offset + len) {
         return UnicodeChunk.concat(
-          UnicodeChunk.slice(chunk, 0, start - offset),
-          UnicodeChunk.slice(chunk, end - offset, len));
+            UnicodeChunk.slice(chunk, 0, start - offset),
+            UnicodeChunk.slice(chunk, end - offset, len)
+        );
       } else {
         return null;
       }
@@ -139,7 +140,10 @@ public class Rope implements Comparable<Rope> {
           while (chunks.hasNext()) {
             newChunk = UnicodeChunk.concat(newChunk, chunks.next());
           }
-          return UnicodeChunk.concat(newChunk, UnicodeChunk.slice(chunk, index - offset, UnicodeChunk.numCodePoints(chunk)));
+          return UnicodeChunk.concat(
+              newChunk,
+              UnicodeChunk.slice(chunk, index - offset, UnicodeChunk.numCodePoints(chunk))
+          );
         } else {
           return null;
         }
@@ -186,7 +190,8 @@ public class Rope implements Comparable<Rope> {
 
   /**
    * @return a new rope representing the code points within {@code [start, end)}
-   * @throws IllegalArgumentException if {@code end} < {@code start}, or {@code start} and {@code end} are not within {@code [0, size)}
+   * @throws IllegalArgumentException if {@code end} < {@code start}, or {@code start} and {@code end} are not within
+   * {@code [0, size)}
    */
   public Rope slice(int start, int end) {
     if (end < start || start < 0 || end > size()) {

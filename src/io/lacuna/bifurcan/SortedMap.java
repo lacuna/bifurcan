@@ -81,8 +81,8 @@ public class SortedMap<K, V> extends ISortedMap.Mixin<K, V> {
     root.split(Math.max(1, (int) Math.ceil((double) root.size / parts)), acc);
 
     return acc.stream()
-      .map(n -> new SortedMap<>(n, isLinear(), comparator))
-      .collect(Lists.collector());
+        .map(n -> new SortedMap<>(n, isLinear(), comparator))
+        .collect(Lists.collector());
   }
 
   @Override

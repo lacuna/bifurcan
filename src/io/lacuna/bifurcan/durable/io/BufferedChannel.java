@@ -10,7 +10,6 @@ import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- *
  * @author ztellman
  */
 public class BufferedChannel {

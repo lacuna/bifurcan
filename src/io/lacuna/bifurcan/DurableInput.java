@@ -79,7 +79,10 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
     Iterator<DurableInput> it = inputs.iterator();
     DurableInput in = it.next();
     return it.hasNext()
-        ? new ConcatInput(inputs, new Bounds(null, 0, Iterators.toStream(inputs.iterator()).mapToLong(DurableInput::size).sum()))
+        ? new ConcatInput(
+        inputs,
+        new Bounds(null, 0, Iterators.toStream(inputs.iterator()).mapToLong(DurableInput::size).sum())
+    )
         : in;
   }
 
@@ -107,7 +110,13 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
     long pos = position();
     BlockPrefix prefix = readPrefix();
     if (prefix.type != type) {
-      throw new IllegalStateException(String.format("expected %s at %d, got %s in %s", type, pos, prefix.type, bounds()));
+      throw new IllegalStateException(String.format(
+          "expected %s at %d, got %s in %s",
+          type,
+          pos,
+          prefix.type,
+          bounds()
+      ));
     }
     return sliceBytes(prefix.length);
   }
@@ -193,7 +202,8 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
   }
 
   /**
-   * Copies bytes into {@code b}, starting at {@code offset}, throwing an {@link EOFException} if there are not {@code len}
+   * Copies bytes into {@code b}, starting at {@code offset}, throwing an {@link EOFException} if there are not
+   * {@code len}
    * bytes available.
    */
   default void readFully(byte[] b, int off, int len) throws EOFException {
@@ -264,7 +274,8 @@ public interface DurableInput extends DataInput, Closeable, AutoCloseable {
   }
 
   /**
-   * Reads and advances past the next unsigned variable-length quantity, which works as described <a href="https://en.wikipedia.org/wiki/Variable-length_quantity">here</a>.
+   * Reads and advances past the next unsigned variable-length quantity, which works as described
+   * <a href="https://en.wikipedia.org/wiki/Variable-length_quantity">here</a>.
    */
   default long readUVLQ() {
     return Util.readUVLQ(this);

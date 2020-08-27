@@ -18,7 +18,8 @@ public class Util {
   public static <V, E> Iterator<IList<V>> partitionBy(
       Iterator<V> it,
       int blockSize,
-      Predicate<V> isSingleton) {
+      Predicate<V> isSingleton
+  ) {
     return new Iterator<IList<V>>() {
       LinearList<V> next = null;
 
@@ -148,13 +149,14 @@ public class Util {
 
       int firstByte = prefix | continueBit;
       if (0 < rem && rem < (7 - prefixLength)) {
-//        System.out.println(Long.toBinaryString(n) + " " + bits + " " + rem + " " + Long.toBinaryString(Bits.slice(n, bits - rem, bits)));
+        //        System.out.println(Long.toBinaryString(n) + " " + bits + " " + rem + " " + Long.toBinaryString(Bits
+        //        .slice(n, bits - rem, bits)));
         bits -= rem;
         firstByte |= Bits.slice(n, bits, bits + rem);
       }
 
       out.writeByte(firstByte);
-//      System.out.println(Integer.toBinaryString(firstByte) + " " + bits);
+      //      System.out.println(Integer.toBinaryString(firstByte) + " " + bits);
       writeUVLQ(n, bits, out);
     }
   }

@@ -29,7 +29,15 @@ public class MapNodes {
 
   interface INode<K, V> {
 
-    INode<K, V> put(int shift, Object editor, int hash, K key, V value, BiPredicate<K, K> equals, BinaryOperator<V> merge);
+    INode<K, V> put(
+        int shift,
+        Object editor,
+        int hash,
+        K key,
+        V value,
+        BiPredicate<K, K> equals,
+        BinaryOperator<V> merge
+    );
 
     INode<K, V> remove(int shift, Object editor, int hash, K key, BiPredicate<K, K> equals);
 
@@ -132,7 +140,15 @@ public class MapNodes {
 
     // updates
 
-    private boolean mergeEntry(int shift, int mask, int hash, K key, V value, BiPredicate<K, K> equals, BinaryOperator<V> merge) {
+    private boolean mergeEntry(
+        int shift,
+        int mask,
+        int hash,
+        K key,
+        V value,
+        BiPredicate<K, K> equals,
+        BinaryOperator<V> merge
+    ) {
       int idx = entryIndex(mask);
 
       // there's a match
@@ -153,8 +169,8 @@ public class MapNodes {
           node = new Collision<>(hash, currKey, currValue, key, value);
         } else {
           node = new Node<K, V>(editor)
-            .put(shift + SHIFT_INCREMENT, editor, hashes[idx], currKey, currValue, equals, merge)
-            .put(shift + SHIFT_INCREMENT, editor, hash, key, value, equals, merge);
+              .put(shift + SHIFT_INCREMENT, editor, hashes[idx], currKey, currValue, equals, merge)
+              .put(shift + SHIFT_INCREMENT, editor, hash, key, value, equals, merge);
         }
 
         removeEntry(mask).putNode(mask, node);
@@ -163,7 +179,15 @@ public class MapNodes {
     }
 
     @Override
-    public Node<K, V> put(int shift, Object editor, int hash, K key, V value, BiPredicate<K, K> equals, BinaryOperator<V> merge) {
+    public Node<K, V> put(
+        int shift,
+        Object editor,
+        int hash,
+        K key,
+        V value,
+        BiPredicate<K, K> equals,
+        BinaryOperator<V> merge
+    ) {
 
       if (editor != this.editor) {
         return clone(editor).put(shift, editor, hash, key, value, equals, merge);
@@ -365,11 +389,13 @@ public class MapNodes {
     @Override
     public Iterable<IEntry<K, V>> entries() {
       return () ->
-        Iterators.range(bitCount(datamap),
-          i -> {
-            int idx = (int) (i << 1);
-            return IEntry.of((K) content[idx], (V) content[idx + 1]);
-          });
+          Iterators.range(
+              bitCount(datamap),
+              i -> {
+                int idx = (int) (i << 1);
+                return IEntry.of((K) content[idx], (V) content[idx + 1]);
+              }
+          );
     }
 
     // misc
@@ -431,11 +457,11 @@ public class MapNodes {
 
     private INode<K, V> collapse(int shift) {
       return (shift > 0
-        && datamap == 0
-        && Bits.isPowerOfTwo(nodemap)
-        && node(nodemap) instanceof Collision)
-        ? node(nodemap)
-        : this;
+          && datamap == 0
+          && Bits.isPowerOfTwo(nodemap)
+          && node(nodemap) instanceof Collision)
+          ? node(nodemap)
+          : this;
     }
 
     private void grow() {
@@ -625,16 +651,24 @@ public class MapNodes {
     // update
 
     @Override
-    public INode<K, V> put(int shift, Object editor, int hash, K key, V value, BiPredicate<K, K> equals, BinaryOperator<V> merge) {
+    public INode<K, V> put(
+        int shift,
+        Object editor,
+        int hash,
+        K key,
+        V value,
+        BiPredicate<K, K> equals,
+        BinaryOperator<V> merge
+    ) {
       if (hash != this.hash) {
         return new Node<K, V>(editor)
-          .putNode(hashMask(this.hash, shift), this)
-          .put(shift, editor, hash, key, value, equals, merge);
+            .putNode(hashMask(this.hash, shift), this)
+            .put(shift, editor, hash, key, value, equals, merge);
       } else {
         int idx = indexOf(key, equals);
         return idx < 0
-          ? new Collision<K, V>(hash, ArrayVector.append(entries, key, value))
-          : new Collision<K, V>(hash, ArrayVector.set(entries, idx, key, merge.apply((V) entries[idx + 1], value)));
+            ? new Collision<K, V>(hash, ArrayVector.append(entries, key, value))
+            : new Collision<K, V>(hash, ArrayVector.set(entries, idx, key, merge.apply((V) entries[idx + 1], value)));
       }
     }
 
@@ -662,11 +696,13 @@ public class MapNodes {
 
     public Iterable<IEntry<K, V>> entries() {
       return () ->
-        Iterators.range(entries.length >> 1,
-          i -> {
-            int idx = (int) (i << 1);
-            return IEntry.of((K) entries[idx], (V) entries[idx + 1]);
-          });
+          Iterators.range(
+              entries.length >> 1,
+              i -> {
+                int idx = (int) (i << 1);
+                return IEntry.of((K) entries[idx], (V) entries[idx + 1]);
+              }
+          );
     }
 
     // misc
@@ -723,7 +759,14 @@ public class MapNodes {
     return get(node, shift, hash, key, equals, DEFAULT_VALUE) != DEFAULT_VALUE;
   }
 
-  public static <K, V> Object get(Node<K, V> node, int shift, int hash, K key, BiPredicate<K, K> equals, Object defaultValue) {
+  public static <K, V> Object get(
+      Node<K, V> node,
+      int shift,
+      int hash,
+      K key,
+      BiPredicate<K, K> equals,
+      Object defaultValue
+  ) {
 
     Object currNode = node;
     while (!(currNode instanceof Collision)) {
@@ -735,8 +778,8 @@ public class MapNodes {
       if (n.isEntry(mask)) {
         int idx = n.entryIndex(mask) << 1;
         return /*n.hashes[idx] == hash &&*/ equals.test(key, (K) n.content[idx])
-          ? n.content[idx + 1]
-          : defaultValue;
+            ? n.content[idx + 1]
+            : defaultValue;
 
         // we must go deeper
       } else if (n.isNode(mask)) {
@@ -755,7 +798,14 @@ public class MapNodes {
 
   /// Set operations
 
-  public static <K, V> INode<K, V> mergeNodes(int shift, Object editor, INode<K, V> a, INode<K, V> b, BiPredicate<K, K> equals, BinaryOperator<V> merge) {
+  public static <K, V> INode<K, V> mergeNodes(
+      int shift,
+      Object editor,
+      INode<K, V> a,
+      INode<K, V> b,
+      BiPredicate<K, K> equals,
+      BinaryOperator<V> merge
+  ) {
     Collision<K, V> ca, cb;
     Node<K, V> na, nb;
 
@@ -792,7 +842,14 @@ public class MapNodes {
     }
   }
 
-  public static <K, V> Node<K, V> merge(int shift, Object editor, Node<K, V> a, Node<K, V> b, BiPredicate<K, K> equals, BinaryOperator<V> merge) {
+  public static <K, V> Node<K, V> merge(
+      int shift,
+      Object editor,
+      Node<K, V> a,
+      Node<K, V> b,
+      BiPredicate<K, K> equals,
+      BinaryOperator<V> merge
+  ) {
     Node<K, V> result = new Node<K, V>(editor);
 
     PrimitiveIterator.OfInt masks = Util.masks(a.datamap | a.nodemap | b.datamap | b.nodemap);
@@ -812,7 +869,15 @@ public class MapNodes {
         case ENTRY_ENTRY:
           result = transferEntry(mask, a, result);
           idx = b.entryIndex(mask);
-          result = (Node<K, V>) result.put(shift, editor, b.hash(idx), (K) b.content[idx << 1], (V) b.content[(idx << 1) + 1], equals, merge);
+          result = (Node<K, V>) result.put(
+              shift,
+              editor,
+              b.hash(idx),
+              (K) b.content[idx << 1],
+              (V) b.content[(idx << 1) + 1],
+              equals,
+              merge
+          );
           break;
         case NODE_NODE:
           result = result.putNode(mask, mergeNodes(shift + 5, editor, a.node(mask), b.node(mask), equals, merge));
@@ -820,14 +885,22 @@ public class MapNodes {
         case NODE_ENTRY:
           idx = b.entryIndex(mask);
           result = (Node<K, V>) result
-            .putNode(mask, a.node(mask))
-            .put(shift, editor, b.hash(idx), (K) b.content[idx << 1], (V) b.content[(idx << 1) + 1], equals, merge);
+              .putNode(mask, a.node(mask))
+              .put(shift, editor, b.hash(idx), (K) b.content[idx << 1], (V) b.content[(idx << 1) + 1], equals, merge);
           break;
         case ENTRY_NODE:
           idx = a.entryIndex(mask);
           result = (Node<K, V>) result
-            .putNode(mask, b.node(mask))
-            .put(shift, editor, a.hash(idx), (K) a.content[idx << 1], (V) a.content[(idx << 1) + 1], equals, (x, y) -> merge.apply(y, x));
+              .putNode(mask, b.node(mask))
+              .put(
+                  shift,
+                  editor,
+                  a.hash(idx),
+                  (K) a.content[idx << 1],
+                  (V) a.content[(idx << 1) + 1],
+                  equals,
+                  (x, y) -> merge.apply(y, x)
+              );
           break;
         case NONE_NONE:
           break;
@@ -837,7 +910,13 @@ public class MapNodes {
     return result;
   }
 
-  public static <K, V> INode<K, V> diffNodes(int shift, Object editor, INode<K, V> a, INode<K, V> b, BiPredicate<K, K> equals) {
+  public static <K, V> INode<K, V> diffNodes(
+      int shift,
+      Object editor,
+      INode<K, V> a,
+      INode<K, V> b,
+      BiPredicate<K, K> equals
+  ) {
     Collision<K, V> ca, cb;
     Node<K, V> na, nb;
 
@@ -877,7 +956,13 @@ public class MapNodes {
     }
   }
 
-  public static <K, V> Node<K, V> difference(int shift, Object editor, Node<K, V> a, Node<K, V> b, BiPredicate<K, K> equals) {
+  public static <K, V> Node<K, V> difference(
+      int shift,
+      Object editor,
+      Node<K, V> a,
+      Node<K, V> b,
+      BiPredicate<K, K> equals
+  ) {
     Node<K, V> result = new Node<K, V>(editor);
 
     INode<K, V> n;
@@ -927,7 +1012,13 @@ public class MapNodes {
     return result.size() > 0 ? result : null;
   }
 
-  public static <K, V> INode<K, V> intersectNodes(int shift, Object editor, INode<K, V> a, INode<K, V> b, BiPredicate<K, K> equals) {
+  public static <K, V> INode<K, V> intersectNodes(
+      int shift,
+      Object editor,
+      INode<K, V> a,
+      INode<K, V> b,
+      BiPredicate<K, K> equals
+  ) {
     Collision<K, V> ca, cb;
     Node<K, V> na, nb;
 
@@ -978,7 +1069,13 @@ public class MapNodes {
     }
   }
 
-  public static <K, V> Node<K, V> intersection(int shift, Object editor, Node<K, V> a, Node<K, V> b, BiPredicate<K, K> equals) {
+  public static <K, V> Node<K, V> intersection(
+      int shift,
+      Object editor,
+      Node<K, V> a,
+      Node<K, V> b,
+      BiPredicate<K, K> equals
+  ) {
     Node<K, V> result = new Node<K, V>(editor);
 
     PrimitiveIterator.OfInt masks = Util.masks((a.nodemap | a.datamap) & (b.nodemap | b.datamap));
@@ -1045,8 +1142,8 @@ public class MapNodes {
           INode<K, V> child = node.node(mask);
           if (child instanceof Node && child.size() >= (targetSize << 1)) {
             split(editor, (Node<K, V>) child, targetSize).stream()
-              .map(n -> new Node<K, V>(editor).putNode(mask, n))
-              .forEach(result::addLast);
+                .map(n -> new Node<K, V>(editor).putNode(mask, n))
+                .forEach(result::addLast);
           } else {
             acc = acc.putNode(mask, child);
           }

@@ -22,7 +22,7 @@ public class Dependencies {
     ROOT_DEPENDENCIES.set(null);
     return dependencies;
   }
-  
+
   public static void encode(ISet<Fingerprint> dependencies, DurableOutput out) {
     out.writeUnsignedInt(dependencies.size());
     dependencies.forEach(f -> Fingerprints.encode(f, out));

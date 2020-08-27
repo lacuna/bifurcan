@@ -16,8 +16,8 @@ import java.util.stream.StreamSupport;
  * @author ztellman
  */
 public interface ISet<V> extends
-  ICollection<ISet<V>, V>,
-  Predicate<V> {
+    ICollection<ISet<V>, V>,
+    Predicate<V> {
 
   abstract class Mixin<V> implements ISet<V> {
     protected int hash = -1;
@@ -178,7 +178,8 @@ public interface ISet<V> extends
   }
 
   /**
-   * @return the collection, represented as a normal Java set, which will throw {@link UnsupportedOperationException} on writes
+   * @return the collection, represented as a normal Java set, which will throw {@link UnsupportedOperationException}
+   * on writes
    */
   default java.util.Set<V> toSet() {
     return Sets.toSet(elements(), this::contains);

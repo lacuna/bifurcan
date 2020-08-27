@@ -15,12 +15,15 @@ import java.util.Iterator;
 public interface ICollection<C, V> extends Iterable<V> {
 
   /**
-   * This returns a data structure which is <i>linear</i>, or temporarily mutable.  The term "linear", as used here, does
-   * not completely align with the formal definition of <a href="https://en.wikipedia.org/wiki/Substructural_type_system#Linear_type_systems">linear types</a>
+   * This returns a data structure which is <i>linear</i>, or temporarily mutable.  The term "linear", as used here,
+   * does
+   * not completely align with the formal definition of
+   * <a href="https://en.wikipedia.org/wiki/Substructural_type_system#Linear_type_systems">linear types</a>
    * as used in type theory.  It is meant to describe the linear dataflow of the method calls, and as a converse to
    * "forked" data structures.
    * <p>
-   * If {@link ICollection#forked()} is called on a linear collection, all references to that linear collection should be discarded.
+   * If {@link ICollection#forked()} is called on a linear collection, all references to that linear collection
+   * should be discarded.
    * <p>
    * If the data structure is already linear, it will simply return itself.
    *
@@ -29,7 +32,6 @@ public interface ICollection<C, V> extends Iterable<V> {
   C linear();
 
   /**
-   *
    * @return true, if the collection is linear
    */
   boolean isLinear();
@@ -90,7 +92,11 @@ public interface ICollection<C, V> extends Iterable<V> {
   C clone();
 
   default C save(IDurableEncoding encoding, Path directory) {
-    IDurableCollection.Fingerprint f = FileOutput.write(directory, Map.empty(), acc -> Core.encodeSingleton(this, encoding, acc));
+    IDurableCollection.Fingerprint f = FileOutput.write(
+        directory,
+        Map.empty(),
+        acc -> Core.encodeSingleton(this, encoding, acc)
+    );
     return (C) Roots.open(directory, f).decode(encoding);
   }
 }

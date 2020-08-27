@@ -52,8 +52,8 @@ public class Graph<V, E> implements IGraph<V, E> {
   @Override
   public Iterable<IEdge<V, E>> edges() {
     return () -> edges.stream()
-      .map(e -> (IEdge<V, E>) new Graphs.UndirectedEdge<>(e.value(), e.key().v, e.key().w))
-      .iterator();
+        .map(e -> (IEdge<V, E>) new Graphs.UndirectedEdge<>(e.value(), e.key().v, e.key().w))
+        .iterator();
   }
 
   @Override
@@ -79,14 +79,15 @@ public class Graph<V, E> implements IGraph<V, E> {
   @Override
   public Graph<V, E> select(ISet<V> vertices) {
     Set<VertexSet<V>> es = edges.keys()
-      .stream()
-      .filter(s -> vertices.contains(s.v) && vertices.contains(s.w))
-      .collect(Sets.collector());
+        .stream()
+        .filter(s -> vertices.contains(s.v) && vertices.contains(s.w))
+        .collect(Sets.collector());
 
     return new Graph<>(
-      isLinear(),
-      adjacent.intersection(vertices).mapValues((k, v) -> v.intersection(vertices)),
-      edges.intersection(es));
+        isLinear(),
+        adjacent.intersection(vertices).mapValues((k, v) -> v.intersection(vertices)),
+        edges.intersection(es)
+    );
   }
 
   @Override
@@ -94,8 +95,8 @@ public class Graph<V, E> implements IGraph<V, E> {
     Object editor = isLinear() ? this.editor : new Object();
 
     Map<V, Set<V>> adjacentPrime = adjacent
-      .update(from, s -> (s == null ? new Set<V>() : s).add(to, editor), editor)
-      .update(to, s -> (s == null ? new Set<V>() : s).add(from, editor), editor);
+        .update(from, s -> (s == null ? new Set<V>() : s).add(to, editor), editor)
+        .update(to, s -> (s == null ? new Set<V>() : s).add(from, editor), editor);
 
     Map<VertexSet<V>, E> edgesPrime = edges.put(new VertexSet<>(from, to), edge, merge, editor);
 
@@ -120,8 +121,8 @@ public class Graph<V, E> implements IGraph<V, E> {
 
     Map<VertexSet<V>, E> edgesPrime = edges.remove(t, editor);
     Map<V, Set<V>> adjacentPrime = adjacent
-      .update(from, s -> s.remove(to, editor), editor)
-      .update(to, s -> s.remove(from, editor), editor);
+        .update(from, s -> s.remove(to, editor), editor)
+        .update(to, s -> s.remove(from, editor), editor);
 
     if (isLinear()) {
       edges = edgesPrime;
@@ -139,7 +140,12 @@ public class Graph<V, E> implements IGraph<V, E> {
 
     Object editor = isLinear() ? this.editor : new Object();
 
-    Map<V, Set<V>> adjacentPrime = adjacent.put(vertex, new Set<>(), (BinaryOperator<Set<V>>) Graphs.MERGE_LAST_WRITE_WINS, editor);
+    Map<V, Set<V>> adjacentPrime = adjacent.put(
+        vertex,
+        new Set<>(),
+        (BinaryOperator<Set<V>>) Graphs.MERGE_LAST_WRITE_WINS,
+        editor
+    );
 
     if (isLinear()) {
       adjacent = adjacentPrime;
@@ -180,9 +186,10 @@ public class Graph<V, E> implements IGraph<V, E> {
   @Override
   public <U> Graph<V, U> mapEdges(Function<IEdge<V, E>, U> f) {
     return new Graph<>(
-      isLinear(),
-      adjacent,
-      edges.mapValues((k, v) -> f.apply(new Graphs.DirectedEdge<V, E>(v, k.v, k.w))));
+        isLinear(),
+        adjacent,
+        edges.mapValues((k, v) -> f.apply(new Graphs.DirectedEdge<V, E>(v, k.v, k.w)))
+    );
   }
 
   @Override
@@ -215,9 +222,10 @@ public class Graph<V, E> implements IGraph<V, E> {
     if (graph instanceof Graph) {
       Graph<V, E> g = (Graph<V, E>) graph;
       return new Graph<>(
-        isLinear(),
-        adjacent.merge(g.adjacent, Set::union),
-        edges.merge(g.edges, merge));
+          isLinear(),
+          adjacent.merge(g.adjacent, Set::union),
+          edges.merge(g.edges, merge)
+      );
     } else {
       return (Graph<V, E>) Graphs.merge(this, graph, merge);
     }

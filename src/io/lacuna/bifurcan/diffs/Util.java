@@ -38,7 +38,7 @@ public class Util {
       long estimate = idx;
       // TODO: this can get linear for long contiguous blocks of indices, is there a better (but still simple) index?
       // barring that, use a binary search
-      for (;;) {
+      for (; ; ) {
         long actual = estimate - (removedIndices.indexOf(floor).getAsLong() + 1);
         if (actual == idx) {
           return estimate;

@@ -197,7 +197,13 @@ public class GenerationalAllocator {
       this(instance, buffer, allocator, range, false);
     }
 
-    private MemoryBuffer(Instance instance, ByteBuffer buffer, MemoryAllocator allocator, Range range, boolean isClosed) {
+    private MemoryBuffer(
+        Instance instance,
+        ByteBuffer buffer,
+        MemoryAllocator allocator,
+        Range range,
+        boolean isClosed
+    ) {
       this.instance = instance;
       this.buffer = buffer;
       this.allocator = allocator;
@@ -296,7 +302,8 @@ public class GenerationalAllocator {
       currMemAllocator = new MemoryAllocator(
           this,
           new BuddyAllocator(MEMORY_MIN_ALLOCATION, MEMORY_SLAB_SIZE),
-          Bytes.allocate(MEMORY_SLAB_SIZE));
+          Bytes.allocate(MEMORY_SLAB_SIZE)
+      );
       memAllocators.add(currMemAllocator);
     }
 
@@ -304,12 +311,16 @@ public class GenerationalAllocator {
       try {
         Path path = directory.resolve(UUID.randomUUID() + ".swap");
         IAllocator allocator = new BuddyAllocator(FILE_MIN_ALLOCATION, FILE_SLAB_SIZE);
-        BufferedChannel channel = new BufferedChannel(path,
-            FileChannel.open(path,
+        BufferedChannel channel = new BufferedChannel(
+            path,
+            FileChannel.open(
+                path,
                 StandardOpenOption.CREATE_NEW,
                 StandardOpenOption.READ,
                 StandardOpenOption.WRITE,
-                StandardOpenOption.SPARSE));
+                StandardOpenOption.SPARSE
+            )
+        );
 
         this.currFileAllocator = new FileAllocator(this, allocator, channel);
         fileAllocators.add(currFileAllocator);
@@ -367,12 +378,12 @@ public class GenerationalAllocator {
   ///
 
   public static void logStatus(String action) {
-//    System.out.printf("%s: mem %d, disk utilized %d, total disk %d, utilization %.3f\n",
-//        action,
-//        memoryAllocations() / (1 << 20),
-//        diskAllocations() / (1 << 20),
-//        fileSize() / (1 << 20),
-//        (double) diskAllocations() / fileSize());
+    //    System.out.printf("%s: mem %d, disk utilized %d, total disk %d, utilization %.3f\n",
+    //        action,
+    //        memoryAllocations() / (1 << 20),
+    //        diskAllocations() / (1 << 20),
+    //        fileSize() / (1 << 20),
+    //        (double) diskAllocations() / fileSize());
   }
 
   private static final ThreadLocal<Instance> INSTANCES = ThreadLocal.withInitial(Instance::new);

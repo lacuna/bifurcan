@@ -20,7 +20,14 @@ public class DurableList<V> extends IList.Mixin<V> implements IList.Durable<V> {
   private final ISortedMap<Long, Long> indexTable;
   private final DurableInput.Pool elements;
 
-  public DurableList(DurableInput.Pool bytes, Root root, long size, ISortedMap<Long, Long> indexTable, DurableInput.Pool elements, IDurableEncoding.List encoding) {
+  public DurableList(
+      DurableInput.Pool bytes,
+      Root root,
+      long size,
+      ISortedMap<Long, Long> indexTable,
+      DurableInput.Pool elements,
+      IDurableEncoding.List encoding
+  ) {
     this.bytes = bytes;
     this.root = root;
 
@@ -81,6 +88,7 @@ public class DurableList<V> extends IList.Mixin<V> implements IList.Durable<V> {
     DurableInput elements = this.elements.instance();
     return Iterators.flatMap(
         Iterators.from(elements::hasRemaining, elements::slicePrefixedBlock),
-        in -> (Iterator<V>) decodeBlock(in, root, encoding.elementEncoding()));
+        in -> (Iterator<V>) decodeBlock(in, root, encoding.elementEncoding())
+    );
   }
 }

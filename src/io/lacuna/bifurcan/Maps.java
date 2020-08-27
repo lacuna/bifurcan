@@ -143,7 +143,11 @@ public class Maps {
     return from(keys, lookup, () -> Iterators.map(keys.iterator(), k -> IEntry.of(k, lookup.apply(k))));
   }
 
-  public static <K, V> ISortedMap<K, V> from(ISortedSet<K> keys, Function<K, V> lookup, Supplier<Iterator<IEntry<K, V>>> iterator) {
+  public static <K, V> ISortedMap<K, V> from(
+      ISortedSet<K> keys,
+      Function<K, V> lookup,
+      Supplier<Iterator<IEntry<K, V>>> iterator
+  ) {
     return new ISortedMap.Mixin<K, V>() {
       @Override
       public ISortedSet<K> keys() {
@@ -289,8 +293,9 @@ public class Maps {
       @Override
       public java.util.Set<K> keySet() {
         return Sets.toSet(
-          lazyMap(map.entries(), IEntry::key),
-          k -> map.get(k).isPresent());
+            lazyMap(map.entries(), IEntry::key),
+            k -> map.get(k).isPresent()
+        );
       }
 
       @Override
@@ -301,8 +306,9 @@ public class Maps {
       @Override
       public java.util.Set<Entry<K, V>> entrySet() {
         return Sets.toSet(
-          lazyMap(map.entries(), Maps::toEntry),
-          e -> map.get(e.getKey()).map(v -> Objects.equals(v, e.getValue())).orElse(false));
+            lazyMap(map.entries(), Maps::toEntry),
+            e -> map.get(e.getKey()).map(v -> Objects.equals(v, e.getValue())).orElse(false)
+        );
       }
 
       @Override
@@ -396,19 +402,27 @@ public class Maps {
     return a;
   }
 
-  public static <T, K, V> Collector<T, LinearMap<K, V>, LinearMap<K, V>> linearCollector(Function<T, K> keyFn, Function<T, V> valFn, int capacity) {
+  public static <T, K, V> Collector<T, LinearMap<K, V>, LinearMap<K, V>> linearCollector(
+      Function<T, K> keyFn,
+      Function<T, V> valFn,
+      int capacity
+  ) {
     return linearCollector(keyFn, valFn, Maps.MERGE_LAST_WRITE_WINS, capacity);
   }
 
-  public static <T, K, V> Collector<T, LinearMap<K, V>, LinearMap<K, V>> linearCollector(Function<T, K> keyFn, Function<T, V> valFn) {
+  public static <T, K, V> Collector<T, LinearMap<K, V>, LinearMap<K, V>> linearCollector(
+      Function<T, K> keyFn,
+      Function<T, V> valFn
+  ) {
     return linearCollector(keyFn, valFn, Maps.MERGE_LAST_WRITE_WINS, 8);
   }
 
   public static <T, K, V> Collector<T, LinearMap<K, V>, LinearMap<K, V>> linearCollector(
-    Function<T, K> keyFn,
-    Function<T, V> valFn,
-    BinaryOperator<V> mergeFn,
-    int capacity) {
+      Function<T, K> keyFn,
+      Function<T, V> valFn,
+      BinaryOperator<V> mergeFn,
+      int capacity
+  ) {
     return new Collector<T, LinearMap<K, V>, LinearMap<K, V>>() {
       @Override
       public Supplier<LinearMap<K, V>> supplier() {
@@ -441,7 +455,11 @@ public class Maps {
     return collector(keyFn, valFn, Maps.MERGE_LAST_WRITE_WINS);
   }
 
-  public static <T, K, V> Collector<T, Map<K, V>, Map<K, V>> collector(Function<T, K> keyFn, Function<T, V> valFn, BinaryOperator<V> mergeFn) {
+  public static <T, K, V> Collector<T, Map<K, V>, Map<K, V>> collector(
+      Function<T, K> keyFn,
+      Function<T, V> valFn,
+      BinaryOperator<V> mergeFn
+  ) {
     return new Collector<T, Map<K, V>, Map<K, V>>() {
       @Override
       public Supplier<Map<K, V>> supplier() {

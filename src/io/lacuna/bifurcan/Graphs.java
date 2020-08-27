@@ -122,8 +122,11 @@ public class Graphs {
         return true;
       } else if (obj instanceof IEdge && !((IEdge) obj).isDirected()) {
         IEdge<V, E> e = (IEdge<V, E>) obj;
-        return ((Objects.equals(from, e.from()) && Objects.equals(to, e.to())) || (Objects.equals(from, e.to()) && Objects.equals(to, e.from())))
-          && Objects.equals(value, e.value());
+        return ((Objects.equals(from, e.from()) && Objects.equals(to, e.to())) || (Objects.equals(
+            from,
+            e.to()
+        ) && Objects.equals(to, e.from())))
+            && Objects.equals(value, e.value());
       }
       return false;
     }
@@ -229,26 +232,36 @@ public class Graphs {
   }
 
   /**
-   * @param graph a graph
-   * @param start the starting vertex
+   * @param graph  a graph
+   * @param start  the starting vertex
    * @param accept a predicate for whether a vertex represents a search end state
-   * @param cost the cost associated with each edge
+   * @param cost   the cost associated with each edge
    * @return the shortest path, if one exists, between the starting vertex and an accepted vertex, excluding trivial
    * solutions where a starting vertex is accepted
    */
-  public static <V, E> Optional<IList<V>> shortestPath(IGraph<V, E> graph, V start, Predicate<V> accept, ToDoubleFunction<IEdge<V, E>> cost) {
+  public static <V, E> Optional<IList<V>> shortestPath(
+      IGraph<V, E> graph,
+      V start,
+      Predicate<V> accept,
+      ToDoubleFunction<IEdge<V, E>> cost
+  ) {
     return shortestPath(graph, LinearList.of(start), accept, cost);
   }
 
   /**
-   * @param graph a graph
-   * @param start a list of starting vertices
+   * @param graph  a graph
+   * @param start  a list of starting vertices
    * @param accept a predicate for whether a vertex represents a search end state
-   * @param cost the cost associated with each edge
+   * @param cost   the cost associated with each edge
    * @return the shortest path, if one exists, between a starting vertex and an accepted vertex, excluding trivial
    * solutions where a starting vertex is accepted
    */
-  public static <V, E> Optional<IList<V>> shortestPath(IGraph<V, E> graph, Iterable<V> start, Predicate<V> accept, ToDoubleFunction<IEdge<V, E>> cost) {
+  public static <V, E> Optional<IList<V>> shortestPath(
+      IGraph<V, E> graph,
+      Iterable<V> start,
+      Predicate<V> accept,
+      ToDoubleFunction<IEdge<V, E>> cost
+  ) {
     IMap<V, IMap<V, ShortestPathState<V>>> originStates = new LinearMap<>();
     PriorityQueue<ShortestPathState<V>> queue = new PriorityQueue<>(Comparator.comparingDouble(x -> x.distance));
 
@@ -321,7 +334,8 @@ public class Graphs {
   }
 
   /**
-   * @return sets of vertices, where each vertex can reach every other vertex within the set, even if a single vertex is removed
+   * @return sets of vertices, where each vertex can reach every other vertex within the set, even if a single vertex
+   * is removed
    */
   public static <V> Set<Set<V>> biconnectedComponents(IGraph<V, ?> graph) {
     Set<V> cuts = articulationPoints(graph);
@@ -330,10 +344,10 @@ public class Graphs {
 
     for (Set<V> component : connectedComponents(graph.select(graph.vertices().difference(cuts)))) {
       result.add(
-        component.union(
-          cuts.stream()
-            .filter(v -> graph.out(v).containsAny(component))
-            .collect(Sets.collector())));
+          component.union(
+              cuts.stream()
+                  .filter(v -> graph.out(v).containsAny(component))
+                  .collect(Sets.collector())));
     }
 
     for (int i = 0; i < cuts.size() - 1; i++) {
@@ -372,9 +386,10 @@ public class Graphs {
 
     // algorithmic state
     IMap<V, ArticulationPointState<V>> state = new LinearMap<>(
-      (int) graph.vertices().size(),
-      graph.vertexHash(),
-      graph.vertexEquality());
+        (int) graph.vertices().size(),
+        graph.vertexHash(),
+        graph.vertexEquality()
+    );
 
     // call-stack state
     LinearList<ArticulationPointState<V>> path = new LinearList<>();
@@ -421,7 +436,7 @@ public class Graphs {
             vs.lowlink = min(ws.lowlink, vs.lowlink);
 
             if ((path.size() > 1 && ws.lowlink >= vs.depth)
-              || (path.size() == 1 && vs.childCount > 1)) {
+                || (path.size() == 1 && vs.childCount > 1)) {
               result.add(vs.node);
             }
           }
@@ -459,9 +474,10 @@ public class Graphs {
 
     // algorithmic state
     IMap<V, TarjanState> state = new LinearMap<>(
-      (int) graph.vertices().size(),
-      graph.vertexHash(),
-      graph.vertexEquality());
+        (int) graph.vertices().size(),
+        graph.vertexHash(),
+        graph.vertexEquality()
+    );
     LinearList<V> stack = new LinearList<>();
 
     // call-stack state
@@ -535,8 +551,7 @@ public class Graphs {
   }
 
   /**
-   *
-   * @param graph a directed graph
+   * @param graph             a directed graph
    * @param includeSingletons if false, omits any subgraphs containing a single vertex
    * @return a list of subgraphs, where all vertices within each subgraph can reach every other vertex
    */
@@ -659,7 +674,8 @@ public class Graphs {
           });
 
           return v;
-        });
+        }
+    );
   }
 
 

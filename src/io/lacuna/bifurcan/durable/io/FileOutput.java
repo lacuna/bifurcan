@@ -64,7 +64,11 @@ public class FileOutput implements WritableByteChannel {
     }
   }
 
-  public static Fingerprint write(Path directory, IMap<Fingerprint, Fingerprint> redirects, Consumer<DurableOutput> body) {
+  public static Fingerprint write(
+      Path directory,
+      IMap<Fingerprint, Fingerprint> redirects,
+      Consumer<DurableOutput> body
+  ) {
     Dependencies.enter();
     DurableBuffer acc = new DurableBuffer();
 
@@ -80,7 +84,8 @@ public class FileOutput implements WritableByteChannel {
   }
 
   /**
-   * Finalizes the collection after {@link #close()} is called, moving the file to {@code directory}, with the hex-encoded
+   * Finalizes the collection after {@link #close()} is called, moving the file to {@code directory}, with the
+   * hex-encoded
    * hash for a name.
    */
   public Path moveTo(Path directory) {
@@ -111,7 +116,7 @@ public class FileOutput implements WritableByteChannel {
     }
 
     return end - start;
-//    return channel.transferTo(start, end, this.file);
+    //    return channel.transferTo(start, end, this.file);
   }
 
   @Override
