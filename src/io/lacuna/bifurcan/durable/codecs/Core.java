@@ -1,19 +1,15 @@
 package io.lacuna.bifurcan.durable.codecs;
 
-import com.sun.tools.internal.xjc.outline.FieldOutline;
 import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.IDurableCollection.Fingerprint;
-import io.lacuna.bifurcan.diffs.DiffMap;
 import io.lacuna.bifurcan.durable.BlockPrefix;
 import io.lacuna.bifurcan.durable.io.DurableBuffer;
 import io.lacuna.bifurcan.durable.io.FileOutput;
 import io.lacuna.bifurcan.utils.Iterators;
 
-import java.io.FileWriter;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 public class Core {
 
