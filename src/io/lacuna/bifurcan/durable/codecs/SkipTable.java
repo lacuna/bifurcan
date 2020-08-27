@@ -64,15 +64,14 @@ public class SkipTable {
   }
 
   public final DurableInput.Pool in;
-  public final int numTiers;
 
-  private SkipTable(DurableInput.Pool in, int numTiers) {
+  private SkipTable(DurableInput.Pool in) {
     this.in = in;
-    this.numTiers = numTiers;
   }
 
-  public static ISortedMap<Long, Long> decode(DurableInput.Pool pool, int numTiers) {
-    return new SkipTable(pool, numTiers).toSortedMap();
+  public static ISortedMap<Long, Long> decode(IDurableCollection.Root root, DurableInput in) {
+    DurableInput block = in.sliceBlock(BlockType.TABLE);
+    return new SkipTable((root == null ? block : root.cached(block)).pool()).toSortedMap();
   }
 
   private Reader reader() {
@@ -165,22 +164,22 @@ public class SkipTable {
     private final DurableInput in = SkipTable.this.in.instance();
 
     int tier;
-    long idx, key, offset;
+    long idx, key, value;
 
-    private long prevKey, prevOffset, nextTier, step;
-    private final long initOffset;
+    private long prevKey, prevValue, nextTier, step;
+    private final long initValue;
 
     public Reader() {
+      tier = in.readUnsignedByte();
       prevKey = key = in.readVLQ();
-      initOffset = in.readVLQ();
+      initValue = in.readVLQ();
       nextTier = in.position();
 
-      tier = SkipTable.this.numTiers;
       step = 1L << tier;
       if (tier > 0) {
         descend();
       } else {
-        offset = initOffset;
+        value = initValue;
       }
     }
 
@@ -197,12 +196,12 @@ public class SkipTable {
     void next() {
       assert hasNext();
       prevKey = key;
-      prevOffset = offset;
+      prevValue = value;
 
       key += in.readUVLQ();
       if (prevKey != key) {
         idx += step;
-        offset += in.readVLQ();
+        value += in.readVLQ();
       } else {
         // we've hit the end of this chunk, make sure hasNext() return false
         in.seek(nextTier);
@@ -223,12 +222,12 @@ public class SkipTable {
       nextTier = in.position() + len;
 
       // recalibrate wrt offset on the next tier
-      if (offset > 0) {
-        in.skipBytes(offset);
-        prevOffset = offset = in.readVLQ();
+      if (value > 0) {
+        in.skipBytes(value);
+        prevValue = value = in.readVLQ();
         prevKey = key;
       } else if (tier == 0) {
-        prevOffset = offset = initOffset;
+        prevValue = value = initValue;
       }
     }
 
@@ -237,19 +236,19 @@ public class SkipTable {
      */
     void descendPrev() {
       key = prevKey;
-      offset = prevOffset;
+      value = prevValue;
       idx -= step;
       descend();
     }
 
     Entry entry() {
       assert tier == 0;
-      return new Entry(key, offset);
+      return new Entry(key, value);
     }
 
     Entry prevEntry() {
       assert tier == 0;
-      return key == prevKey ? null : new Entry(prevKey, prevOffset);
+      return key == prevKey ? null : new Entry(prevKey, prevValue);
     }
   }
 
@@ -261,21 +260,21 @@ public class SkipTable {
     private Writer parent = null;
 
     private boolean init = false;
-    private long firstKey, firstOffset, lastKey, lastOffset, count = 0;
+    private long firstKey, firstValue, lastKey, lastValue, count = 0;
 
     public Writer() {
     }
 
-    public Writer(long firstKey, long firstOffset) {
+    public Writer(long firstKey, long firstValue) {
       this.firstKey = this.lastKey = firstKey;
-      this.firstOffset = this.lastOffset = firstOffset;
+      this.firstValue = this.lastValue = firstValue;
       this.init = true;
     }
 
-    public void append(long key, long offset) {
+    public void append(long key, long value) {
       if (!init) {
         firstKey = lastKey = key;
-        firstOffset = lastOffset = offset;
+        firstValue = lastValue = value;
         init = true;
         return;
       }
@@ -293,15 +292,15 @@ public class SkipTable {
         acc.writeUVLQ(0);
 
         parent.append(key, acc.written());
-        acc.writeVLQ(offset);
+        acc.writeVLQ(value);
       } else {
         acc.writeUVLQ(key - lastKey);
-        acc.writeVLQ(offset - lastOffset);
+        acc.writeVLQ(value - lastValue);
       }
 
       count++;
       lastKey = key;
-      lastOffset = offset;
+      lastValue = value;
     }
 
     public void free() {
@@ -311,7 +310,7 @@ public class SkipTable {
       acc.free();
     }
 
-    public int tiers() {
+    private int tiers() {
       if (acc.written() == 0) {
         return 0;
       } else {
@@ -338,8 +337,9 @@ public class SkipTable {
       long offset = out.written();
       DurableBuffer.flushTo(out, BlockType.TABLE, acc -> {
         if (init) {
+          acc.writeUnsignedByte(tiers());
           acc.writeVLQ(firstKey);
-          acc.writeVLQ(firstOffset);
+          acc.writeVLQ(firstValue);
           flush(acc, 1);
         } else {
           free();
@@ -351,7 +351,7 @@ public class SkipTable {
     public ISortedMap<Long, Long> toOffHeapMap() {
       DurableBuffer tmp = new DurableBuffer();
       flushTo(tmp);
-      return SkipTable.decode(tmp.toOffHeapInput().sliceBlock(BlockType.TABLE).pool(), tiers());
+      return SkipTable.decode(null, tmp.toOffHeapInput());
     }
   }
 }

@@ -72,6 +72,14 @@ public interface IDurableCollection {
   Root root();
 
   interface Rebase {
+    Fingerprint original();
+
+    Fingerprint updated();
+
+    ISortedMap<Long, Long> updatedIndices();
+
+    Root root();
+
     <T extends IDurableCollection> T apply(T collection);
   }
 
@@ -84,27 +92,15 @@ public interface IDurableCollection {
       throw new IllegalArgumentException("unexpected roots in `compactSet`: " + unexpectedRoots);
     }
 
-    System.out.println(compactSet + " " + compactGraph + " " + root().dependencyGraph());
     ISet<Fingerprint> reachable = Set.from(Graphs.bfsVertices(fingerprint, compactGraph::out));
     if (reachable.size() < compactSet.size()) {
       throw new IllegalArgumentException("disconnected elements in `compactSet`: " + compactSet.difference(reachable));
     }
 
-    Fingerprint compacted = Core.compacting(
-        compactSet,
-        () -> FileOutput.write(
-            root().path().getParent(),
-            Map.empty(),
-            acc -> Core.encodeSingleton(this, encoding(), acc)));
+    if (compactSet.size() < 2) {
+      throw new IllegalArgumentException("there must be at least two elements in `compactSet`");
+    }
 
-    IMap<Fingerprint, Fingerprint> rebases = new Map<Fingerprint, Fingerprint>().put(fingerprint, compacted);
-    return new Rebase() {
-      @Override
-      public <T extends IDurableCollection> T apply(T c) {
-        Path dir = c.root().path().getParent();
-        Fingerprint f = FileOutput.write(dir, rebases, acc -> Core.encodeSingleton(c, c.encoding(), acc));
-        return (T) Roots.open(dir, f).decode(c.encoding());
-      }
-    };
+    return Core.compact(compactSet, this);
   }
 }

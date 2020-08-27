@@ -52,6 +52,10 @@ public interface IList<V> extends
     }
   }
 
+  interface Durable<V> extends IList<V>, IDurableCollection {
+    IDurableEncoding.List encoding();
+  }
+
   default IList<V> update(long idx, Function<V, V> updateFn) {
     return set(idx, updateFn.apply(nth(idx)));
   }

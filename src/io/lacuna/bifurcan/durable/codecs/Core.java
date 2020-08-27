@@ -1,12 +1,15 @@
 package io.lacuna.bifurcan.durable.codecs;
 
+import com.sun.tools.internal.xjc.outline.FieldOutline;
 import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.IDurableCollection.Fingerprint;
 import io.lacuna.bifurcan.diffs.DiffMap;
 import io.lacuna.bifurcan.durable.BlockPrefix;
 import io.lacuna.bifurcan.durable.io.DurableBuffer;
+import io.lacuna.bifurcan.durable.io.FileOutput;
 import io.lacuna.bifurcan.utils.Iterators;
 
+import java.io.FileWriter;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.function.Function;
@@ -15,15 +18,6 @@ import java.util.function.Supplier;
 public class Core {
 
   private static ThreadLocal<ISet<Fingerprint>> COMPACT_SET = new ThreadLocal<>();
-
-  public static <T> T compacting(ISet<Fingerprint> compactSet, Supplier<T> body) {
-    COMPACT_SET.set(compactSet);
-    try {
-      return body.get();
-    } finally {
-      COMPACT_SET.set(null);
-    }
-  }
 
   /**
    * Encodes a block to {@code out}
@@ -78,7 +72,9 @@ public class Core {
       encodePrimitives(LinearList.of(o), (IDurableEncoding.Primitive) encoding, out);
 
     } else {
-      throw new IllegalArgumentException(String.format("cannot encode %s with %s", o.getClass().getName(), encoding.description()));
+      throw new IllegalArgumentException(
+          String.format("cannot encode %s with %s", o.getClass().getName(), encoding.description())
+      );
     }
   }
 
@@ -95,7 +91,8 @@ public class Core {
               IEntry.of(
                   encoding.keyEncoding().hashFn().applyAsLong(e.getKey()),
                   e.getKey(),
-                  e.getValue()))
+                  e.getValue()
+              ))
           .sorted(Comparator.comparing(IEntry.WithHash::keyHash))
           .iterator();
       HashMap.encodeSortedEntries(it, encoding, out);
@@ -108,19 +105,15 @@ public class Core {
 
   public static void inlineCollection(IDurableCollection c, ISet<Fingerprint> compactSet, DurableOutput out) {
     if (c instanceof IDiffMap) {
-      IList<IDiffMap<Object, Object>> stack = diffStack((IDiffMap<Object, Object>) c, x ->
-          x.underlying() instanceof IDiffMap && compactSet.contains(fingerprint(x.underlying()))
-              ? (IDiffMap<Object, Object>) x.underlying()
-              : null
-      );
+      IList<IDiffMap<Object, Object>> stack = diffStack((IDiffMap<Object, Object>) c, compactSet);
 
       // inline the entire map
       if (compactSet.contains(fingerprint(stack.first().underlying()))) {
-        DiffHashMap.inline(stack, (IDurableEncoding.Map) c.encoding(), out);
+        DiffHashMap.inline(stack, (IDurableEncoding.Map) c.encoding(), null, out);
 
         // inline a set of diffs without inlining the underlying collection
       } else {
-        DiffHashMap.inlineDiffs(stack, (IDurableEncoding.Map) c.encoding(), out);
+        DiffHashMap.inlineDiffs(stack, (IDurableEncoding.Map) c.encoding(), null, out);
       }
 
     } else if (c instanceof IMap.Durable) {
@@ -134,14 +127,23 @@ public class Core {
   /**
    * Decodes a singleton block containing a collection. This does NOT advance the input.
    */
-  public static IDurableCollection decodeCollection(IDurableEncoding encoding, IDurableCollection.Root root, DurableInput.Pool pool) {
+  public static IDurableCollection decodeCollection(
+      IDurableEncoding encoding,
+      IDurableCollection.Root root,
+      DurableInput.Pool pool
+  ) {
     return decodeCollection(pool.instance().readPrefix(), encoding, root, pool);
   }
 
   /**
    * Decodes a singleton block containing a collection. This does NOT advance the input.
    */
-  public static IDurableCollection decodeCollection(BlockPrefix prefix, IDurableEncoding encoding, IDurableCollection.Root root, DurableInput.Pool pool) {
+  public static IDurableCollection decodeCollection(
+      BlockPrefix prefix,
+      IDurableEncoding encoding,
+      IDurableCollection.Root root,
+      DurableInput.Pool pool
+  ) {
     switch (prefix.type) {
       case REFERENCE:
         return Reference.decode(pool).decodeCollection(encoding, root);
@@ -167,17 +169,61 @@ public class Core {
   }
 
   /**
-   * Decodes a block of encoded values, which may or may not be a singleton collection.  This does NOT advance the input.
+   * Decodes a block of encoded values, which may or may not be a singleton collection.  This does NOT advance the
+   * input.
    */
-  public static IDurableEncoding.SkippableIterator decodeBlock(DurableInput in, IDurableCollection.Root root, IDurableEncoding encoding) {
+  public static IDurableEncoding.SkippableIterator decodeBlock(
+      DurableInput in,
+      IDurableCollection.Root root,
+      IDurableEncoding encoding
+  ) {
     BlockPrefix prefix = in.peekPrefix();
     if (prefix.type == BlockPrefix.BlockType.PRIMITIVE) {
       if (!(encoding instanceof IDurableEncoding.Primitive)) {
-        throw new IllegalArgumentException(String.format("cannot decode primitive value using %s", encoding.description()));
+        throw new IllegalArgumentException(String.format(
+            "cannot decode primitive value using %s",
+            encoding.description()
+        ));
       }
-      return ((IDurableEncoding.Primitive) encoding).decode(in.duplicate().sliceBlock(BlockPrefix.BlockType.PRIMITIVE), root);
+
+      return ((IDurableEncoding.Primitive) encoding).decode(
+          in.duplicate().sliceBlock(BlockPrefix.BlockType.PRIMITIVE),
+          root
+      );
     } else {
       return Iterators.skippable(Iterators.singleton(decodeCollection(prefix, encoding, root, in.pool())));
+    }
+  }
+
+  public static IDurableCollection.Rebase compact(ISet<Fingerprint> compactSet, IDurableCollection c) {
+    COMPACT_SET.set(compactSet);
+    SkipTable.Writer updatedIndices = new SkipTable.Writer();
+
+    try {
+      Fingerprint updated = FileOutput.write(
+          c.root().path().getParent(),
+          Map.empty(),
+          acc -> {
+            if (c instanceof IDiffMap) {
+              IList<IDiffMap<Object, Object>> stack = diffStack((IDiffMap<Object, Object>) c, compactSet);
+
+              // inline the entire map
+              if (compactSet.contains(fingerprint(stack.first().underlying()))) {
+                DiffHashMap.inline(stack, (IDurableEncoding.Map) c.encoding(), updatedIndices, acc);
+
+                // inline a set of diffs without inlining the underlying collection
+              } else {
+                DiffHashMap.inlineDiffs(stack, (IDurableEncoding.Map) c.encoding(), updatedIndices, acc);
+              }
+            } else {
+              inlineCollection(c, compactSet, acc);
+            }
+          }
+      );
+
+      return Rebase.encode(c.root(), updated, updatedIndices);
+    } finally {
+      COMPACT_SET.set(null);
     }
   }
 
@@ -186,6 +232,14 @@ public class Core {
 
   private static Fingerprint fingerprint(Object c) {
     return ((IDurableCollection) c).root().fingerprint();
+  }
+
+  private static <K, V> IList<IDiffMap<K, V>> diffStack(IDiffMap<K, V> m, ISet<Fingerprint> compactSet) {
+    return diffStack(m, (IDiffMap<K, V> x) ->
+        x.underlying() instanceof IDiffMap && compactSet.contains(fingerprint(x.underlying()))
+            ? (IDiffMap<K, V>) x.underlying()
+            : null
+    );
   }
 
   private static <T> IList<T> diffStack(T initial, Function<T, T> inner) {

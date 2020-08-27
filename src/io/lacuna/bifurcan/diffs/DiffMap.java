@@ -33,9 +33,19 @@ public class DiffMap<K, V> extends IMap.Mixin<K, V> implements IDiffMap<K, V> {
 
     if (addedPrime.size() != addedSize) {
       ISortedSet<Long> removedIndicesPrime = idx.isPresent() ? removedIndices.add(idx.getAsLong()) : removedIndices;
-      return isLinear() ? this : new DiffMap<>(underlying, addedPrime, removedIndicesPrime);
+      if (isLinear()) {
+        super.hash = -1;
+        return this;
+      } else {
+        return new DiffMap<>(underlying, addedPrime, removedIndicesPrime);
+      }
     } else {
-      return isLinear() ? this : new DiffMap<>(underlying, addedPrime, removedIndices);
+      if (isLinear()) {
+        super.hash = -1;
+        return this;
+      } else {
+        return new DiffMap<>(underlying, addedPrime, removedIndices);
+      }
     }
   }
 
@@ -44,7 +54,12 @@ public class DiffMap<K, V> extends IMap.Mixin<K, V> implements IDiffMap<K, V> {
     IMap<K, V> addedPrime = added.remove(key);
     OptionalLong idx = underlying.indexOf(key);
     ISortedSet<Long> removedIndicesPrime = idx.isPresent() ? removedIndices.add(idx.getAsLong()) : removedIndices;
-    return isLinear() ? this : new DiffMap<>(underlying, addedPrime, removedIndicesPrime);
+    if (isLinear()) {
+      super.hash = -1;
+      return this;
+    } else {
+      return new DiffMap<>(underlying, addedPrime, removedIndicesPrime);
+    }
   }
 
   @Override

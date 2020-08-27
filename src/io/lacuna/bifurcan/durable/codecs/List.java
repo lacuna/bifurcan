@@ -40,14 +40,7 @@ public class List {
     long size = index;
     DurableBuffer.flushTo(out, BlockType.LIST, acc -> {
       acc.writeUVLQ(size);
-      acc.writeUnsignedByte(skipTable.tiers());
-
-      if (skipTable.tiers() > 0) {
-        skipTable.flushTo(acc);
-      } else {
-        skipTable.free();
-      }
-
+      skipTable.flushTo(acc);
       elements.flushTo(acc);
     });
   }
@@ -62,13 +55,9 @@ public class List {
     long pos = in.position();
 
     long size = in.readUVLQ();
-    int skipTableTiers = in.readUnsignedByte();
 
-    ISortedMap<Long, Long> indexTable;
-    if (skipTableTiers > 0) {
-      DurableInput skipIn = in.sliceBlock(BlockType.TABLE);
-      indexTable = SkipTable.decode(() -> root.cached(skipIn), skipTableTiers);
-    } else {
+    ISortedMap<Long, Long> indexTable = SkipTable.decode(root, in);
+    if (indexTable.size() == 0) {
       indexTable = DEFAULT_TABLE;
     }
 

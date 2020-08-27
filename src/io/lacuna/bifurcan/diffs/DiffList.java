@@ -48,7 +48,6 @@ public class DiffList<V> extends IList.Mixin<V> implements IDiffList<V> {
 
   @Override
   public IList<V> slice(long start, long end) {
-
     long pSize = prefix().size();
     List<V> prefix = start < pSize
         ? this.prefix.slice(start, Math.min(pSize, end))
@@ -98,6 +97,10 @@ public class DiffList<V> extends IList.Mixin<V> implements IDiffList<V> {
 
   @Override
   public IList<V> removeLast() {
+    if (isLinear()) {
+      super.hash = -1;
+    }
+
     if (suffix.size() > 0) {
       List<V> suffixPrime = suffix.removeLast();
       return isLinear() ? this : new DiffList<>(underlying, prefix, suffixPrime, slice);
@@ -117,6 +120,10 @@ public class DiffList<V> extends IList.Mixin<V> implements IDiffList<V> {
 
   @Override
   public IList<V> removeFirst() {
+    if (isLinear()) {
+      super.hash = -1;
+    }
+
     if (prefix.size() > 0) {
       List<V> prefixPrime = prefix.removeFirst();
       return isLinear() ? this : new DiffList<>(underlying, prefixPrime, suffix, slice);
@@ -136,6 +143,10 @@ public class DiffList<V> extends IList.Mixin<V> implements IDiffList<V> {
 
   @Override
   public IList<V> set(long idx, V value) {
+    if (isLinear()){
+      super.hash = -1;
+    }
+
     if (idx < prefix.size()) {
       List<V> prefixPrime = prefix.set(idx, value);
       return isLinear() ? this : new DiffList<>(underlying, prefixPrime, suffix, slice);

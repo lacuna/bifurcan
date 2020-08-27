@@ -10,7 +10,7 @@ import java.util.Iterator;
 
 import static io.lacuna.bifurcan.durable.codecs.Core.decodeBlock;
 
-public class DurableList<V> extends IList.Mixin<V> implements IDurableCollection {
+public class DurableList<V> extends IList.Mixin<V> implements IList.Durable<V> {
 
   private final DurableInput.Pool bytes;
   private final Root root;

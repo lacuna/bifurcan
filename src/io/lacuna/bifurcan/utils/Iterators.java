@@ -6,6 +6,7 @@ import io.lacuna.bifurcan.IList;
 import io.lacuna.bifurcan.LinearList;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.*;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -335,6 +336,30 @@ public class Iterators {
         return it.next();
       }
     };
+  }
+
+  public static class Indexed<T> {
+    public final long index;
+    public final T value;
+
+    public Indexed(long index, T value) {
+      this.index = index;
+      this.value = value;
+    }
+
+    @Override
+    public String toString() {
+      return index + ": " + value;
+    }
+  }
+
+  public static <V> Iterator<Indexed<V>> indexed(Iterator<V> it) {
+    return indexed(it, 0);
+  }
+
+  public static <V> Iterator<Indexed<V>> indexed(Iterator<V> it, long offset) {
+    AtomicLong counter = new AtomicLong(offset);
+    return map(it, v -> new Indexed<>(counter.getAndIncrement(), v));
   }
 
 }

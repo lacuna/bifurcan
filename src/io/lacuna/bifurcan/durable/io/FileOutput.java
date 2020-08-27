@@ -64,13 +64,13 @@ public class FileOutput implements WritableByteChannel {
     }
   }
 
-  public static Fingerprint write(Path directory, IMap<Fingerprint, Fingerprint> rebases, Consumer<DurableOutput> body) {
+  public static Fingerprint write(Path directory, IMap<Fingerprint, Fingerprint> redirects, Consumer<DurableOutput> body) {
     Dependencies.enter();
     DurableBuffer acc = new DurableBuffer();
 
     body.accept(acc);
 
-    FileOutput file = new FileOutput(Dependencies.exit(), rebases);
+    FileOutput file = new FileOutput(Dependencies.exit(), redirects);
     DurableOutput out = DurableOutput.from(file);
     acc.flushTo(out);
     out.close();

@@ -149,27 +149,8 @@ public class HashMap {
   private static void flush(long size, SkipTable.Writer indexTable, SkipTable.Writer hashTable, DurableBuffer entries, DurableOutput out) {
     DurableBuffer.flushTo(out, BlockType.HASH_MAP, acc -> {
       acc.writeUVLQ(size);
-
-      // skip table metadata
-      int tiers = indexTable.tiers();
-      acc.writeUnsignedByte(tiers);
-
-      // hash table metadata
-      int bytesPerEntry = hashTable.tiers();
-      acc.writeUnsignedByte(bytesPerEntry);
-
-      if (tiers > 0) {
-        indexTable.flushTo(acc);
-      } else {
-        indexTable.free();
-      }
-
-      if (bytesPerEntry > 0) {
-        hashTable.flushTo(acc);
-      } else {
-        hashTable.free();
-      }
-
+      indexTable.flushTo(acc);
+      hashTable.flushTo(acc);
       entries.flushTo(acc);
     });
   }
@@ -186,22 +167,14 @@ public class HashMap {
     long pos = in.position();
 
     long size = in.readUVLQ();
-    int skipTableTiers = in.readUnsignedByte();
-    int hashTableTiers = in.readUnsignedByte();
 
-    ISortedMap<Long, Long> skipTable;
-    if (skipTableTiers > 0) {
-      DurableInput skipIn = in.sliceBlock(BlockType.TABLE);
-      skipTable = SkipTable.decode(root == null ? skipIn.pool() : () -> root.cached(skipIn), skipTableTiers);
-    } else {
+    ISortedMap<Long, Long> skipTable = SkipTable.decode(root, in);
+    if (skipTable.size() == 0) {
       skipTable = DEFAULT_TABLE;
     }
 
-    ISortedMap<Long, Long> hashTable;
-    if (hashTableTiers > 0) {
-      DurableInput hashIn = in.sliceBlock(BlockType.TABLE);
-      hashTable = SkipTable.decode(root == null ? hashIn.pool() : () -> root.cached(hashIn), hashTableTiers);
-    } else {
+    ISortedMap<Long, Long> hashTable = SkipTable.decode(root, in);
+    if (hashTable.size() == 0) {
       hashTable = DEFAULT_TABLE;
     }
 

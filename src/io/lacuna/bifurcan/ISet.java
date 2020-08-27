@@ -50,6 +50,10 @@ public interface ISet<V> extends
     }
   }
 
+  interface Durable<V> extends ISet<V>, IDurableCollection {
+    IDurableEncoding.Set encoding();
+  }
+
   /**
    * @return the hash function used by the set
    */
