@@ -40,7 +40,7 @@ public class ChunkSort {
     }
   }
 
-  private static class Accumulator<T, S> {
+  public static class Accumulator<T, S> {
 
     private final Function<Iterator<T>, S> encode;
     private final Function<S, Iterator<T>> decode;
@@ -85,10 +85,11 @@ public class ChunkSort {
 
       while (iterators.size() > maxRealizedElements) {
         IList<Iterator<T>> merged = new LinearList<>();
+        TempStream.push();
         for (int i = 0; i < iterators.size(); i += maxRealizedElements) {
           merged.addLast(decode.apply(spill(iterators.slice(i, Math.min(iterators.size(), i + maxRealizedElements)))));
         }
-        TempStream.release();
+        TempStream.pop();
         iterators = merged;
       }
 
@@ -98,6 +99,20 @@ public class ChunkSort {
 
   ///
 
+  public static <V> ChunkSort.Accumulator<V, ?> accumulator(
+      Comparator<V> comparator,
+      IDurableEncoding elementEncoding,
+      int maxRealizedElements
+  ) {
+    TempStream.push();
+    return new Accumulator<>(
+        it -> TempStream.encode(it, elementEncoding),
+        bufs -> TempStream.decode((IList<IBuffer>) bufs, elementEncoding),
+        comparator,
+        maxRealizedElements
+    );
+  }
+
   public static <T, S> Iterator<T> sortedEntries(
       Iterator<T> entries,
       Function<Iterator<T>, S> encode,
@@ -105,7 +120,7 @@ public class ChunkSort {
       Comparator<T> comparator,
       int maxRealizedElements
   ) {
-
+    TempStream.push();
     Accumulator<T, S> acc = new Accumulator<>(encode, decode, comparator, maxRealizedElements);
     entries.forEachRemaining(acc::add);
     return acc.sortedIterator();

@@ -5,6 +5,7 @@ import io.lacuna.bifurcan.durable.codecs.SkipTable;
 import io.lacuna.bifurcan.durable.io.DurableBuffer;
 import io.lacuna.bifurcan.utils.Iterators;
 
+import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.OptionalLong;
@@ -80,5 +81,14 @@ public interface IDiffMap<K, V> extends IMap<K, V>, IDiff<IMap<K, V>, IEntry<K, 
         Util.skipIndices(underlying().entries().iterator(), removedIndices().iterator()),
         added().entries().iterator()
     );
+  }
+
+  @Override
+  default Durable<K, V> save(IDurableEncoding encoding, Path directory) {
+    if (removedIndices().size() == 0 && added().size() == 0) {
+      return underlying().save(encoding, directory);
+    } else {
+      return IMap.super.save(encoding, directory);
+    }
   }
 }

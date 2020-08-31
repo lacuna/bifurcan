@@ -3,6 +3,7 @@ package io.lacuna.bifurcan.durable.codecs;
 import io.lacuna.bifurcan.*;
 import io.lacuna.bifurcan.IDurableCollection.Fingerprint;
 import io.lacuna.bifurcan.durable.BlockPrefix;
+import io.lacuna.bifurcan.durable.ChunkSort;
 import io.lacuna.bifurcan.durable.io.DurableBuffer;
 import io.lacuna.bifurcan.durable.io.FileOutput;
 import io.lacuna.bifurcan.utils.Iterators;
@@ -11,9 +12,14 @@ import java.util.Comparator;
 import java.util.Iterator;
 import java.util.function.Function;
 
+/**
+ * A dispatch layer for encoding, decoding, inlining, compacting, and rebasing.
+ */
 public class Core {
 
   private static ThreadLocal<ISet<Fingerprint>> COMPACT_SET = new ThreadLocal<>();
+
+  /// ENCODE
 
   /**
    * Encodes a block to {@code out}
@@ -74,7 +80,7 @@ public class Core {
     }
   }
 
-  public static void encodeMap(Object o, IDurableEncoding.Map encoding, DurableOutput out) {
+  private static void encodeMap(Object o, IDurableEncoding.Map encoding, DurableOutput out) {
     // it's a diff over a durable collection
     if (o instanceof IDiffMap && ((IDiffMap<?, ?>) o).underlying() instanceof IDurableCollection) {
       IDiffMap<Object, Object> m = (IDiffMap<Object, Object>) o;
@@ -99,6 +105,8 @@ public class Core {
     }
   }
 
+  /// INLINE
+
   public static void inlineCollection(IDurableCollection c, ISet<Fingerprint> compactSet, DurableOutput out) {
     if (c instanceof IDiffMap) {
       IList<IDiffMap<Object, Object>> stack = diffStack((IDiffMap<Object, Object>) c, compactSet);
@@ -112,7 +120,7 @@ public class Core {
         DiffHashMap.inlineDiffs(stack, (IDurableEncoding.Map) c.encoding(), null, out);
       }
 
-    } else if (c instanceof IMap.Durable) {
+    } else if (c instanceof IMap) {
       HashMap.inline(c.bytes(), (IDurableEncoding.Map) c.encoding(), c.root(), out);
 
     } else {
@@ -120,15 +128,101 @@ public class Core {
     }
   }
 
+  /// COMPACT
+
+  public static IDurableCollection.Rebase compact(ISet<Fingerprint> compactSet, IDurableCollection c) {
+    COMPACT_SET.set(compactSet);
+    ChunkSort.Accumulator<IEntry<Long, Long>, ?> updatedIndices = Rebase.accumulator();
+
+    try {
+      Fingerprint updated = FileOutput.write(
+          c.root(),
+          Map.empty(),
+          acc -> {
+            if (c instanceof IDiffMap) {
+              IList<IDiffMap<Object, Object>> stack = diffStack((IDiffMap<Object, Object>) c, compactSet);
+
+              // inline the entire map
+              if (compactSet.contains(fingerprint(stack.first().underlying()))) {
+                DiffHashMap.inline(stack, (IDurableEncoding.Map) c.encoding(), updatedIndices, acc);
+
+                // inline a set of diffs without inlining the underlying collection
+              } else {
+                DiffHashMap.inlineDiffs(stack, (IDurableEncoding.Map) c.encoding(), updatedIndices, acc);
+              }
+
+            } else {
+              inlineCollection(c, compactSet, acc);
+            }
+          }
+      );
+
+      return Rebase.encode(c, updated, updatedIndices);
+    } finally {
+      COMPACT_SET.set(null);
+    }
+  }
+
+  /// REBASE
+
+  public static Fingerprint applyRebase(IDurableCollection c, IDurableCollection.Rebase rebase) {
+    DirectedAcyclicGraph<Fingerprint, Void> deps = c.root().dependencyGraph();
+    if (!deps.vertices().contains(rebase.original())) {
+      throw new IllegalArgumentException("collection does not depend on " + rebase.original());
+    }
+
+    if (rebase.updatedIndices().size() == 0) {
+      return FileOutput.write(
+          c.root(),
+          new Map<Fingerprint, Fingerprint>().put(rebase.original(), rebase.updated()),
+          out -> Reference.from(c).encode(out)
+      );
+    } else if (c instanceof IDiffMap) {
+      IList<Fingerprint> toRebase =
+          LinearList.from(
+              Graphs.bfsVertices(
+                  rebase.original(),
+                  v -> () -> deps.in(v).stream().filter(u -> DiffHashMap.hasUnderlying(c, v, u)).iterator()
+              ));
+
+      DirectedAcyclicGraph<Fingerprint, Void> rebaseDeps = deps.select(LinearSet.from(toRebase));
+      assert (rebaseDeps.vertices().stream().allMatch(v -> rebaseDeps.out(v).size() < 2));
+
+      IMap<Fingerprint, IDurableCollection.Rebase> rebases = new LinearMap<>();
+      rebases.put(rebase.original(), rebase);
+
+      for (Fingerprint v : toRebase.removeFirst()) {
+        rebases.put(
+            v,
+            DiffHashMap.rebase(
+                c.root().open(v).decode(c.encoding()),
+                rebases.apply(rebaseDeps.out(v).nth(0)).updatedIndices()
+            )
+        );
+      }
+
+      IMap<Fingerprint, Fingerprint> redirects = rebases.entries().stream().collect(Maps.collector(
+          IEntry::key,
+          e -> e.value().updated()
+      ));
+
+      return FileOutput.write(c.root(), redirects, out -> Reference.from(c).encode(out));
+    } else {
+      throw new IllegalStateException("only IDiffMaps should have any updated indices");
+    }
+  }
+
+  /// DECODE
+
   /**
    * Decodes a singleton block containing a collection. This does NOT advance the input.
    */
-  public static IDurableCollection decodeCollection(
+  public static <T extends IDurableCollection> T decodeCollection(
       IDurableEncoding encoding,
       IDurableCollection.Root root,
       DurableInput.Pool pool
   ) {
-    return decodeCollection(pool.instance().readPrefix(), encoding, root, pool);
+    return (T) decodeCollection(pool.instance().readPrefix(), encoding, root, pool);
   }
 
   /**
@@ -190,39 +284,6 @@ public class Core {
       return Iterators.skippable(Iterators.singleton(decodeCollection(prefix, encoding, root, in.pool())));
     }
   }
-
-  public static IDurableCollection.Rebase compact(ISet<Fingerprint> compactSet, IDurableCollection c) {
-    COMPACT_SET.set(compactSet);
-    SkipTable.Writer updatedIndices = new SkipTable.Writer();
-
-    try {
-      Fingerprint updated = FileOutput.write(
-          c.root().path().getParent(),
-          Map.empty(),
-          acc -> {
-            if (c instanceof IDiffMap) {
-              IList<IDiffMap<Object, Object>> stack = diffStack((IDiffMap<Object, Object>) c, compactSet);
-
-              // inline the entire map
-              if (compactSet.contains(fingerprint(stack.first().underlying()))) {
-                DiffHashMap.inline(stack, (IDurableEncoding.Map) c.encoding(), updatedIndices, acc);
-
-                // inline a set of diffs without inlining the underlying collection
-              } else {
-                DiffHashMap.inlineDiffs(stack, (IDurableEncoding.Map) c.encoding(), updatedIndices, acc);
-              }
-            } else {
-              inlineCollection(c, compactSet, acc);
-            }
-          }
-      );
-
-      return Rebase.encode(c.root(), updated, updatedIndices);
-    } finally {
-      COMPACT_SET.set(null);
-    }
-  }
-
 
   /// utility functions
 

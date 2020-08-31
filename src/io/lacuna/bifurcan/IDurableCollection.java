@@ -1,11 +1,8 @@
 package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.durable.Bytes;
-import io.lacuna.bifurcan.durable.Roots;
 import io.lacuna.bifurcan.durable.codecs.Core;
-import io.lacuna.bifurcan.durable.io.FileOutput;
 
-import java.io.File;
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
 import java.util.function.Function;
@@ -61,8 +58,8 @@ public interface IDurableCollection {
 
     Root open(Fingerprint dependency);
 
-    default IDurableCollection decode(IDurableEncoding encoding) {
-      return decodeCollection(encoding, this, bytes());
+    default <T extends IDurableCollection> T decode(IDurableEncoding encoding) {
+      return (T) decodeCollection(encoding, this, bytes());
     }
   }
 
@@ -73,6 +70,8 @@ public interface IDurableCollection {
   Root root();
 
   interface Rebase {
+    IDurableEncoding encoding();
+
     Fingerprint original();
 
     Fingerprint updated();

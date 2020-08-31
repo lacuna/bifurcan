@@ -7,6 +7,7 @@ import io.lacuna.bifurcan.durable.io.DurableBuffer;
 import io.lacuna.bifurcan.utils.Iterators;
 
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 
 import static io.lacuna.bifurcan.durable.codecs.Core.decodeBlock;
 import static io.lacuna.bifurcan.durable.codecs.Core.encodeBlock;
@@ -18,10 +19,8 @@ import static io.lacuna.bifurcan.durable.codecs.Core.encodeBlock;
  * the overhead of fully double-buffering the data.
  * <p>
  * The general heuristic is that once the decoder has moved two full blocks of encoded values beyond the end of an
- * allocated
- * buffer, it's safe to release that buffer.  We can't, however, move beyond he very end of the iterator, so we must
- * also
- * provide a means to signal once the stream is completely consumed (see {@link #release()}).
+ * allocated buffer, it's safe to release that buffer.  We can't, however, move beyond he very end of the iterator,
+ * so we must also provide a means to signal once the stream is completely consumed (see {@link #pop()}).
  * <p>
  * This is all a pretty ugly hack, but it reduces our disk overhead while building a collection from ~100% to ~15%.
  *
@@ -29,14 +28,20 @@ import static io.lacuna.bifurcan.durable.codecs.Core.encodeBlock;
  */
 public class TempStream {
 
-  private static final ThreadLocal<LinearSet<TempIterator>> ITERATORS = ThreadLocal.withInitial(LinearSet::new);
+  private static final ThreadLocal<LinearList<LinearList<TempIterator>>> ITERATORS =
+      ThreadLocal.withInitial(LinearList::new);
 
   private interface TempIterator<V> extends Iterator<V> {
     boolean tryFree();
   }
 
-  public static void release() {
-    ITERATORS.get().clone().stream().filter(TempIterator::tryFree).forEach(ITERATORS.get()::remove);
+  public static void push() {
+    ITERATORS.get().addLast(new LinearList<>());
+  }
+
+  public static void pop() {
+    boolean result = ITERATORS.get().popLast().stream().allMatch(TempIterator::tryFree);
+    assert result;
   }
 
   public static <V> IList<IBuffer> encode(Iterator<V> it, IDurableEncoding elementEncoding) {
@@ -71,7 +76,7 @@ public class TempStream {
       private long index = 0;
 
       {
-        ITERATORS.get().add(this);
+        ITERATORS.get().last().addLast(this);
 
         long offset = 0;
         for (IBuffer b : buffers) {

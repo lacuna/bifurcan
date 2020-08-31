@@ -38,8 +38,8 @@ public class Reference {
     return root.open(fingerprint).bytes().instance().seek(position).slicePrefixedBlock().pool();
   }
 
-  public IDurableCollection decodeCollection(IDurableEncoding encoding, IDurableCollection.Root root) {
-    return Core.decodeCollection(encoding, root.open(fingerprint), underlyingBytes(root));
+  public <T extends IDurableCollection> T decodeCollection(IDurableEncoding encoding, IDurableCollection.Root root) {
+    return (T) Core.decodeCollection(encoding, root.open(fingerprint), underlyingBytes(root));
   }
 
   public static void encode(IDurableCollection collection, DurableOutput out) {

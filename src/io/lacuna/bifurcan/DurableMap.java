@@ -3,6 +3,7 @@ package io.lacuna.bifurcan;
 import io.lacuna.bifurcan.durable.Roots;
 import io.lacuna.bifurcan.durable.codecs.HashMap;
 import io.lacuna.bifurcan.durable.codecs.HashMapEntries;
+import io.lacuna.bifurcan.durable.codecs.TempStream;
 import io.lacuna.bifurcan.durable.io.FileOutput;
 import io.lacuna.bifurcan.utils.Iterators;
 
@@ -41,7 +42,7 @@ public class DurableMap<K, V> extends IMap.Mixin<K, V> implements IMap.Durable<K
   }
 
   public static <K, V> DurableMap<K, V> open(Path path, IDurableEncoding.Map encoding) {
-    return (DurableMap<K, V>) Roots.open(path).decode(encoding);
+    return Roots.open(path).decode(encoding);
   }
 
   public static <K, V> DurableMap<K, V> from(
@@ -53,9 +54,13 @@ public class DurableMap<K, V> extends IMap.Mixin<K, V> implements IMap.Durable<K
     Fingerprint f = FileOutput.write(
         directory,
         Map.empty(),
-        acc -> HashMap.encodeSortedEntries(HashMap.sortEntries(entries, encoding, maxRealizedEntries), encoding, acc)
+        acc -> {
+          HashMap.encodeSortedEntries(HashMap.sortEntries(entries, encoding, maxRealizedEntries), encoding, acc);
+          TempStream.pop();
+        }
     );
-    return (DurableMap<K, V>) Roots.open(directory, f).decode(encoding);
+
+    return Roots.open(directory, f).decode(encoding);
   }
 
   private Iterator<HashMapEntries> chunkedEntries(long offset) {

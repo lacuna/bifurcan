@@ -22,6 +22,7 @@ public class BufferedChannel {
   private final FileChannel channel;
   private long size;
 
+  // TODO: create thread-local-ish map of thread-id -> buffer
   private final ByteBuffer buffer;
   private long bufferOffset;
   private long threadId = Thread.currentThread().getId();

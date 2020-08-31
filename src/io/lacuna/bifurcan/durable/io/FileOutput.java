@@ -65,6 +65,14 @@ public class FileOutput implements WritableByteChannel {
   }
 
   public static Fingerprint write(
+      IDurableCollection.Root siblingRoot,
+      IMap<Fingerprint, Fingerprint> redirects,
+      Consumer<DurableOutput> body
+  ) {
+    return write(siblingRoot.path().getParent(), redirects, body);
+  }
+
+  public static Fingerprint write(
       Path directory,
       IMap<Fingerprint, Fingerprint> redirects,
       Consumer<DurableOutput> body

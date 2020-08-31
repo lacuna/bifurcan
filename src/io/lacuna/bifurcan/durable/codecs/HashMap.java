@@ -122,6 +122,7 @@ public class HashMap {
         encoding,
         out
     );
+    TempStream.pop();
   }
 
   public static <K, V> void encodeSortedEntries(
@@ -171,8 +172,6 @@ public class HashMap {
       HashMapEntries.encode(index, b, encoding, entries);
       index += b.size();
     }
-
-    TempStream.release();
 
     flush(index, indexTable, hashTable, entries, out);
   }

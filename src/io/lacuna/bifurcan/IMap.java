@@ -191,6 +191,7 @@ public interface IMap<K, V> extends
    * @return an iterator over all entries, sorted by their hash
    */
   default Iterator<IEntry.WithHash<K, V>> hashSortedEntries() {
+    // TODO: figure out how to make this place nicely with the TempStream lifecycle
     return HashMap.sortIndexedEntries(this, keyHash());
   }
 

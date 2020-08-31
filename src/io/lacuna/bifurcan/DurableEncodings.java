@@ -2,11 +2,13 @@ package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.durable.BlockPrefix;
 import io.lacuna.bifurcan.durable.io.DurableBuffer;
+import io.lacuna.bifurcan.utils.Iterators;
 
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.*;
 
 import static io.lacuna.bifurcan.durable.codecs.Core.decodeBlock;
@@ -48,6 +50,24 @@ public class DurableEncodings {
               }
           )
       );
+
+  /** A delta encoding for 64-bit integer values */
+  public static final IDurableEncoding.Primitive INTEGERS =
+      primitive("int64", 1 << 10,
+          Codec.from(
+              (l, out) -> {
+                long prev = 0;
+                for (Object o : l) {
+                  long n = (Long) o;
+                  out.writeVLQ(n - prev);
+                  prev = n;
+                }
+              },
+              (in, root) -> {
+                AtomicLong v = new AtomicLong(0);
+                return Iterators.skippable(Iterators.from(in::hasRemaining, () -> v.addAndGet(in.readVLQ())));
+              }
+          ));
 
   /**
    * @return the block size for {@code encoding}, which is {@code 1} for all non-primitives

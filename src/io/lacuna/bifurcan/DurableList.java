@@ -38,12 +38,12 @@ public class DurableList<V> extends IList.Mixin<V> implements IList.Durable<V> {
   }
 
   public static <V> DurableList<V> open(IDurableEncoding.List encoding, Path path) {
-    return (DurableList<V>) Roots.open(path).decode(encoding);
+    return Roots.open(path).decode(encoding);
   }
 
   public static <V> DurableList<V> from(Iterator<V> elements, IDurableEncoding.List encoding, Path directory) {
     Fingerprint f = FileOutput.write(directory, Map.empty(), acc -> List.encode(elements, encoding, acc));
-    return (DurableList<V>) Roots.open(directory, f).decode(encoding);
+    return Roots.open(directory, f).decode(encoding);
   }
 
   @Override

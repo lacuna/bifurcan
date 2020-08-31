@@ -9,7 +9,7 @@ import io.lacuna.bifurcan.utils.Iterators;
 import java.util.PrimitiveIterator.OfLong;
 
 /**
- * A block representing a sorted sequence of 32-bit integers:
+ * A block representing a sorted sequence of integers:
  * - the initial value [VLQ]
  * - zero or more deltas from the previous value [UVLQs]
  *

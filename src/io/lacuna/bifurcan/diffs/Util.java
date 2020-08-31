@@ -30,6 +30,10 @@ public class Util {
     }
   }
 
+  /**
+   * Given an index on a collection which is an underlying collection with some indices removed, return the corresponding
+   * index within that underlying collection.
+   */
   public static long offsetIndex(ISortedSet<Long> removedIndices, long idx) {
     Long floor = removedIndices.floor(idx);
     if (floor == null) {
@@ -52,6 +56,9 @@ public class Util {
     }
   }
 
+  /**
+   * Given a sequence and a set of indices to skip, return the sequence with those indices omitted.
+   */
   public static <V> Iterator<V> skipIndices(Iterator<V> it, Iterator<Long> skippedIndices) {
     return new Iterator<V>() {
 
@@ -88,6 +95,10 @@ public class Util {
     };
   }
 
+  /**
+   * Given a stack of collections, each removing some number of indices from the previous one, return the combined
+   * sequence of removed indices from the collection underlying the first element.
+   */
   public static PrimitiveIterator.OfLong mergedRemovedIndices(IList<Iterator<Long>> iteratorStack) {
     int stackSize = (int) iteratorStack.size();
     return new PrimitiveIterator.OfLong() {
