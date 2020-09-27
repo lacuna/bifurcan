@@ -126,14 +126,14 @@ public interface ISet<V> extends
    * @return the set, containing {@code value}
    */
   default ISet<V> add(V value) {
-    return new DiffSet<V>(this).add(value);
+    return diff().add(value);
   }
 
   /**
    * @return the set, without {@code value}
    */
   default ISet<V> remove(V value) {
-    return new DiffSet<V>(this).remove(value);
+    return diff().remove(value);
   }
 
   /**
@@ -207,6 +207,14 @@ public interface ISet<V> extends
   }
 
   /**
+   * @return a diff wrapper around this collection
+   */
+  default IDiffSet<V> diff() {
+    DiffSet<V> result = new DiffSet<>(this);
+    return isLinear() ? result.linear() : result;
+  }
+
+  /**
    * @return true, if the set is linear
    */
   @Override
@@ -221,7 +229,14 @@ public interface ISet<V> extends
 
   @Override
   default ISet<V> linear() {
-    return new DiffSet<>(this).linear();
+    return diff().linear();
+  }
+
+  default ISet<V> sliceIndices(long startIndex, long endIndex) {
+    return Sets.from(elements().slice(startIndex, endIndex), x -> {
+      long idx = indexOf(x).orElse(-1);
+      return idx < startIndex || idx >= endIndex ? OptionalLong.empty() : OptionalLong.of(idx - startIndex);
+    });
   }
 
   @Override

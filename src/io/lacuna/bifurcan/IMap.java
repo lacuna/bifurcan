@@ -258,7 +258,7 @@ public interface IMap<K, V> extends
    * @return an updated map with {@code value} under {@code key}
    */
   default IMap<K, V> put(K key, V value, BinaryOperator<V> merge) {
-    return new DiffMap<>(this).put(key, value, merge);
+    return diff().put(key, value, merge);
   }
 
   /**
@@ -281,7 +281,15 @@ public interface IMap<K, V> extends
    * @return an updated map that does not contain {@code key}
    */
   default IMap<K, V> remove(K key) {
-    return new DiffMap<>(this).remove(key);
+    return diff().remove(key);
+  }
+
+  /**
+   * @return a diff wrapper around this collection
+   */
+  default IDiffMap<K, V> diff() {
+    DiffMap<K, V> result = new DiffMap<>(this);
+    return isLinear() ? result.linear() : result;
   }
 
   @Override
@@ -291,7 +299,11 @@ public interface IMap<K, V> extends
 
   @Override
   default IMap<K, V> linear() {
-    return new DiffMap<>(this).linear();
+    return diff().linear();
+  }
+
+  default IMap<K, V> sliceIndices(long startIndex, long endIndex) {
+    return Maps.from(keys().sliceIndices(startIndex, endIndex), this::apply);
   }
 
   @Override

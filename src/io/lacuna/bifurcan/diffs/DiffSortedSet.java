@@ -11,16 +11,26 @@ public class DiffSortedSet<V> extends ISortedSet.Mixin<V> implements IDiffSorted
   }
 
   public DiffSortedSet(ISortedMap<V, Void> diffMap) {
-    this(ConcatSortedMap.from(diffMap.comparator(), LinearList.of(diffMap)));
+    this(ConcatSortedMap.from(diffMap));
   }
 
   public DiffSortedSet(ISortedSet<V> underlying) {
-    this(Maps.from(underlying, x -> null));
+    this(underlying.zip(x -> null));
+  }
+
+  @Override
+  public ISortedSet<V> underlying() {
+    return diffMap.underlying().keys();
   }
 
   @Override
   public IDiffSortedMap<V, Void> diffMap() {
     return diffMap;
+  }
+
+  @Override
+  public IDiffSortedSet<V> rebase(ISortedSet<V> newUnderlying) {
+    return new DiffSortedSet<>(diffMap.rebase(newUnderlying.zip(x -> null)));
   }
 
   @Override

@@ -1,13 +1,20 @@
 package io.lacuna.bifurcan;
 
 import io.lacuna.bifurcan.diffs.DiffSortedSet;
+import io.lacuna.bifurcan.diffs.Slice;
 
 import java.util.Comparator;
 import java.util.OptionalLong;
 import java.util.function.BiPredicate;
+import java.util.function.Function;
 import java.util.function.ToLongFunction;
 
 public interface ISortedSet<V> extends ISet<V> {
+
+  enum Bound {
+    INCLUSIVE,
+    EXCLUSIVE
+  }
 
   abstract class Mixin<V> extends ISet.Mixin<V> implements ISortedSet<V> {
     @Override
@@ -22,7 +29,7 @@ public interface ISortedSet<V> extends ISet<V> {
    * @return the entry whose key is either equal to {@code key}, or just below it. If {@code key} is less than the
    * minimum value in the map, returns {@code null}.
    */
-  OptionalLong floorIndex(V val);
+  OptionalLong inclusiveFloorIndex(V val);
 
   @Override
   default ToLongFunction<V> valueHash() {
@@ -34,24 +41,46 @@ public interface ISortedSet<V> extends ISet<V> {
     return (a, b) -> comparator().compare(a, b) == 0;
   }
 
+  default OptionalLong floorIndex(V val, Bound bound) {
+    OptionalLong oIdx = inclusiveFloorIndex(val);
+    if (bound == Bound.INCLUSIVE) {
+      return oIdx;
+    } else {
+      if (oIdx.isPresent()) {
+        long idx = oIdx.getAsLong();
+        if (comparator().compare(nth(idx), val) == 0) {
+          return idx == 0 ? OptionalLong.empty() : OptionalLong.of(idx - 1);
+        }
+      }
+    }
+    return oIdx;
+  }
+
+  default OptionalLong ceilIndex(V val, Bound bound) {
+    OptionalLong oIdx = inclusiveFloorIndex(val);
+    if (oIdx.isPresent()) {
+      long idx = oIdx.getAsLong();
+      if (bound == Bound.INCLUSIVE && comparator().compare(nth(idx), val) == 0) {
+        return oIdx;
+      } else if (idx == size() - 1) {
+        return OptionalLong.empty();
+      } else {
+        return OptionalLong.of(idx + 1);
+      }
+    }
+    return size() == 0 ? OptionalLong.empty() : OptionalLong.of(0);
+  }
+
   /**
    * @return the entry whose key is either equal to {@code key}, or just above it. If {@code key} is greater than the
    * maximum value in the map, returns {@code null}.
    */
   default OptionalLong ceilIndex(V val) {
-    OptionalLong idx = floorIndex(val);
-    if (!idx.isPresent()) {
-      return size() > 0 ? OptionalLong.of(0) : idx;
-    } else {
-      long i = idx.getAsLong();
-      if (comparator().compare(nth(i), val) == 0) {
-        return idx;
-      } else if (i < size() - 1) {
-        return OptionalLong.of(i + 1);
-      } else {
-        return OptionalLong.empty();
-      }
-    }
+    return ceilIndex(val, Bound.INCLUSIVE);
+  }
+
+  default OptionalLong floorIndex(V val) {
+    return floorIndex(val, Bound.INCLUSIVE);
   }
 
   @Override
@@ -89,32 +118,32 @@ public interface ISortedSet<V> extends ISet<V> {
    * @param max the inclusive maximum key value
    * @return a map representing all entries within {@code [min, max]}
    */
-  default ISortedSet<V> slice(V min, V max) {
-    OptionalLong oMinIdx = ceilIndex(min);
-    OptionalLong oMaxIdx = floorIndex(max);
-    if (!oMinIdx.isPresent() || !oMaxIdx.isPresent()) {
-      return Sets.from(List.EMPTY, comparator(), k -> OptionalLong.empty());
-    } else {
-      long minIdx = oMinIdx.getAsLong();
-      long maxIdx = oMaxIdx.getAsLong();
-      return Sets.from(elements().slice(minIdx, maxIdx + 1), comparator(), v -> {
-        OptionalLong oIdx = floorIndex(v);
-        if (oIdx.isPresent()) {
-          long idx = oIdx.getAsLong();
-          return idx >= minIdx && idx <= maxIdx ? OptionalLong.of(idx - minIdx) : OptionalLong.empty();
-        } else {
-          return OptionalLong.empty();
-        }
-      });
-    }
+  default IDiffSortedSet<V> slice(V min, V max) {
+    return slice(min, Bound.INCLUSIVE, max, Bound.INCLUSIVE);
+  }
+
+  default IDiffSortedSet<V> slice(V min, Bound minBound, V max, Bound maxBound) {
+    return new Slice.SortedSet<V>(min, minBound, max, maxBound, this.zip(x -> null));
+  }
+
+  @Override
+  default <U> ISortedMap<V, U> zip(Function<V, U> f) {
+    return Maps.from(this, f);
+  }
+
+  default ISortedSet<V> sliceIndices(long startIndex, long endIndex) {
+    return Sets.from(elements().slice(startIndex, endIndex), comparator(), x -> {
+      long idx = inclusiveFloorIndex(x).orElse(-1);
+      return (idx < startIndex || idx >= endIndex) ? OptionalLong.empty() : OptionalLong.of(idx - startIndex);
+    });
   }
 
   default ISortedSet<V> add(V value) {
-    return new DiffSortedSet<V>(this).add(value);
+    return diffSorted().add(value);
   }
 
   default ISortedSet<V> remove(V value) {
-    return new DiffSortedSet<V>(this).remove(value);
+    return diffSorted().remove(value);
   }
 
   default ISortedSet<V> union(ISet<V> s) {
@@ -135,6 +164,11 @@ public interface ISortedSet<V> extends ISet<V> {
 
   default ISortedSet<V> linear() {
     return new DiffSortedSet<V>(this).linear();
+  }
+
+  default IDiffSortedSet<V> diffSorted() {
+    DiffSortedSet<V> result = new DiffSortedSet<>(this);
+    return isLinear() ? result.linear() : result;
   }
 
   default V first() {

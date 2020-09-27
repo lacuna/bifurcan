@@ -122,7 +122,7 @@ public class FloatMap<V> extends ISortedMap.Mixin<Double, V> {
   }
 
   @Override
-  public OptionalLong floorIndex(Double key) {
+  public OptionalLong inclusiveFloorIndex(Double key) {
     return floorIndex((double) key);
   }
 
@@ -139,8 +139,7 @@ public class FloatMap<V> extends ISortedMap.Mixin<Double, V> {
     return new FloatMap<>(map.slice(doubleToLong(min), doubleToLong(max)));
   }
 
-  @Override
-  public FloatMap<V> slice(Double min, Double max) {
+  public FloatMap<V> sliceReal(Double min, Double max) {
     return slice((double) min, (double) max);
   }
 

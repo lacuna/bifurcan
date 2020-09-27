@@ -4,34 +4,50 @@ import io.lacuna.bifurcan.utils.Iterators;
 
 import java.util.Iterator;
 
-public interface IDiffList<V> extends IList<V>, IDiff<IList<V>, V> {
+public interface IDiffList<V> extends IList<V>, IDiff<IList<V>> {
 
-  class Range {
-    public final long start, end;
+  interface Durable<V> extends IDiffList<V>, IDurableCollection {
+  }
 
-    public Range(long start, long end) {
-      this.start = start;
-      this.end = end;
+  /**
+   * A descriptor for the number of elements removed from the front and back of the underlying list.
+   */
+  class Slice {
+    public final long fromFront, fromBack;
+
+    public Slice(long fromFront, long fromBack) {
+      this.fromFront = fromFront;
+      this.fromBack = fromBack;
     }
 
-    public long size() {
-      return end - start;
+    public long size(IList<?> underlying) {
+      return Math.max(0, underlying.size() - (fromBack + fromFront));
+    }
+
+    public <V> V nth(IList<V> underlying, long idx) {
+      return underlying.nth(idx + fromFront);
+    }
+
+    public <V> Iterator<V> iterator(IList<V> underlying, long startIdx) {
+      return Iterators.range(fromFront + startIdx, size(underlying), underlying::nth);
     }
   }
 
   IList<V> underlying();
 
-  Range underlyingSlice();
+  Slice slice();
 
   IList<V> prefix();
 
   IList<V> suffix();
 
+  IDiffList<V> rebase(IList<V> newUnderlying);
+
   @Override
   default IList<V> concat(IList<V> l) {
     IList<V> result = Lists.concat(
         prefix(),
-        underlying().slice(underlyingSlice().start, underlyingSlice().end),
+        underlying().slice(slice().fromFront, slice().fromBack),
         suffix(),
         l
     );
@@ -41,7 +57,7 @@ public interface IDiffList<V> extends IList<V>, IDiff<IList<V>, V> {
 
   @Override
   default long size() {
-    return prefix().size() + underlyingSlice().size() + suffix().size();
+    return (prefix().size() + suffix().size() + slice().size(underlying()));
   }
 
   @Override
@@ -51,20 +67,20 @@ public interface IDiffList<V> extends IList<V>, IDiff<IList<V>, V> {
     }
     idx -= prefix().size();
 
-    if (idx < underlyingSlice().size()) {
-      return underlying().nth(underlyingSlice().start + idx);
+    long underlyingSize = slice().size(underlying());
+    if (idx < underlyingSize) {
+      return slice().nth(underlying(), idx);
     }
-    idx -= underlyingSlice().size();
+    idx -= underlyingSize;
 
     return suffix().nth(idx);
   }
 
   @Override
   default Iterator<V> iterator() {
-    Range r = underlyingSlice();
     return Iterators.concat(
         prefix().iterator(),
-        r.size() == underlying().size() ? underlying().iterator() : Iterators.range(r.start, r.end, underlying()::nth),
+        slice().iterator(underlying(), 0),
         suffix().iterator()
     );
   }

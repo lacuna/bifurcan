@@ -160,18 +160,13 @@ public class Maps {
       }
 
       @Override
-      public OptionalLong floorIndex(K key) {
+      public OptionalLong inclusiveFloorIndex(K key) {
         return keys.floorIndex(key);
       }
 
       @Override
       public OptionalLong ceilIndex(K key) {
         return keys.ceilIndex(key);
-      }
-
-      @Override
-      public ISortedMap<K, V> slice(K min, K max) {
-        return from(keys.slice(min, max), lookup);
       }
 
       @Override

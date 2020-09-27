@@ -1,9 +1,6 @@
 package io.lacuna.bifurcan.diffs;
 
-import io.lacuna.bifurcan.IDiffList;
-import io.lacuna.bifurcan.IList;
-import io.lacuna.bifurcan.List;
-import io.lacuna.bifurcan.Lists;
+import io.lacuna.bifurcan.*;
 
 /**
  * @author ztellman
@@ -12,13 +9,13 @@ public class DiffList<V> extends IList.Mixin<V> implements IDiffList<V> {
 
   private final IList<V> underlying;
   private final List<V> prefix, suffix;
-  private Range slice;
+  private Slice slice;
 
   public DiffList(IList<V> underlying) {
-    this(underlying, List.EMPTY, List.EMPTY, new Range(0, underlying.size()));
+    this(underlying, List.EMPTY, List.EMPTY, new Slice(0, underlying.size()));
   }
 
-  private DiffList(IList<V> underlying, List<V> prefix, List<V> suffix, Range slice) {
+  private DiffList(IList<V> underlying, List<V> prefix, List<V> suffix, Slice slice) {
     this.underlying = underlying;
     this.prefix = prefix;
     this.suffix = suffix;
@@ -31,7 +28,7 @@ public class DiffList<V> extends IList.Mixin<V> implements IDiffList<V> {
   }
 
   @Override
-  public Range underlyingSlice() {
+  public Slice slice() {
     return slice;
   }
 
@@ -46,6 +43,11 @@ public class DiffList<V> extends IList.Mixin<V> implements IDiffList<V> {
   }
 
   @Override
+  public IDiffList<V> rebase(IList<V> newUnderlying) {
+    return new DiffList<>(newUnderlying, prefix, suffix, slice);
+  }
+
+  @Override
   public IList<V> slice(long start, long end) {
     long pSize = prefix().size();
     List<V> prefix = start < pSize
@@ -55,19 +57,19 @@ public class DiffList<V> extends IList.Mixin<V> implements IDiffList<V> {
     start = Math.max(0, start - pSize);
     end -= pSize;
 
-    Range slice = underlyingSlice();
-    Range slicePrime = end > 0 && start < slice.size()
-        ? new Range(slice.start + start, Math.min(slice.end, slice.start + end))
-        : new Range(0, 0);
+    Slice slice = slice();
+    Slice slicePrime = end > 0 && start < slice.size(underlying)
+        ? new Slice(slice.fromFront + start, slice.fromBack + Math.max(0, slice.size(underlying) - end))
+        : new Slice(0, 0);
 
-    start = Math.max(0, start - slice.size());
-    end -= slice.size();
+    start = Math.max(0, start - slice.size(underlying));
+    end -= slice.size(underlying);
 
     List<V> suffix = end > 0
         ? this.suffix.slice(start, end)
         : List.EMPTY;
 
-    return slicePrime.size() == 0
+    return slicePrime.size(underlying) == 0
         ? Lists.concat(prefix, suffix)
         : new DiffList<>(underlying, prefix, suffix, slicePrime);
   }
@@ -103,8 +105,8 @@ public class DiffList<V> extends IList.Mixin<V> implements IDiffList<V> {
     if (suffix.size() > 0) {
       List<V> suffixPrime = suffix.removeLast();
       return isLinear() ? this : new DiffList<>(underlying, prefix, suffixPrime, slice);
-    } else if (slice.size() > 0) {
-      Range slicePrime = new Range(slice.start, slice.end - 1);
+    } else if (slice.size(underlying) > 0) {
+      Slice slicePrime = new Slice(slice.fromFront, slice.fromBack + 1);
       if (isLinear()) {
         this.slice = slicePrime;
         return this;
@@ -126,8 +128,8 @@ public class DiffList<V> extends IList.Mixin<V> implements IDiffList<V> {
     if (prefix.size() > 0) {
       List<V> prefixPrime = prefix.removeFirst();
       return isLinear() ? this : new DiffList<>(underlying, prefixPrime, suffix, slice);
-    } else if (slice.size() > 0) {
-      Range slicePrime = new Range(slice.start + 1, slice.end);
+    } else if (slice.size(underlying) > 0) {
+      Slice slicePrime = new Slice(slice.fromFront + 1, slice.fromBack);
       if (isLinear()) {
         this.slice = slicePrime;
         return this;
@@ -152,16 +154,16 @@ public class DiffList<V> extends IList.Mixin<V> implements IDiffList<V> {
     }
 
     idx -= prefix.size();
-    if (idx < slice.size()) {
+    if (idx < slice.size(underlying)) {
       return new DiffList<>(
-          new ConcatList<>(underlying.slice(slice.start, slice.end)).set(idx, value),
+          new ConcatList<>(underlying.slice(slice.fromFront, slice.fromBack)).set(idx, value),
           prefix,
           suffix,
-          new Range(0, slice.size())
+          new Slice(0, slice.size(underlying))
       );
     }
 
-    idx -= slice.size();
+    idx -= slice.size(underlying);
     List<V> suffixPrime = suffix.set(idx, value);
     return isLinear() ? this : new DiffList<>(underlying, prefix, suffixPrime, slice);
   }
@@ -172,12 +174,12 @@ public class DiffList<V> extends IList.Mixin<V> implements IDiffList<V> {
   }
 
   @Override
-  public IList<V> forked() {
+  public DiffList<V> forked() {
     return isLinear() ? new DiffList<>(underlying, prefix.linear(), suffix.linear(), slice) : this;
   }
 
   @Override
-  public IList<V> linear() {
+  public DiffList<V> linear() {
     return isLinear() ? this : new DiffList<>(underlying, prefix.forked(), suffix.forked(), slice);
   }
 

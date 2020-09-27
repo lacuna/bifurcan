@@ -485,7 +485,7 @@
           s     (range (* 2 end))]
       (map=
         (->> s (drop start) (take (inc (- end start))) (map #(vector % %)) (into {}))
-        (-> (->> s (map #(vector % %)) (into {})) IntMap/from (.slice start end))))))
+        (-> (->> s (map #(vector % %)) (into {})) IntMap/from (.sliceReal start end))))))
 
 (defspec test-int-map-floor iterations
   (prop/for-all [m (int-map-gen #(IntMap.))
@@ -509,7 +509,7 @@
           s     (range (* 2 end))]
       (map=
         (->> s (drop start) (take (inc (- end start))) (map #(vector % %)) (into {}))
-        (-> (->> s (map #(vector % %)) (into {})) SortedMap/from (.slice start end))))))
+        (-> (->> s (map #(vector % %)) (into {})) SortedMap/from (.sliceReal start end))))))
 
 (defspec test-sorted-map-floor iterations
   (prop/for-all [m (sorted-map-gen #(SortedMap.))
@@ -539,7 +539,7 @@
           (into {}))
         (-> (->> s (map #(vector % %)) (into {}))
           FloatMap/from
-          (.slice (double start) (double end)))))))
+          (.sliceReal (double start) (double end)))))))
 
 (defspec test-float-map-floor iterations
   (prop/for-all [m (float-map-gen #(FloatMap.))

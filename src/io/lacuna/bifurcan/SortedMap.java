@@ -49,7 +49,7 @@ public class SortedMap<K, V> extends ISortedMap.Mixin<K, V> {
   }
 
   @Override
-  public OptionalLong floorIndex(K key) {
+  public OptionalLong inclusiveFloorIndex(K key) {
     long idx = root.floorIndex(key, comparator, 0);
     return idx < 0 ? OptionalLong.empty() : OptionalLong.of(idx);
   }
@@ -68,11 +68,6 @@ public class SortedMap<K, V> extends ISortedMap.Mixin<K, V> {
   @Override
   public SortedMap<K, V> put(K key, V value) {
     return put(key, value, (BinaryOperator<V>) Maps.MERGE_LAST_WRITE_WINS);
-  }
-
-  @Override
-  public SortedMap<K, V> slice(K min, K max) {
-    return new SortedMap<>(root.slice(min, max, comparator), isLinear(), comparator);
   }
 
   @Override

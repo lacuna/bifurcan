@@ -16,7 +16,7 @@ import java.util.function.*;
  * characteristics.
  * <p>
  * This collection keeps the keys in sorted order, and can thought of as either a map of integers or a sparse vector.
- * It provides {@link IntMap#slice(Long, Long)}, {@link IntMap#floorIndex(Long)}, and {@link IntMap#ceilIndex(Long)}
+ * It provides {@link IntMap#slice(Long, Long)}, {@link IntMap#inclusiveFloorIndex(Long)}, and {@link IntMap#ceilIndex(Long)}
  * methods which
  * allow for lookups and filtering on its keys.
  *
@@ -118,8 +118,7 @@ public class IntMap<V> extends ISortedMap.Mixin<Long, V> {
     );
   }
 
-  @Override
-  public IntMap<V> slice(Long min, Long max) {
+  public IntMap<V> sliceReal(Long min, Long max) {
     return slice((long) min, (long) max);
   }
 
@@ -373,7 +372,7 @@ public class IntMap<V> extends ISortedMap.Mixin<Long, V> {
   }
 
   @Override
-  public OptionalLong floorIndex(Long key) {
+  public OptionalLong inclusiveFloorIndex(Long key) {
     return floorIndex((long) key);
   }
 

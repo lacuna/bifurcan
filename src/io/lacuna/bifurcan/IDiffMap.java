@@ -13,7 +13,10 @@ import java.util.PrimitiveIterator;
 import java.util.function.BiPredicate;
 import java.util.function.ToLongFunction;
 
-public interface IDiffMap<K, V> extends IMap<K, V>, IDiff<IMap<K, V>, IEntry<K, V>> {
+public interface IDiffMap<K, V> extends IMap<K, V>, IDiff<IMap<K, V>> {
+
+  interface Durable<K, V> extends IDiffMap<K, V>, IDurableCollection {
+  }
 
   /**
    * The baseline data structure.
@@ -29,6 +32,8 @@ public interface IDiffMap<K, V> extends IMap<K, V>, IDiff<IMap<K, V>, IEntry<K, 
    * Indices which have been removed or shadowed from the underlying data structure.
    */
   ISortedSet<Long> removedIndices();
+
+  IDiffMap<K, V> rebase(IMap<K, V> newUnderlying);
 
   @Override
   default ToLongFunction<K> keyHash() {
@@ -84,7 +89,7 @@ public interface IDiffMap<K, V> extends IMap<K, V>, IDiff<IMap<K, V>, IEntry<K, 
   }
 
   @Override
-  default Durable<K, V> save(IDurableEncoding encoding, Path directory) {
+  default IMap.Durable<K, V> save(IDurableEncoding encoding, Path directory) {
     if (removedIndices().size() == 0 && added().size() == 0) {
       return underlying().save(encoding, directory);
     } else {

@@ -269,6 +269,12 @@ public class DiffHashMap {
       public Root root() {
         return root;
       }
+
+      @Override
+      public IDiffMap<K, V> rebase(IMap<K, V> newUnderlying) {
+        // TOOD: implement
+        throw new UnsupportedOperationException();
+      }
     };
   }
 }

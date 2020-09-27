@@ -4,9 +4,14 @@ import java.util.OptionalLong;
 import java.util.function.BiPredicate;
 import java.util.function.ToLongFunction;
 
-public interface IDiffSet<V> extends ISet<V>, IDiff<IMap<V, Void>, IEntry<V, Void>> {
+public interface IDiffSet<V> extends ISet<V>, IDiff<IMap<V, Void>> {
+
+  interface Durable<V> extends IDiffSet<V>, IDurableCollection {
+  }
 
   IDiffMap<V, Void> diffMap();
+
+  IDiffSet<V> rebase(IMap<V, Void> newUnderlying);
 
   default IMap<V, Void> underlying() {
     return diffMap().underlying();

@@ -24,6 +24,18 @@ public class DiffMap<K, V> extends IMap.Mixin<K, V> implements IDiffMap<K, V> {
   }
 
   @Override
+  public IDiffMap<K, V> rebase(IMap<K, V> newUnderlying) {
+    IntSet removed = new IntSet().linear();
+    for (long idx : removedIndices) {
+      OptionalLong newIdx = underlying.indexOf(underlying.nth(idx).key());
+      if (newIdx.isPresent()) {
+        removed.add(newIdx.getAsLong());
+      }
+    }
+    return new DiffMap<>(newUnderlying, added, removed.forked());
+  }
+
+  @Override
   public DiffMap<K, V> put(K key, V value, BinaryOperator<V> merge) {
     long addedSize = added.size();
     OptionalLong idx = underlying.indexOf(key);

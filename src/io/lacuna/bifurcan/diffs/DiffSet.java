@@ -29,6 +29,11 @@ public class DiffSet<V> extends IDiffSet.Mixin<V> implements IDiffSet<V> {
   }
 
   @Override
+  public IDiffSet<V> rebase(IMap<V, Void> newUnderlying) {
+    return new DiffSet<V>(diffMap.rebase(newUnderlying));
+  }
+
+  @Override
   public ISet<V> add(V value) {
     DiffMap<V, Void> diffPrime = diffMap.put(value, null, Maps.MERGE_LAST_WRITE_WINS);
     if (isLinear()) {
@@ -56,12 +61,12 @@ public class DiffSet<V> extends IDiffSet.Mixin<V> implements IDiffSet<V> {
   }
 
   @Override
-  public ISet<V> forked() {
+  public DiffSet<V> forked() {
     return isLinear() ? new DiffSet<>(diffMap.forked()) : this;
   }
 
   @Override
-  public ISet<V> linear() {
+  public DiffSet<V> linear() {
     return isLinear() ? this : new DiffSet<>(diffMap.linear());
   }
 }

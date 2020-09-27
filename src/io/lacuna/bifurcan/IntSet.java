@@ -1,10 +1,8 @@
 package io.lacuna.bifurcan;
 
 import java.util.Comparator;
-import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.function.BiPredicate;
-import java.util.function.ToIntFunction;
 import java.util.function.ToLongFunction;
 
 public class IntSet extends ISet.Mixin<Long> implements ISortedSet<Long> {
@@ -21,8 +19,8 @@ public class IntSet extends ISet.Mixin<Long> implements ISortedSet<Long> {
   }
 
   @Override
-  public OptionalLong floorIndex(Long val) {
-    return m.floorIndex(val);
+  public OptionalLong inclusiveFloorIndex(Long val) {
+    return m.inclusiveFloorIndex(val);
   }
 
   @Override
@@ -30,9 +28,8 @@ public class IntSet extends ISet.Mixin<Long> implements ISortedSet<Long> {
     return m.ceilIndex(val);
   }
 
-  @Override
-  public IntSet slice(Long min, Long max) {
-    return new IntSet(m.slice(min, max));
+  public IntSet sliceReal(Long min, Long max) {
+    return new IntSet(m.sliceReal(min, max));
   }
 
   @Override

@@ -71,28 +71,28 @@ public interface IList<V> extends
    * @return a new list, with {@code value} appended
    */
   default IList<V> addLast(V value) {
-    return new DiffList<>(this).addLast(value);
+    return diff().addLast(value);
   }
 
   /**
    * @return a new list, with {@code value} prepended
    */
   default IList<V> addFirst(V value) {
-    return new DiffList<>(this).addFirst(value);
+    return diff().addFirst(value);
   }
 
   /**
    * @return a new list with the last value removed, or the same list if already empty
    */
   default IList<V> removeLast() {
-    return new DiffList<>(this).removeLast();
+    return diff().removeLast();
   }
 
   /**
    * @return a new list with the first value removed, or the same value if already empty
    */
   default IList<V> removeFirst() {
-    return new DiffList<>(this).removeFirst();
+    return diff().removeFirst();
   }
 
   /**
@@ -101,7 +101,7 @@ public interface IList<V> extends
    * @throws IndexOutOfBoundsException when {@code idx} is not within {@code [0, size]}
    */
   default IList<V> set(long idx, V value) {
-    return new DiffList<>(this).set(idx, value);
+    return diff().set(idx, value);
   }
 
   /**
@@ -212,6 +212,14 @@ public interface IList<V> extends
     return DurableList.from(iterator(), (IDurableEncoding.List) encoding, directory);
   }
 
+  /**
+   * @return a diff wrapper around this collection
+   */
+  default IDiffList<V> diff() {
+    DiffList<V> result = new DiffList<>(this);
+    return isLinear() ? result.linear() : result;
+  }
+
   @Override
   default IList<V> forked() {
     return this;
@@ -219,7 +227,7 @@ public interface IList<V> extends
 
   @Override
   default IList<V> linear() {
-    return new DiffList<>(this).linear();
+    return diff().linear();
   }
 
   default boolean equals(Object o, BiPredicate<V, V> equals) {

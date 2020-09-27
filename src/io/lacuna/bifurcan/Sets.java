@@ -130,7 +130,7 @@ public class Sets {
   public static <V> ISortedSet<V> from(
       IList<V> elements,
       Comparator<V> comparator,
-      Function<V, OptionalLong> floorIndex
+      Function<V, OptionalLong> inclusiveFloorIndex
   ) {
     return new ISortedSet.Mixin<V>() {
       @Override
@@ -139,8 +139,8 @@ public class Sets {
       }
 
       @Override
-      public OptionalLong floorIndex(V val) {
-        return floorIndex.apply(val);
+      public OptionalLong inclusiveFloorIndex(V val) {
+        return inclusiveFloorIndex.apply(val);
       }
 
       @Override

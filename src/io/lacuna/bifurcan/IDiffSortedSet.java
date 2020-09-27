@@ -6,9 +6,19 @@ import java.util.Comparator;
 import java.util.Iterator;
 import java.util.OptionalLong;
 
-public interface IDiffSortedSet<V> extends ISortedSet<V> {
+public interface IDiffSortedSet<V> extends IDiff<ISortedSet<V>>, ISortedSet<V> {
+
+  interface Durable<V> extends IDiffSortedSet<V>, IDurableCollection {
+  }
 
   IDiffSortedMap<V, Void> diffMap();
+
+  IDiffSortedSet<V> rebase(ISortedSet<V> newUnderlying);
+
+  @Override
+  default ISortedSet<V> underlying() {
+    return diffMap().underlying().keys();
+  }
 
   @Override
   default Comparator<V> comparator() {
@@ -21,8 +31,8 @@ public interface IDiffSortedSet<V> extends ISortedSet<V> {
   }
 
   @Override
-  default OptionalLong floorIndex(V value) {
-    return diffMap().floorIndex(value);
+  default OptionalLong inclusiveFloorIndex(V value) {
+    return diffMap().inclusiveFloorIndex(value);
   }
 
   @Override

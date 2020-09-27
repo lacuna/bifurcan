@@ -4,7 +4,7 @@
 <dependency>
   <groupId>io.lacuna</groupId>
   <artifactId>bifurcan</artifactId>
-  <version>0.2.0-alpha1</version>
+  <version>0.2.0-alpha4</version>
 </dependency>
 ```
 
@@ -16,13 +16,14 @@ This library provides high-quality Java implementations of mutable and immutable
 * customizable equality semantics
 * contiguous memory used wherever possible
 * performance equivalent to, or better than, existing alternatives
+* changes to a collection can be tracked in a **diff** data structure, which can be subsequently rebased onto a different collection
 * [ALPHA] durable (disk-backed) representations which share the API and asymptotic performance of their in-memory counterparts
 
 Rather than using the existing collection interfaces in `java.util` such as `List` or `Map`, it provides its own interfaces (`IList`, `IMap`, `ISet`) that provide functional semantics - each update to a collection returns a reference to a new collection.  Each interface provides a method (`toList`, `toMap`, `toSet`) for coercing the collection to a read-only version of the standard Java interfaces.
 
 ### what makes this better?
 
-Some aspects of this library, like the inverted indices and durable collections, are unique.  
+Some aspects of this library, like the inverted indices, diffs, and durable collections, are unique.  
 
 There are, however, many existing implementations of "functional" (aka persistent, immutable) data structures on the JVM.  As shown in [these in-depth comparisons](https://github.com/lacuna/bifurcan/blob/master/doc/comparison.md), Bifurcan's performance is equivalent to the best existing implementations for basic operations, and significantly better for batch operations such as `union`, `intersection`, and `difference`.
 
@@ -80,28 +81,64 @@ for (int i = 0; i < 1000; i++) {
 }
 ```
 
-If we call `forked()` on this collection, it will be wrapped in an immutable "diff" facade which tracks changes without touching the underlying collection.  These facades have similar performance to typical collections, but do not support efficient set operations.
+If we call `forked()` on this collection, it will be wrapped in a **diff** facade, which is described below.
 
 ### virtual collections
 
-These facades also allow us to define collections programmatically:
+Bifurcan offers a variety of collection implementations, but you can also create your own by implementing a handful of methods.
+
+A list, at its base, is just a `size` and a function that, given an index, returns the corresponding element.  This can be constructed using the `Lists.from` method:
 
 ```java
-// a list of numbers within [0,1e6)
 IList<Long> list = Lists.from(1_000_000, i -> i);
-	
-// the set of numbers within [0,1e6)
-ISet<Long> set = Sets.from(list, i -> (0 <= i && i < list.size()) ? OptionalLong.of(i) : OptionalLong.empty());
-	
-// a map of numbers within [0,1e6) onto their square
-IMap<Long, Long> map = Maps.from(set, i -> i * i);
 ```
 
-These collections are not realized in-memory, and can be used as a translation layer for other data structure implementations.  Using our facades, however, we can still update them like any other collection, and only those changes will be directly represented in-memory.
+This creates a list of the numbers within `[0, 1e6)` without any of the elements being stored in memory.  All of the other operations associated with lists (adding and removing elements, updating elements, concatenating other lists, and so on) have efficient default implementations, which will be discussed in the next section.
+
+An unsorted set is just a list of elements, plus a function that, given an value, returns an `OptionalLong` describing the index of that element:
+
+```java
+Function<Long, OptionalLong> indexOf = n -> (0 <= n && n < list.size()) ? OptionalLong.of(i) : OptionalLong.empty();
+
+ISet<Long> set = Sets.from(list, indexOf)
+```
+
+A sorted set, conversely, is a list of elements, a comparator, and a function that, given a value, returns an `OptionalLong` describing the index of the closest element which equal to or less than that value (referred to as the "floor index"):
+
+```java
+Function<Double, OptionalLong> floorIndexOf = n -> indexOf.apply((long) n);
+
+ISet<Double> sortedSet = Sets.from(list, Comparator.naturalOrder(), floorIndexOf);
+```
+
+Sorted and unsorted maps are just their corresponding sets, plus a function from key to value.  These can be constructed using `Maps.from`, or by calling `zip` on a set:
+
+```java
+IMap<Long, Double> squareRoots = set.zip(n -> Math.sqrt(n))
+```
+
+### diffs
+
+These virtual collections can be modified just like any other Bifurcan collection:
+
+```java
+Lists.from(1, x -> 1).addLast(42)
+// [1, 42]
+```
+
+This is made possible by [diffs](https://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/IDiff.html), which track changes on an immutable **underlying** collection.  Diff implementations exists for all variants of Bifurcan collections, and share the asymptotic performance of their normal counterparts.  By calling `diff()` on any collection, we create a diff wrapper whose changes can then be **rebased** onto a new underlying collection:
+
+```java
+IList<Integer> numDiff = List.of(1, 2, 3).diff().removeFirst().addLast(42)
+// [2, 3, 42]
+
+IList<Integer> rebased = numDiffs.rebase(List.of(4, 5, 6))
+// [5, 6, 42]
+```
 
 ### durable collections
 
-All in-memory structures can be saved to disk, while retaining the same API and asymptotic performance.  These durable collections are optimized for reads and batched writes, which means they are not a replacement for general-purpose databases, but they are still [useful in a variety of applications](doc/durable.md).
+All in-memory structures can be also saved to disk, while retaining the same API and asymptotic performance.  These durable collections are optimized for reads and batched writes, which means they are not a replacement for general-purpose databases, but they are still [useful in a variety of applications](doc/durable.md).
 
 ### no lazy collections
 

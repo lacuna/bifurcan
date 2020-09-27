@@ -9,32 +9,32 @@ import java.util.function.BinaryOperator;
 
 public class ConcatSortedMap<K, V> extends ISortedMap.Mixin<K, V> implements IDiffSortedMap<K, V> {
 
-  private Comparator<K> comparator;
+  private ISortedMap<K, V> underlying;
   private ISortedMap<K, ISortedMap<K, V>> segments;
   private ISortedSet<Long> segmentOffsets;
   private final boolean isLinear;
 
   private ConcatSortedMap(
-      Comparator<K> comparator,
+      ISortedMap<K, V> underlying,
       ISortedMap<K, ISortedMap<K, V>> segments,
       ISortedSet<Long> segmentOffsets,
       boolean isLinear
   ) {
-    this.comparator = comparator;
+    this.underlying = underlying;
     this.segments = segments;
     this.segmentOffsets = segmentOffsets;
     this.isLinear = isLinear;
   }
 
-  public static <K, V> ConcatSortedMap<K, V> from(ISortedMap<K, V> m) {
-    return from(m.comparator(), LinearList.of(m));
+  public static <K, V> ConcatSortedMap<K, V> from(ISortedMap<K, V> underlying) {
+    return from(underlying, LinearList.of(underlying));
   }
 
-  public static <K, V> ConcatSortedMap<K, V> from(Comparator<K> comparator, ISortedMap<K, V>... segments) {
-    return from(comparator, LinearList.of(segments));
+  public static <K, V> ConcatSortedMap<K, V> from(ISortedMap<K, V> underlying, ISortedMap<K, V>... segments) {
+    return from(underlying, LinearList.of(segments));
   }
 
-  public static <K, V> ConcatSortedMap<K, V> from(Comparator<K> comparator, IList<ISortedMap<K, V>> segments) {
+  public static <K, V> ConcatSortedMap<K, V> from(ISortedMap<K, V> underlying, IList<ISortedMap<K, V>> segments) {
     int n = 0;
     for (ISortedMap<K, V> s : segments) {
       if (s.size() > 0) {
@@ -42,7 +42,7 @@ public class ConcatSortedMap<K, V> extends ISortedMap.Mixin<K, V> implements IDi
       }
     }
 
-    ISortedMap<K, ISortedMap<K, V>> m = new SortedMap<>(comparator);
+    ISortedMap<K, ISortedMap<K, V>> m = new SortedMap<>(underlying.comparator());
     long[] o = new long[n];
 
     int i = 0;
@@ -60,12 +60,17 @@ public class ConcatSortedMap<K, V> extends ISortedMap.Mixin<K, V> implements IDi
         Long::compare,
         idx -> aryFloorIndex(o, idx)
     );
-    return new ConcatSortedMap<K, V>(comparator, m, s, false);
+    return new ConcatSortedMap<>(underlying, m, s, false);
+  }
+
+  @Override
+  public ISortedMap<K, V> underlying() {
+    return underlying;
   }
 
   @Override
   public Comparator<K> comparator() {
-    return comparator;
+    return underlying.comparator();
   }
 
   @Override
@@ -79,14 +84,20 @@ public class ConcatSortedMap<K, V> extends ISortedMap.Mixin<K, V> implements IDi
   }
 
   @Override
+  public ConcatSortedMap<K, V> rebase(ISortedMap<K, V> newUnderlying) {
+    // TODO: implement
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public ConcatSortedMap<K, V> put(K key, V value, BinaryOperator<V> merge) {
     ConcatSortedMap<K, V> result;
 
-    OptionalLong oIdx = floorIndex(key);
+    OptionalLong oIdx = inclusiveFloorIndex(key);
     if (!oIdx.isPresent()) {
       result = size() > 0 && segments.first().value() instanceof SortedMap
-          ? from(comparator, segments.values().removeFirst().addFirst(segments.values().first().put(key, value)))
-          : from(comparator, segments.values().addFirst(new SortedMap<K, V>().put(key, value)));
+          ? from(underlying, segments.values().removeFirst().addFirst(segments.values().first().put(key, value)))
+          : from(underlying, segments.values().addFirst(new SortedMap<K, V>().put(key, value)));
     } else {
       long idx = oIdx.getAsLong();
       boolean overwrite = keyEquality().test(key, nth(idx).key());
@@ -97,11 +108,11 @@ public class ConcatSortedMap<K, V> extends ISortedMap.Mixin<K, V> implements IDi
         ISortedMap<K, V> s = segments.last().put(key, value);
         segments = segments.removeLast().addLast(s);
       } else {
-        segments = segments.addLast(new SortedMap<K, V>(comparator).put(key, value));
+        segments = segments.addLast(new SortedMap<K, V>(comparator()).put(key, value));
       }
       segments = segments.concat(aboveExclusive(idx).segments().values());
 
-      result = from(comparator, segments);
+      result = from(underlying, segments);
     }
 
     if (isLinear) {
@@ -116,10 +127,10 @@ public class ConcatSortedMap<K, V> extends ISortedMap.Mixin<K, V> implements IDi
 
   @Override
   public ConcatSortedMap<K, V> remove(K key) {
-    OptionalLong oIdx = floorIndex(key);
+    OptionalLong oIdx = inclusiveFloorIndex(key);
     if (oIdx.isPresent() && keyEquality().test(key, nth(oIdx.getAsLong()).key())) {
       ConcatSortedMap<K, V> result = from(
-          comparator,
+          underlying,
           belowExclusive(oIdx.getAsLong()),
           aboveExclusive(oIdx.getAsLong())
       );
@@ -137,8 +148,8 @@ public class ConcatSortedMap<K, V> extends ISortedMap.Mixin<K, V> implements IDi
 
   @Override
   public ConcatSortedMap<K, V> slice(K min, K max) {
-    OptionalLong oMinIdx = segments.floorIndex(min);
-    OptionalLong oMaxIdx = segments.floorIndex(max);
+    OptionalLong oMinIdx = segments.inclusiveFloorIndex(min);
+    OptionalLong oMaxIdx = segments.inclusiveFloorIndex(max);
 
     LinearList<ISortedMap<K, V>> acc = new LinearList<>();
     long minIdx = oMinIdx.isPresent() ? oMinIdx.getAsLong() : -1;
@@ -156,17 +167,17 @@ public class ConcatSortedMap<K, V> extends ISortedMap.Mixin<K, V> implements IDi
       acc.addLast(segments.nth(maxIdx).value().slice(min, max));
     }
 
-    return from(comparator, acc);
+    return from(underlying, acc);
   }
 
   @Override
   public ConcatSortedMap<K, V> forked() {
-    return isLinear ? new ConcatSortedMap<>(comparator, segments, segmentOffsets, false) : this;
+    return isLinear ? new ConcatSortedMap<>(underlying, segments, segmentOffsets, false) : this;
   }
 
   @Override
   public ConcatSortedMap<K, V> linear() {
-    return isLinear ? this : new ConcatSortedMap<>(comparator, segments, segmentOffsets, true);
+    return isLinear ? this : new ConcatSortedMap<>(underlying, segments, segmentOffsets, true);
   }
 
   @Override
@@ -182,11 +193,11 @@ public class ConcatSortedMap<K, V> extends ISortedMap.Mixin<K, V> implements IDi
   ///
 
   private ConcatSortedMap<K, V> belowExclusive(long idx) {
-    return idx == 0 ? from(comparator) : slice(first().key(), nth(idx - 1).key());
+    return idx == 0 ? from(underlying, List.empty()) : slice(first().key(), nth(idx - 1).key());
   }
 
   private ConcatSortedMap<K, V> aboveExclusive(long idx) {
-    return idx == size() - 1 ? from(comparator) : slice(nth(idx + 1).key(), last().key());
+    return idx == size() - 1 ? from(underlying, List.empty()) : slice(nth(idx + 1).key(), last().key());
   }
 
   private ConcatSortedMap<K, V> belowInclusive(long idx) {
