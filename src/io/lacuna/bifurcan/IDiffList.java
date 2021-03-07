@@ -13,6 +13,8 @@ public interface IDiffList<V> extends IList<V>, IDiff<IList<V>> {
    * A descriptor for the number of elements removed from the front and back of the underlying list.
    */
   class Slice {
+    public static final Slice FULL = new Slice(0, 0);
+
     public final long fromFront, fromBack;
 
     public Slice(long fromFront, long fromBack) {
@@ -29,7 +31,16 @@ public interface IDiffList<V> extends IList<V>, IDiff<IList<V>> {
     }
 
     public <V> Iterator<V> iterator(IList<V> underlying, long startIdx) {
-      return Iterators.range(fromFront + startIdx, size(underlying), underlying::nth);
+      return Iterators.range(fromFront + startIdx, fromFront + size(underlying), underlying::nth);
+    }
+
+    public <V> IList<V> apply(IList<V> underlying) {
+      return underlying.slice(fromFront, underlying.size() - fromBack);
+    }
+
+    @Override
+    public String toString() {
+      return "[ {skip " + fromFront + "} ... {skip " + fromBack + "} ]";
     }
   }
 
@@ -47,7 +58,7 @@ public interface IDiffList<V> extends IList<V>, IDiff<IList<V>> {
   default IList<V> concat(IList<V> l) {
     IList<V> result = Lists.concat(
         prefix(),
-        underlying().slice(slice().fromFront, slice().fromBack),
+        slice().apply(underlying()),
         suffix(),
         l
     );
@@ -57,7 +68,7 @@ public interface IDiffList<V> extends IList<V>, IDiff<IList<V>> {
 
   @Override
   default long size() {
-    return (prefix().size() + suffix().size() + slice().size(underlying()));
+    return prefix().size() + suffix().size() + slice().size(underlying());
   }
 
   @Override

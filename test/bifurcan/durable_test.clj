@@ -56,7 +56,7 @@
 (set! *warn-on-reflection* true)
 
 (def test-dirs
-  (->> [:repl :maps :sets :lists]
+  (->> [:repl :maps :map-compact :sets :lists]
     (map (fn [t]
            (let [f (io/file (str "/tmp/bifurcan-tests/" (name t)))]
              (.mkdirs f)
@@ -215,6 +215,10 @@
   (assoc coll/bifurcan-map
     :save #(save (test-dirs :maps) %)))
 
+(def bifurcan-durable-map-compact
+  (assoc coll/bifurcan-map
+    :save #(save (test-dirs :map-compact) %)))
+
 (u/def-collection-check test-durable-map iterations durable-map-actions
   []
   [m (Map.) bifurcan-durable-map
@@ -240,7 +244,7 @@
 (u/def-collection-check test-durable-map-compact iterations durable-map-actions
   [n-drop gen-small-pos-int
    n-take gen-small-pos-int]
-  [m (Map.) bifurcan-durable-map]
+  [m (Map.) bifurcan-durable-map-compact]
   (let [m (save (:maps test-dirs) m)
         deps (->> ^IDurableCollection m .root dep-chain (drop n-drop) (take n-take))]
     (if (= m (compact m deps))

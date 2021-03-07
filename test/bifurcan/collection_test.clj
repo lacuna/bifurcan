@@ -243,7 +243,7 @@
    :union        #(.union ^IMap %1 (SortedMap/from ^java.util.Map (zipmap %2 %2)))
    :intersection #(.intersection ^IMap %1 (SortedMap/from ^java.util.Map (zipmap %2 %2)))
    :difference   #(.difference ^IMap %1 (SortedMap/from ^java.util.Map (zipmap %2 %2)))
-   :diff-wrap    #(ConcatSortedMap/from %)
+   :diff-wrap    identity ;; #(ConcatSortedMap/from %)
    :linear       #(.linear ^IMap %)
    :forked       #(.forked ^IMap %)
    })
@@ -254,7 +254,7 @@
    :union        #(.union ^IMap %1 (IntMap/from (zipmap %2 %2)))
    :intersection #(.intersection ^IMap %1 (IntMap/from (zipmap %2 %2)))
    :difference   #(.difference ^IMap %1 (IntMap/from (zipmap %2 %2)))
-   :diff-wrap    #(ConcatSortedMap/from %)
+   :diff-wrap    identity ;; #(ConcatSortedMap/from %)
    :linear       #(.linear ^IMap %)
    :forked       #(.forked ^IMap %)
    })
@@ -265,7 +265,7 @@
    :union        #(.union ^IMap %1 (FloatMap/from (zipmap %2 %2)))
    :intersection #(.intersection ^IMap %1 (FloatMap/from (zipmap %2 %2)))
    :difference   #(.difference ^IMap %1 (FloatMap/from (zipmap %2 %2)))
-   :diff-wrap    #(ConcatSortedMap/from %)
+   :diff-wrap    identity ;; #(ConcatSortedMap/from %)
    :linear       #(.linear ^IMap %)
    :forked       #(.forked ^IMap %)
    })
@@ -485,7 +485,7 @@
           s     (range (* 2 end))]
       (map=
         (->> s (drop start) (take (inc (- end start))) (map #(vector % %)) (into {}))
-        (-> (->> s (map #(vector % %)) (into {})) IntMap/from (.sliceReal start end))))))
+        (-> (->> s (map #(vector % %)) (into {})) IntMap/from (.sliceIndices start end))))))
 
 (defspec test-int-map-floor iterations
   (prop/for-all [m (int-map-gen #(IntMap.))
@@ -509,7 +509,7 @@
           s     (range (* 2 end))]
       (map=
         (->> s (drop start) (take (inc (- end start))) (map #(vector % %)) (into {}))
-        (-> (->> s (map #(vector % %)) (into {})) SortedMap/from (.sliceReal start end))))))
+        (-> (->> s (map #(vector % %)) (into {})) SortedMap/from (.sliceIndices start end))))))
 
 (defspec test-sorted-map-floor iterations
   (prop/for-all [m (sorted-map-gen #(SortedMap.))
@@ -628,7 +628,7 @@
 (defspec test-linear-list-concat iterations
   (prop/for-all [a (list-gen #(LinearList.))
                  b (list-gen #(LinearList.))]
-    (= (concat (->vec a) (->vec b))
+     (= (concat (->vec a) (->vec b))
       (->vec (.concat ^IList a b)))))
 
 (defspec test-concat-wrapper iterations

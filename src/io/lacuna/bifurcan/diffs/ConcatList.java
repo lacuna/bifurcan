@@ -17,7 +17,7 @@ public class ConcatList<V> extends IList.Mixin<V> {
 
   // both constructors assume the lists are non-empty
   public ConcatList(IList<V> a, IList<V> b) {
-    lists = new IntMap<IList<V>>().linear().put(0, a).put(a.size(), b).forked();
+    lists = new IntMap<IList<V>>().put(0, a).put(a.size(), b);
     size = a.size() + b.size();
   }
 
@@ -58,7 +58,7 @@ public class ConcatList<V> extends IList.Mixin<V> {
   @Override
   public IList<V> slice(long start, long end) {
     if (end > size() || start < 0) {
-      throw new IndexOutOfBoundsException();
+      throw new IndexOutOfBoundsException("[" + start + "," + end + ") isn't a subset of [0,"+ size() + ")");
     } else if (start == 0 && end == size()) {
       return this;
     } else if (end <= start) {

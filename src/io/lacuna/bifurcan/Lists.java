@@ -319,7 +319,7 @@ public class Lists {
     if (end <= start) {
       result = List.EMPTY;
     } else if (start < 0 || end > list.size()) {
-      throw new IndexOutOfBoundsException();
+      throw new IndexOutOfBoundsException("[" + start + "," + end + ") isn't a subset of [0,"+ list.size() + ")");
     } else if (end - start == list.size()) {
       result = list;
     } else {

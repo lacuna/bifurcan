@@ -98,6 +98,7 @@ public class FileOutput implements WritableByteChannel {
    */
   public Path moveTo(Path directory) {
     assert !isOpen();
+    assert path.toFile().exists();
 
     try {
       Path newPath = directory.resolve(fingerprint.toHexString() + ".bfn");

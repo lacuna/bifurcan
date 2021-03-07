@@ -204,7 +204,7 @@ public class List<V> extends IList.Mixin<V> implements Cloneable {
   @Override
   public List<V> slice(long start, long end) {
     if (start < 0 || end > size()) {
-      throw new IndexOutOfBoundsException();
+      throw new IndexOutOfBoundsException("[" + start + "," + end + ") isn't a subset of [0,"+ size() + ")");
     } else if (end <= start) {
       return new List<>();
     }
