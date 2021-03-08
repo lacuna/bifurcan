@@ -149,13 +149,6 @@ public interface ISet<V> extends
   }
 
   /**
-   * @return a {@link java.util.stream.Stream}, representing the elements in the set
-   */
-  default Stream<V> stream() {
-    return StreamSupport.stream(spliterator(), false);
-  }
-
-  /**
    * @return a new set, representing the union with {@code set}
    */
   default ISet<V> union(ISet<V> set) {

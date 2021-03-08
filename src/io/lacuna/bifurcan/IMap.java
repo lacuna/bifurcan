@@ -195,13 +195,6 @@ public interface IMap<K, V> extends
     return HashMap.sortIndexedEntries(this, keyHash());
   }
 
-  /**
-   * @return a {@link java.util.stream.Stream}, representing the entries in the map
-   */
-  default Stream<IEntry<K, V>> stream() {
-    return StreamSupport.stream(spliterator(), false);
-  }
-
   @Override
   default Spliterator<IEntry<K, V>> spliterator() {
     return Spliterators.spliterator(iterator(), size(), Spliterator.DISTINCT);

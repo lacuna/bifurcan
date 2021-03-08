@@ -104,13 +104,6 @@ public interface IList<V> extends
     return diff().set(idx, value);
   }
 
-  /**
-   * @return a {@link java.util.stream.Stream}, representing the elements in the list
-   */
-  default Stream<V> stream() {
-    return StreamSupport.stream(spliterator(), false);
-  }
-
   @Override
   default Spliterator<V> spliterator() {
     return Spliterators.spliterator(iterator(), size(), Spliterator.ORDERED);

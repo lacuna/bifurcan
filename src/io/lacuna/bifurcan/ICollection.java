@@ -6,6 +6,8 @@ import io.lacuna.bifurcan.durable.io.FileOutput;
 
 import java.nio.file.Path;
 import java.util.Iterator;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 /**
  * @author ztellman
@@ -82,6 +84,10 @@ public interface ICollection<C, V> extends Iterable<V> {
 
   default Iterator<V> iterator() {
     return iterator(0);
+  }
+
+  default Stream<V> stream() {
+    return StreamSupport.stream(spliterator(), false);
   }
 
   /**
