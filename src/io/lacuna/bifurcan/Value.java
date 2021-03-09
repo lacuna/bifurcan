@@ -81,7 +81,30 @@ public class Value implements ICollection<Value, Value> {
     }
   }
 
-  @Override
+  public Value getIn(List path) {
+      var firstPathComponent = path.first();
+      var restOfPath = path.removeFirst();
+      Value child;
+      if (underlying instanceof IMap) {
+          child = get(firstPathComponent);
+      } else if (underlying instanceof ICollection) {
+          if(firstPathComponent instanceof Long) {
+              child = nth((Long)first);
+          } else if(firstPathComponent instanceof Integer) {
+              child = nth(Long.valueOf((Integer)firstPathComponent));
+          } else {
+              throw new UnsupportedOperationException("`getIn` can only be called on integers or longs when we encounter an non-associative collection along the path");
+          }
+      } else  {
+          throw new UnsupportedOperationException("`getIn` can only be called on an underlying `ICollection` through the whole path");
+      }
+      if (restOfPath.size() == 0) {
+          return child;
+      }
+      return child.getIn(restOfPath);
+  }
+
+@Override
   public long size() {
     if (underlying instanceof ICollection) {
       return ((ICollection<?, ?>) underlying).size();
