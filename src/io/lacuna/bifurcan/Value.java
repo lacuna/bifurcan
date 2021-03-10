@@ -74,10 +74,30 @@ public class Value implements ICollection<Value, Value> {
   public Value get(Object x) {
     if (underlying instanceof IMap) {
       return wrap(((IMap<Object, ?>) underlying).get(unwrap(x), null));
+    } else if (underlying instanceof IList) {
+      return wrap(((IList<?>) underlying).nth(((Number) x).longValue()));
     } else if (underlying == null) {
       return this;
     } else {
-      throw new UnsupportedOperationException("`get` can only be called on an underlying `IMap`");
+      throw new UnsupportedOperationException("`get` can only be called on an underlying `IMap` or `IList`");
+    }
+  }
+
+  public Value getIn(IList path) {
+    Value v = this;
+    for (Object k : path) {
+      v = v.get(k);
+    }
+    return v;
+  }
+
+  public Value list() {
+    if (underlying instanceof IList) {
+      return this;
+    } else if (underlying instanceof ICollection) {
+      return wrap(Lists.from(size(), ((ICollection) underlying)::nth));
+    } else {
+      throw new UnsupportedOperationException("`list` can only be called on an underlying `ICollection`");
     }
   }
 
