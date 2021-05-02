@@ -3,7 +3,6 @@ package io.lacuna.bifurcan;
 import io.lacuna.bifurcan.utils.Iterators;
 
 import java.util.Iterator;
-import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.function.*;
 
@@ -202,7 +201,7 @@ public class Set<V> extends ISet.Mixin<V> {
   @Override
   public boolean equals(Object obj) {
     if (obj instanceof Set) {
-      return map.equals(((Set<V>) obj).map, (a, b) -> true);
+      return ((Map) map).equals(((Set) obj).map, (BiPredicate<Object, Object>) (a, b) -> true);
     } else if (obj instanceof ISet) {
       return Sets.equals(this, (ISet<V>) obj);
     } else {
