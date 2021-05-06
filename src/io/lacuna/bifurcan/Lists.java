@@ -162,7 +162,7 @@ public class Lists {
 
         @Override
         public boolean hasPrevious() {
-          return idx > index;
+          return idx > 0;
         }
 
         @Override
