@@ -122,6 +122,11 @@ public class IntSet extends ISet.Mixin<Long> implements ISortedSet<Long> {
   }
 
   @Override
+  public boolean isLinear() {
+    return m.isLinear();
+  }
+
+  @Override
   public IntSet forked() {
     return isLinear() ? new IntSet(m.forked()) : this;
   }
