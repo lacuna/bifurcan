@@ -96,6 +96,11 @@ public class SortedSet<V> extends ISortedSet.Mixin<V> {
   }
 
   @Override
+  public boolean isLinear() {
+    return m.isLinear();
+  }
+
+  @Override
   public SortedSet<V> forked() {
     return isLinear() ? new SortedSet<>(m.forked()) : this;
   }
