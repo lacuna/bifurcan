@@ -188,12 +188,12 @@ public class DiffList<V> extends IList.Mixin<V> implements IDiffList<V> {
 
   @Override
   public DiffList<V> forked() {
-    return isLinear() ? new DiffList<>(underlying, prefix.linear(), suffix.linear(), slice) : this;
+    return isLinear() ? new DiffList<>(underlying, prefix.forked(), suffix.forked(), slice) : this;
   }
 
   @Override
   public DiffList<V> linear() {
-    return isLinear() ? this : new DiffList<>(underlying, prefix.forked(), suffix.forked(), slice);
+    return isLinear() ? this : new DiffList<>(underlying, prefix.linear(), suffix.linear(), slice);
   }
 
   @Override
