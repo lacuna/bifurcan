@@ -484,7 +484,7 @@
           end   (max start end)
           s     (range (* 2 end))]
       (map=
-        (->> s (drop start) (take (inc (- end start))) (map #(vector % %)) (into {}))
+        (->> s (drop start) (take (- end start)) (map #(vector % %)) (into {}))
         (-> (->> s (map #(vector % %)) (into {})) IntMap/from (.sliceIndices start end))))))
 
 (defspec test-int-map-floor iterations
@@ -508,7 +508,7 @@
           end   (max start end)
           s     (range (* 2 end))]
       (map=
-        (->> s (drop start) (take (inc (- end start))) (map #(vector % %)) (into {}))
+        (->> s (drop start) (take (- end start)) (map #(vector % %)) (into {}))
         (-> (->> s (map #(vector % %)) (into {})) SortedMap/from (.sliceIndices start end))))))
 
 (defspec test-sorted-map-floor iterations
