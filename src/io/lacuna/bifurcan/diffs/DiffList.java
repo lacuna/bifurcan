@@ -170,6 +170,7 @@ public class DiffList<V> extends IList.Mixin<V> implements IDiffList<V> {
       IList<V> underlyingPrime = new ConcatList<>(slice.apply(underlying)).set(idx, value);
       if (isLinear()) {
         underlying = underlyingPrime;
+        this.slice = Slice.FULL;
         return this;
       } else {
         return new DiffList<>(underlyingPrime, prefix, suffix, Slice.FULL);
