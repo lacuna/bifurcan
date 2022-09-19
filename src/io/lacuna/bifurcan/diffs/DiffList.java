@@ -59,31 +59,31 @@ public class DiffList<V> extends IList.Mixin<V> implements IDiffList<V> {
 
     long pSize = prefix().size();
     List<V> prefix = start < pSize
-        ? this.prefix.slice(start, Math.min(pSize, end))
-        : List.EMPTY;
+      ? this.prefix.slice(start, Math.min(pSize, end))
+      : (isLinear() ? List.EMPTY.linear() : List.EMPTY);
 
     start -= pSize;
     end -= pSize;
 
     Slice slice = slice();
     Slice slicePrime = end > 0 && start < slice.size(underlying)
-        // narrow the slice
-        ? new Slice(slice.fromFront + max(0, start), slice.fromBack + max(0, slice.size(underlying) - end))
-        // if we only have the prefix, truncate from the back, otherwise truncat from the front
-        : prefix.size() > 0
-        ? new Slice(0, underlying.size())
-        : new Slice(underlying.size(), 0);
+      // narrow the slice
+      ? new Slice(slice.fromFront + max(0, start), slice.fromBack + max(0, slice.size(underlying) - end))
+      // if we only have the prefix, truncate from the back, otherwise truncat from the front
+      : prefix.size() > 0
+      ? new Slice(0, underlying.size())
+      : new Slice(underlying.size(), 0);
 
     start -= slice.size(underlying);
     end -= slice.size(underlying);
 
     List<V> suffix = end > 0
-        ? this.suffix.slice(max(0, start), end)
-        : List.EMPTY;
+      ? this.suffix.slice(max(0, start), end)
+      : (isLinear() ? List.EMPTY.linear() : List.EMPTY);
 
     return slicePrime.size(underlying) == 0
-        ? Lists.concat(prefix, suffix)
-        : new DiffList<>(underlying, prefix, suffix, slicePrime);
+      ? Lists.concat(prefix, suffix)
+      : (isLinear() ? new DiffList<>(underlying, prefix, suffix, slicePrime) : new DiffList<>(underlying, prefix, suffix, slicePrime).linear());
   }
 
   @Override
