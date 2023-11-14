@@ -107,6 +107,15 @@
               (recur (remove #(= seed (last %)) paths')))))))
     @acc))
 
+(deftest edge-test
+  (doseq [g [(Graph.)
+             (DirectedGraph.)
+             (DirectedAcyclicGraph.)]]
+    (let [g (.link g 1 2 :meow)]
+      (is (= :meow (.edge g 1 2)))
+      (is (= :meow (.edge g 1 2 :default)))
+      (is (= :default (.edge 2 3 :default))))))
+
 ;;;
 
 (defn gen-sized-graph [init size]
