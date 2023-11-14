@@ -6,6 +6,7 @@
                                  (some #{:benchmark :stress}
                                    (cons (:tag %) (keys %))))
                    :benchmark :benchmark
+                   :focus     :focus
                    :stress    :stress
                    :all       (constantly true)}
   :profiles {:low-mem {:jvm-opts ^:replace ["-server" "-Xmx1g" "-XX:MaxDirectMemorySize=2g" "-XX:+UseG1GC"]}
