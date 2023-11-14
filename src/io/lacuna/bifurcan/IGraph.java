@@ -28,6 +28,14 @@ public interface IGraph<V, E> extends ICollection<IGraph<V, E>, V> {
   E edge(V from, V to);
 
   /**
+   * 
+   * @param from A vertex
+   * @param to Another vertex
+   * @return The value of the edge from {@code from} and {@code to}, or {@code notFound} if no such edge exists.
+   */
+  E edge (V from, V to, E notFound);
+
+  /**
    * In an undirected graph, this is equivalent to {@link IGraph#out(Object)}.
    *
    * @return the set of all incoming edges to {@code vertex}

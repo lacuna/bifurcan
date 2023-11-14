@@ -47,7 +47,6 @@ public class DirectedGraph<V, E> implements IGraph<V, E> {
 
   @Override
   public E edge(V from, V to) {
-
     Map m = out.get(from).orElseThrow(() -> new IllegalArgumentException("no such edge"));
     Object e = m.get(to, DEFAULT);
 
@@ -56,6 +55,15 @@ public class DirectedGraph<V, E> implements IGraph<V, E> {
     } else {
       return (E) e;
     }
+  }
+
+  @Override
+  public E edge(V from, V to, E notFound) {
+    Object m = ((Map) out).get(from, DEFAULT);
+    if (m == DEFAULT) {
+      return notFound;
+    }
+    return ((Map<V, E>) m).get(to, notFound);
   }
 
   @Override
