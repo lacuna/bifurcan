@@ -1,8 +1,4 @@
 ;; this is to allow the insecure `usethesource` repository
-(require 'cemerick.pomegranate.aether)
-(cemerick.pomegranate.aether/register-wagon-factory!
-  "http" #(org.apache.maven.wagon.providers.http.HttpWagon.))
-
 (defproject io.lacuna/bifurcan "0.2.0-alpha6"
   :java-source-paths ["src"]
   :dependencies []
@@ -54,7 +50,7 @@
                        #_"-XX:CompileCommand=dontinline,io.lacuna.bifurcan.nodes.Util::mergeState"
                        ]
 
-  :repositories {"usethesource" "http://nexus.usethesource.io/content/repositories/public/"}
+  :repositories {"usethesource" "https://releases.usethesource.io/maven/"}
 
   ;; deployment
   :url "https://github.com/lacuna/bifurcan"
