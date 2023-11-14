@@ -43,7 +43,8 @@
                        "-XX:-OmitStackTraceInFastThrow"
                        "-ea:io.lacuna..."
                        "-Xmx4g"
-
+                       "--add-opens=java.base/java.lang=ALL-UNNAMED"
+                       "--add-opens=java.base/java.util=ALL-UNNAMED"
                        #_"-XX:+UnlockDiagnosticVMOptions"
                        #_"-XX:+PrintAssembly"
                        #_"-XX:CompileCommand=print,io.lacuna.bifurcan.nodes.Util::mergeState"
