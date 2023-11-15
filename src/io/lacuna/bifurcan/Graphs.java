@@ -473,8 +473,9 @@ public class Graphs {
     }
 
     // algorithmic state
+    final ISet<V> vertices = graph.vertices();
     IMap<V, TarjanState> state = new LinearMap<>(
-        (int) graph.vertices().size(),
+        (int) vertices.size(),
         graph.vertexHash(),
         graph.vertexEquality()
     );
@@ -486,7 +487,7 @@ public class Graphs {
 
     Set<Set<V>> result = new Set<Set<V>>().linear();
 
-    for (V seed : graph.vertices()) {
+    for (V seed : vertices) {
 
       if (state.contains(seed)) {
         continue;
