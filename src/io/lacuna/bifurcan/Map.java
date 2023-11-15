@@ -246,7 +246,7 @@ public class Map<K, V> extends IMap.Mixin<K, V> {
     if (keys instanceof Set && Maps.equivEquality(this, keys)) {
       return intersection(((Set<K>) keys).map);
     } else {
-      Map<K, V> map = (Map<K, V>) Maps.intersection(new Map<K, V>().linear(), this, keys);
+      Map<K, V> map = (Map<K, V>) Maps.intersection(new Map<K, V>(hashFn, equalsFn).linear(), this, keys);
       return isLinear() ? map : map.forked();
     }
   }

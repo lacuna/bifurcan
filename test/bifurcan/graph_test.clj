@@ -8,7 +8,9 @@
    [clojure.set :as set])
   (:import
    [java.util.function
-    ToDoubleFunction]
+    BiPredicate
+    ToDoubleFunction
+    ToLongFunction]
    [io.lacuna.bifurcan
     List
     Graph
@@ -115,6 +117,23 @@
       (is (= :meow (.edge g 1 2)))
       (is (= :meow (.edge g 1 2 :default)))
       (is (= :default (.edge g 2 3 :default))))))
+
+(deftest select-equality-test
+  ; Select should preserve vertex hash and equality semantics
+  (let [eq (reify BiPredicate
+             (test [_ a b] (= a b)))
+        hash (reify ToLongFunction
+               (applyAsLong [_ x]
+                 (hash x)))]
+    (doseq [g [(Graph. hash eq)
+               (DirectedGraph. hash eq)
+               (DirectedAcyclicGraph. hash eq)]]
+      (let [g (.. g (link 1 2) (link 2 3) (link 3 4))]
+        (is (identical? eq (.vertexEquality g)))
+        (is (identical? hash (.vertexHash g)))
+        (let [g' (.select g (Set/from [2 3]))]
+          (is (identical? eq (.vertexEquality g')))
+          (is (identical? hash (.vertexHash g'))))))))
 
 ;;;
 
