@@ -114,7 +114,7 @@
     (let [g (.link g 1 2 :meow)]
       (is (= :meow (.edge g 1 2)))
       (is (= :meow (.edge g 1 2 :default)))
-      (is (= :default (.edge 2 3 :default))))))
+      (is (= :default (.edge g 2 3 :default))))))
 
 ;;;
 
