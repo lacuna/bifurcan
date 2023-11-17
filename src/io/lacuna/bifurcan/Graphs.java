@@ -188,7 +188,7 @@ public class Graphs {
     IGraph<V, E> result = a.forked().linear();
     for (V src : b.vertices()) {
       for (V dst : b.out(src)) {
-        a = a.link(src, dst, b.edge(src, dst), merge);
+        result = result.link(src, dst, b.edge(src, dst), merge);
       }
     }
     return result.forked();

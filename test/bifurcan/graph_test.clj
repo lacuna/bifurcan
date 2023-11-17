@@ -17,6 +17,7 @@
     DirectedGraph
     DirectedAcyclicGraph
     IGraph
+    Maps
     Graphs
     Set
     ISet]))
@@ -109,6 +110,19 @@
               (recur (remove #(= seed (last %)) paths')))))))
     @acc))
 
+(defn naive-merge
+  "Merges two graphs together using a function (merge-fn edge-value1
+  edge-value2)."
+  [^IGraph a, ^IGraph b, merge-fn]
+  (.forked ^IGraph
+           (reduce (fn [g v]
+                     (reduce (fn [^IGraph g v']
+                               (.link g v v' (.edge b v v') merge-fn))
+                             g
+                             (.out b v)))
+                   (.linear a)
+                   (.vertices b))))
+
 (deftest edge-test
   (doseq [g [(Graph.)
              (DirectedGraph.)
@@ -156,7 +170,7 @@
   (gen/fmap
     #(DirectedAcyclicGraph/from %)
     (gen/such-that
-      (fn [g] (-> g #(Graphs/stronglyConnectedComponents % false) .size zero?))
+      (fn [g] (-> g (Graphs/stronglyConnectedComponents false) .size zero?))
       gen-digraph)))
 
 ;;;
@@ -183,3 +197,11 @@
       (->> graph
         Graphs/articulationPoints
         ->set))))
+
+(defspec ^:focus merge-digraph iterations
+  (prop/for-all [a gen-digraph
+                 b gen-digraph]
+                (= (naive-merge a b Maps/MERGE_LAST_WRITE_WINS)
+                   (.merge a b Maps/MERGE_LAST_WRITE_WINS)
+                   ; Graphs/merge uses a diff, more general implementation
+                   (Graphs/merge a b Maps/MERGE_LAST_WRITE_WINS))))
