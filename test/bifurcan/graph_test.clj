@@ -8,13 +8,16 @@
    [clojure.set :as set])
   (:import
    [java.util.function
-    ToDoubleFunction]
+    BiPredicate
+    ToDoubleFunction
+    ToLongFunction]
    [io.lacuna.bifurcan
     List
     Graph
     DirectedGraph
     DirectedAcyclicGraph
     IGraph
+    Maps
     Graphs
     Set
     ISet]))
@@ -107,6 +110,45 @@
               (recur (remove #(= seed (last %)) paths')))))))
     @acc))
 
+(defn naive-merge
+  "Merges two graphs together using a function (merge-fn edge-value1
+  edge-value2)."
+  [^IGraph a, ^IGraph b, merge-fn]
+  (.forked ^IGraph
+           (reduce (fn [g v]
+                     (reduce (fn [^IGraph g v']
+                               (.link g v v' (.edge b v v') merge-fn))
+                             g
+                             (.out b v)))
+                   (.linear a)
+                   (.vertices b))))
+
+(deftest edge-test
+  (doseq [g [(Graph.)
+             (DirectedGraph.)
+             (DirectedAcyclicGraph.)]]
+    (let [g (.link g 1 2 :meow)]
+      (is (= :meow (.edge g 1 2)))
+      (is (= :meow (.edge g 1 2 :default)))
+      (is (= :default (.edge g 2 3 :default))))))
+
+(deftest select-equality-test
+  ; Select should preserve vertex hash and equality semantics
+  (let [eq (reify BiPredicate
+             (test [_ a b] (= a b)))
+        hash (reify ToLongFunction
+               (applyAsLong [_ x]
+                 (hash x)))]
+    (doseq [g [(Graph. hash eq)
+               (DirectedGraph. hash eq)
+               (DirectedAcyclicGraph. hash eq)]]
+      (let [g (.. g (link 1 2) (link 2 3) (link 3 4))]
+        (is (identical? eq (.vertexEquality g)))
+        (is (identical? hash (.vertexHash g)))
+        (let [g' (.select g (Set/from [2 3]))]
+          (is (identical? eq (.vertexEquality g')))
+          (is (identical? hash (.vertexHash g'))))))))
+
 ;;;
 
 (defn gen-sized-graph [init size]
@@ -128,7 +170,7 @@
   (gen/fmap
     #(DirectedAcyclicGraph/from %)
     (gen/such-that
-      (fn [g] (-> g #(Graphs/stronglyConnectedComponents % false) .size zero?))
+      (fn [g] (-> g (Graphs/stronglyConnectedComponents false) .size zero?))
       gen-digraph)))
 
 ;;;
@@ -155,3 +197,11 @@
       (->> graph
         Graphs/articulationPoints
         ->set))))
+
+(defspec ^:focus merge-digraph iterations
+  (prop/for-all [a gen-digraph
+                 b gen-digraph]
+                (= (naive-merge a b Maps/MERGE_LAST_WRITE_WINS)
+                   (.merge a b Maps/MERGE_LAST_WRITE_WINS)
+                   ; Graphs/merge uses a diff, more general implementation
+                   (Graphs/merge a b Maps/MERGE_LAST_WRITE_WINS))))
