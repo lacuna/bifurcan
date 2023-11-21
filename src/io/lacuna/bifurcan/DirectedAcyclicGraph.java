@@ -102,6 +102,11 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
   }
 
   @Override
+  public E edge(V src, V dst, E notFound) {
+    return graph.edge(src, dst, notFound);
+  }
+
+  @Override
   public Set<V> in(V vertex) {
     return graph.in(vertex);
   }

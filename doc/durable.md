@@ -76,7 +76,7 @@ Benchmarks for disk-backed collections require even more disclaimers than [in-me
 
 Read amplification is the ratio of bytes read from disk to each byte read from the database.  When all data is in-cache, we'd expect the value to be zero.  When our data is not in-cache, we'd expect the value to be the size of a [page](https://en.wikipedia.org/wiki/Page_(computer_memory)) (typically 4kb) divided by the size of each entry.  In our benchmarks, each entry is 1kb, so the "optimal" amplification for a single uncached read is 4x.  
 
-Likewise, write amplification is the ratio of bytes written to disk to each byte written to the database.  To allow for efficient reads, each new write cannot simply be app ended to the end of a file.  As we write, the existing data must be periodically reshuffled, leading to write amplifications above the minimum theoretical value of 1x.
+Likewise, write amplification is the ratio of bytes written to disk to each byte written to the database.  To allow for efficient reads, each new write cannot simply be appended to the end of a file.  As we write, the existing data must be periodically reshuffled, leading to write amplifications above the minimum theoretical value of 1x.
 
 Both of these values are measured using [pidstat](https://linux.die.net/man/1/pidstat), and unlike the latency numbers should be reproducible on a variety of hardware.  Since all measured tasks are I/O bound, low amplification should always correlate to low latency and high throughput, but not always linearly.
 

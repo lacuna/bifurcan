@@ -67,6 +67,12 @@ public class Graph<V, E> implements IGraph<V, E> {
   }
 
   @Override
+  public E edge (V from, V to, E notFound) {
+    Object e = ((Map) edges).get(new VertexSet<>(from, to), notFound);
+    return (E) e;
+  }
+
+  @Override
   public Set<V> in(V vertex) {
     return out(vertex);
   }
