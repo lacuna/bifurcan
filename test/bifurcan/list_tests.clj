@@ -3,7 +3,7 @@
    [clojure.test :refer :all])
   (:import
    [io.lacuna.bifurcan
-    List]))
+    LinearList List]))
 
 ;; Access some private constants in the Java implementation, so some
 ;; tests can be parameterized based upon those values.
@@ -92,3 +92,13 @@
     (is (= true (same-seq l3 r3)))
     (let [l4 (.slice l3 1 10)]
       (is (= true (same-seq l4 r4))))))
+
+(deftest github-issue-40-test
+  (let [l1 (.slice (LinearList/from (range 1 3)) 0 1)
+        l2 (.linear l1)
+        l3 (.forked l2)]
+    (is (= (same-seq l2 (range 1 2)) true) "l2 has correct contents")
+    (is (= (same-seq l3 (range 1 2)) true) "l3 has correct contents")
+    (is (= (.isLinear l2) true) "l2 is linear")
+    (is (= (.isLinear l3) false) "l3 is forked")))
+
