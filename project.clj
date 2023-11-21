@@ -1,5 +1,5 @@
 ;; this is to allow the insecure `usethesource` repository
-(defproject io.lacuna/bifurcan "0.2.0-alpha6"
+(defproject io.lacuna/bifurcan "0.2.0-alpha7"
   :java-source-paths ["src"]
   :dependencies []
   :test-selectors {:default   #(not
@@ -31,7 +31,7 @@
                                       [org.organicdesign/Paguro "3.1.2"]
 
                                       ;; for comparative durable benchmarks
-                                      [org.rocksdb/rocksdbjni "6.4.6"]
+                                      [org.rocksdb/rocksdbjni "8.6.7"]
                                       [com.sleepycat/je "18.3.12"]
                                       [org.lmdbjava/lmdbjava "0.7.0"]
                                       ]}}

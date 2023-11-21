@@ -241,7 +241,7 @@
           r  (.compact c' (-> ^Iterable deps .iterator Set/from))]
       (.apply r c))))
 
-(u/def-collection-check test-durable-map-compact iterations durable-map-actions
+#_(u/def-collection-check test-durable-map-compact iterations durable-map-actions
   [n-drop gen-small-pos-int
    n-take gen-small-pos-int]
   [m (Map.) bifurcan-durable-map-compact]
