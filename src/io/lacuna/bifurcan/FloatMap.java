@@ -1,5 +1,6 @@
 package io.lacuna.bifurcan;
 
+import io.lacuna.bifurcan.ISortedSet.Bound;
 import io.lacuna.bifurcan.utils.Encodings;
 
 import java.util.*;
@@ -135,11 +136,15 @@ public class FloatMap<V> extends ISortedMap.Mixin<Double, V> {
     return ceilIndex((double) key);
   }
 
-  public FloatMap<V> slice(double min, double max) {
-    return new FloatMap<>(map.slice(doubleToLong(min), doubleToLong(max)));
+  public FloatMap<V> slice(double min, Bound minBound, double max, Bound maxBound) {
+    return new FloatMap<>(map.slice(doubleToLong(min), minBound, doubleToLong(max), maxBound));
   }
 
-  public FloatMap<V> sliceReal(Double min, Double max) {
+  public FloatMap<V> slice(double min, double max) {
+    return slice(min, Bound.INCLUSIVE, max, Bound.EXCLUSIVE);
+  }
+
+  public FloatMap<V> slice(Double min, Double max) {
     return slice((double) min, (double) max);
   }
 

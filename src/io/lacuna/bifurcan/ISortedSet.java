@@ -8,140 +8,156 @@ import java.util.function.ToLongFunction;
 
 public interface ISortedSet<V> extends ISet<V> {
 
-  enum Bound {
-    INCLUSIVE,
-    EXCLUSIVE
-  }
-
-  abstract class Mixin<V> extends ISet.Mixin<V> implements ISortedSet<V> {
-    @Override
-    public ISortedSet<V> clone() {
-      return this;
+    enum Bound {
+        INCLUSIVE,
+        EXCLUSIVE
     }
-  }
 
-  Comparator<V> comparator();
-
-  /**
-   * @return the entry whose key is either equal to {@code key}, or just below it. If {@code key} is less than the
-   * minimum value in the map, returns {@code null}.
-   */
-  OptionalLong inclusiveFloorIndex(V val);
-
-  @Override
-  default ToLongFunction<V> valueHash() {
-    throw new UnsupportedOperationException("ISortedSet does not use hashes");
-  }
-
-  @Override
-  default BiPredicate<V, V> valueEquality() {
-    return (a, b) -> comparator().compare(a, b) == 0;
-  }
-
-  default OptionalLong floorIndex(V val, Bound bound) {
-    OptionalLong oIdx = inclusiveFloorIndex(val);
-    if (bound == Bound.INCLUSIVE) {
-      return oIdx;
-    } else {
-      if (oIdx.isPresent()) {
-        long idx = oIdx.getAsLong();
-        if (comparator().compare(nth(idx), val) == 0) {
-          return idx == 0 ? OptionalLong.empty() : OptionalLong.of(idx - 1);
+    abstract class Mixin<V> extends ISet.Mixin<V> implements ISortedSet<V> {
+        @Override
+        public ISortedSet<V> clone() {
+            return this;
         }
-      }
     }
-    return oIdx;
-  }
 
-  default OptionalLong ceilIndex(V val, Bound bound) {
-    OptionalLong oIdx = inclusiveFloorIndex(val);
-    if (oIdx.isPresent()) {
-      long idx = oIdx.getAsLong();
-      if (bound == Bound.INCLUSIVE && comparator().compare(nth(idx), val) == 0) {
+    Comparator<V> comparator();
+
+    /**
+     * @return the entry whose key is either equal to {@code key}, or just below it. If {@code key} is less than the
+     * minimum value in the map, returns {@code null}.
+     */
+    OptionalLong inclusiveFloorIndex(V val);
+
+    @Override
+    default ToLongFunction<V> valueHash() {
+        throw new UnsupportedOperationException("ISortedSet does not use hashes");
+    }
+
+    @Override
+    default BiPredicate<V, V> valueEquality() {
+        return (a, b) -> comparator().compare(a, b) == 0;
+    }
+
+    default OptionalLong floorIndex(V val, Bound bound) {
+        OptionalLong oIdx = inclusiveFloorIndex(val);
+        if (bound == Bound.INCLUSIVE) {
+            return oIdx;
+        } else {
+            if (oIdx.isPresent()) {
+                long idx = oIdx.getAsLong();
+                if (comparator().compare(nth(idx), val) == 0) {
+                    return idx == 0 ? OptionalLong.empty() : OptionalLong.of(idx - 1);
+                }
+            }
+        }
         return oIdx;
-      } else if (idx == size() - 1) {
-        return OptionalLong.empty();
-      } else {
-        return OptionalLong.of(idx + 1);
-      }
     }
-    return size() == 0 ? OptionalLong.empty() : OptionalLong.of(0);
-  }
 
-  /**
-   * @return the entry whose key is either equal to {@code key}, or just above it. If {@code key} is greater than the
-   * maximum value in the map, returns {@code null}.
-   */
-  default OptionalLong ceilIndex(V val) {
-    return ceilIndex(val, Bound.INCLUSIVE);
-  }
+    default OptionalLong ceilIndex(V val, Bound bound) {
+        OptionalLong oIdx = inclusiveFloorIndex(val);
+        if (oIdx.isPresent()) {
+            long idx = oIdx.getAsLong();
+            if (bound == Bound.INCLUSIVE && comparator().compare(nth(idx), val) == 0) {
+                return oIdx;
+            } else if (idx == size() - 1) {
+                return OptionalLong.empty();
+            } else {
+                return OptionalLong.of(idx + 1);
+            }
+        }
+        return size() == 0 ? OptionalLong.empty() : OptionalLong.of(0);
+    }
 
-  default OptionalLong floorIndex(V val) {
-    return floorIndex(val, Bound.INCLUSIVE);
-  }
+    /**
+     * @return the entry whose key is either equal to {@code key}, or just above it. If {@code key} is greater than the
+     * maximum value in the map, returns {@code null}.
+     */
+    default OptionalLong ceilIndex(V val) {
+        return ceilIndex(val, Bound.INCLUSIVE);
+    }
 
-  @Override
-  default OptionalLong indexOf(V element) {
-    OptionalLong idx = floorIndex(element);
-    return idx.isPresent() && comparator().compare(nth(idx.getAsLong()), element) == 0
-        ? idx
-        : OptionalLong.empty();
-  }
+    default OptionalLong floorIndex(V val) {
+        return floorIndex(val, Bound.INCLUSIVE);
+    }
 
-  /**
-   * @return the entry whose key is either equal to {@code key}, or just below it. If {@code key} is less than the
-   * minimum value in the map, returns {@code null}.
-   */
-  default V floor(V val) {
-    OptionalLong idx = floorIndex(val);
-    return idx.isPresent()
-        ? nth(idx.getAsLong())
-        : null;
-  }
+    @Override
+    default OptionalLong indexOf(V element) {
+        OptionalLong idx = floorIndex(element);
+        return idx.isPresent() && comparator().compare(nth(idx.getAsLong()), element) == 0
+                ? idx
+                : OptionalLong.empty();
+    }
 
-  /**
-   * @return the entry whose key is either equal to {@code key}, or just above it. If {@code key} is greater than the
-   * maximum value in the map, returns {@code null}.
-   */
-  default V ceil(V val) {
-    OptionalLong idx = ceilIndex(val);
-    return idx.isPresent()
-        ? nth(idx.getAsLong())
-        : null;
-  }
+    /**
+     * @return the entry whose key is either equal to {@code key}, or just below it. If {@code key} is less than the
+     * minimum value in the map, returns {@code null}.
+     */
+    default V floor(V val) {
+        OptionalLong idx = floorIndex(val);
+        return idx.isPresent()
+                ? nth(idx.getAsLong())
+                : null;
+    }
 
-  @Override
-  default <U> ISortedMap<V, U> zip(Function<V, U> f) {
-    return Maps.from(this, f);
-  }
+    /**
+     * @return the entry whose key is either equal to {@code key}, or just above it. If {@code key} is greater than the
+     * maximum value in the map, returns {@code null}.
+     */
+    default V ceil(V val) {
+        OptionalLong idx = ceilIndex(val);
+        return idx.isPresent()
+                ? nth(idx.getAsLong())
+                : null;
+    }
 
-  ISortedSet<V> add(V value);
+    /**
+     * @param startIndex The inclusive starting index
+     * @param endIndex The exclusive ending index
+     * @return a sorted map representing all entries within {@code [startIndex, endIndex)}
+     */
+    default ISortedSet<V> sliceIndices(long startIndex, long endIndex) {
+        long min = Math.max(0, startIndex);
+        long max = Math.min(size(), endIndex);
+        return Sets.from(elements().slice(startIndex, endIndex),
+                comparator(),
+                x -> {
+                    long idx = indexOf(x).orElse(-1);
+                    return idx < min || idx >= max ? OptionalLong.empty() : OptionalLong.of(idx - startIndex);
+                });
+    }
 
-  ISortedSet<V> remove(V value);
+    @Override
+    default <U> ISortedMap<V, U> zip(Function<V, U> f) {
+        return Maps.from(this, f);
+    }
 
-  default ISortedSet<V> union(ISet<V> s) {
-    return (ISortedSet<V>) Sets.union(this, s);
-  }
+    ISortedSet<V> add(V value);
 
-  default ISortedSet<V> difference(ISet<V> s) {
-    return (ISortedSet<V>) Sets.difference(this, s);
-  }
+    ISortedSet<V> remove(V value);
 
-  default ISortedSet<V> intersection(ISet<V> s) {
-    return (ISortedSet<V>) Sets.intersection(new SortedSet<>(), this, s);
-  }
+    default ISortedSet<V> union(ISet<V> s) {
+        return (ISortedSet<V>) Sets.union(this, s);
+    }
 
-  default ISortedSet<V> forked() {
-    return this;
-  }
+    default ISortedSet<V> difference(ISet<V> s) {
+        return (ISortedSet<V>) Sets.difference(this, s);
+    }
 
-  ISortedSet<V> linear();
+    default ISortedSet<V> intersection(ISet<V> s) {
+        return (ISortedSet<V>) Sets.intersection(new SortedSet<>(), this, s);
+    }
 
-  default V first() {
-    return nth(0);
-  }
+    default ISortedSet<V> forked() {
+        return this;
+    }
 
-  default V last() {
-    return nth(size() - 1);
-  }
+    ISortedSet<V> linear();
+
+    default V first() {
+        return nth(0);
+    }
+
+    default V last() {
+        return nth(size() - 1);
+    }
 }

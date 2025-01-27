@@ -28,10 +28,6 @@ public class IntSet extends ISet.Mixin<Long> implements ISortedSet<Long> {
     return m.ceilIndex(val);
   }
 
-  public IntSet sliceReal(Long min, Long max) {
-    return new IntSet(m.sliceReal(min, max));
-  }
-
   @Override
   public IntSet add(Long value) {
     IntMap<Void> mPrime = m.put(value, null);

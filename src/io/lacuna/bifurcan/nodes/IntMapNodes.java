@@ -382,7 +382,7 @@ public class IntMapNodes {
         if (isEntry(mask)) {
           int idx = entryIndex(mask);
           long key = keys[idx];
-          if (min <= key && key <= max) {
+          if (min <= key && key < max) {
             n = n.put(editor, key, (V) content[idx], null);
           }
         } else if (isNode(mask)) {

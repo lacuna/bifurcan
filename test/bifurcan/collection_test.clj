@@ -487,38 +487,6 @@
 
 ;;; SortedMap
 
-(deftest sorted-map-slice-test
-  (let [m (SortedMap/from {1 :a, 2 :b, 3 :c, 4 :d})]
-    (testing "slice"
-      (testing "empty"
-        ; Broken: returns entire map somehow?
-        (is (map= {} (.slice m 0 0))))
-      (testing "single"
-        ; Broken: returns empty map?
-        (is (map= {1 :a} (.slice m 1 1)))
-        (is (map= {4 :d} (.slice m 4 4))))
-      (testing "middle"
-        ; Broken: returns just 2
-        (is (map= {2 :b, 3 :c} (.slice m 2 3))))
-      (testing "over the edge"
-        ; Broken: returns just 1
-        (is (map= {1 :a, 2 :b} (.slice m 0 2)))
-        ; Broken: returns just 3
-        (is (map= {3 :c, 4 :d} (.slice m 3 8)))))
-
-    (testing "sliceIndices"
-      (testing "empty"
-        (is (map= {} (.sliceIndices m 4 4))))
-      (testing "single"
-        (is (map= {1 :a} (.sliceIndices m 0 0)))
-        (is (map= {4 :d} (.sliceIndices m 3 3))))
-      (testing "middle"
-        (is (map= {2 :b, 3 :c} (.sliceIndices m 1 2))))
-      (testing "up to the edge"
-        ; Note that sliceIndices throws when given an bounds beyond the min/max
-        (is (map= {1 :a, 2 :b} (.sliceIndices m 0 1)))
-        (is (map= {3 :c, 4 :d} (.sliceIndices m 2 4)))))))
-
 (defspec test-sorted-map-slice iterations
   (prop/for-all [start (gen/choose 1 1e4)
                  end   (gen/choose 1 1e4)]
@@ -528,9 +496,7 @@
       (map=
         (->> s
              (drop start)
-             ; Bounds for slice are documented to be inclusive, inclusive. This
-             ; is weird because the List slice bounds are inclusive, exclusive?
-             (take (inc (- end start)))
+             (take (- end start))
              (map #(vector % %))
              (into {}))
         (-> (->> s (map #(vector % %)) (into {}))
@@ -545,7 +511,10 @@
           s     (range (* 2 end))]
       (map=
         (->> s (drop start) (take (- end start)) (map #(vector % %)) (into {}))
-        (-> (->> s (map #(vector % %)) (into {})) SortedMap/from (.sliceIndices start end))))))
+        (->
+          (->> s (map #(vector % %)) (into {}))
+          SortedMap/from
+          (.sliceIndices start end))))))
 
 (defspec test-sorted-map-floor iterations
   (prop/for-all [m (sorted-map-gen #(SortedMap.))
@@ -570,12 +539,12 @@
       (map=
         (->> s
           (drop start)
-          (take (inc (- end start)))
+          (take (- end start))
           (map #(vector % %))
           (into {}))
         (-> (->> s (map #(vector % %)) (into {}))
           FloatMap/from
-          (.sliceReal (double start) (double end)))))))
+          (.slice (double start) (double end)))))))
 
 (defspec test-float-map-floor iterations
   (prop/for-all [m (float-map-gen #(FloatMap.))

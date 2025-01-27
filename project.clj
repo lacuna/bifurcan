@@ -1,5 +1,5 @@
 ;; this is to allow the insecure `usethesource` repository
-(defproject io.lacuna/bifurcan "0.2.0-alpha7"
+(defproject io.lacuna/bifurcan "0.2.0-rc1"
   :java-source-paths ["src"]
   :dependencies []
   :test-selectors {:default   #(not
@@ -20,7 +20,7 @@
                                       [byte-streams "0.2.4"]
                                       [byte-transforms "0.1.4"]
                                       [eftest "0.5.9"]
-                                      [virgil "0.1.9"]
+                                      [virgil "0.3.0"]
 
                                       ;; for comparative in-memory benchmarks
                                       [io.usethesource/capsule "0.6.3"]

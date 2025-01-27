@@ -14,7 +14,7 @@ import java.util.stream.IntStream;
 public class Sets {
 
   public static <V> long hash(ISet<V> s) {
-    return hash(s, x -> s.valueHash().applyAsLong(x), (a, b) -> a + b);
+    return hash(s, x -> s.valueHash().applyAsLong(x), Long::sum);
   }
 
   public static <V> long hash(ISet<V> set, ToLongFunction<V> hash, LongBinaryOperator combiner) {

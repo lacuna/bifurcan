@@ -41,6 +41,32 @@ public interface ISortedMap<K, V> extends IMap<K, V> {
     return keys().ceilIndex(key, bound);
   }
 
+  /**
+   * @param min the inclusive minimum key value
+   * @param max the exclusive maximum key value
+   * @return a map representing all entries within {@code [min, max)}
+   */
+  default ISortedMap<K, V> slice(K min, K max) {
+    return slice(min, Bound.INCLUSIVE, max, Bound.EXCLUSIVE);
+  }
+
+  default ISortedMap<K, V> slice(K min, Bound minBound, K max, Bound maxBound) {
+    OptionalLong start = keys().ceilIndex(min, minBound);
+    OptionalLong end = keys().floorIndex(max, maxBound);
+    return start.isPresent() && end.isPresent()
+            ? sliceIndices(start.getAsLong(), end.getAsLong() + 1)
+            : new SortedMap<>(comparator());
+  }
+
+  /**
+   * @param startIndex The inclusive starting index
+   * @param endIndex   The exclusive ending index
+   * @return a sorted map representing all entries within {@code [startIndex, endIndex)}
+   */
+  default ISortedMap<K, V> sliceIndices(long startIndex, long endIndex) {
+    return keys().sliceIndices(startIndex, endIndex).zip(this);
+  }
+
   @Override
   default ToLongFunction<K> keyHash() {
     throw new UnsupportedOperationException("ISortedMap does not use hashes");
@@ -60,8 +86,8 @@ public interface ISortedMap<K, V> extends IMap<K, V> {
   default OptionalLong indexOf(K key) {
     OptionalLong idx = inclusiveFloorIndex(key);
     return idx.isPresent() && comparator().compare(key, nth(idx.getAsLong()).key()) == 0
-        ? idx
-        : OptionalLong.empty();
+            ? idx
+            : OptionalLong.empty();
   }
 
   default IEntry<K, V> floor(K key) {
@@ -75,8 +101,8 @@ public interface ISortedMap<K, V> extends IMap<K, V> {
   default IEntry<K, V> floor(K key, Bound bound) {
     OptionalLong idx = floorIndex(key, bound);
     return idx.isPresent()
-        ? nth(idx.getAsLong())
-        : null;
+            ? nth(idx.getAsLong())
+            : null;
   }
 
   default IEntry<K, V> ceil(K key) {
@@ -90,8 +116,8 @@ public interface ISortedMap<K, V> extends IMap<K, V> {
   default IEntry<K, V> ceil(K key, Bound bound) {
     OptionalLong idx = ceilIndex(key, bound);
     return idx.isPresent()
-        ? nth(idx.getAsLong())
-        : null;
+            ? nth(idx.getAsLong())
+            : null;
   }
 
   default ISortedMap<K, V> merge(IMap<K, V> b, BinaryOperator<V> mergeFn) {
