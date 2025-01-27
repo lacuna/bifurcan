@@ -101,13 +101,18 @@ public class Iterators {
     }
   }
 
+  /* Returns true if the corresponding elements of two iterators are equal,
+   * according to some BiPredicate. False otherwise. */
   public static <V> boolean equals(Iterator<V> a, Iterator<V> b, BiPredicate<V, V> equals) {
     while (a.hasNext()) {
+      if (!b.hasNext()) {
+        return false;
+      }
       if (!equals.test(a.next(), b.next())) {
         return false;
       }
     }
-    return true;
+    return !b.hasNext();
   }
 
   public static <V> Iterator<V> from(BooleanSupplier hasNext, Supplier<V> next) {
