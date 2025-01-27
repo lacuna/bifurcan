@@ -1,10 +1,7 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.diffs.DiffMap;
-import io.lacuna.bifurcan.utils.Iterators;
-
 import java.util.*;
-import java.util.Map;
+import java.util.Map.Entry;
 import java.util.function.*;
 
 import static io.lacuna.bifurcan.utils.Bits.log2Ceil;
@@ -81,8 +78,8 @@ public class LinearMap<K, V> extends IMap.Mixin<K, V> {
   /**
    * @return a map representing the entries in {@code collection}
    */
-  public static <K, V> LinearMap<K, V> from(Collection<Map.Entry<K, V>> collection) {
-    return collection.stream().collect(Maps.linearCollector(Map.Entry::getKey, Map.Entry::getValue, collection.size()));
+  public static <K, V> LinearMap<K, V> from(Collection<Entry<K, V>> collection) {
+    return collection.stream().collect(Maps.linearCollector(Entry::getKey, Entry::getValue, collection.size()));
   }
 
   public LinearMap() {
@@ -259,7 +256,7 @@ public class LinearMap<K, V> extends IMap.Mixin<K, V> {
 
   @Override
   public IMap<K, V> forked() {
-    return new DiffMap<>(this);
+    return new Map<K,V>(hashFn, equalsFn).merge(this, Maps.MERGE_LAST_WRITE_WINS);
   }
 
   @Override

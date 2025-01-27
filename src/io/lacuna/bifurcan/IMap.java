@@ -1,10 +1,7 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.diffs.DiffMap;
-import io.lacuna.bifurcan.durable.codecs.HashMap;
 import io.lacuna.bifurcan.utils.Iterators;
 
-import java.nio.file.Path;
 import java.util.*;
 import java.util.function.*;
 import java.util.stream.Stream;
@@ -47,10 +44,6 @@ public interface IMap<K, V> extends
     public IMap<K, V> clone() {
       return this;
     }
-  }
-
-  interface Durable<K, V> extends IMap<K, V>, IDurableCollection {
-    IDurableEncoding.Map encoding();
   }
 
   /**
@@ -188,14 +181,6 @@ public interface IMap<K, V> extends
   }
 
   /**
-   * @return an iterator over all entries, sorted by their hash
-   */
-  default Iterator<IEntry.WithHash<K, V>> hashSortedEntries() {
-    // TODO: figure out how to make this place nicely with the TempStream lifecycle
-    return HashMap.sortIndexedEntries(this, keyHash());
-  }
-
-  /**
    * @return a {@link java.util.stream.Stream}, representing the entries in the map
    */
   default Stream<IEntry<K, V>> stream() {
@@ -257,9 +242,7 @@ public interface IMap<K, V> extends
    *              value as the first argument and new value as the second, to determine the combined result
    * @return an updated map with {@code value} under {@code key}
    */
-  default IMap<K, V> put(K key, V value, BinaryOperator<V> merge) {
-    return diff().put(key, value, merge);
-  }
+  IMap<K, V> put(K key, V value, BinaryOperator<V> merge);
 
   /**
    * @param update a function which takes the existing value, or {@code null} if none exists, and returns an updated
@@ -280,17 +263,7 @@ public interface IMap<K, V> extends
   /**
    * @return an updated map that does not contain {@code key}
    */
-  default IMap<K, V> remove(K key) {
-    return diff().remove(key);
-  }
-
-  /**
-   * @return a diff wrapper around this collection
-   */
-  default IDiffMap<K, V> diff() {
-    DiffMap<K, V> result = new DiffMap<>(this);
-    return isLinear() ? result.linear() : result;
-  }
+  IMap<K, V> remove(K key);
 
   @Override
   default IMap<K, V> forked() {
@@ -298,9 +271,7 @@ public interface IMap<K, V> extends
   }
 
   @Override
-  default IMap<K, V> linear() {
-    return diff().linear();
-  }
+  IMap<K, V> linear();
 
   default IMap<K, V> sliceIndices(long startIndex, long endIndex) {
     return Maps.from(keys().sliceIndices(startIndex, endIndex), this::apply);
@@ -336,10 +307,5 @@ public interface IMap<K, V> extends
       throw new IllegalArgumentException("key not found");
     }
     return val;
-  }
-
-  @Override
-  default IMap.Durable<K, V> save(IDurableEncoding encoding, Path directory) {
-    return (IMap.Durable<K, V>) ICollection.super.save(encoding, directory);
   }
 }

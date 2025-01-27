@@ -1,7 +1,5 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.diffs.DiffList;
-
 import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.Spliterator;
@@ -52,10 +50,6 @@ public interface IList<V> extends
     }
   }
 
-  interface Durable<V> extends IList<V>, IDurableCollection {
-    IDurableEncoding.List encoding();
-  }
-
   default IList<V> update(long idx, Function<V, V> updateFn) {
     return set(idx, updateFn.apply(nth(idx)));
   }
@@ -70,39 +64,29 @@ public interface IList<V> extends
   /**
    * @return a new list, with {@code value} appended
    */
-  default IList<V> addLast(V value) {
-    return diff().addLast(value);
-  }
+  IList<V> addLast(V value);
 
   /**
    * @return a new list, with {@code value} prepended
    */
-  default IList<V> addFirst(V value) {
-    return diff().addFirst(value);
-  }
+  IList<V> addFirst(V value);
 
   /**
    * @return a new list with the last value removed, or the same list if already empty
    */
-  default IList<V> removeLast() {
-    return diff().removeLast();
-  }
+  IList<V> removeLast();
 
   /**
    * @return a new list with the first value removed, or the same value if already empty
    */
-  default IList<V> removeFirst() {
-    return diff().removeFirst();
-  }
+  IList<V> removeFirst();
 
   /**
    * @return a new list, with the element at {@code idx} overwritten with {@code value}. If {@code idx} is equal to
    * {@link ICollection#size()}, the value is appended.
    * @throws IndexOutOfBoundsException when {@code idx} is not within {@code [0, size]}
    */
-  default IList<V> set(long idx, V value) {
-    return diff().set(idx, value);
-  }
+  IList<V> set(long idx, V value);
 
   /**
    * @return a {@link java.util.stream.Stream}, representing the elements in the list
@@ -204,31 +188,12 @@ public interface IList<V> extends
   }
 
   @Override
-  default DurableList<V> save(IDurableEncoding encoding, Path directory) {
-    if (!(encoding instanceof IDurableEncoding.List)) {
-      throw new IllegalArgumentException(String.format("%s cannot be used to encode lists", encoding.description()));
-    }
-
-    return DurableList.from(iterator(), (IDurableEncoding.List) encoding, directory);
-  }
-
-  /**
-   * @return a diff wrapper around this collection
-   */
-  default IDiffList<V> diff() {
-    DiffList<V> result = new DiffList<>(this);
-    return isLinear() ? result.linear() : result;
-  }
-
-  @Override
   default IList<V> forked() {
     return this;
   }
 
   @Override
-  default IList<V> linear() {
-    return diff().linear();
-  }
+  IList<V> linear();
 
   default boolean equals(Object o, BiPredicate<V, V> equals) {
     if (o instanceof IList) {

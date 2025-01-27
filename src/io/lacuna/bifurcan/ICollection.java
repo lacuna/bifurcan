@@ -1,10 +1,5 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.durable.Roots;
-import io.lacuna.bifurcan.durable.codecs.Core;
-import io.lacuna.bifurcan.durable.io.FileOutput;
-
-import java.nio.file.Path;
 import java.util.Iterator;
 
 /**
@@ -88,17 +83,4 @@ public interface ICollection<C, V> extends Iterable<V> {
    * @return a cloned copy of the collection
    */
   C clone();
-
-  default C save(IDurableEncoding encoding, Path directory) {
-    if (this instanceof IDurableCollection) {
-      return (C) this;
-    } else {
-      IDurableCollection.Fingerprint f = FileOutput.write(
-          directory,
-          Map.empty(),
-          acc -> Core.encodeSingleton(this, encoding, acc)
-      );
-      return (C) Roots.open(directory, f).decode(encoding);
-    }
-  }
 }

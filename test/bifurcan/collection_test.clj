@@ -22,12 +22,6 @@
     Iterators]
    [io.lacuna.bifurcan.nodes
     ListNodes$Node]
-   [io.lacuna.bifurcan.diffs
-    DiffMap
-    DiffList
-    DiffSet
-    ConcatSortedMap
-    DiffSortedSet]
    [io.lacuna.bifurcan
     IntMap
     FloatMap
@@ -38,7 +32,6 @@
     Lists
     Set
     Sets
-    IDiffMap
     IMap
     IEntry
     IList
@@ -150,8 +143,7 @@
     (gen/fmap #(if (== -0.0 %) 0.0 %))))
 
 (def common-actions
-  {:diff-wrap []
-   :linear    []
+  {:linear    []
    :forked    []})
 
 (def list-actions
@@ -214,7 +206,6 @@
    :concat       #(.concat ^IList %1 (List/from %2))
    :remove-first #(.removeFirst ^IList %)
    :remove-last  #(.removeLast ^IList %)
-   :diff-wrap    #(DiffList. %)
    :linear       #(.linear ^IList %)
    :forked       #(.forked ^IList %)})
 
@@ -232,7 +223,6 @@
    :union        #(.union ^IMap %1 (Map/from ^java.util.Map (zipmap %2 %2)))
    :intersection #(.intersection ^IMap %1 (Map/from ^java.util.Map (zipmap %2 %2)))
    :difference   #(.difference ^IMap %1 (Map/from ^java.util.Map (zipmap %2 %2)))
-   :diff-wrap    #(DiffMap. %)
    :linear       #(.linear ^IMap %)
    :forked       #(.forked ^IMap %)
    })
@@ -243,7 +233,6 @@
    :union        #(.union ^IMap %1 (SortedMap/from ^java.util.Map (zipmap %2 %2)))
    :intersection #(.intersection ^IMap %1 (SortedMap/from ^java.util.Map (zipmap %2 %2)))
    :difference   #(.difference ^IMap %1 (SortedMap/from ^java.util.Map (zipmap %2 %2)))
-   :diff-wrap    identity ;; #(ConcatSortedMap/from %)
    :linear       #(.linear ^IMap %)
    :forked       #(.forked ^IMap %)
    })
@@ -254,7 +243,6 @@
    :union        #(.union ^IMap %1 (IntMap/from (zipmap %2 %2)))
    :intersection #(.intersection ^IMap %1 (IntMap/from (zipmap %2 %2)))
    :difference   #(.difference ^IMap %1 (IntMap/from (zipmap %2 %2)))
-   :diff-wrap    identity ;; #(ConcatSortedMap/from %)
    :linear       #(.linear ^IMap %)
    :forked       #(.forked ^IMap %)
    })
@@ -265,7 +253,6 @@
    :union        #(.union ^IMap %1 (FloatMap/from (zipmap %2 %2)))
    :intersection #(.intersection ^IMap %1 (FloatMap/from (zipmap %2 %2)))
    :difference   #(.difference ^IMap %1 (FloatMap/from (zipmap %2 %2)))
-   :diff-wrap    identity ;; #(ConcatSortedMap/from %)
    :linear       #(.linear ^IMap %)
    :forked       #(.forked ^IMap %)
    })
@@ -289,7 +276,6 @@
    :union        #(.union ^ISet %1 (construct-set %1 %2))
    :intersection #(.intersection ^ISet %1 (construct-set %1 %2))
    :difference   #(.difference ^ISet %1 (construct-set %1 %2))
-   :diff-wrap    #(DiffSet. %)
    :linear       #(.linear ^ISet %)
    :forked       #(.forked ^ISet %)
    })

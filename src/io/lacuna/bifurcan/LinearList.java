@@ -1,8 +1,5 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.diffs.DiffList;
-import io.lacuna.bifurcan.utils.Bits;
-
 import java.util.*;
 
 import static io.lacuna.bifurcan.utils.Bits.log2Ceil;
@@ -274,7 +271,7 @@ public class LinearList<V> extends IList.Mixin<V> implements Cloneable {
 
   @Override
   public IList<V> forked() {
-    return new DiffList<>(this);
+    return List.from(this);
   }
 
   @Override

@@ -16,14 +16,12 @@ This library provides high-quality Java implementations of mutable and immutable
 * customizable equality semantics
 * contiguous memory used wherever possible
 * performance equivalent to, or better than, existing alternatives
-* changes to a collection can be tracked in a **diff** data structure, which can be subsequently rebased onto a different collection
-* [ALPHA] durable (disk-backed) representations which share the API and asymptotic performance of their in-memory counterparts
 
 Rather than using the existing collection interfaces in `java.util` such as `List` or `Map`, it provides its own interfaces (`IList`, `IMap`, `ISet`) that provide functional semantics - each update to a collection returns a reference to a new collection.  Each interface provides a method (`toList`, `toMap`, `toSet`) for coercing the collection to a read-only version of the standard Java interfaces.
 
 ### what makes this better?
 
-Some aspects of this library, like the inverted indices, diffs, and durable collections, are unique.  
+Some aspects of this library, like inverted indices and ubiquitous random access are unique.  
 
 There are, however, many existing implementations of "functional" (aka persistent, immutable) data structures on the JVM.  As shown in [these in-depth comparisons](https://github.com/lacuna/bifurcan/blob/master/doc/comparison.md), Bifurcan's performance is equivalent to the best existing implementations for basic operations, and significantly better for batch operations such as `union`, `intersection`, and `difference`.
 
@@ -116,29 +114,6 @@ Sorted and unsorted maps are just their corresponding sets, plus a function from
 ```java
 IMap<Long, Double> squareRoots = set.zip(n -> Math.sqrt(n))
 ```
-
-### diffs
-
-These virtual collections can be modified just like any other Bifurcan collection:
-
-```java
-Lists.from(1, x -> 1).addLast(42)
-// [1, 42]
-```
-
-This is made possible by [diffs](https://lacuna.io/docs/bifurcan/io/lacuna/bifurcan/IDiff.html), which track changes on an immutable **underlying** collection.  Diff implementations exists for all variants of Bifurcan collections, and share the asymptotic performance of their normal counterparts.  By calling `diff()` on any collection, we create a diff wrapper whose changes can then be **rebased** onto a new underlying collection:
-
-```java
-IList<Integer> numDiff = List.of(1, 2, 3).diff().removeFirst().addLast(42)
-// [2, 3, 42]
-
-IList<Integer> rebased = numDiffs.rebase(List.of(4, 5, 6))
-// [5, 6, 42]
-```
-
-### durable collections
-
-All in-memory structures can be also saved to disk, while retaining the same API and asymptotic performance.  These durable collections are optimized for reads and batched writes, which means they are not a replacement for general-purpose databases, but they are still [useful in a variety of applications](doc/durable.md).
 
 ### no lazy collections
 

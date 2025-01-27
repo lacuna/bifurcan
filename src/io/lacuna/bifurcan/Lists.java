@@ -1,7 +1,6 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.diffs.ConcatList;
-import io.lacuna.bifurcan.diffs.DiffList;
+import io.lacuna.bifurcan.utils.ConcatList;
 import io.lacuna.bifurcan.utils.Iterators;
 
 import java.lang.reflect.Array;
@@ -323,7 +322,7 @@ public class Lists {
     } else if (end - start == list.size()) {
       result = list;
     } else {
-      result = new DiffList<>(list).slice(start, end);
+      result = Lists.from(end - start, i -> list.nth(i + start));
     }
 
     return list.isLinear() ? result.linear() : result;
@@ -375,6 +374,36 @@ public class Lists {
           throw new IndexOutOfBoundsException(idx + " must be within [0," + size + ")");
         }
         return elementFn.apply(idx);
+      }
+
+      @Override
+      public IList<V> set(long idx, V value) {
+        return List.from(this).set(idx, value);
+      }
+
+      @Override
+      public IList<V> removeFirst() {
+        return Lists.slice(this, 1, size());
+      }
+
+      @Override
+      public IList<V> removeLast() {
+        return Lists.slice(this, 0, size() - 1);
+      }
+
+      @Override
+      public IList<V> addFirst(V value) {
+        return Lists.concat(List.of(value), this);
+      }
+
+      @Override
+      public IList<V> addLast(V value) {
+        return Lists.concat(this, List.of(value));
+      }
+
+      @Override
+      public IList<V> linear() {
+        return List.from(this).linear();
       }
 
       @Override

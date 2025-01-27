@@ -162,6 +162,21 @@ public class Sets {
       public Iterator<V> iterator(long startIndex) {
         return elements.iterator(startIndex);
       }
+
+      @Override
+      public ISortedSet<V> add(V value) {
+        return new SortedSet<>(comparator).union(this).add(value);
+      }
+
+      @Override
+      public ISortedSet<V> remove(V value) {
+        return new SortedSet<>(comparator).union(this).remove(value);
+      }
+
+      @Override
+      public ISortedSet<V> linear() {
+        return new SortedSet<>(comparator).union(this).linear();
+      }
     };
   }
 
@@ -209,6 +224,21 @@ public class Sets {
       @Override
       public BiPredicate<V, V> valueEquality() {
         return Maps.DEFAULT_EQUALS;
+      }
+
+      @Override
+      public ISet<V> add(V value) {
+        return Set.from(this).add(value);
+      }
+
+      @Override
+      public ISet<V> remove(V value) {
+        return Set.from(this).remove(value);
+      }
+
+      @Override
+      public ISet<V> linear() {
+        return Set.from(this).linear();
       }
     };
   }

@@ -1,6 +1,5 @@
 package io.lacuna.bifurcan.utils;
 
-import io.lacuna.bifurcan.IDurableEncoding;
 import io.lacuna.bifurcan.IEntry;
 import io.lacuna.bifurcan.IList;
 import io.lacuna.bifurcan.LinearList;
@@ -318,25 +317,6 @@ public class Iterators {
 
   public static <V> Stream<V> toStream(Iterator<V> it, long estimatedSize) {
     return StreamSupport.stream(Spliterators.spliterator(it, estimatedSize, Spliterator.ORDERED), false);
-  }
-
-  public static <V> IDurableEncoding.SkippableIterator skippable(Iterator<V> it) {
-    return new IDurableEncoding.SkippableIterator() {
-      @Override
-      public void skip() {
-        it.next();
-      }
-
-      @Override
-      public boolean hasNext() {
-        return it.hasNext();
-      }
-
-      @Override
-      public Object next() {
-        return it.next();
-      }
-    };
   }
 
   public static class Indexed<T> {

@@ -181,6 +181,21 @@ public class Maps {
       }
 
       @Override
+      public ISortedMap<K, V> put(K key, V value, BinaryOperator<V> merge) {
+        return new SortedMap<K,V>(comparator()).merge(this, Maps.MERGE_LAST_WRITE_WINS).put(key, value, merge);
+      }
+
+      @Override
+      public ISortedMap<K, V> remove(K key) {
+        return new SortedMap<K,V>(comparator()).merge(this, Maps.MERGE_LAST_WRITE_WINS).remove(key);
+      }
+
+      @Override
+      public ISortedMap<K, V> linear() {
+        return new SortedMap<K,V>(comparator()).linear();
+      }
+
+      @Override
       public Iterator<IEntry<K, V>> iterator() {
         return iterator.get();
       }
@@ -233,6 +248,21 @@ public class Maps {
       @Override
       public BiPredicate<K, K> keyEquality() {
         return keys.valueEquality();
+      }
+
+      @Override
+      public IMap<K, V> put(K key, V value, BinaryOperator<V> merge) {
+        return Map.from(this).put(key, value, merge);
+      }
+
+      @Override
+      public IMap<K, V> remove(K key) {
+        return Map.from(this).remove(key);
+      }
+
+      @Override
+      public IMap<K, V> linear() {
+        return Map.from(this).linear();
       }
     };
   }

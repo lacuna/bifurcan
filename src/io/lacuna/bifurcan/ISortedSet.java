@@ -1,8 +1,5 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.diffs.DiffSortedSet;
-import io.lacuna.bifurcan.diffs.Slice;
-
 import java.util.Comparator;
 import java.util.OptionalLong;
 import java.util.function.BiPredicate;
@@ -113,38 +110,14 @@ public interface ISortedSet<V> extends ISet<V> {
         : null;
   }
 
-  /**
-   * @param min the inclusive minimum key value
-   * @param max the inclusive maximum key value
-   * @return a map representing all entries within {@code [min, max]}
-   */
-  default IDiffSortedSet<V> slice(V min, V max) {
-    return slice(min, Bound.INCLUSIVE, max, Bound.INCLUSIVE);
-  }
-
-  default IDiffSortedSet<V> slice(V min, Bound minBound, V max, Bound maxBound) {
-    return new Slice.SortedSet<V>(min, minBound, max, maxBound, this.zip(x -> null));
-  }
-
   @Override
   default <U> ISortedMap<V, U> zip(Function<V, U> f) {
     return Maps.from(this, f);
   }
 
-  default ISortedSet<V> sliceIndices(long startIndex, long endIndex) {
-    return Sets.from(elements().slice(startIndex, endIndex), comparator(), x -> {
-      long idx = inclusiveFloorIndex(x).orElse(-1);
-      return (idx < startIndex || idx >= endIndex) ? OptionalLong.empty() : OptionalLong.of(idx - startIndex);
-    });
-  }
+  ISortedSet<V> add(V value);
 
-  default ISortedSet<V> add(V value) {
-    return diffSorted().add(value);
-  }
-
-  default ISortedSet<V> remove(V value) {
-    return diffSorted().remove(value);
-  }
+  ISortedSet<V> remove(V value);
 
   default ISortedSet<V> union(ISet<V> s) {
     return (ISortedSet<V>) Sets.union(this, s);
@@ -162,14 +135,7 @@ public interface ISortedSet<V> extends ISet<V> {
     return this;
   }
 
-  default ISortedSet<V> linear() {
-    return new DiffSortedSet<V>(this).linear();
-  }
-
-  default IDiffSortedSet<V> diffSorted() {
-    DiffSortedSet<V> result = new DiffSortedSet<>(this);
-    return isLinear() ? result.linear() : result;
-  }
+  ISortedSet<V> linear();
 
   default V first() {
     return nth(0);

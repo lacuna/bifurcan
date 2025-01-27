@@ -14,6 +14,10 @@ public class SortedSet<V> extends ISortedSet.Mixin<V> {
     this.m = new SortedMap<>();
   }
 
+  public SortedSet(Comparator<V> comparator) {
+    this(new SortedMap<>(comparator));
+  }
+
   private SortedSet(SortedMap<V, Void> m) {
     this.m = m;
   }

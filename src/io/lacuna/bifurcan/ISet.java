@@ -1,6 +1,5 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.diffs.DiffSet;
 import io.lacuna.bifurcan.utils.Iterators;
 
 import java.util.Iterator;
@@ -48,10 +47,6 @@ public interface ISet<V> extends
     public ISet<V> clone() {
       return this;
     }
-  }
-
-  interface Durable<V> extends ISet<V>, IDurableCollection {
-    IDurableEncoding.Set encoding();
   }
 
   /**
@@ -125,16 +120,12 @@ public interface ISet<V> extends
   /**
    * @return the set, containing {@code value}
    */
-  default ISet<V> add(V value) {
-    return diff().add(value);
-  }
+  ISet<V> add(V value);
 
   /**
    * @return the set, without {@code value}
    */
-  default ISet<V> remove(V value) {
-    return diff().remove(value);
-  }
+  ISet<V> remove(V value);
 
   /**
    * @return an iterator representing the elements of the set
@@ -207,14 +198,6 @@ public interface ISet<V> extends
   }
 
   /**
-   * @return a diff wrapper around this collection
-   */
-  default IDiffSet<V> diff() {
-    DiffSet<V> result = new DiffSet<>(this);
-    return isLinear() ? result.linear() : result;
-  }
-
-  /**
    * @return true, if the set is linear
    */
   @Override
@@ -228,9 +211,7 @@ public interface ISet<V> extends
   }
 
   @Override
-  default ISet<V> linear() {
-    return diff().linear();
-  }
+  ISet<V> linear();
 
   default ISet<V> sliceIndices(long startIndex, long endIndex) {
     return Sets.from(elements().slice(startIndex, endIndex), x -> {

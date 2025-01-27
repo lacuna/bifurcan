@@ -1,14 +1,11 @@
 package io.lacuna.bifurcan;
 
-import io.lacuna.bifurcan.diffs.DiffSet;
 import io.lacuna.bifurcan.utils.Iterators;
 
 import java.util.Iterator;
-import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
-import java.util.function.ToIntFunction;
 import java.util.function.ToLongFunction;
 
 /**
@@ -213,7 +210,7 @@ public class LinearSet<V> extends ISet.Mixin<V> {
 
   @Override
   public ISet<V> forked() {
-    return new DiffSet<>(this);
+    return Set.from(this);
   }
 
   @Override

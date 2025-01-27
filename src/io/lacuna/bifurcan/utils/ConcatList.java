@@ -1,7 +1,6 @@
-package io.lacuna.bifurcan.diffs;
+package io.lacuna.bifurcan.utils;
 
 import io.lacuna.bifurcan.*;
-import io.lacuna.bifurcan.utils.Iterators;
 
 import java.util.Iterator;
 
@@ -95,5 +94,36 @@ public class ConcatList<V> extends IList.Mixin<V> {
       }
     }
     return new ConcatList<V>(m.forked(), nSize);
+  }
+
+  @Override
+  public IList<V> addFirst(V value) {
+    return List.of(value).concat(this);
+  }
+
+  @Override
+  public IList<V> addLast(V value) {
+    return concat(List.of(value));
+  }
+
+  @Override
+  public IList<V> removeLast() {
+    Long idx = lists.keys().last();
+    IList<V> l = lists.get(idx).get();
+    return new ConcatList<>(lists.put(idx, l.slice(0, l.size() - 1)), size - 1);
+  }
+
+  @Override
+  public IList<V> removeFirst() {
+    IList<V> result = new ConcatList<>(lists.first().value().removeFirst());
+    for (IList<V> l : lists.values().removeFirst()) {
+      result = result.concat(l);
+    }
+    return result;
+  }
+
+  @Override
+  public IList<V> linear() {
+    return List.from(this).linear();
   }
 }
