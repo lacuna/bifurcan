@@ -190,7 +190,7 @@ public class Rope implements Comparable<Rope> {
 
   /**
    * @return a new rope representing the code points within {@code [start, end)}
-   * @throws IllegalArgumentException if {@code end} < {@code start}, or {@code start} and {@code end} are not within
+   * @throws IllegalArgumentException if {@code end} &lt; {@code start}, or {@code start} and {@code end} are not within
    * {@code [0, size)}
    */
   public Rope slice(int start, int end) {

@@ -17,7 +17,7 @@ import java.util.function.*;
  * characteristics.
  * <p>
  * This collection keeps the keys in sorted order, and can thought of as either a map of integers or a sparse vector.
- * It provides {@link IntMap#slice(Long, Long)}, {@link IntMap#inclusiveFloorIndex(Long)}, and {@link IntMap#ceilIndex(Long)}
+ * It provides {@link IntMap#slice(long, long)}, {@link IntMap#inclusiveFloorIndex(Long)}, and {@link IntMap#ceilIndex(Long)}
  * methods which
  * allow for lookups and filtering on its keys.
  *
