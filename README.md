@@ -4,7 +4,7 @@
 <dependency>
   <groupId>io.lacuna</groupId>
   <artifactId>bifurcan</artifactId>
-  <version>0.2.0-alpha7</version>
+  <version>0.2.0-rc1</version>
 </dependency>
 ```
 
@@ -21,7 +21,7 @@ Rather than using the existing collection interfaces in `java.util` such as `Lis
 
 ### what makes this better?
 
-Some aspects of this library, like inverted indices and ubiquitous random access are unique.  
+Some aspects of this library, like inverted indices and ubiquitous random access are unique.
 
 There are, however, many existing implementations of "functional" (aka persistent, immutable) data structures on the JVM.  As shown in [these in-depth comparisons](https://github.com/lacuna/bifurcan/blob/master/doc/comparison.md), Bifurcan's performance is equivalent to the best existing implementations for basic operations, and significantly better for batch operations such as `union`, `intersection`, and `difference`.
 
