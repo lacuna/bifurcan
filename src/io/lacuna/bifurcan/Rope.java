@@ -292,6 +292,18 @@ public class Rope implements Comparable<Rope> {
       public IntStream codePoints() {
         return IntIterators.toStream(Rope.this.codePoints(), root.numCodePoints());
       }
+
+      @Override
+      public String toString() {
+	  char[] cs = new char[root.numCodeUnits()];
+	  Iterator<byte[]> it = chunks();
+	  int offset = 0;
+	  while (it.hasNext()) {
+	      offset += UnicodeChunk.writeCodeUnits(cs, offset, it.next());
+	  }
+
+	  return new String(cs);
+      }
     };
   }
 
