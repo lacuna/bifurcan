@@ -409,7 +409,7 @@
   ([program]
    (print-program-bifurcan 0 program))
   ([first-line program]
-   (println "(import 'io.lacuna.bifurcan.Set)")
+   (println "(import '(io.lacuna.bifurcan Map Set))")
    (dorun
      (map-indexed (fn [i expr]
                     (println (str "(def x" (+ first-line i) " "
@@ -636,35 +636,99 @@
         gen/one-of
         (gen/fmap uninline-expr))))
 
+(defn map-program-gen
+  "Takes a Clojure map and returns a generator of programs which produce that
+  map as their final value."
+  [m]
+  (->> [; Empty map
+        (when (empty? m)
+          (gen/return :map/empty))
+
+        ; Build the map with map/of
+        (gen/fmap (fn [pairs]
+                    (->> pairs
+                         (mapcat identity)
+                         (into [:map/of])))
+                  (gen/shuffle m))]
+       (remove nil?)
+       vec
+       gen/one-of
+       (gen/fmap uninline-expr)))
+
 (defn value-program-gen
   "Takes a Clojure structure and returns a generator of programs which produce
   that structure as its final value."
   [x]
-  (cond (set? x) (set-program-gen x)))
+  (cond
+    (set? x) (set-program-gen x)
+    (map? x) (map-program-gen x)))
 
-(deftest set-equal-test
-  ; Confirms that programs producing equal Clojure structures are also equal
-  ; when evaluated using Bifurcan.
-  (checking "two ways of constructing the same set should be equal" iterations
-            ; Note that we intentionally *don't* generate a program which
-            ; efficiently produces a single value v--we generate a program
-            ; which happens to incidentally produce v, but probably
-            ; does lots of other stuff. We want to make sure that those other
-            ; operations don't inadvertently mess up v in some way!
-            [p1 (program-ending-in-type-gen :set)
-             :let [v (eval-last eval-expr-clj p1)]
-             p2 (value-program-gen v)]
-            ; Evaluate both programs with Bifurcan
-            (let [v1 (eval-last eval-expr-bifurcan p1)
-                  v2 (eval-last eval-expr-bifurcan p2)]
-              ; They should be equal!
-              (is (= v1 v2))
-              (when (not= v1 v2)
-                (prn)
-                (prn :v v)
-                (prn)
-                (prn :p1)
-                (print-program-bifurcan p1)
-                (prn)
-                (prn :p2)
-                (print-program-bifurcan (count p1) p2)))))
+(defprotocol IsEqual
+  (is-equal [a b] "Are these two Bifurcan collections equal in various ways?
+                  Performs clojure.test assertions and returns false if any
+                  fail."))
+
+(extend-protocol IsEqual
+  IMap
+  (is-equal [a ^IMap b]
+    (and (is (= a b))
+         (is (= (.size a) (.size b)))
+         (is (= (datafy a) (datafy b)))
+         (is (= (set (datafy (.entries a)))
+                (set (datafy (.entries b)))))
+         (is (= (.keys a) (.keys b)))
+         (is (= (.values a) (.values b)))
+         (is (.containsAll a b))
+         (is (.containsAll b a))
+         (every? (fn [k]
+                   (and (is (.contains a k))
+                        (is (.contains b k))))
+                 (set/union (datafy (.keys a))
+                            (datafy (.keys b))))))
+  ISet
+  (is-equal [a ^ISet b]
+    (and (is (= a b))
+         (is (= (.size a) (.size b)))
+         (is (= (datafy a) (datafy b)))
+         (is (= (set (datafy (.elements a)))
+                (set (datafy (.elements b)))))
+         (is (.containsAll a b))
+         (is (.containsAll b a))
+         (every? (fn [x]
+                   (and (is (.contains a x))
+                        (is (.contains b x))))
+                 (set/union (datafy a) (datafy b))))))
+
+(defmacro def-equal-test
+  "Defines an equality test for a type. Takes a symbol for the test, a type,
+  and a number of iterations. Defines a test which checks that two programs
+  constructing the same value produce values which are equal."
+  [name type iterations]
+  `(deftest ~name
+     (checking ~(str "two ways of constructing the same "
+                     type " should be equal")
+             ~iterations
+             ; Note that we intentionally *don't* generate a program which
+             ; efficiently produces a single value v--we generate a program
+             ; which happens to incidentally produce v, but probably
+             ; does lots of other stuff. We want to make sure that those other
+             ; operations don't inadvertently mess up v in some way!
+             [p1# (program-ending-in-type-gen ~type)
+              :let [v# (eval-last eval-expr-clj p1#)]
+              p2# (value-program-gen v#)]
+             ; Evaluate both programs with Bifurcan, and check that they're
+             ; equal
+             (let [v1# (eval-last eval-expr-bifurcan p1#)
+                   v2# (eval-last eval-expr-bifurcan p2#)]
+               (when-not (is-equal v1# v2#)
+                 (prn)
+                 (println "; Value: " (pr-str v#))
+                 (prn)
+                 (println "; Program 1")
+                 (print-program-bifurcan p1#)
+                 (prn)
+                 (println "; Program 1")
+                 (print-program-bifurcan (count p1#) p2#))))))
+
+(def-equal-test set-equal-test :set iterations)
+(def-equal-test map-equal-test :map iterations)
