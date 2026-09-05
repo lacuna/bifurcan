@@ -76,15 +76,46 @@ public class ListNodes {
 
     // invariants
 
-    public void assertInvariants() {
-      if (shift == SHIFT_INCREMENT) {
-        for (int i = 0; i < numNodes; i++) {
-          assert nodes[i] instanceof Object[];
+    private void checkInvariant() {
+      if (numNodes < 0 || numNodes > MAX_BRANCHES) {
+        throw new IllegalStateException("numNodes is " + numNodes);
+      } else if (shift < SHIFT_INCREMENT) {
+        throw new IllegalStateException("shift is " + shift);
+      } else if (offsets.length < numNodes || nodes.length < numNodes) {
+        throw new IllegalStateException("arrays are too short at shift " + shift);
+      }
+
+      for (int i = 0; i < numNodes; i++) {
+        Object child = nodes[i];
+        long childSize;
+
+        if (shift == SHIFT_INCREMENT) {
+          if (!(child instanceof Object[])) {
+            throw new IllegalStateException("leaf level holds a non-chunk child");
+          }
+          childSize = ((Object[]) child).length;
+        } else {
+          if (!(child instanceof Node)) {
+            throw new IllegalStateException("branch level holds a chunk");
+          }
+          Node n = (Node) child;
+          if (n.shift != shift - SHIFT_INCREMENT) {
+            throw new IllegalStateException("child shift is " + n.shift + ", expected " + (shift - SHIFT_INCREMENT));
+          }
+          n.checkInvariant();
+          childSize = n.size();
         }
-      } else {
-        for (int i = 0; i < numNodes; i++) {
-          assert ((Node) nodes[i]).shift == (shift - SHIFT_INCREMENT);
+
+        if (childSize == 0) {
+          throw new IllegalStateException("empty child at index " + i + ", shift " + shift);
+        } else if (offsets[i] - offset(i) != childSize) {
+          throw new IllegalStateException("offset " + i + " disagrees with child size at shift " + shift);
         }
+      }
+
+      // in a strict node, every child but the last is full
+      if (isStrict && numNodes > 1 && offset(numNodes - 1) != (numNodes - 1) * (1L << shift)) {
+        throw new IllegalStateException("strict node has a partial child before the last, shift " + shift);
       }
     }
 
@@ -280,11 +311,10 @@ public class ListNodes {
         stack[i] = (Node) n.nodes[n.numNodes - 1];
       }
 
-      // we need to grow a parent
+      // we need to grow a parent, which pushLast(Node) does by walking up the
+      // right spine, only adding a level once every node on it is full
       if (stack[stack.length - 1].numNodes == MAX_BRANCHES) {
-        return numNodes == MAX_BRANCHES
-            ? new Node(editor, shift + SHIFT_INCREMENT).pushLast(this, editor).pushLast(chunk, editor)
-            : pushLast(from(editor, chunk), editor);
+        return pushLast(from(editor, chunk), editor);
       }
 
       for (int i = 0; i < stack.length; i++) {
@@ -406,7 +436,6 @@ public class ListNodes {
         Node n = stack[i];
         int lastIdx = n.numNodes - 1;
         n.nodes[lastIdx] = i == stack.length - 1 ? node : stack[i + 1];
-        assertInvariants();
         n.offsets[lastIdx] += nSize;
         n.updateStrict();
       }

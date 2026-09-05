@@ -2,13 +2,14 @@
 (defproject io.lacuna/bifurcan "0.2.0-rc1"
   :java-source-paths ["src"]
   :dependencies []
-  :test-selectors {:default   #(not
-                                 (some #{:benchmark :stress}
-                                   (cons (:tag %) (keys %))))
-                   :benchmark :benchmark
-                   :focus     :focus
-                   :stress    :stress
-                   :all       (constantly true)}
+  :test-selectors {:default    #(not
+                                  (some #{:benchmark :stress :known-bug}
+                                    (cons (:tag %) (keys %))))
+                   :benchmark  :benchmark
+                   :focus      :focus
+                   :stress     :stress
+                   :known-bug  :known-bug
+                   :all        (constantly true)}
   :profiles {:low-mem {:jvm-opts ^:replace ["-server" "-Xmx1g" "-XX:MaxDirectMemorySize=2g" "-XX:+UseG1GC"]}
              :bench   {:jvm-opts ^:replace
                        ["-server" "-Xmx10g" "-XX:+UseG1GC"

@@ -89,6 +89,16 @@
     (apply [_ x]
       (f x))))
 
+(defn ->unary-operator [f]
+  (reify java.util.function.UnaryOperator
+    (apply [_ x]
+      (f x))))
+
+(defn ->binary-operator [f]
+  (reify java.util.function.BinaryOperator
+    (apply [_ a b]
+      (f a b))))
+
 (defn ->predicate [f]
   (reify java.util.function.Predicate
     (test [_ x]

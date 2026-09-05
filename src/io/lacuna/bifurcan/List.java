@@ -24,7 +24,7 @@ public class List<V> extends IList.Mixin<V> implements Cloneable {
   private Node root;
   private byte prefixLen, suffixLen;
   public Object[] prefix, suffix;
-  private final Object editor;
+  private Object editor;
 
   public static <V> List<V> of(V... elements) {
     List<V> list = new List<V>().linear();
@@ -272,7 +272,13 @@ public class List<V> extends IList.Mixin<V> implements Cloneable {
 
   @Override
   public List<V> forked() {
-    return isLinear() ? new List(false, root, prefixLen, prefix, suffixLen, suffix).clone() : this;
+    if (!isLinear()) {
+      return this;
+    }
+    List<V> result = new List(false, root, prefixLen, prefix, suffixLen, suffix).clone();
+    // the result shares our nodes, so give up ownership of them
+    editor = new Object();
+    return result;
   }
 
   @Override
@@ -318,7 +324,7 @@ public class List<V> extends IList.Mixin<V> implements Cloneable {
 
       // overwrite tree
     } else if (idx < (prefixLen + rootSize)) {
-      root = root.set(editor, idx - prefixLen, value);
+      root = root.set(isLinear() ? editor : new Object(), idx - prefixLen, value);
 
       // overwrite suffix
     } else {

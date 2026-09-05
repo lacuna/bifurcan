@@ -28,7 +28,7 @@ public class IntMap<V> extends ISortedMap.Mixin<Long, V> {
   static final ToLongFunction<Long> HASH = n -> n;
   private static final Object DEFAULT_VALUE = new Object();
 
-  final Object editor;
+  Object editor;
   private Node<V> neg, pos;
 
   /**
@@ -414,7 +414,13 @@ public class IntMap<V> extends ISortedMap.Mixin<Long, V> {
 
   @Override
   public IntMap<V> forked() {
-    return isLinear() ? new IntMap<V>(neg, pos, false) : this;
+    if (!isLinear()) {
+      return this;
+    }
+    IntMap<V> result = new IntMap<V>(neg, pos, false);
+    // the result shares our nodes, so give up ownership of them
+    editor = new Object();
+    return result;
   }
 
   @Override

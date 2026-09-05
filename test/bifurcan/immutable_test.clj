@@ -7,7 +7,8 @@
   take a set and union it with another, that union function actually alters its
   arguments."
   (:refer-clojure :exclude [eval])
-  (:require [bifurcan.test-utils :as u]
+  (:require [bifurcan.invariant :as inv]
+            [bifurcan.test-utils :as u]
             [clojure [datafy :refer [datafy]]
                      [pprint :refer [pprint]]
                      [set :as set]
@@ -51,8 +52,10 @@
 ;(set! *warn-on-reflection* true)
 
 (def iterations
-  "Our tests are a lot more expensive, so we run fewer of them."
-  (/ u/iterations 10))
+  "Our tests are a lot more expensive, so we run fewer of them. There are also
+  a lot of them now, one per collection implementation, so we favor breadth
+  over depth."
+  (/ u/iterations 50))
 
 (def max-program-size
   "How long can programs be? This generator is very bad at shrinking, so when
@@ -320,14 +323,45 @@
       :set/empty #{}
       expr)))
 
-(defn eval-expr-bifurcan
-  "Takes a trace of program results so far, and evaluates a new expression in
-  that context."
-  [trace expr]
+(defn- fold-set
+  "Builds a set by adding elements one at a time, for the set types which have
+  no static `from`."
+  [empty]
+  (fn [xs]
+    (.forked ^ISet (reduce (fn [s x] (.add ^ISet s x))
+                           (.linear ^ISet empty)
+                           xs))))
+
+(def default-impl
+  "Every operation in an AST is an interface call, so the only thing which
+  varies between collection types is construction. An impl maps each of :list,
+  :map and :set to its empty value and a function building one from a Clojure
+  collection."
+  {:list {:empty List/EMPTY :of #(List/from ^Iterable (vec %))}
+   :map  {:empty Map/EMPTY  :of #(Map/from ^java.util.Map %)}
+   :set  {:empty Set/EMPTY  :of #(Set/from ^Iterable (vec %))}})
+
+(def map-impls
+  "The map types an AST of :map operations can be evaluated against. Keys are
+  always integers, so every one of these accepts them."
+  {"Map"       (:map default-impl)
+   "IntMap"    {:empty (IntMap.)    :of #(IntMap/from ^java.util.Map %)}
+   "SortedMap" {:empty (SortedMap.) :of #(SortedMap/from ^java.util.Map %)}})
+
+(def set-impls
+  "The set types an AST of :set operations can be evaluated against."
+  {"Set"       (:set default-impl)
+   "IntSet"    {:empty (IntSet.)    :of (fold-set (IntSet.))}
+   "SortedSet" {:empty (SortedSet.) :of (fold-set (SortedSet.))}})
+
+(defn eval-expr-bifurcan-with
+  "Takes an impl (see `default-impl`), a trace of program results so far, and
+  evaluates a new expression in that context."
+  [impl trace expr]
   (if (vector? expr)
     (let [[f a b c] expr]
       (case f
-        :list/of           (List/from ^Iterable (rest expr))
+        :list/of           ((-> impl :list :of) (rest expr))
         :list/add-first    (.addFirst ^IList a b)
         :list/add-last     (.addLast ^IList a b)
         :list/remove-first (.removeFirst ^IList a)
@@ -335,13 +369,13 @@
         :list/concat       (.concat ^IList a b)
         :list/slice        (.slice ^IList a b c)
 
-        :map/of           (Map/from ^java.util.Map (apply hash-map (rest expr)))
+        :map/of           ((-> impl :map :of) (apply hash-map (rest expr)))
         :map/put          (.put ^IMap a b c)
         :map/union        (.union ^IMap a b)
         :map/intersection (.intersection ^IMap a ^IMap b)
         :map/difference   (.difference ^IMap a ^IMap b)
 
-        :set/of           (Set/from ^Iterable (vec (rest expr)))
+        :set/of           ((-> impl :set :of) (rest expr))
         :set/add          (.add ^ISet a b)
         :set/remove       (.remove ^ISet a b)
         :set/union        (.union ^ISet a b)
@@ -349,10 +383,14 @@
         :set/difference   (.difference ^ISet a b)
         :var              (:res (nth trace a))))
     (case expr
-      :list/empty List/EMPTY
-      :map/empty Map/EMPTY
-      :set/empty Set/EMPTY
+      :list/empty (-> impl :list :empty)
+      :map/empty  (-> impl :map :empty)
+      :set/empty  (-> impl :set :empty)
       expr)))
+
+(def eval-expr-bifurcan
+  "Evaluates against Map, Set and List."
+  (partial eval-expr-bifurcan-with default-impl))
 
 (defn print-program
   "Prints out a program without evaluating it."
@@ -482,6 +520,12 @@
    (let [trace (eval-trace eval-expr program)]
      ; Check the trace elements are still stable.
      (doseq [{:keys [expr res clj]} trace]
+       ; Structural invariants first: a violation here explains an equality or
+       ; iteration failure further down.
+       (is (inv/valid? res)
+           (str (with-out-str (print-trace trace))
+                "\n\nExpr:         " (pr-str expr)
+                "\nRes:          " res))
        (is (= clj (datafy res))
            (when (instance? ICollection res)
              (str
@@ -506,33 +550,49 @@
 (defn eval-compare
   "Evaluates a program using both Clojure and Bifurcan evaluators, testing that
   the two yield equivalent traces."
-  [program]
-  (let [clj      (eval-check-immutable eval-expr-clj      program)
-        bifurcan (eval-check-immutable eval-expr-bifurcan program)]
-    (mapv (fn [clj bifurcan]
-            (is (= (:clj clj) (:clj bifurcan))))
-          clj
-          bifurcan)
-    {:clj clj
-     :bifurcan bifurcan}))
+  ([program]
+   (eval-compare default-impl program))
+  ([impl program]
+   (let [clj      (eval-check-immutable eval-expr-clj program)
+         bifurcan (eval-check-immutable (partial eval-expr-bifurcan-with impl) program)]
+     (mapv (fn [clj bifurcan]
+             (is (= (:clj clj) (:clj bifurcan))))
+           clj
+           bifurcan)
+     {:clj clj
+      :bifurcan bifurcan})))
 
 (defmacro def-imm-test
   "Defines a new test for immutability. Takes a var name, a text description,
-  the number of iterations, and a vector of types."
-  [name desc iterations types]
-  `(deftest ~name
-     (checking ~desc ~iterations
-               [program# (program-gen ~types)]
-               ;(print ".")
-               ;(flush)
-               (let [res# (eval-compare program#)]
-                 ; (prn)
-                 ;(print-trace (:bifurcan res#))
-                 ))))
+  the number of iterations, and a vector of types. Optionally takes an impl to
+  evaluate against, defaulting to Map, Set and List."
+  ([name desc iterations types]
+   `(def-imm-test ~name ~desc ~iterations ~types default-impl))
+  ([name desc iterations types impl]
+   `(deftest ~name
+      (checking ~desc ~iterations
+                [program# (program-gen ~types)]
+                (eval-compare ~impl program#)))))
 
 (def-imm-test list-test "Lists are immutable" iterations [:list])
 (def-imm-test map-test  "Maps are immutable"  iterations [:map])
 (def-imm-test set-test  "Sets are immutable"  iterations [:set])
+
+;; The same programs, evaluated against the other map and set implementations.
+;; Each has its own node code and its own notion of an editor token, so none of
+;; them inherits Map's or Set's correctness.
+
+(def-imm-test int-map-test "IntMaps are immutable" iterations [:map]
+  {:map (get map-impls "IntMap")})
+
+(def-imm-test sorted-map-test "SortedMaps are immutable" iterations [:map]
+  {:map (get map-impls "SortedMap")})
+
+(def-imm-test int-set-test "IntSets are immutable" iterations [:set]
+  {:set (get set-impls "IntSet")})
+
+(def-imm-test sorted-set-test "SortedSets are immutable" iterations [:set]
+  {:set (get set-impls "SortedSet")})
 
 (deftest iterator-oob-bug
   ; Test for a specific bug where iterators threw out-of-bounds exceptions
@@ -597,7 +657,9 @@
           arg-vars (->> sub-programs
                         (map count)
                         (reductions + 0)
-                        next)
+                        next
+                        ; a sub-program's result is its last expression
+                        (map dec))
           ; Which means our new expression is
           expr (loop [expr          (transient expr)
                       i             1
@@ -636,35 +698,131 @@
         gen/one-of
         (gen/fmap uninline-expr))))
 
+(defn map-program-gen
+  "Takes a map and returns a generator of programs which produce that map as
+  their final value. The insertion order is shuffled, which is what makes this
+  interesting: two maps holding the same entries must be equal however they
+  were built."
+  [m]
+  (->> [(when (empty? m)
+          (gen/return :map/empty))
+
+        ; Build the map directly with map/of
+        (gen/fmap (fn [pairs] (into [:map/of] (mapcat identity pairs)))
+                  (gen/shuffle (vec m)))
+
+        ; Build it one entry at a time, in a shuffled order
+        (gen/fmap (fn [pairs]
+                    (reduce (fn [expr [k v]] [:map/put expr k v])
+                            :map/empty
+                            pairs))
+                  (gen/shuffle (vec m)))]
+       (remove nil?)
+       vec
+       gen/one-of
+       (gen/fmap uninline-expr)))
+
+(defn list-program-gen
+  "Takes a vector and returns a generator of programs which produce that
+  vector as their final value. Unlike sets and maps, order is significant, so
+  we vary how the list is assembled rather than the order of its elements."
+  [xs]
+  (->> [(when (empty? xs)
+          (gen/return :list/empty))
+
+        ; Build it directly
+        (gen/return (into [:list/of] xs))
+
+        ; Append one element at a time
+        (gen/return (reduce (fn [expr x] [:list/add-last expr x])
+                            :list/empty
+                            xs))
+
+        ; Prepend one element at a time, from the back
+        (gen/return (reduce (fn [expr x] [:list/add-first expr x])
+                            :list/empty
+                            (reverse xs)))
+
+        ; Split in two and concatenate
+        (gen/fmap (fn [i]
+                    [:list/concat
+                     (into [:list/of] (subvec xs 0 i))
+                     (into [:list/of] (subvec xs i))])
+                  (gen/choose 0 (count xs)))]
+       (remove nil?)
+       vec
+       gen/one-of
+       (gen/fmap uninline-expr)))
+
 (defn value-program-gen
   "Takes a Clojure structure and returns a generator of programs which produce
   that structure as its final value."
   [x]
-  (cond (set? x) (set-program-gen x)))
+  (cond (set? x)    (set-program-gen x)
+        (map? x)    (map-program-gen x)
+        (vector? x) (list-program-gen x)))
 
-(deftest set-equal-test
-  ; Confirms that programs producing equal Clojure structures are also equal
-  ; when evaluated using Bifurcan.
-  (checking "two ways of constructing the same set should be equal" iterations
-            ; Note that we intentionally *don't* generate a program which
-            ; efficiently produces a single value v--we generate a program
-            ; which happens to incidentally produce v, but probably
-            ; does lots of other stuff. We want to make sure that those other
-            ; operations don't inadvertently mess up v in some way!
-            [p1 (program-ending-in-type-gen :set)
-             :let [v (eval-last eval-expr-clj p1)]
-             p2 (value-program-gen v)]
-            ; Evaluate both programs with Bifurcan
-            (let [v1 (eval-last eval-expr-bifurcan p1)
-                  v2 (eval-last eval-expr-bifurcan p2)]
-              ; They should be equal!
-              (is (= v1 v2))
-              (when (not= v1 v2)
-                (prn)
-                (prn :v v)
-                (prn)
-                (prn :p1)
-                (print-program-bifurcan p1)
-                (prn)
-                (prn :p2)
-                (print-program-bifurcan (count p1) p2)))))
+(defn- check-equal-programs
+  "Evaluates two programs which should produce equal values, and checks that
+  Bifurcan agrees. Equal collections must also agree on hashCode, since
+  otherwise they can't be used together in a hashed collection."
+  [impl v p1 p2]
+  (let [eval-expr (partial eval-expr-bifurcan-with impl)
+        v1        (eval-last eval-expr p1)
+        v2        (eval-last eval-expr p2)
+        ok        (and (= v1 v2)
+                       (= v2 v1)
+                       (= (.hashCode ^Object v1) (.hashCode ^Object v2)))]
+    (is ok)
+    (when-not ok
+      (prn)
+      (prn :v v)
+      (prn :hashes (.hashCode ^Object v1) (.hashCode ^Object v2))
+      (prn)
+      (prn :p1)
+      (print-program-bifurcan p1)
+      (prn)
+      (prn :p2)
+      (print-program-bifurcan (count p1) p2))))
+
+(defmacro def-equal-test
+  "Defines a test that two differently constructed collections of the given
+  type compare equal. Note that we intentionally *don't* generate a program
+  which efficiently produces a single value v--we generate a program which
+  happens to incidentally produce v, but probably does lots of other stuff. We
+  want to make sure that those other operations don't inadvertently mess up v
+  in some way!"
+  ([name desc type]
+   `(def-equal-test ~name ~desc ~type default-impl))
+  ([name desc type impl]
+   `(deftest ~name
+      (checking ~desc iterations
+                [p1# (program-ending-in-type-gen ~type)
+                 :let [v# (eval-last eval-expr-clj p1#)]
+                 p2# (value-program-gen v#)]
+                (check-equal-programs ~impl v# p1# p2#)))))
+
+(def-equal-test set-equal-test
+  "two ways of constructing the same set should be equal" :set)
+
+(def-equal-test map-equal-test
+  "two ways of constructing the same map should be equal" :map)
+
+(def-equal-test list-equal-test
+  "two ways of constructing the same list should be equal" :list)
+
+(def-equal-test int-map-equal-test
+  "two ways of constructing the same IntMap should be equal" :map
+  {:map (get map-impls "IntMap")})
+
+(def-equal-test sorted-map-equal-test
+  "two ways of constructing the same SortedMap should be equal" :map
+  {:map (get map-impls "SortedMap")})
+
+(def-equal-test int-set-equal-test
+  "two ways of constructing the same IntSet should be equal" :set
+  {:set (get set-impls "IntSet")})
+
+(def-equal-test sorted-set-equal-test
+  "two ways of constructing the same SortedSet should be equal" :set
+  {:set (get set-impls "SortedSet")})

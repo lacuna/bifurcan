@@ -85,6 +85,52 @@ public class RopeNodes {
       return new Node(editor, SHIFT_INCREMENT).pushLast(child, editor);
     }
 
+    // invariants
+
+    private void checkInvariant() {
+      if (numNodes < 0 || numNodes > MAX_BRANCHES) {
+        throw new IllegalStateException("numNodes is " + numNodes);
+      } else if (shift < SHIFT_INCREMENT) {
+        throw new IllegalStateException("shift is " + shift);
+      } else if (unitOffsets.length < numNodes
+          || pointOffsets.length < numNodes
+          || nodes.length < numNodes) {
+        throw new IllegalStateException("arrays are too short at shift " + shift);
+      }
+
+      for (int i = 0; i < numNodes; i++) {
+        Object child = nodes[i];
+
+        if (shift == SHIFT_INCREMENT) {
+          if (!(child instanceof byte[])) {
+            throw new IllegalStateException("leaf level holds a non-chunk child");
+          }
+        } else {
+          if (!(child instanceof Node)) {
+            throw new IllegalStateException("branch level holds a chunk");
+          }
+          Node n = (Node) child;
+          if (n.shift != shift - SHIFT_INCREMENT) {
+            throw new IllegalStateException("child shift is " + n.shift + ", expected " + (shift - SHIFT_INCREMENT));
+          }
+          n.checkInvariant();
+        }
+
+        int units = unitOffsets[i] - offsetFor(i, unitOffsets);
+        int points = pointOffsets[i] - offsetFor(i, pointOffsets);
+
+        if (units != RopeNodes.numCodeUnits(child)) {
+          throw new IllegalStateException("unit offset " + i + " disagrees with child at shift " + shift);
+        } else if (points != RopeNodes.numCodePoints(child)) {
+          throw new IllegalStateException("point offset " + i + " disagrees with child at shift " + shift);
+        } else if (points == 0) {
+          throw new IllegalStateException("empty child at index " + i + ", shift " + shift);
+        } else if (units < points) {
+          throw new IllegalStateException("child " + i + " has fewer units than points at shift " + shift);
+        }
+      }
+    }
+
     // lookup
 
     private int indexFor(int idx, int[] offsets) {

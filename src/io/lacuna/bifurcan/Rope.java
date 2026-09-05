@@ -28,7 +28,7 @@ public class Rope implements Comparable<Rope> {
 
   public static final Rope EMPTY = Rope.from("");
 
-  private final Object editor;
+  private Object editor;
   private Node root;
   private int hash = -1;
 
@@ -206,7 +206,13 @@ public class Rope implements Comparable<Rope> {
   }
 
   public Rope forked() {
-    return isLinear() ? new Rope(root, false) : this;
+    if (!isLinear()) {
+      return this;
+    }
+    Rope result = new Rope(root, false);
+    // the result shares our nodes, so give up ownership of them
+    editor = new Object();
+    return result;
   }
 
   public Rope linear() {
@@ -292,6 +298,11 @@ public class Rope implements Comparable<Rope> {
       public IntStream codePoints() {
         return IntIterators.toStream(Rope.this.codePoints(), root.numCodePoints());
       }
+
+      @Override
+      public String toString() {
+        return Rope.this.toString();
+      }
     };
   }
 
@@ -339,7 +350,7 @@ public class Rope implements Comparable<Rope> {
 
       @Override
       public boolean hasNext() {
-        return idx > 0;
+        return idx >= 0;
       }
 
       @Override

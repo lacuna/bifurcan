@@ -5,6 +5,7 @@
    [clojure.test.check.properties :as prop]
    [clojure.test.check.clojure-test :as ct :refer [defspec]]
    [clojure.pprint :refer [pprint]]
+   [bifurcan.invariant :as inv]
    [bifurcan.test-utils :as u :refer [iterations]]
    [clojure.set :as set]
    [proteus :refer [let-mutable]])
@@ -96,8 +97,13 @@
 
 ;;;
 
+;; these also validate internal structure, since a trie can hold the right
+;; elements while being laid out wrongly
+
 (defn map= [a ^IMap b]
   (and
+    (inv/valid? b)
+    (= (count a) (.size b))
     (=
       (set a)
       (->> b
@@ -110,14 +116,20 @@
       (->map b))))
 
 (defn set= [a ^ISet b]
-  (= a
-    (->set b)
-    (->> b ->set (filter #(.contains b %)) (into #{}))))
+  (and
+    (inv/valid? b)
+    (= (count a) (.size b))
+    (= a
+      (->set b)
+      (->> b ->set (filter #(.contains b %)) (into #{})))))
 
 (defn list= [a ^IList b]
-  (= (seq a)
-    (-> b .iterator iterator-seq)
-    (->> (.size b) range (map #(.nth b %)) seq)))
+  (and
+    (inv/valid? b)
+    (= (count a) (.size b))
+    (= (seq a)
+      (-> b .iterator iterator-seq)
+      (->> (.size b) range (map #(.nth b %)) seq))))
 
 (defn valid-map-indices? [^IMap m]
   (->> m
@@ -226,6 +238,62 @@
    :linear       #(.linear ^IMap %)
    :forked       #(.forked ^IMap %)
    })
+
+;; Hash collisions are rare under the default hashing, so the collision nodes
+;; in Map and Set are barely exercised by the tests above. These build
+;; collections whose hash function deliberately collapses keys into a handful
+;; of buckets, which makes collision nodes the common case rather than a
+;; once-in-a-blue-moon event.
+
+(def colliding-equality (u/->bi-predicate =))
+
+(defn colliding-hash [buckets]
+  (u/->to-long-fn #(mod (hash %) buckets)))
+
+(defn colliding-map
+  "An empty Map whose keys collapse into `buckets` distinct hashes."
+  [buckets]
+  (Map. (colliding-hash buckets) colliding-equality))
+
+(defn colliding-set
+  "An empty Set whose elements collapse into `buckets` distinct hashes."
+  [buckets]
+  (Set. (colliding-hash buckets) colliding-equality))
+
+(defn- into-coll
+  "Adds everything in `xs` to a Bifurcan collection, via a linear copy."
+  [empty add xs]
+  (.forked (reduce add (.linear empty) xs)))
+
+(defn colliding-map-actions
+  "Like `bifurcan-map`, but the arguments to the set operations share the
+  collection's hash and equality semantics. Otherwise `Maps.equivEquality`
+  fails and every set operation silently falls back to the generic path,
+  skipping the node code entirely."
+  [buckets]
+  (let [->map #(into-coll (colliding-map buckets)
+                          (fn [^IMap m k] (.put m k k))
+                          %)]
+    {:put          #(.put ^IMap %1 %2 %3)
+     :remove       #(.remove ^IMap %1 %2)
+     :union        #(.union ^IMap %1 (->map %2))
+     :intersection #(.intersection ^IMap %1 ^IMap (->map %2))
+     :difference   #(.difference ^IMap %1 ^IMap (->map %2))
+     :linear       #(.linear ^IMap %)
+     :forked       #(.forked ^IMap %)}))
+
+(defn colliding-set-actions
+  [buckets]
+  (let [->set #(into-coll (colliding-set buckets)
+                          (fn [^ISet s x] (.add s x))
+                          %)]
+    {:add          #(.add ^ISet %1 %2)
+     :remove       #(.remove ^ISet %1 %2)
+     :union        #(.union ^ISet %1 (->set %2))
+     :intersection #(.intersection ^ISet %1 (->set %2))
+     :difference   #(.difference ^ISet %1 (->set %2))
+     :linear       #(.linear ^ISet %)
+     :forked       #(.forked ^ISet %)}))
 
 (def bifurcan-sorted-map
   {:put          #(.put ^IMap %1 %2 %3)
@@ -369,6 +437,26 @@
     (= b c)
     (map= a b)
     (map= a c)))
+
+(u/def-collection-check test-colliding-map iterations map-actions
+  [buckets (gen/elements [1 2 8 64])]
+  [a {} clj-map
+   b (colliding-map buckets) (colliding-map-actions buckets)
+   c (.linear (colliding-map buckets)) (colliding-map-actions buckets)]
+  (and
+    (= b c)
+    (map= a b)
+    (map= a c)))
+
+(u/def-collection-check test-colliding-set iterations set-actions
+  [buckets (gen/elements [1 2 8 64])]
+  [a #{} clj-set
+   b (colliding-set buckets) (colliding-set-actions buckets)
+   c (.linear (colliding-set buckets)) (colliding-set-actions buckets)]
+  (and
+    (= b c)
+    (set= a b)
+    (set= a c)))
 
 (u/def-collection-check test-map-indices iterations map-actions
   []

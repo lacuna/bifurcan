@@ -437,6 +437,68 @@ public class MapNodes {
       return false;
     }
 
+    // invariants
+
+    private void checkInvariant(int shift) {
+      if ((datamap & nodemap) != 0) {
+        throw new IllegalStateException("datamap and nodemap overlap at shift " + shift);
+      }
+
+      int numEntries = bitCount(datamap);
+      int numNodes = bitCount(nodemap);
+
+      if (hashes == null || content == null) {
+        if (numEntries != 0 || numNodes != 0 || size != 0) {
+          throw new IllegalStateException("node without storage has contents");
+        }
+        return;
+      }
+
+      if (hashes.length < numEntries) {
+        throw new IllegalStateException("hashes array is too short at shift " + shift);
+      } else if (content.length < (numEntries << 1) + numNodes) {
+        throw new IllegalStateException("content array is too short at shift " + shift);
+      }
+
+      // unused slots between the entries and the nodes must be empty
+      for (int i = numEntries << 1; i < content.length - numNodes; i++) {
+        if (content[i] != null) {
+          throw new IllegalStateException("dirty content slot " + i + " at shift " + shift);
+        }
+      }
+
+      long expectedSize = numEntries;
+
+      PrimitiveIterator.OfInt masks = Util.masks(datamap);
+      while (masks.hasNext()) {
+        int mask = masks.nextInt();
+        int idx = entryIndex(mask);
+        if (hashMask(hashes[idx], shift) != mask) {
+          throw new IllegalStateException("entry " + idx + " is in the wrong slot at shift " + shift);
+        }
+      }
+
+      masks = Util.masks(nodemap);
+      while (masks.hasNext()) {
+        INode<K, V> child = node(masks.nextInt());
+        if (child instanceof Node) {
+          ((Node<K, V>) child).checkInvariant(shift + SHIFT_INCREMENT);
+        } else {
+          ((Collision<K, V>) child).checkInvariant();
+        }
+        expectedSize += child.size();
+      }
+
+      if (size != expectedSize) {
+        throw new IllegalStateException("size is " + size + ", expected " + expectedSize + " at shift " + shift);
+      }
+
+      // anything `collapse` would have folded away is not a canonical layout
+      if (shift > 0 && datamap == 0 && Bits.isPowerOfTwo(nodemap) && node(nodemap) instanceof Collision) {
+        throw new IllegalStateException("uncollapsed collision wrapper at shift " + shift);
+      }
+    }
+
     /////
 
     private Node<K, V> clone(Object editor) {
@@ -726,7 +788,7 @@ public class MapNodes {
           while (it.hasNext()) {
             IEntry<K, V> e = it.next();
             int idx = c.indexOf(e.key(), keyEquals);
-            if (idx < 0 || !valEquals.test(e.value(), (V) entries[idx + 1])) {
+            if (idx < 0 || !valEquals.test(e.value(), (V) c.entries[idx + 1])) {
               return false;
             }
           }
@@ -735,6 +797,14 @@ public class MapNodes {
       }
 
       return false;
+    }
+
+    private void checkInvariant() {
+      if ((entries.length & 1) != 0) {
+        throw new IllegalStateException("collision has a dangling key");
+      } else if (entries.length < 4) {
+        throw new IllegalStateException("collision holds fewer than two entries");
+      }
     }
 
     ///
@@ -922,7 +992,9 @@ public class MapNodes {
 
     // Node / Node
     if (a instanceof Node && b instanceof Node) {
-      return difference(shift, editor, (Node<K, V>) a, (Node<K, V>) b, equals);
+      Node<K, V> n = difference(shift, editor, (Node<K, V>) a, (Node<K, V>) b, equals);
+      // `collapse` preserves canonical layout
+      return n == null ? null : n.collapse(shift);
 
       // Node / Collision
     } else if (a instanceof Node && b instanceof Collision) {
@@ -1024,7 +1096,9 @@ public class MapNodes {
 
     // Node / Node
     if (a instanceof Node && b instanceof Node) {
-      return intersection(shift, editor, (Node<K, V>) a, (Node<K, V>) b, equals);
+      Node<K, V> n = intersection(shift, editor, (Node<K, V>) a, (Node<K, V>) b, equals);
+      // `collapse` preserves canonical layout
+      return n == null ? null : n.collapse(shift);
 
       // Node / Collision
     } else if (a instanceof Node && b instanceof Collision) {
