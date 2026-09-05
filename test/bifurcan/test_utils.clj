@@ -27,7 +27,7 @@
 
 (def iterations
   "Number of iterations for generative tests"
-  (long 1e4))
+  (long 1e5))
 
 ;; Coercion back to Clojure structures.
 

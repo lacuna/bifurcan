@@ -11,6 +11,7 @@
             [clojure [datafy :refer [datafy]]
                      [pprint :refer [pprint]]
                      [set :as set]
+                     [string :as str]
                      [test :refer [deftest is are]]]
 
             [clojure.test.check [generators :as gen]
@@ -216,7 +217,22 @@
        vec
        gen/one-of))
 
-(defn rewrite-var*
+(defn rewrite-vars
+  "Takes an expression, and rewrites every [:var ...] form in it with `(f [:var
+  ...])`."
+  [f expr]
+  (cond (not (vector? expr))
+        expr
+
+        (identical? :var (first expr))
+        (f expr)
+
+        ; Recur
+        true
+        (into [(first expr)]
+              (map (partial rewrite-vars f) (rest expr)))))
+
+(defn resolve-var
   "Given an index of types to vectors of available expression indices, and a
   var expression like [:var 2 :set], returns a var expression like [:var 5],
   where that variable is a set defined before index. If no var of that type is
@@ -229,22 +245,8 @@
       (fallback-expr type)
       [:var (nth indices (mod i n))])))
 
-(defn rewrite-var
-  "Like rewrite-var*, but rewrites expressions recursively."
-  [by-type expr]
-  (cond (not (vector? expr))
-        expr
 
-        ; Found it
-        (identical? :var (first expr))
-        (rewrite-var* by-type expr)
-
-        ; Recur
-        true
-        (into [(first expr)]
-              (map (partial rewrite-var by-type) (rest expr)))))
-
-(defn rewrite-vars
+(defn resolve-vars
   "Runs through a program and rewrites any occurrence of [:var 2 :set] to a
   previous set expression, or the empty set."
   ([program]
@@ -255,7 +257,8 @@
           program program]
      (if (= i (count program))
        program
-       (let [expr     (rewrite-var by-type (nth program i))
+       (let [expr     (rewrite-vars (partial resolve-var by-type)
+                                    (nth program i))
              program  (assoc program i expr)
              type     (expr-type expr program)]
          (recur (inc i)
@@ -276,7 +279,7 @@
   This program computes a set containing 1, 2, and 3, then an empty set, then
   takes the union of those two."
   [types]
-  (gen/fmap rewrite-vars
+  (gen/fmap resolve-vars
             (gen/vector (expr-gen types) 1 max-program-size)))
 
 (defn eval-expr-clj
@@ -338,7 +341,7 @@
         :map/intersection (.intersection ^IMap a ^IMap b)
         :map/difference   (.difference ^IMap a ^IMap b)
 
-        :set/of           (Set/from ^Iterable (rest expr))
+        :set/of           (Set/from ^Iterable (vec (rest expr)))
         :set/add          (.add ^ISet a b)
         :set/remove       (.remove ^ISet a b)
         :set/union        (.union ^ISet a b)
@@ -350,6 +353,82 @@
       :map/empty Map/EMPTY
       :set/empty Set/EMPTY
       expr)))
+
+(defn print-program
+  "Prints out a program without evaluating it."
+  [program]
+  (->> program
+       (map-indexed (fn [i expr]
+                      (printf "%3d %s\n" i (pr-str expr))))
+       dorun))
+
+(defn expr-str-bifurcan
+  "Converts an expression in a program to a printable string. See
+  print-program-bifurcan."
+  [expr]
+  (if (vector? expr)
+    (let [r         expr-str-bifurcan
+          [f a b c] expr]
+      (case f
+        :list/of           (str "(List/from "
+                                (str/join " " (map r (rest expr)))
+                                ")")
+        :list/add-first    (str "(.addFirst " (r a) " " (r b) ")")
+        :list/add-last     (str "(.addLast " (r a) " " (r b) ")")
+        :list/remove-first (str "(.removeFirst " (r a) ")")
+        :list/remove-last  (str "(.removeLast " (r a) ")")
+        :list/concat       (str "(.concat " (r a) " " (r b) ")")
+        :list/slice        (str "(.slice " (r a) " " (r b) " " (r c) ")")
+
+        :map/of           (str "(Map/from "
+                               (pr-str (apply hash-map (rest expr)))
+                               ")")
+        :map/put          (str "(.put " (r a) " " (r b) " " (r c) ")")
+        :map/union        (str "(.union " (r a) " " (r b) ")")
+        :map/intersection (str "(.intersection " (r a) " " (r b) ")")
+        :map/difference   (str "(.difference " (r a) " " (r b) ")")
+
+        :set/of           (str "(Set/from "
+                               (pr-str (vec (rest expr)))
+                               ")")
+        :set/add          (str "(.add " (r a) " " (r b) ")")
+        :set/remove       (str "(.remove " (r a) " " (r b) ")")
+        :set/union        (str "(.union " (r a) " " (r b) ")")
+        :set/intersection (str "(.intersection " (r a) " " (r b) ")")
+        :set/difference   (str "(.difference " (r a) " " (r b) ")")
+        :var              (str "x" a)))
+    (case expr
+      :list/empty "List/EMPTY"
+      :map/empty "Map/EMPTY"
+      :set/empty "Set/EMPTY"
+      (pr-str expr))))
+
+(defn print-program-bifurcan
+  "Prints out a program as Bifurcan expressions you can run at the REPL.
+  Optionally takes a line number to begin at."
+  ([program]
+   (print-program-bifurcan 0 program))
+  ([first-line program]
+   (println "(import 'io.lacuna.bifurcan.Set)")
+   (dorun
+     (map-indexed (fn [i expr]
+                    (println (str "(def x" (+ first-line i) " "
+                                  (expr-str-bifurcan expr)
+                                  ")")))
+                  program))))
+
+(defn print-trace
+  "Prints out a trace."
+  [trace]
+  (->> trace
+       (map-indexed (fn [i {:keys [expr res clj]}]
+                      (println
+                        (format "%3d" i)
+                        (pr-str expr)
+                        "->"
+                        (pr-str clj))))
+       dorun))
+
 
 (defn eval-recursive
   "To simplify our node evaluators, they don't recur themselves. This takes an
@@ -388,18 +467,12 @@
           []
           program))
 
-(defn print-trace
-  "Prints out a trace."
-  [trace]
-  (->> trace
-       (map-indexed (fn [i {:keys [expr res clj]}]
-                      (println
-                        (format "%3d" i)
-                        (pr-str expr)
-                        "->"
-                        (pr-str clj))))
-       dorun))
-
+(defn eval-last
+  "Evaluates a program and returns its final value."
+  [eval-expr program]
+  (-> (eval-trace eval-expr program)
+      peek
+      :res))
 
 (defn eval-check-immutable
   "Evaluates a program using the given function for evaluating an expression.
@@ -467,3 +540,131 @@
     [[:set/of 0 -5130]
      [:set/intersection [:var 0] [:var 0]]
      [:set/difference [:var 1] [:set/of 0]]]))
+
+; These tests measure equality by generating a program which produces two equal
+; data structures through different paths, and checking that they're equal.
+
+(defn last-expr-index-of-type
+  "Picks the index of the last expression of a given type from a program, or
+  nil."
+  [program type]
+  (loop [i (dec (count program))]
+    (when (<= 0 i)
+      (if (= type (expr-type (nth program i)))
+        i
+        (recur (dec i))))))
+
+(defn program-ending-in-type-gen
+  "A generator which produces programs whose final value is of the given type."
+  [type]
+  (gen/fmap (fn [program]
+              (let [i (last-expr-index-of-type program type)]
+                (subvec program 0 (inc i))))
+            (gen/such-that seq
+                           (program-gen #{type}))))
+
+(defn concat-programs
+  "Concatenates two programs together, rewriting the second one's variable
+  references."
+  ([] [])
+  ([program1 program2]
+   (let [n (count program1)]
+     (into program1
+           (map (partial rewrite-vars (fn reindex [[f i]] [f (+ n i)]))
+                program2)))))
+
+(defn inline-expr
+  "Takes a program and an expression in it. Returns that expression with all
+  vars inlined."
+  [program expr]
+  (rewrite-vars (fn inline [[f i]]
+                  (let [expr (nth program i)]
+                    (if (and (vector? expr) (= :var (first expr)))
+                      (recur expr)
+                      expr)))
+                expr))
+
+(defn uninline-expr
+  "Takes an expression and un-inlines nested expressions to vars, returning a
+  program."
+  [expr]
+  (if (vector? expr)
+    ; Turn each vector argument into a program
+    (let [sub-programs (->> (rest expr)
+                            (filter vector?)
+                            (mapv uninline-expr))
+          ; What will their result indices be?
+          arg-vars (->> sub-programs
+                        (map count)
+                        (reductions + 0)
+                        next)
+          ; Which means our new expression is
+          expr (loop [expr          (transient expr)
+                      i             1
+                      sub-program-i 0]
+                 (cond ; Done iterating
+                       (= i (count expr))
+                       (persistent! expr)
+
+                       ; Sub-program; rewrite to a variable
+                       (vector? (nth expr i))
+                       (let [var [:var (nth arg-vars sub-program-i)]]
+                         (recur (assoc! expr i var)
+                                (inc i)
+                                (inc sub-program-i)))
+
+                       ; Literal
+                       true
+                       (recur expr (inc i) sub-program-i)))]
+      (conj (reduce concat-programs sub-programs) expr))
+    ; Just a literal
+    [expr]))
+
+(defn set-program-gen
+  "Takes a set and returns a generator of programs which produces that
+  set as their final value."
+  ([s]
+   (->> [; Empty set
+         (when (empty? s)
+           (gen/return :set/empty))
+
+         ; Build the set directly with set/of
+         (gen/fmap (partial into [:set/of])
+                   (gen/shuffle s))]
+        (remove nil?)
+        vec
+        gen/one-of
+        (gen/fmap uninline-expr))))
+
+(defn value-program-gen
+  "Takes a Clojure structure and returns a generator of programs which produce
+  that structure as its final value."
+  [x]
+  (cond (set? x) (set-program-gen x)))
+
+(deftest set-equal-test
+  ; Confirms that programs producing equal Clojure structures are also equal
+  ; when evaluated using Bifurcan.
+  (checking "two ways of constructing the same set should be equal" iterations
+            ; Note that we intentionally *don't* generate a program which
+            ; efficiently produces a single value v--we generate a program
+            ; which happens to incidentally produce v, but probably
+            ; does lots of other stuff. We want to make sure that those other
+            ; operations don't inadvertently mess up v in some way!
+            [p1 (program-ending-in-type-gen :set)
+             :let [v (eval-last eval-expr-clj p1)]
+             p2 (value-program-gen v)]
+            ; Evaluate both programs with Bifurcan
+            (let [v1 (eval-last eval-expr-bifurcan p1)
+                  v2 (eval-last eval-expr-bifurcan p2)]
+              ; They should be equal!
+              (is (= v1 v2))
+              (when (not= v1 v2)
+                (prn)
+                (prn :v v)
+                (prn)
+                (prn :p1)
+                (print-program-bifurcan p1)
+                (prn)
+                (prn :p2)
+                (print-program-bifurcan (count p1) p2)))))
