@@ -403,13 +403,17 @@
       :set/empty "Set/EMPTY"
       (pr-str expr))))
 
+(defn print-bifurcan-preamble
+  "Prints out some Clojure expressions as a preamble to print-program-bifurcan."
+  []
+  (println "(import '(io.lacuna.bifurcan Map Set))"))
+
 (defn print-program-bifurcan
   "Prints out a program as Bifurcan expressions you can run at the REPL.
   Optionally takes a line number to begin at."
   ([program]
    (print-program-bifurcan 0 program))
   ([first-line program]
-   (println "(import '(io.lacuna.bifurcan Map Set))")
    (dorun
      (map-indexed (fn [i expr]
                     (println (str "(def x" (+ first-line i) " "
@@ -655,13 +659,29 @@
        gen/one-of
        (gen/fmap uninline-expr)))
 
+(defn list-program-gen
+  "Takes a Clojure vector or seq and returns a generator of programs which
+  produce that list as their final value."
+  [l]
+  (->> [; Empty list
+        (when (empty? l)
+          (gen/return :list/empty))
+
+        ; Build the list with list/of
+        (gen/return (into [:list/of] l))]
+       (remove nil?)
+       vec
+       gen/one-of
+       (gen/fmap uninline-expr)))
+
 (defn value-program-gen
   "Takes a Clojure structure and returns a generator of programs which produce
   that structure as its final value."
   [x]
   (cond
     (set? x) (set-program-gen x)
-    (map? x) (map-program-gen x)))
+    (map? x) (map-program-gen x)
+    (sequential? x) (list-program-gen x)))
 
 (defprotocol IsEqual
   (is-equal [a b] "Are these two Bifurcan collections equal in various ways?
@@ -669,6 +689,12 @@
                   fail."))
 
 (extend-protocol IsEqual
+  IList
+  (is-equal [a ^IList b]
+    (and (is (= a b))
+         (is (= (.size a) (.size b)))
+         (is (= (datafy a) (datafy b)))))
+
   IMap
   (is-equal [a ^IMap b]
     (and (is (= a b))
@@ -721,14 +747,16 @@
              (let [v1# (eval-last eval-expr-bifurcan p1#)
                    v2# (eval-last eval-expr-bifurcan p2#)]
                (when-not (is-equal v1# v2#)
-                 (prn)
+                 (println "\n-----------------\n")
                  (println "; Value: " (pr-str v#))
                  (prn)
                  (println "; Program 1")
+                 (print-bifurcan-preamble)
                  (print-program-bifurcan p1#)
                  (prn)
-                 (println "; Program 1")
+                 (println "; Program 2")
                  (print-program-bifurcan (count p1#) p2#))))))
 
+(def-equal-test list-equal-test :list iterations)
 (def-equal-test set-equal-test :set iterations)
 (def-equal-test map-equal-test :map iterations)
