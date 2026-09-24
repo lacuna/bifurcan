@@ -57,6 +57,54 @@ public class IntMapNodes {
       this.content = new Object[2];
     }
 
+    // invariants
+
+    private void checkInvariant() {
+      if ((datamap & nodemap) != 0) {
+        throw new IllegalStateException("datamap and nodemap overlap at offset " + offset);
+      } else if ((offset & 0x3) != 0) {
+        throw new IllegalStateException("offset " + offset + " is not nibble-aligned");
+      }
+
+      // the empty sentinels carry no storage
+      if (keys == null || content == null) {
+        if (datamap != 0 || nodemap != 0 || size != 0) {
+          throw new IllegalStateException("empty node has contents");
+        }
+        return;
+      }
+
+      long expectedSize = bitCount(datamap);
+
+      PrimitiveIterator.OfInt masks = Util.masks(datamap);
+      while (masks.hasNext()) {
+        int mask = masks.nextInt();
+        int idx = entryIndex(mask);
+        if (mask(keys[idx]) != mask) {
+          throw new IllegalStateException("entry " + idx + " is in the wrong slot at offset " + offset);
+        }
+      }
+
+      masks = Util.masks(nodemap);
+      while (masks.hasNext()) {
+        int mask = masks.nextInt();
+        Node<V> child = node(mask);
+
+        if (child.offset >= offset) {
+          throw new IllegalStateException("child offset " + child.offset + " does not descend from " + offset);
+        } else if (mask(child.prefix) != mask) {
+          throw new IllegalStateException("child is in the wrong slot at offset " + offset);
+        }
+
+        child.checkInvariant();
+        expectedSize += child.size();
+      }
+
+      if (size != expectedSize) {
+        throw new IllegalStateException("size is " + size + ", expected " + expectedSize + " at offset " + offset);
+      }
+    }
+
     // lookup
 
     public Object get(long k, Object defaultVal) {
@@ -189,11 +237,11 @@ public class IntMapNodes {
 
     public <U> Node<U> mapVals(Object editor, BiFunction<Long, V, U> f) {
       Node n = clone(editor);
-      for (int i = bitCount(n.datamap); i >= 0; i--) {
+      for (int i = bitCount(n.datamap) - 1; i >= 0; i--) {
         n.content[i] = f.apply(n.keys[i], (V) n.content[i]);
       }
 
-      for (int i = content.length - 1 - bitCount(n.nodemap); i < content.length; i++) {
+      for (int i = content.length - bitCount(n.nodemap); i < content.length; i++) {
         n.content[i] = ((Node<V>) n.content[i]).mapVals(editor, f);
       }
 

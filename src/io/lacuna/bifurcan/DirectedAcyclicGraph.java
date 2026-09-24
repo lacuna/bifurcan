@@ -19,21 +19,20 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
   }
 
   private DirectedGraph<V, E> graph;
+  // derived from the edges on demand, and null whenever stale
   private Set<V> top;
   private Set<V> bottom;
 
-  private DirectedAcyclicGraph(DirectedGraph<V, E> graph, Set<V> top, Set<V> bottom) {
+  private DirectedAcyclicGraph(DirectedGraph<V, E> graph) {
     this.graph = graph;
-    this.top = top;
-    this.bottom = bottom;
   }
 
   public DirectedAcyclicGraph() {
-    this(new DirectedGraph<>(), new Set<>(), new Set<>());
+    this(new DirectedGraph<>());
   }
 
   public DirectedAcyclicGraph(ToLongFunction<V> hashFn, BiPredicate<V, V> equalsFn) {
-    this(new DirectedGraph<>(hashFn, equalsFn), new Set<>(hashFn, equalsFn), new Set<>(hashFn, equalsFn));
+    this(new DirectedGraph<>(hashFn, equalsFn));
   }
 
   /**
@@ -45,20 +44,36 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
       throw new CycleException();
     }
 
-    Set<V> top = new Set<>(graph.vertexHash(), graph.vertexEquality()).linear();
-    Set<V> bottom = new Set<>(graph.vertexHash(), graph.vertexEquality()).linear();
-
-    graph.vertices().stream().filter(v -> graph.in(v).size() == 0).forEach(top::add);
-    graph.vertices().stream().filter(v -> graph.out(v).size() == 0).forEach(bottom::add);
-
-    return new DirectedAcyclicGraph<>(graph, top.forked(), bottom.forked());
+    return new DirectedAcyclicGraph<>(graph);
   }
 
+  private Set<V> verticesWithNoEdges(Function<V, ISet<V>> edges) {
+    Set<V> result = new Set<V>(vertexHash(), vertexEquality()).linear();
+    graph.vertices().forEach(v -> {
+      if (edges.apply(v).size() == 0) {
+        result.add(v);
+      }
+    });
+    return result.forked();
+  }
+
+  /**
+   * @return the vertices with no inbound edges
+   */
   public Set<V> top() {
+    if (top == null) {
+      top = verticesWithNoEdges(graph::in);
+    }
     return top;
   }
 
+  /**
+   * @return the vertices with no outbound edges
+   */
   public Set<V> bottom() {
+    if (bottom == null) {
+      bottom = verticesWithNoEdges(graph::out);
+    }
     return bottom;
   }
 
@@ -135,24 +150,13 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
     }
 
     DirectedGraph<V, E> graphPrime = graph.link(from, to, edge, merge);
-    Set<V> topPrime = top.remove(to);
-    Set<V> bottomPrime = bottom.remove(from);
-
-    if (newFrom) {
-      topPrime = top.add(from);
-    }
-
-    if (newTo) {
-      bottomPrime = bottom.add(to);
-    }
 
     if (isLinear()) {
       graph = graphPrime;
-      top = topPrime;
-      bottom = bottomPrime;
+      top = bottom = null;
       return this;
     } else {
-      return new DirectedAcyclicGraph<>(graphPrime, topPrime, bottomPrime);
+      return new DirectedAcyclicGraph<>(graphPrime);
     }
   }
 
@@ -160,16 +164,15 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
   public DirectedAcyclicGraph<V, E> unlink(V from, V to) {
 
     DirectedGraph<V, E> graphPrime = graph.unlink(from, to);
-    Set<V> topPrime = graph.in(to).size() == 1 ? top.add(to) : top;
-    Set<V> bottomPrime = graph.out(from).size() == 1 ? bottom.add(from) : bottom;
 
-    if (isLinear() || graph == graphPrime) {
+    if (isLinear()) {
       graph = graphPrime;
-      top = topPrime;
-      bottom = bottomPrime;
+      top = bottom = null;
+      return this;
+    } else if (graph == graphPrime) {
       return this;
     } else {
-      return new DirectedAcyclicGraph<>(graphPrime, topPrime, bottomPrime);
+      return new DirectedAcyclicGraph<>(graphPrime);
     }
   }
 
@@ -190,16 +193,13 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
     } else {
 
       DirectedGraph<V, E> graphPrime = graph.add(vertex);
-      Set<V> topPrime = top.add(vertex);
-      Set<V> bottomPrime = bottom.add(vertex);
 
       if (isLinear()) {
         graph = graphPrime;
-        top = topPrime;
-        bottom = bottomPrime;
+        top = bottom = null;
         return this;
       } else {
-        return new DirectedAcyclicGraph<>(graphPrime, topPrime, bottomPrime);
+        return new DirectedAcyclicGraph<>(graphPrime);
       }
     }
   }
@@ -207,19 +207,14 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
   @Override
   public DirectedAcyclicGraph<V, E> remove(V vertex) {
     if (graph.vertices().contains(vertex)) {
-      Set<V> topPrime =
-          top.union(graph.out(vertex).stream().filter(v -> graph.in(v).size() == 1).collect(Sets.collector()));
-      Set<V> bottomPrime =
-          bottom.union(graph.in(vertex).stream().filter(v -> graph.out(v).size() == 1).collect(Sets.collector()));
       DirectedGraph<V, E> graphPrime = graph.remove(vertex);
 
       if (isLinear()) {
         graph = graphPrime;
-        top = topPrime;
-        bottom = bottomPrime;
+        top = bottom = null;
         return this;
       } else {
-        return new DirectedAcyclicGraph<>(graphPrime, topPrime, bottomPrime);
+        return new DirectedAcyclicGraph<>(graphPrime);
       }
     } else {
       return this;
@@ -228,12 +223,12 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
 
   @Override
   public DirectedAcyclicGraph<V, E> forked() {
-    return graph.isLinear() ? new DirectedAcyclicGraph<>(graph.forked(), top.forked(), bottom.forked()) : this;
+    return graph.isLinear() ? new DirectedAcyclicGraph<>(graph.forked()) : this;
   }
 
   @Override
   public DirectedAcyclicGraph<V, E> linear() {
-    return graph.isLinear() ? this : new DirectedAcyclicGraph<>(graph.linear(), top.linear(), bottom.linear());
+    return graph.isLinear() ? this : new DirectedAcyclicGraph<>(graph.linear());
   }
 
   @Override
@@ -248,12 +243,12 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
 
   @Override
   public <U> DirectedAcyclicGraph<V, U> mapEdges(Function<IEdge<V, E>, U> f) {
-    return new DirectedAcyclicGraph<>(graph.mapEdges(f), top, bottom);
+    return new DirectedAcyclicGraph<>(graph.mapEdges(f));
   }
 
   @Override
   public DirectedAcyclicGraph<V, E> transpose() {
-    return new DirectedAcyclicGraph<>(graph.transpose(), bottom, top);
+    return new DirectedAcyclicGraph<>(graph.transpose());
   }
 
   @Override
@@ -283,7 +278,7 @@ public class DirectedAcyclicGraph<V, E> implements IGraph<V, E> {
 
   @Override
   public DirectedAcyclicGraph<V, E> clone() {
-    return new DirectedAcyclicGraph<V, E>(graph.clone(), bottom.clone(), top.clone());
+    return new DirectedAcyclicGraph<V, E>(graph.clone());
   }
 
   ///

@@ -469,7 +469,7 @@ public class LinearMap<K, V> extends IMap.Mixin<K, V> {
       if (Row.populated(row)) {
         int currKeyIndex = Row.keyIndex(row);
         K currKey = (K) m.entries[currKeyIndex];
-        if (m.tableIndex(Row.hash(row), currKey) == -1) {
+        if (tableIndex(Row.hash(row), currKey) == -1) {
           return false;
         }
       }
@@ -483,13 +483,13 @@ public class LinearMap<K, V> extends IMap.Mixin<K, V> {
       if (Row.populated(row)) {
         int currKeyIndex = Row.keyIndex(row);
         K currKey = (K) m.entries[currKeyIndex];
-        if (m.tableIndex(Row.hash(row), currKey) != -1) {
+        if (tableIndex(Row.hash(row), currKey) != -1) {
           return true;
         }
       }
     }
 
-    return true;
+    return false;
   }
 
   private void combine(LinearMap<K, ?> m, LinearMap<K, V> result, IntPredicate indexPredicate) {

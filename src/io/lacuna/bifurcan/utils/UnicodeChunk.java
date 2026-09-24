@@ -208,10 +208,11 @@ public class UnicodeChunk {
 
   public static OfInt reverseCodePointIterator(byte[] chunk) {
     return new OfInt() {
-      int idx = chunk.length;
+      int idx = chunk.length - 1;
 
       @Override
       public int nextInt() {
+        // walk back over the continuation bytes to this code point's lead byte
         while ((chunk[idx] & 0b11000000) == 0b10000000) {
           idx--;
         }
@@ -222,7 +223,7 @@ public class UnicodeChunk {
 
       @Override
       public boolean hasNext() {
-        return idx > 2;
+        return idx >= 2;
       }
     };
   }
@@ -230,7 +231,7 @@ public class UnicodeChunk {
   public static OfInt codeUnitIterator(byte[] chunk) {
     return new OfInt() {
       OfInt it = codePointIterator(chunk);
-      short low = -1;
+      int low = -1;
 
       @Override
       public int nextInt() {
@@ -239,7 +240,7 @@ public class UnicodeChunk {
           if (codePoint < 0x10000) {
             return codePoint;
           } else {
-            low = (short) Character.lowSurrogate(codePoint);
+            low = Character.lowSurrogate(codePoint);
             return Character.highSurrogate(codePoint);
           }
         } else {
@@ -258,8 +259,8 @@ public class UnicodeChunk {
 
   public static OfInt reverseCodeUnitIterator(byte[] chunk) {
     return new OfInt() {
-      OfInt it = codePointIterator(chunk);
-      short high = -1;
+      OfInt it = reverseCodePointIterator(chunk);
+      int high = -1;
 
       @Override
       public int nextInt() {
@@ -268,7 +269,7 @@ public class UnicodeChunk {
           if (codePoint < 0x10000) {
             return codePoint;
           } else {
-            high = (short) Character.highSurrogate(codePoint);
+            high = Character.highSurrogate(codePoint);
             return Character.lowSurrogate(codePoint);
           }
         } else {

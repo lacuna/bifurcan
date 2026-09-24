@@ -31,7 +31,7 @@ public class Map<K, V> extends IMap.Mixin<K, V> {
   private final BiPredicate<K, K> equalsFn;
   private final ToLongFunction<K> hashFn;
   private Node<K, V> root;
-  final Object editor;
+  Object editor;
 
   ///
 
@@ -187,7 +187,10 @@ public class Map<K, V> extends IMap.Mixin<K, V> {
   @Override
   public Map<K, V> forked() {
     if (isLinear()) {
-      return new Map<>(root, hashFn, equalsFn, false);
+      Map<K, V> result = new Map<>(root, hashFn, equalsFn, false);
+      // the result shares our nodes, so give up ownership of them
+      editor = new Object();
+      return result;
     } else {
       return this;
     }

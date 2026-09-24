@@ -299,9 +299,9 @@ public class SortedMapNodes {
           : new Node<>(c, l.mapValues(f), k, f.apply(k, v), r.mapValues(f));
     }
 
-    public int checkInvariant() {
+    private int checkInvariant() {
       if (c == DOUBLE_BLACK) {
-        throw new IllegalStateException();
+        throw new IllegalStateException("double black node");
       }
 
       if (size == 0) {
@@ -309,14 +309,18 @@ public class SortedMapNodes {
       }
 
       if (c == RED && (l.c == RED || r.c == RED)) {
-        throw new IllegalStateException();
+        throw new IllegalStateException("red node with a red child");
+      }
+
+      if (size != l.size + r.size + 1) {
+        throw new IllegalStateException("size is " + size + ", expected " + (l.size + r.size + 1));
       }
 
       int ld = l.checkInvariant();
       int rd = r.checkInvariant();
 
       if (ld != rd) {
-        throw new IllegalStateException();
+        throw new IllegalStateException("black height " + ld + " on the left, " + rd + " on the right");
       }
 
       int n = ld;
