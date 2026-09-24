@@ -441,13 +441,17 @@
       :set/empty "Set/EMPTY"
       (pr-str expr))))
 
+(defn print-bifurcan-preamble
+  "Prints out some Clojure expressions as a preamble to print-program-bifurcan."
+  []
+  (println "(import '(io.lacuna.bifurcan Map Set))"))
+
 (defn print-program-bifurcan
   "Prints out a program as Bifurcan expressions you can run at the REPL.
   Optionally takes a line number to begin at."
   ([program]
    (print-program-bifurcan 0 program))
   ([first-line program]
-   (println "(import 'io.lacuna.bifurcan.Set)")
    (dorun
      (map-indexed (fn [i expr]
                     (println (str "(def x" (+ first-line i) " "
@@ -699,10 +703,8 @@
         (gen/fmap uninline-expr))))
 
 (defn map-program-gen
-  "Takes a map and returns a generator of programs which produce that map as
-  their final value. The insertion order is shuffled, which is what makes this
-  interesting: two maps holding the same entries must be equal however they
-  were built."
+  "Takes a Clojure map and returns a generator of programs which produce that
+  map as their final value."
   [m]
   (->> [(when (empty? m)
           (gen/return :map/empty))
@@ -723,32 +725,32 @@
        (gen/fmap uninline-expr)))
 
 (defn list-program-gen
-  "Takes a vector and returns a generator of programs which produce that
-  vector as their final value. Unlike sets and maps, order is significant, so
-  we vary how the list is assembled rather than the order of its elements."
-  [xs]
-  (->> [(when (empty? xs)
+  "Takes a Clojure vector and returns a generator of programs which
+  produce that list as their final value."
+  [l]
+  (->> [; Empty list
+        (when (empty? l)
           (gen/return :list/empty))
 
-        ; Build it directly
-        (gen/return (into [:list/of] xs))
+        ; Build the list with list/of
+        (gen/return (into [:list/of] l))
 
         ; Append one element at a time
         (gen/return (reduce (fn [expr x] [:list/add-last expr x])
                             :list/empty
-                            xs))
+                            l))
 
         ; Prepend one element at a time, from the back
         (gen/return (reduce (fn [expr x] [:list/add-first expr x])
                             :list/empty
-                            (reverse xs)))
+                            (reverse l)))
 
         ; Split in two and concatenate
         (gen/fmap (fn [i]
                     [:list/concat
-                     (into [:list/of] (subvec xs 0 i))
-                     (into [:list/of] (subvec xs i))])
-                  (gen/choose 0 (count xs)))]
+                     (into [:list/of] (subvec l 0 i))
+                     (into [:list/of] (subvec l i))])
+                  (gen/choose 0 (count l)))]
        (remove nil?)
        vec
        gen/one-of
@@ -758,9 +760,55 @@
   "Takes a Clojure structure and returns a generator of programs which produce
   that structure as its final value."
   [x]
-  (cond (set? x)    (set-program-gen x)
-        (map? x)    (map-program-gen x)
-        (vector? x) (list-program-gen x)))
+  (cond
+    (set?    x) (set-program-gen x)
+    (map?    x) (map-program-gen x)
+    (vector? x) (list-program-gen x)))
+
+(defprotocol IsEqual
+  (is-equal [a b] "Are these two Bifurcan collections equal in various ways?
+                  Performs clojure.test assertions and returns false if any
+                  fail."))
+
+(extend-protocol IsEqual
+  IList
+  (is-equal [a ^IList b]
+    (and (is (= a b))
+         (is (= (.size a) (.size b)))
+         (is (= (.hashCode a) (.hashCode b)))
+         (is (= (datafy a) (datafy b)))))
+
+  IMap
+  (is-equal [a ^IMap b]
+    (and (is (= a b))
+         (is (= (.size a) (.size b)))
+         (is (= (.hashCode a) (.hashCode b)))
+         (is (= (datafy a) (datafy b)))
+         (is (= (set (datafy (.entries a)))
+                (set (datafy (.entries b)))))
+         (is (= (.keys a) (.keys b)))
+         (is (= (set (.values a)) (set (.values b))))
+         (is (.containsAll a b))
+         (is (.containsAll b a))
+         (every? (fn [k]
+                   (and (is (.contains a k))
+                        (is (.contains b k))))
+                 (set/union (datafy (.keys a))
+                            (datafy (.keys b))))))
+  ISet
+  (is-equal [a ^ISet b]
+    (and (is (= a b))
+         (is (= (.size a) (.size b)))
+         (is (= (.hashCode a) (.hashCode b)))
+         (is (= (datafy a) (datafy b)))
+         (is (= (set (datafy (.elements a)))
+                (set (datafy (.elements b)))))
+         (is (.containsAll a b))
+         (is (.containsAll b a))
+         (every? (fn [x]
+                   (and (is (.contains a x))
+                        (is (.contains b x))))
+                 (set/union (datafy a) (datafy b))))))
 
 (defn- check-equal-programs
   "Evaluates two programs which should produce equal values, and checks that
@@ -769,20 +817,16 @@
   [impl v p1 p2]
   (let [eval-expr (partial eval-expr-bifurcan-with impl)
         v1        (eval-last eval-expr p1)
-        v2        (eval-last eval-expr p2)
-        ok        (and (= v1 v2)
-                       (= v2 v1)
-                       (= (.hashCode ^Object v1) (.hashCode ^Object v2)))]
-    (is ok)
-    (when-not ok
+        v2        (eval-last eval-expr p2)]
+    (when-not (is-equal v1 v2)
+      (println "\n-----------------\n")
+      (println "; Value: " (pr-str v))
       (prn)
-      (prn :v v)
-      (prn :hashes (.hashCode ^Object v1) (.hashCode ^Object v2))
-      (prn)
-      (prn :p1)
+      (println "; Program 1")
+      (print-bifurcan-preamble)
       (print-program-bifurcan p1)
       (prn)
-      (prn :p2)
+      (println "; Program 2")
       (print-program-bifurcan (count p1) p2))))
 
 (defmacro def-equal-test
