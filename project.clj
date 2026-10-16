@@ -1,5 +1,5 @@
 ;; this is to allow the insecure `usethesource` repository
-(defproject io.lacuna/bifurcan "0.2.0-rc1"
+(defproject com.aphyr/bifurcan "0.2.0-rc2"
   :java-source-paths ["src"]
   :dependencies []
   :test-selectors {:default    #(not
@@ -59,7 +59,7 @@
   :repositories {"usethesource" "https://releases.usethesource.io/maven/"}
 
   ;; deployment
-  :url "https://github.com/lacuna/bifurcan"
+  :url "https://github.com/aphyr/bifurcan"
   :description "impure functional data structures"
   :license {:name "MIT License"}
   :javac-options ["-target" "1.8" "-source" "1.8"]
@@ -74,7 +74,12 @@
                               [:name "Zach Tellman"]
                               [:url "http://ideolalia.com"]
                               [:email "ztellman@gmail.com"]
-                              [:timezone "-8"]]]
+                              [:timezone "-8"]]
+                             [:developer
+                              [:name "Kyle Kingsbury"
+                               :url  "https://aphyr.com"
+                               :email "aphyr@aphyr.com"
+                               :timezone "-6"]]]
   :classifiers {:javadoc {:java-source-paths ^:replace []
                           :source-paths      ^:replace []
                           :resource-paths    ^:replace ["javadoc"]}

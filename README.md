@@ -2,11 +2,15 @@
 
 ```xml
 <dependency>
-  <groupId>io.lacuna</groupId>
+  <groupId>com.aphyr</groupId>
   <artifactId>bifurcan</artifactId>
-  <version>0.2.0-rc1</version>
+  <version>0.2.0-rc2</version>
 </dependency>
 ```
+
+This is aphyr's fork of Bifurcan. It closely tracks ztellman's official
+version, but there are some major bugfixes that don't have a release yet, and I
+need them for the systems I maintain.
 
 This library provides high-quality Java implementations of mutable and immutable data structures, each sharing a common API and these design principles:
 
