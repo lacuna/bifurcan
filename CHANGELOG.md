@@ -8,6 +8,12 @@
 * fixed issue where `list.toList().equals(...)` would always return true no matter the input
 * fixed issue where `IntMap.slice(min, max)` would omit any negative entries if `min` was negative and `max` was non-negative
 * fixed issue where `LinearSet.union` would update the collection in-place if given a set which was not also a `LinearSet`
+* fixed issue where `union`, `intersection`, and `difference` on `Map` and `Set` could mutate forked collections (#59)
+* fixed issue where `Set`s and `Map`s with equal contents were not always `equals` (#60)
+* fixed issue where calling `forked()` on a linear `Map`, `IntMap`, `List`, or `Rope` and then continuing to update the linear collection could mutate the forked result
+* fixed issue where `DirectedAcyclicGraph.top()` and `bottom()` could return incorrect vertices
+* fixed issue where `LinearMap.containsAll` and `containsAny` could return incorrect results when given another `LinearMap` or `LinearSet`
+* fixed issues in `Rope` handling of multi-byte code points and surrogate pairs at chunk boundaries
 
 ### Changes
 

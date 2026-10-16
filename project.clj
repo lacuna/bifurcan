@@ -1,5 +1,5 @@
 ;; this is to allow the insecure `usethesource` repository
-(defproject io.lacuna/bifurcan "0.2.0-rc1"
+(defproject io.lacuna/bifurcan "0.2.0"
   :java-source-paths ["src"]
   :dependencies []
   :test-selectors {:default    #(not
@@ -63,9 +63,9 @@
   :description "impure functional data structures"
   :license {:name "MIT License"}
   :javac-options ["-target" "1.8" "-source" "1.8"]
-  :deploy-repositories {"releases"  {:url   "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
+  :deploy-repositories {"releases"  {:url   "https://ossrh-staging-api.central.sonatype.com/service/local/staging/deploy/maven2/"
                                      :creds :gpg}
-                        "snapshots" {:url   "https://oss.sonatype.org/content/repositories/snapshots/"
+                        "snapshots" {:url   "https://central.sonatype.com/repository/maven-snapshots/"
                                      :creds :gpg}}
 
   ;; Maven properties for the Maven God

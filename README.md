@@ -4,7 +4,7 @@
 <dependency>
   <groupId>io.lacuna</groupId>
   <artifactId>bifurcan</artifactId>
-  <version>0.2.0-rc1</version>
+  <version>0.2.0</version>
 </dependency>
 ```
 
