@@ -1,5 +1,5 @@
 ;; this is to allow the insecure `usethesource` repository
-(defproject com.aphyr/bifurcan "0.2.0-rc2"
+(defproject com.aphyr/bifurcan "0.2.0-rc4"
   :java-source-paths ["src"]
   :dependencies []
   :test-selectors {:default    #(not
@@ -57,31 +57,9 @@
                        ]
 
   :repositories {"usethesource" "https://releases.usethesource.io/maven/"}
-
   ;; deployment
   :url "https://github.com/aphyr/bifurcan"
   :description "impure functional data structures"
   :license {:name "MIT License"}
-  :javac-options ["-target" "1.8" "-source" "1.8"]
-  :deploy-repositories {"releases"  {:url   "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
-                                     :creds :gpg}
-                        "snapshots" {:url   "https://oss.sonatype.org/content/repositories/snapshots/"
-                                     :creds :gpg}}
-
-  ;; Maven properties for the Maven God
-  :scm {:url "git@github.com:lacuna/bifurcan.git"}
-  :pom-addition [:developers [:developer
-                              [:name "Zach Tellman"]
-                              [:url "http://ideolalia.com"]
-                              [:email "ztellman@gmail.com"]
-                              [:timezone "-8"]]
-                             [:developer
-                              [:name "Kyle Kingsbury"
-                               :url  "https://aphyr.com"
-                               :email "aphyr@aphyr.com"
-                               :timezone "-6"]]]
-  :classifiers {:javadoc {:java-source-paths ^:replace []
-                          :source-paths      ^:replace []
-                          :resource-paths    ^:replace ["javadoc"]}
-                :sources {:source-paths   ^:replace ["src"]
-                          :resource-paths ^:replace []}})
+  :javac-options ["--release" "21"]
+  :scm {:url "git@github.com:aphyr/bifurcan.git"})
